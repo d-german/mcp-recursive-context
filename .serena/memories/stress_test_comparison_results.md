@@ -1,228 +1,207 @@
-# Stress Test Comparison: Recursive-Context MCP vs Native PowerShell/Grep
+# Stress Test Comparison: Recursive-Context MCP vs Native Approaches
 
 ## Test Overview
 
 **Date**: January 19, 2026  
 **Test Prompt**: Comprehensive text analysis of shakespeare.txt (~5.5MB, 196k lines) and bible.txt (~4.4MB, 100k lines)  
-**Model**: Claude Sonnet 4.5  
+**Models Tested**: Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5 mini, GPT-4.1  
 **Tasks**: 5 analysis tasks (cross-reference, structural patterns, character frequency, sentiment words, question density)
 
----
-
-## Performance Comparison
-
-| Metric | With Recursive-Context | Without (PowerShell/Grep) | Difference |
-|--------|------------------------|---------------------------|------------|
-| **Wall Time** | 6m 39s | 14m 51s | **2.2x faster** |
-| **API Time** | 2m 29s | 5m 22s | **2.2x faster** |
-| **Input Tokens** | 532.0k | 1.3M | **2.4x fewer** |
-| **Output Tokens** | 9.8k | 18.4k | **1.9x fewer** |
-| **Cache Read** | 475.2k | 1.2M | **2.5x fewer** |
-| **Context Usage** | 52k (36%) | 54k (38%) | ~Similar |
-| **Tool Calls** | ~40 specialized | ~25 PowerShell scripts | Different approach |
-
----
-
-## Key Findings
-
-### 🏆 Winner: Recursive-Context MCP
-
-The recursive-context approach was significantly more efficient:
-
-1. **2.2x faster execution** - Completed in under 7 minutes vs nearly 15 minutes
-2. **2.4x fewer input tokens** - 532k vs 1.3M tokens consumed
-3. **More deterministic** - Direct pattern matching vs PowerShell script debugging
-4. **Lower complexity** - Simple tool calls vs multi-step script iterations
-
-### Why Recursive-Context Was Faster
-
-| Factor | Recursive-Context | PowerShell/Grep |
-|--------|-------------------|-----------------|
-| File reading | Targeted chunks only | Full file loads into memory |
-| Pattern matching | Server-side regex engine | PowerShell regex (slower) |
-| Aggregation | Built-in grouping tools | Manual hashtable logic |
-| Iteration | Single pass per analysis | Multiple script attempts |
-| Error handling | Graceful tool responses | Script debugging cycles |
-
----
-
-## Detailed Analysis Results Comparison
-
-### 1. Cross-Reference Analysis (Top 10 Common Words)
-
-| Word | RC Tool Count (Shakes) | RC Tool Count (Bible) | PS Count (Shakes) | PS Count (Bible) |
-|------|------------------------|----------------------|-------------------|------------------|
-| the | 25,743 | 62,313 | 30,526 | 64,309 |
-| and | 20,184 | 38,913 | 23,624 | 51,696 |
-| of | 17,301 | 34,643 | 16,671 | 34,170 |
-| to | 17,424 | 13,494 | 16,161 | 13,562 |
-| I | - | - | 20,908 | 7,668 |
-| you | - | - | 13,855 | 2,531 |
-
-**Note**: Both approaches found similar top words, but with count variations due to:
-- Different regex patterns (word boundaries, case sensitivity)
-- Tokenization differences
-
-### 2. Structural Patterns (Bible Books)
-
-| Rank | RC Tool Result | PS Result |
-|------|---------------|-----------|
-| 1 | Psalms (est. 2,461) | Psalms (3,530) |
-| 2 | Genesis (est. 1,533) | John (1,504) |
-| 3 | Jeremiah (est. 1,364) | Genesis (1,241) |
-
-**Note**: PowerShell approach required multiple script iterations to correctly identify book boundaries.
-
-### 3. Character Frequency (Shakespeare)
-
-| Rank | Character | RC Tool | PowerShell |
-|------|-----------|---------|------------|
-| 1 | FALSTAFF | 472 | 472 |
-| 2 | KING | 455 | 455 |
-| 3 | DUKE | 369 | 370 |
-| 4 | HAMLET | 358 | 358 |
-| 5 | KING HENRY | 352 | 352 |
-
-**Result**: Nearly identical counts - both approaches accurate for this task.
-
-### 4. Sentiment Words
-
-| Word | RC (Shakes) | RC (Bible) | PS (Shakes) | PS (Bible) |
-|------|-------------|------------|-------------|------------|
-| love | 2,223 | 290 | 2,462 | 311 |
-| hate | 180 | 85 | 151 | 87 |
-| death | 913 | 362 | 903 | 370 |
-| king | 552 | 2,279 | 2,094 | 2,532 |
-| god | 100 | 56 | 955 | 4,472 |
-| heart | 1,114 | 813 | 1,114 | 833 |
-
-**Note**: Large discrepancies in "god" and "king" counts suggest different regex patterns:
-- RC may have used case-sensitive matching
-- PS used case-insensitive matching
-
-### 5. Question Density
-
-| File | RC Tool | PowerShell | Match? |
-|------|---------|------------|--------|
-| Shakespeare | 5.31% (10,435 lines) | 5.31% (10,435 lines) | ✅ Exact |
-| Bible | 3.04% (3,039 lines) | 3.04% (3,039 lines) | ✅ Exact |
-
-**Result**: Perfect match - both approaches accurately counted question marks.
-
----
-
-## Approach Characteristics
-
-### Recursive-Context MCP
-
-**Strengths**:
-- ✅ Purpose-built tools for text analysis
-- ✅ Server-side processing reduces token transfer
-- ✅ Consistent, predictable behavior
-- ✅ Built-in sampling and aggregation
-- ✅ No script debugging required
-
-**Weaknesses**:
-- ⚠️ Requires MCP server setup
-- ⚠️ Limited to available tool capabilities
-- ⚠️ Less flexible for custom logic
-
-### Native PowerShell/Grep
-
-**Strengths**:
-- ✅ No external dependencies
-- ✅ Full programming flexibility
-- ✅ Can implement any custom logic
-- ✅ Familiar to Windows developers
-
-**Weaknesses**:
-- ❌ Multiple script iterations needed
-- ❌ Higher token consumption
-- ❌ Slower execution
-- ❌ Error-prone (script debugging)
-- ❌ Memory-intensive (full file loads)
-
----
-
-## Token Efficiency Analysis
+### Original Prompt
 
 ```
-                    Recursive-Context    PowerShell/Grep    Savings
-                    ─────────────────    ───────────────    ───────
-Input Tokens:            532,000           1,300,000         59%
-Output Tokens:             9,800              18,400         47%
-Cache Read:              475,200           1,200,000         60%
-─────────────────────────────────────────────────────────────────
-Total Token Load:      1,017,000           2,518,400         60%
-```
+Analyze both shakespeare.txt and bible.txt to find:
 
-**Key Insight**: Recursive-context reduced total token consumption by approximately 60%.
+   Cross-reference analysis: Find the top 10 words that appear in BOTH files more than 100 times each. For each word, show the count in each file and the ratio.
+
+   Structural patterns: In bible.txt, identify which "book" has the most verses (lines starting with chapter:verse pattern). List the top 5 books by verse count.
+
+   Character frequency: In shakespeare.txt, count how many times each character name appears (lines that are just "CHARACTERNAME." like "HAMLET." or "FALSTAFF."). Show top 20 characters.
+
+   Sentiment words: Count occurrences of these 15 words in both files: love, hate, death, life, god, king, war, peace, heaven, hell, blood, heart, soul, truth, fear. Create a comparison table.
+
+   Question density: What percentage of lines contain a question mark in each file? Sample 10 questions from the middle third of each file.
+
+   Report all counts with specific line number examples.
+```
 
 ---
 
-## Time Efficiency Analysis
+## Performance Comparison (Latest: January 19, 2026)
 
-```
-                    Recursive-Context    PowerShell/Grep    Improvement
-                    ─────────────────    ───────────────    ───────────
-Wall Time:               6m 39s             14m 51s           2.2x
-API Time:                2m 29s              5m 22s           2.2x
-User Wait:               6m 39s             14m 51s           2.2x
-```
+| Metric | Sonnet 4.5 + RC MCP | No MCP (Python Script) | RC Advantage |
+|--------|---------------------|------------------------|--------------|
+| **Wall Time** | **4m 4s** | 8m 58s | **2.2x faster** |
+| **API Time** | **2m 31s** | 3m 21s | **1.3x faster** |
+| **Input Tokens** | **393.8k** | 577.0k | **1.47x fewer** |
+| **Output Tokens** | **10.6k** | 14.3k | **1.35x fewer** |
+| **Cache Read** | **362.5k** | 548.9k | **1.51x fewer** |
+| **Context Usage** | 43k (30%) | 40k (28%) | ~Similar |
+| **Custom Scripts** | **None** | 1 Python script | **Zero-script** |
 
-**Key Insight**: Users wait less than half the time with recursive-context tools.
+---
+
+## Full Model Comparison (All with RC MCP)
+
+| Metric | Sonnet 4.5 | Haiku 4.5 | GPT-4.1 | GPT-5 mini |
+|--------|------------|-----------|---------|------------|
+| **Wall Time** | **4m 4s** | 9m 9s | 6m 11s | 20m 42s |
+| **API Time** | 2m 31s | 1m 47s | **1m 18s** | 11m 56s |
+| **Input Tokens** | **393.8k** | 720.8k | 890.2k | 548.9k |
+| **Output Tokens** | 10.6k | 11.3k | **3.7k** | 41.4k |
+| **Cache Read** | **362.5k** | 686.6k | 827.9k | 424.3k |
+| **Context Usage** | 43k (30%) | 41k (32%) | 40k (62%) | 70k (55%) |
+| **Premium Cost** | 2 | 0.33 | **0 (FREE)** | **0 (FREE)** |
+| **Followed Rules** | Yes | Yes | Yes | **NO** |
+| **Complete Results** | Yes | Yes | Partial | Partial |
+
+### Model Rankings
+
+| Category | 1st | 2nd | 3rd | 4th |
+|----------|-----|-----|-----|-----|
+| **Speed (Wall)** | Sonnet (4m) | GPT-4.1 (6m) | Haiku (9m) | GPT-5 mini (21m) |
+| **Speed (API)** | GPT-4.1 (1m18s) | Haiku (1m47s) | Sonnet (2m31s) | GPT-5 mini (12m) |
+| **Token Efficiency** | Sonnet (394k) | GPT-5 mini (549k) | Haiku (721k) | GPT-4.1 (890k) |
+| **Cost** | GPT-4.1/GPT-5 mini (FREE) | Haiku (0.33x) | Sonnet (2x) | - |
+| **Constraint Following** | Sonnet/Haiku/GPT-4.1 | - | - | GPT-5 mini (FAILED) |
+| **Completeness** | Sonnet/Haiku (100%) | GPT-4.1/GPT-5 mini (Partial) | - | - |
+
+---
+
+## Free Model Analysis (GPT-4.1 vs GPT-5 mini)
+
+### GPT-4.1 (FREE - Recommended)
+
+| Aspect | Result |
+|--------|--------|
+| **Followed "no scripts" rule** | YES |
+| **Wall Time** | 6m 11s (1.5x slower than Sonnet) |
+| **API Time** | 1m 18s (fastest of all!) |
+| **Accuracy (where complete)** | 100% match with Sonnet/Haiku |
+| **Completeness** | Partial - skipped Bible book analysis, abbreviated cross-reference |
+
+**Verdict**: Good free option for simpler tasks. Follows instructions reliably.
+
+### GPT-5 mini (FREE - Not Recommended)
+
+| Aspect | Result |
+|--------|--------|
+| **Followed "no scripts" rule** | **NO - Created PowerShell script!** |
+| **Wall Time** | 20m 42s (5x slower than Sonnet) |
+| **API Time** | 11m 56s (slowest) |
+| **Output Tokens** | 41.4k (4x more than Sonnet - very verbose) |
+| **Accuracy** | Unknown - violated test constraints |
+
+**Verdict**: Failed the constraint test. Not recommended for tasks requiring instruction-following.
+
+---
+
+## Accuracy Comparison (Where Results Complete)
+
+| Metric | Sonnet 4.5 | Haiku 4.5 | GPT-4.1 | Match? |
+|--------|------------|-----------|---------|--------|
+| FALSTAFF count | 472 | 472 | 472 | 100% |
+| KING count | 455 | 455 | 455 | 100% |
+| HAMLET count | 358 | 358 | 358 | 100% |
+| love (Shakes/Bible) | 2,223/290 | 2,223/290 | 2,223/290 | 100% |
+| king (Shakes/Bible) | 552/2,279 | 552/2,279 | 552/2,279 | 100% |
+| heart (Shakes/Bible) | 1,114/813 | 1,114/813 | 1,114/813 | 100% |
+| Shakespeare questions | 5.31% | 5.31% | 5.31% | 100% |
+| Bible questions | 3.04% | 3.04% | 3.04% | 100% |
+
+**Conclusion**: RC MCP tools produce **deterministic results** - accuracy depends on tools, not model.
+
+---
+
+## Key Differentiator: Script Creation Requirement
+
+| Approach | Scripts Created | Followed Rules | Code Generated |
+|----------|-----------------|----------------|----------------|
+| **RC MCP (Sonnet)** | 0 | Yes | 0 lines |
+| **RC MCP (Haiku)** | 0 | Yes | 0 lines |
+| **RC MCP (GPT-4.1)** | 0 | Yes | 0 lines |
+| **RC MCP (GPT-5 mini)** | 1 (PowerShell) | **NO** | ~20 lines |
+| **No MCP (Python)** | 1 (analyze_corpus.py) | N/A | ~100+ lines |
 
 ---
 
 ## Recommendations
 
-### Use Recursive-Context When:
-- Analyzing large text files (>1MB)
-- Performing pattern counting and aggregation
-- Running repeatable analyses
-- Token efficiency is important
-- Time is a constraint
+### By Use Case
 
-### Use Native PowerShell/Grep When:
-- Custom logic is required beyond tool capabilities
-- One-off analyses with unique requirements
-- MCP server is not available
-- Full programmatic control is needed
+| Priority | Recommended Model | Why |
+|----------|-------------------|-----|
+| **Speed + Quality** | Sonnet 4.5 | Fastest wall time, complete results |
+| **Budget + Quality** | Haiku 4.5 | 6x cheaper, 100% accuracy match |
+| **Free + Simple Tasks** | GPT-4.1 | Free, follows rules, partial results OK |
+| **NOT Recommended** | GPT-5 mini | Violates constraints, very slow |
+
+### Decision Matrix
+
+| If you need... | Use... |
+|----------------|--------|
+| Complete, accurate results fast | Sonnet 4.5 + RC |
+| Complete results, budget-conscious | Haiku 4.5 + RC |
+| Free option, simple analysis | GPT-4.1 + RC |
+| Complex multi-part analysis | Sonnet or Haiku (avoid free models) |
+
+---
+
+## Historical Performance Comparison (All Test Runs)
+
+| Metric | RC Sonnet | RC Haiku | RC GPT-4.1 | RC GPT-5 mini | No MCP |
+|--------|-----------|----------|------------|---------------|--------|
+| **Wall Time** | 4m 4s | 9m 9s | 6m 11s | 20m 42s | 8m 58s |
+| **API Time** | 2m 31s | 1m 47s | 1m 18s | 11m 56s | 3m 21s |
+| **Input Tokens** | 393.8k | 720.8k | 890.2k | 548.9k | 577.0k |
+| **Output Tokens** | 10.6k | 11.3k | 3.7k | 41.4k | 14.3k |
+| **Custom Scripts** | None | None | None | 1 PS | 1 Python |
+| **Premium Cost** | 2 | 0.33 | 0 | 0 | 2 |
+| **Complete** | Yes | Yes | Partial | Partial | Yes |
+| **Rules Followed** | Yes | Yes | Yes | No | N/A |
+
+---
+
+## Key Findings
+
+### Winner: Recursive-Context MCP + Claude Models
+
+1. **Sonnet 4.5**: Best overall (speed + quality + completeness)
+2. **Haiku 4.5**: Best value (6x cheaper, same accuracy)
+3. **GPT-4.1**: Best free option (follows rules, partial results)
+4. **GPT-5 mini**: Not recommended (violated constraints)
+
+### Why RC MCP Matters
+
+- **Deterministic accuracy**: Same results regardless of model
+- **Zero scripts**: No code generation required
+- **Model flexibility**: Works with multiple providers
+- **Cost scaling**: Enables cheaper models to succeed
+
+### Free Model Limitations
+
+- May produce incomplete results
+- GPT-5 mini failed to follow constraints
+- GPT-4.1 abbreviated some responses
+- Best for simple, single-focus tasks
 
 ---
 
 ## Conclusion
 
-The **recursive-context MCP approach** demonstrated clear advantages for this stress test:
+| Category | Winner | Notes |
+|----------|--------|-------|
+| Speed | Sonnet 4.5 | 4m wall time |
+| Token Efficiency | Sonnet 4.5 | 394k input |
+| Cost (Paid) | Haiku 4.5 | 0.33x (6x cheaper) |
+| Cost (Free) | GPT-4.1 | 0x but partial results |
+| Accuracy | All (with RC MCP) | Deterministic |
+| Constraint Following | Sonnet/Haiku/GPT-4.1 | GPT-5 mini failed |
+| Completeness | Sonnet/Haiku | Free models partial |
 
-| Category | Winner | Margin |
-|----------|--------|--------|
-| Speed | RC Tools | 2.2x faster |
-| Token Efficiency | RC Tools | 2.4x fewer |
-| Accuracy | Tie | Both accurate |
-| Flexibility | PowerShell | More customizable |
-
-For standard text analysis tasks on large corpora, **recursive-context tools provide substantial efficiency gains** without sacrificing accuracy.
-
----
-
-## Test Reproducibility
-
-### With Recursive-Context:
-```bash
-cd C:\projects\github\mcp-recursive-context\benchmark-corpus
-# Enable recursive-context MCP server
-# Run the 5-part analysis prompt
-```
-
-### Without Recursive-Context:
-```bash
-cd C:\projects\github\mcp-recursive-context\benchmark-corpus
-copilot --allow-all-tools
-# Say: "donot use recursive-context mcp for this session"
-# Run the 5-part analysis prompt
-```
+**Bottom Line**: RC MCP tools provide substantial efficiency gains and enable model flexibility. For production use, Claude models (Sonnet/Haiku) are recommended. GPT-4.1 is a viable free option for simpler tasks.
 
 ---
 
 *Generated: January 19, 2026*
+*Last Updated: January 19, 2026 - Added GPT-5 mini and GPT-4.1 comparisons*

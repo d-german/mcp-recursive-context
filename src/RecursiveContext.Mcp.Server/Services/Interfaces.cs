@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using CSharpFunctionalExtensions; 
 using RecursiveContext.Mcp.Server.Models; 
  
@@ -169,6 +170,44 @@ public interface IAdvancedAnalysisService
     /// <param name="ct">Cancellation token.</param>
     Task<Result<CrossFileComparisonResult>> ComparePatternAcrossFilesAsync(
         string[] paths, string pattern, bool computeRatio, CancellationToken ct);
+
+    /// <summary>
+    /// Counts multiple patterns in a single file pass for efficiency.
+    /// </summary>
+    /// <param name="path">File path to search.</param>
+    /// <param name="patterns">Array of regex patterns to count.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<BatchPatternResult>> CountMultiplePatternsAsync(
+        string path, string[] patterns, CancellationToken ct);
+}
+
+
+/// <summary>
+/// Service for caching compiled regex patterns to avoid redundant compilation overhead.
+/// </summary>
+
+/// <summary>
+/// Service for streaming file content line by line without loading entire file into memory.
+/// </summary>
+public interface IFileStreamingService
+{
+    /// <summary>
+    /// Reads file lines as an async enumerable, streaming line by line.
+    /// </summary>
+    /// <param name="relativePath">Relative path to the file.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success with async enumerable of lines, or Failure if file not found/accessible.</returns>
+    Result<IAsyncEnumerable<string>> ReadLinesAsync(string relativePath, CancellationToken ct);
+}
+
+public interface ICompiledRegexCache
+{
+    /// <summary>
+    /// Gets a compiled regex from cache or compiles and caches a new one.
+    /// </summary>
+    /// <param name="pattern">The regex pattern string.</param>
+    /// <returns>Success with compiled Regex, or Failure if pattern is invalid.</returns>
+    Result<Regex> GetOrCompile(string pattern);
 }
 
 public interface IGuardrailService

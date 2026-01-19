@@ -1,5 +1,7 @@
 using RecursiveContext.Mcp.Server.Config;
 using RecursiveContext.Mcp.Server.Services;
+using RecursiveContext.Mcp.Server.Services.Caching;
+using RecursiveContext.Mcp.Server.Services.Streaming;
 
 namespace RecursiveContext.Mcp.Server.Tests.Services;
 
@@ -9,6 +11,8 @@ public class AdvancedAnalysisServiceTests : IDisposable
     private readonly AdvancedAnalysisService _service;
     private readonly PathResolver _pathResolver;
     private readonly GuardrailService _guardrailService;
+    private readonly CompiledRegexCache _regexCache;
+    private readonly FileStreamingService _streamingService;
 
     public AdvancedAnalysisServiceTests()
     {
@@ -18,7 +22,9 @@ public class AdvancedAnalysisServiceTests : IDisposable
         var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         _pathResolver = new PathResolver(settings);
         _guardrailService = new GuardrailService(settings);
-        _service = new AdvancedAnalysisService(_pathResolver, _guardrailService);
+        _regexCache = new CompiledRegexCache();
+        _streamingService = new FileStreamingService(_pathResolver);
+        _service = new AdvancedAnalysisService(_pathResolver, _guardrailService, _regexCache, _streamingService);
     }
 
     public void Dispose()
@@ -361,6 +367,55 @@ public class AdvancedAnalysisServiceTests : IDisposable
         Assert.True(result2.IsFailure);
         Assert.True(result3.IsFailure);
         Assert.True(result4.IsFailure);
+    }
+
+    #endregion
+
+    #region CountMultiplePatternsAsync Tests
+
+    [Fact]
+    public async Task CountMultiplePatternsAsync_CountsAllPatternsInSinglePass()
+    {
+        var content = "love is love\nhate is strong\nlove and peace\nwar and death";
+        var relativePath = CreateTestFile("multi.txt", content);
+
+        var result = await _service.CountMultiplePatternsAsync(
+            relativePath, new[] { "love", "hate", "peace", "war" }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(4, result.Value.TotalLines);
+        Assert.Equal(4, result.Value.PatternCounts.Length);
+        Assert.Equal(2, result.Value.PatternCounts[0].Count); // "love" appears in 2 lines
+        Assert.Equal(1, result.Value.PatternCounts[1].Count); // "hate" appears in 1 line
+        Assert.Equal(1, result.Value.PatternCounts[2].Count); // "peace" appears in 1 line
+        Assert.Equal(1, result.Value.PatternCounts[3].Count); // "war" appears in 1 line
+    }
+
+    [Fact]
+    public async Task CountMultiplePatternsAsync_InvalidPattern_ReturnsFailure()
+    {
+        var content = "test content";
+        var relativePath = CreateTestFile("invalid_batch.txt", content);
+
+        var result = await _service.CountMultiplePatternsAsync(
+            relativePath, new[] { "valid", "[invalid" }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("Invalid regex pattern", result.Error);
+    }
+
+    [Fact]
+    public async Task CountMultiplePatternsAsync_EmptyPatternArray_ReturnsEmptyCounts()
+    {
+        var content = "test content";
+        var relativePath = CreateTestFile("empty_patterns.txt", content);
+
+        var result = await _service.CountMultiplePatternsAsync(
+            relativePath, Array.Empty<string>(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.TotalLines);
+        Assert.Empty(result.Value.PatternCounts);
     }
 
     #endregion

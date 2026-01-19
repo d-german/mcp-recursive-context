@@ -368,13 +368,13 @@
       "verificationCriteria": "- Memory file updated with implementation status\n- Any design decisions documented"
     },
     {
-      "id": "b43ff8db-841a-4477-a741-cbbcc2e12dcb",
+      "id": "07be8f24-8bda-4d84-b189-5c6ce15d1d2d",
       "name": "Create ICompiledRegexCache Service",
       "description": "**WHAT**: Create a new ICompiledRegexCache interface and implementation that caches compiled Regex objects by pattern string using ConcurrentDictionary. Extract the existing CompileRegex() helper methods from AdvancedAnalysisService, ContentAnalysisService, and any other services into this shared cache service.\n\n**WHY**: Currently, the same regex patterns are recompiled on every tool call. Regex.Compiled is expensive on first use. By caching compiled regex objects, we eliminate redundant compilation overhead for frequently-used patterns (like word boundaries, character names, verse patterns in stress tests). This is a DRY refactor that consolidates duplicate CompileRegex() implementations across 3\u002B services.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Cache only handles regex compilation/retrieval\n\u25A1 Open/Closed: Interface allows future cache implementations\n\u25A1 Liskov Substitution: N/A (no inheritance)\n\u25A1 Interface Segregation: Single-purpose ICompiledRegexCache\n\u25A1 Dependency Inversion: Services depend on interface, not concrete cache\n\u25A1 Cyclomatic Complexity: GetOrCompile should be ~2\n\u25A1 Pure Functions: GetOrAdd is effectively pure\n\u25A1 Immutability: Regex objects are immutable once compiled\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Return Result\u003CRegex\u003E for invalid patterns",
       "status": "Pending",
       "dependencies": [],
-      "createdAt": "2026-01-19T08:43:20.4019716-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5136118-06:00",
+      "createdAt": "2026-01-19T08:41:45.8558076-06:00",
+      "updatedAt": "2026-01-19T08:41:45.8558076-06:00",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
@@ -406,13 +406,13 @@
       "verificationCriteria": "- ICompiledRegexCache interface defined with GetOrCompile method returning Result\u003CRegex\u003E\n- CompiledRegexCache implementation uses ConcurrentDictionary\u003Cstring, Regex\u003E\n- All services using CompileRegex now inject and use ICompiledRegexCache\n- Existing unit tests pass (no regressions)\n- New unit tests for cache hit/miss scenarios"
     },
     {
-      "id": "0dc39d36-b580-48d0-8eca-7abc42f85dac",
+      "id": "791d7d79-50c2-4cf6-9ea0-8dfbbf6bdf4e",
       "name": "Parallelize ComparePatternAcrossFilesAsync",
       "description": "**WHAT**: Refactor the ComparePatternAcrossFilesAsync method in AdvancedAnalysisService to use Parallel.ForEachAsync instead of sequential foreach loop. Use ConcurrentBag\u003CFileComparisonEntry\u003E for thread-safe result collection.\n\n**WHY**: Currently, ComparePatternAcrossFilesAsync (lines 201-239) processes files sequentially in a foreach loop. When comparing patterns across multiple large files (like shakespeare.txt and bible.txt in stress tests), this is inefficient. The AggregationService.AggregateMatchesAsync already demonstrates the correct Parallel.ForEachAsync pattern - we should apply the same pattern here for consistency and 2-4x speedup on multi-core systems.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Method still does one thing - compare patterns\n\u25A1 Open/Closed: No API change, just implementation\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: Should remain ~5\n\u25A1 Pure Functions: File reading has side effects (I/O)\n\u25A1 Immutability: Results collected in ConcurrentBag, then converted to ImmutableArray\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Maintain Result\u003CT\u003E return type",
       "status": "Pending",
       "dependencies": [],
-      "createdAt": "2026-01-19T08:43:20.4148959-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5270265-06:00",
+      "createdAt": "2026-01-19T08:41:45.8925736-06:00",
+      "updatedAt": "2026-01-19T08:41:45.8925736-06:00",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/AdvancedAnalysisService.cs",
@@ -429,13 +429,13 @@
       "verificationCriteria": "- ComparePatternAcrossFilesAsync uses Parallel.ForEachAsync\n- Uses ConcurrentBag for thread-safe collection\n- ParallelOptions with MaxDegreeOfParallelism = Environment.ProcessorCount\n- Results sorted for deterministic output (matching AggregationService pattern)\n- Existing ComparePatternAcrossFilesAsync tests pass\n- Performance improvement measurable with multi-file comparison"
     },
     {
-      "id": "a7abd4ed-aef7-40f9-acbc-af7786f6c117",
+      "id": "2f2d85b6-a1d1-4938-961c-3c0487fab9d3",
       "name": "Create IFileStreamingService for Line Streaming",
       "description": "**WHAT**: Create a new IFileStreamingService interface with a ReadLinesAsync method that returns IAsyncEnumerable\u003Cstring\u003E using File.ReadLinesAsync (.NET 8\u002B). This provides streaming file reading without loading entire file into memory.\n\n**WHY**: Currently, 14 locations use File.ReadAllLinesAsync which loads entire files into memory. For 5MB\u002B files like shakespeare.txt, this creates large string[] allocations causing GC pressure. Streaming reads lines on-demand, reducing peak memory usage and allowing early termination when a search limit is reached. This is critical for scaling to 100MB\u002B files.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Service only streams lines\n\u25A1 Open/Closed: Interface allows mock implementations for testing\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Separate from IFileSystemService (different concern)\n\u25A1 Dependency Inversion: Services depend on IFileStreamingService interface\n\u25A1 Cyclomatic Complexity: ~2 for streaming method\n\u25A1 Pure Functions: I/O is inherently side-effecting\n\u25A1 Immutability: Yields strings (immutable)\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Wrap in Result for path validation errors",
       "status": "Pending",
       "dependencies": [],
-      "createdAt": "2026-01-19T08:43:20.4246692-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5391662-06:00",
+      "createdAt": "2026-01-19T08:41:45.9118664-06:00",
+      "updatedAt": "2026-01-19T08:41:45.9118664-06:00",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
@@ -457,17 +457,13 @@
       "verificationCriteria": "- IFileStreamingService interface with ReadLinesAsync returning IAsyncEnumerable\u003Cstring\u003E\n- FileStreamingService uses File.ReadLinesAsync internally\n- Path validation using existing _pathResolver pattern\n- Unit tests verify streaming behavior\n- Memory profiling shows reduced allocations vs ReadAllLinesAsync"
     },
     {
-      "id": "caa848be-5bdc-4f0c-aef7-252a1ea4c882",
+      "id": "6d4ecd56-c93c-4a9b-9f44-f98f85a9b442",
       "name": "Refactor ContentAnalysisService to Use Streaming",
       "description": "**WHAT**: Refactor CountPatternMatchesAsync, SearchWithContextAsync, and CountLinesAsync in ContentAnalysisService to use IFileStreamingService instead of File.ReadAllLinesAsync where beneficial. For operations that need random access (like context lines), keep buffered approach.\n\n**WHY**: ContentAnalysisService has 3 File.ReadAllLinesAsync calls (lines 39, 87, 123). CountPatternMatchesAsync and CountLinesAsync can fully stream since they process line-by-line. SearchWithContextAsync needs context lines before/after, so it may need to buffer or use a sliding window. Streaming reduces memory for the counting operations.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Each method still does one analysis\n\u25A1 Open/Closed: Internal change, API unchanged\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IFileStreamingService\n\u25A1 Dependency Inversion: Injected streaming service\n\u25A1 Cyclomatic Complexity: Should remain ~5 per method\n\u25A1 Pure Functions: I/O side effects\n\u25A1 Immutability: Results are immutable records\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Maintain Result\u003CT\u003E returns",
       "status": "Pending",
-      "dependencies": [
-        {
-          "taskId": "a7abd4ed-aef7-40f9-acbc-af7786f6c117"
-        }
-      ],
-      "createdAt": "2026-01-19T08:43:20.437158-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5517215-06:00",
+      "dependencies": [],
+      "createdAt": "2026-01-19T08:41:45.9257574-06:00",
+      "updatedAt": "2026-01-19T08:41:45.9257574-06:00",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/ContentAnalysisService.cs",
@@ -484,20 +480,13 @@
       "verificationCriteria": "- CountPatternMatchesAsync uses streaming for counting\n- CountLinesAsync uses streaming enumeration\n- SearchWithContextAsync uses appropriate approach for context\n- All existing ContentAnalysisService tests pass\n- Memory profiling shows improvement for large files"
     },
     {
-      "id": "e2a5febc-385b-4277-aef0-6d146afb39b9",
+      "id": "4c9122f8-06ff-4280-8e07-ab5ea3809fa3",
       "name": "Refactor AdvancedAnalysisService to Use Streaming",
       "description": "**WHAT**: Refactor the 5 File.ReadAllLinesAsync calls in AdvancedAnalysisService (lines 39, 81, 114, 173, 225) to use IFileStreamingService where beneficial. Evaluate each method for streaming viability.\n\n**WHY**: AdvancedAnalysisService has the most file-loading operations (5 total). Some methods like AggregatePatternMatchesAsync need to group matches which benefits from full file access, while others like the inner loop of ComparePatternAcrossFilesAsync just count matches and can stream. Selective streaming where appropriate reduces memory without sacrificing functionality.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Each method maintains single purpose\n\u25A1 Open/Closed: API unchanged\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses streaming service\n\u25A1 Dependency Inversion: Injected services\n\u25A1 Cyclomatic Complexity: Target ~5\n\u25A1 Pure Functions: Some helper methods are pure\n\u25A1 Immutability: Immutable result records\n\u25A1 Static Methods: Keep existing static helpers\n\u25A1 Railway-Oriented: Maintain Result\u003CT\u003E",
       "status": "Pending",
-      "dependencies": [
-        {
-          "taskId": "a7abd4ed-aef7-40f9-acbc-af7786f6c117"
-        },
-        {
-          "taskId": "0dc39d36-b580-48d0-8eca-7abc42f85dac"
-        }
-      ],
-      "createdAt": "2026-01-19T08:43:20.4497299-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5643981-06:00",
+      "dependencies": [],
+      "createdAt": "2026-01-19T08:41:45.9473966-06:00",
+      "updatedAt": "2026-01-19T08:41:45.9473966-06:00",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/AdvancedAnalysisService.cs",
@@ -509,17 +498,13 @@
       "verificationCriteria": "- Each of 5 methods evaluated for streaming viability\n- Streaming applied where line-by-line processing is sufficient\n- Buffered approach kept where random access needed\n- All 22 AdvancedAnalysisService tests pass\n- Memory profiling shows improvement"
     },
     {
-      "id": "0b6b0359-5899-494e-9d56-d4dbe9514338",
+      "id": "731596e9-fea5-4010-8dd3-2dc36d30eabc",
       "name": "Add File Content Caching with IMemoryCache",
       "description": "**WHAT**: Create IFileContentCache interface and implementation using Microsoft.Extensions.Caching.Memory.IMemoryCache. Cache file contents by (path, lastModified) key with configurable expiration and size limits. Integrate with file reading services.\n\n**WHY**: In stress tests, the same large files (shakespeare.txt, bible.txt) are read multiple times for different analyses. Caching file content eliminates redundant I/O. IMemoryCache provides LRU eviction and memory pressure handling. Key includes lastModified to invalidate stale cache entries.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Cache only handles content caching\n\u25A1 Open/Closed: Interface allows alternative implementations\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Separate from regex cache\n\u25A1 Dependency Inversion: Services depend on interface\n\u25A1 Cyclomatic Complexity: ~3 for cache lookup with fallback\n\u25A1 Pure Functions: Cache lookup is not pure (state)\n\u25A1 Immutability: Cached content is string[] (reference type)\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Return Result\u003Cstring[]\u003E",
       "status": "Pending",
-      "dependencies": [
-        {
-          "taskId": "a7abd4ed-aef7-40f9-acbc-af7786f6c117"
-        }
-      ],
-      "createdAt": "2026-01-19T08:43:20.4620724-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5848788-06:00",
+      "dependencies": [],
+      "createdAt": "2026-01-19T08:41:45.9656337-06:00",
+      "updatedAt": "2026-01-19T08:41:45.9656337-06:00",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
@@ -544,125 +529,6 @@
       ],
       "analysisResult": "Comprehensive optimization analysis for recursive-context MCP server. Identified 9 optimization opportunities across parallelization (1 method), memory (14 file-load locations), caching (regex \u002B file content), and new tools (batch patterns). All proposals maintain backward compatibility with existing 227 tests, follow Railway-oriented programming patterns, and reuse existing architectural patterns like Parallel.ForEachAsync from AggregationService.",
       "verificationCriteria": "- IFileContentCache interface with GetOrLoadAsync method\n- FileContentCache uses IMemoryCache with configurable options\n- Cache key includes file path and last modified time\n- Size-based eviction configured\n- Unit tests for cache hit/miss/invalidation"
-    },
-    {
-      "id": "31a74d2b-8a6c-4203-86a8-087fe39aeeca",
-      "name": "Create BatchPatternCountTool for Multi-Pattern Analysis",
-      "description": "**WHAT**: Create a new MCP tool \u0027batch_pattern_count\u0027 that counts multiple regex patterns in a single file pass. Takes path and array of patterns, returns array of counts. Uses streaming and processes all patterns per line.\n\n**WHY**: In the stress test sentiment analysis, 15 separate tool calls counted 15 different words. Each call re-read the entire file. A batch tool reads the file once and applies all patterns, reducing I/O by 15x for such scenarios. This is the highest-impact new tool for the stress test workload.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool, one purpose (batch counting)\n\u25A1 Open/Closed: New tool, doesn\u0027t modify existing\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Extends IAdvancedAnalysisService\n\u25A1 Dependency Inversion: Uses injected services\n\u25A1 Cyclomatic Complexity: ~5 for main loop\n\u25A1 Pure Functions: Pattern compilation is pure\n\u25A1 Immutability: Result is immutable record\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Return Result\u003CBatchPatternResult\u003E",
-      "status": "Pending",
-      "dependencies": [
-        {
-          "taskId": "b43ff8db-841a-4477-a741-cbbcc2e12dcb"
-        },
-        {
-          "taskId": "a7abd4ed-aef7-40f9-acbc-af7786f6c117"
-        }
-      ],
-      "createdAt": "2026-01-19T08:43:20.4740911-06:00",
-      "updatedAt": "2026-01-19T08:43:20.5948172-06:00",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Models/AdvancedAnalysisModels.cs",
-          "type": "TO_MODIFY",
-          "description": "Add BatchPatternResult record"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
-          "type": "TO_MODIFY",
-          "description": "Add method to IAdvancedAnalysisService"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/AdvancedAnalysisService.cs",
-          "type": "TO_MODIFY",
-          "description": "Implement CountMultiplePatternsAsync"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/BatchPatternCountTool.cs",
-          "type": "OTHER",
-          "description": "New MCP tool"
-        }
-      ],
-      "analysisResult": "Comprehensive optimization analysis for recursive-context MCP server. Identified 9 optimization opportunities across parallelization (1 method), memory (14 file-load locations), caching (regex \u002B file content), and new tools (batch patterns). All proposals maintain backward compatibility with existing 227 tests, follow Railway-oriented programming patterns, and reuse existing architectural patterns like Parallel.ForEachAsync from AggregationService.",
-      "verificationCriteria": "- batch_pattern_count tool registered and functional\n- Accepts path and patterns[] parameters\n- Returns counts for each pattern in single file pass\n- Uses streaming to minimize memory\n- Uses regex cache for compiled patterns\n- Unit tests for batch counting scenarios\n- Stress test re-run shows reduced tool calls for sentiment analysis"
-    },
-    {
-      "id": "22195589-168b-4001-9377-bcacb5f73f17",
-      "name": "Evaluate and Apply ValueTask for Hot Paths",
-      "description": "**WHAT**: Analyze high-frequency service methods to determine if ValueTask\u003CT\u003E would reduce allocations compared to Task\u003CT\u003E. Apply ValueTask where synchronous completion is common (e.g., cached results). Document findings for methods where Task is still appropriate.\n\n**WHY**: Task\u003CT\u003E allocates on the heap even for synchronous completions. ValueTask\u003CT\u003E is a struct that avoids allocation when the result is immediately available (like cache hits). After adding regex and file caching, many calls may complete synchronously. However, ValueTask has constraints (can\u0027t await twice, can\u0027t use .Result) so careful evaluation is needed.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Each method signature evaluated\n\u25A1 Open/Closed: Interface changes require careful consideration\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Result\u003CT\u003E compatible with ValueTask",
-      "status": "Pending",
-      "dependencies": [
-        {
-          "taskId": "b43ff8db-841a-4477-a741-cbbcc2e12dcb"
-        },
-        {
-          "taskId": "0b6b0359-5899-494e-9d56-d4dbe9514338"
-        }
-      ],
-      "createdAt": "2026-01-19T08:43:20.4866657-06:00",
-      "updatedAt": "2026-01-19T08:43:20.6048681-06:00",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
-          "type": "TO_MODIFY",
-          "description": "Evaluate interface method signatures"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/ContentAnalysisService.cs",
-          "type": "TO_MODIFY",
-          "description": "Apply ValueTask if beneficial"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/AdvancedAnalysisService.cs",
-          "type": "TO_MODIFY",
-          "description": "Apply ValueTask if beneficial"
-        }
-      ],
-      "analysisResult": "Comprehensive optimization analysis for recursive-context MCP server. Identified 9 optimization opportunities across parallelization (1 method), memory (14 file-load locations), caching (regex \u002B file content), and new tools (batch patterns). All proposals maintain backward compatibility with existing 227 tests, follow Railway-oriented programming patterns, and reuse existing architectural patterns like Parallel.ForEachAsync from AggregationService.",
-      "verificationCriteria": "- Each async method evaluated for ValueTask viability\n- Documentation of which methods benefit from ValueTask\n- ValueTask applied only where synchronous completion is common\n- No breaking changes to existing tests\n- Allocation profiling shows reduction for cached scenarios"
-    },
-    {
-      "id": "25698e15-fabf-4a68-91e8-0441ce000ac2",
-      "name": "Run Stress Test and Document Performance Improvements",
-      "description": "**WHAT**: Re-run the comprehensive stress test (shakespeare.txt \u002B bible.txt analysis) after all optimizations are applied. Document before/after metrics: wall time, API time, token usage, memory allocation, tool call count.\n\n**WHY**: The optimizations were identified through stress test analysis. We need to measure actual impact to validate the improvements. This creates a new benchmark baseline and identifies any remaining optimization opportunities.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Testing task only\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: N/A",
-      "status": "Pending",
-      "dependencies": [
-        {
-          "taskId": "b43ff8db-841a-4477-a741-cbbcc2e12dcb"
-        },
-        {
-          "taskId": "0dc39d36-b580-48d0-8eca-7abc42f85dac"
-        },
-        {
-          "taskId": "caa848be-5bdc-4f0c-aef7-252a1ea4c882"
-        },
-        {
-          "taskId": "e2a5febc-385b-4277-aef0-6d146afb39b9"
-        },
-        {
-          "taskId": "31a74d2b-8a6c-4203-86a8-087fe39aeeca"
-        }
-      ],
-      "createdAt": "2026-01-19T08:43:20.4997322-06:00",
-      "updatedAt": "2026-01-19T08:43:20.6150106-06:00",
-      "relatedFiles": [
-        {
-          "path": ".serena/memories/stress_test_comparison_results.md",
-          "type": "TO_MODIFY",
-          "description": "Update with new benchmark results"
-        },
-        {
-          "path": "benchmark-corpus/shakespeare.txt",
-          "type": "REFERENCE",
-          "description": "Test file"
-        },
-        {
-          "path": "benchmark-corpus/bible.txt",
-          "type": "REFERENCE",
-          "description": "Test file"
-        }
-      ],
-      "analysisResult": "Comprehensive optimization analysis for recursive-context MCP server. Identified 9 optimization opportunities across parallelization (1 method), memory (14 file-load locations), caching (regex \u002B file content), and new tools (batch patterns). All proposals maintain backward compatibility with existing 227 tests, follow Railway-oriented programming patterns, and reuse existing architectural patterns like Parallel.ForEachAsync from AggregationService.",
-      "verificationCriteria": "- Stress test completed with all optimizations\n- Wall time reduced (target: 30%\u002B improvement)\n- Memory allocation reduced (target: 50%\u002B for large files)\n- Tool call count reduced for sentiment analysis (target: 15 calls -\u003E 1 batch call)\n- Results documented in memory file\n- No accuracy regressions in analysis results"
     }
   ]
 }

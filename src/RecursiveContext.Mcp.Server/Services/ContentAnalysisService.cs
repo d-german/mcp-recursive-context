@@ -13,11 +13,15 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
 {
     private readonly PathResolver _pathResolver;
     private readonly IGuardrailService _guardrails;
+    private readonly ICompiledRegexCache _regexCache;
+    private readonly IFileStreamingService _streamingService;
 
-    public ContentAnalysisService(PathResolver pathResolver, IGuardrailService guardrails)
+    public ContentAnalysisService(PathResolver pathResolver, IGuardrailService guardrails, ICompiledRegexCache regexCache, IFileStreamingService streamingService)
     {
         _pathResolver = pathResolver;
         _guardrails = guardrails;
+        _regexCache = regexCache;
+        _streamingService = streamingService;
     }
 
     public async Task<Result<MatchCountResult>> CountPatternMatchesAsync(
@@ -28,23 +32,34 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
         if (regexResult.IsFailure)
             return Result.Failure<MatchCountResult>(regexResult.Error);
 
-        var pathResult = _pathResolver.ResolveAndValidateExists(path);
-        if (pathResult.IsFailure)
-            return Result.Failure<MatchCountResult>(pathResult.Error);
-
         var callCheck = _guardrails.CheckAndIncrementCallCount();
         if (callCheck.IsFailure)
             return Result.Failure<MatchCountResult>(callCheck.Error);
 
-        var lines = await File.ReadAllLinesAsync(pathResult.Value, ct).ConfigureAwait(false);
         var regex = regexResult.Value;
 
-        // Count unique lines containing pattern (grep -c behavior) vs total match occurrences
+        // Use streaming for unique line counting (most efficient path)
         if (countUniqueLinesOnly)
         {
-            var lineCount = lines.Count(line => regex.IsMatch(line));
+            var streamResult = _streamingService.ReadLinesAsync(path, ct);
+            if (streamResult.IsFailure)
+                return Result.Failure<MatchCountResult>(streamResult.Error);
+
+            var lineCount = 0;
+            await foreach (var line in streamResult.Value.ConfigureAwait(false))
+            {
+                if (regex.IsMatch(line))
+                    lineCount++;
+            }
             return Result.Success(new MatchCountResult(lineCount, ImmutableArray<MatchResult>.Empty, false));
         }
+
+        // For sample collection, need to load file (requires random access for context)
+        var pathResult = _pathResolver.ResolveAndValidateExists(path);
+        if (pathResult.IsFailure)
+            return Result.Failure<MatchCountResult>(pathResult.Error);
+
+        var lines = await File.ReadAllLinesAsync(pathResult.Value, ct).ConfigureAwait(false);
 
         // Count all match occurrences (original behavior)
         var matches = lines
@@ -112,29 +127,26 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
 
     public async Task<Result<int>> CountLinesAsync(string path, CancellationToken ct)
     {
-        var pathResult = _pathResolver.ResolveAndValidateExists(path);
-        if (pathResult.IsFailure)
-            return Result.Failure<int>(pathResult.Error);
-
         var callCheck = _guardrails.CheckAndIncrementCallCount();
         if (callCheck.IsFailure)
             return Result.Failure<int>(callCheck.Error);
 
-        var lines = await File.ReadAllLinesAsync(pathResult.Value, ct).ConfigureAwait(false);
-        return Result.Success(lines.Length);
+        var streamResult = _streamingService.ReadLinesAsync(path, ct);
+        if (streamResult.IsFailure)
+            return Result.Failure<int>(streamResult.Error);
+
+        var count = 0;
+        await foreach (var _ in streamResult.Value.ConfigureAwait(false))
+        {
+            count++;
+        }
+        
+        return Result.Success(count);
     }
 
-    private static Result<Regex> CompileRegex(string pattern)
+    private Result<Regex> CompileRegex(string pattern)
     {
-        try
-        {
-            var regex = new Regex(pattern, RegexOptions.Compiled | RegexOptions.Multiline, TimeSpan.FromSeconds(5));
-            return Result.Success(regex);
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<Regex>($"Invalid regex pattern: {ex.Message}");
-        }
+        return _regexCache.GetOrCompile(pattern);
     }
 
     private static ImmutableArray<string> GetContextLines(string[] lines, int currentIndex, int count)

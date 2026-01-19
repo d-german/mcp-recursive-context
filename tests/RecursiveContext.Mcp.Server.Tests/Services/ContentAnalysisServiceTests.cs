@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using RecursiveContext.Mcp.Server.Config;
 using RecursiveContext.Mcp.Server.Services;
+using RecursiveContext.Mcp.Server.Services.Caching;
+using RecursiveContext.Mcp.Server.Services.Streaming;
 
 namespace RecursiveContext.Mcp.Server.Tests.Services;
 
@@ -10,6 +12,8 @@ public class ContentAnalysisServiceTests : IDisposable
     private readonly ContentAnalysisService _service;
     private readonly PathResolver _pathResolver;
     private readonly GuardrailService _guardrailService;
+    private readonly CompiledRegexCache _regexCache;
+    private readonly FileStreamingService _streamingService;
 
     public ContentAnalysisServiceTests()
     {
@@ -19,7 +23,9 @@ public class ContentAnalysisServiceTests : IDisposable
         var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         _pathResolver = new PathResolver(settings);
         _guardrailService = new GuardrailService(settings);
-        _service = new ContentAnalysisService(_pathResolver, _guardrailService);
+        _regexCache = new CompiledRegexCache();
+        _streamingService = new FileStreamingService(_pathResolver);
+        _service = new ContentAnalysisService(_pathResolver, _guardrailService, _regexCache, _streamingService);
     }
 
     public void Dispose()

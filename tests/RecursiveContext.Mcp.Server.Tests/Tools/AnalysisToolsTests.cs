@@ -1,6 +1,8 @@
 using System.Text.Json;
 using RecursiveContext.Mcp.Server.Config;
 using RecursiveContext.Mcp.Server.Services;
+using RecursiveContext.Mcp.Server.Services.Caching;
+using RecursiveContext.Mcp.Server.Services.Streaming;
 using RecursiveContext.Mcp.Server.Tools.Analysis;
 
 namespace RecursiveContext.Mcp.Server.Tests.Tools;
@@ -13,6 +15,8 @@ public class AnalysisToolsTests : IDisposable
     private readonly string _tempDir;
     private readonly PathResolver _pathResolver;
     private readonly GuardrailService _guardrails;
+    private readonly CompiledRegexCache _regexCache;
+    private readonly FileStreamingService _streamingService;
     private readonly ContentAnalysisService _contentAnalysisService;
     private readonly ChunkingService _chunkingService;
     private readonly AggregationService _aggregationService;
@@ -25,7 +29,9 @@ public class AnalysisToolsTests : IDisposable
         var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         _pathResolver = new PathResolver(settings);
         _guardrails = new GuardrailService(settings);
-        _contentAnalysisService = new ContentAnalysisService(_pathResolver, _guardrails);
+        _regexCache = new CompiledRegexCache();
+        _streamingService = new FileStreamingService(_pathResolver);
+        _contentAnalysisService = new ContentAnalysisService(_pathResolver, _guardrails, _regexCache, _streamingService);
         _chunkingService = new ChunkingService(_pathResolver, _guardrails);
         var patternService = new PatternMatchingService(_pathResolver, _guardrails);
         _aggregationService = new AggregationService(_pathResolver, _guardrails, patternService);

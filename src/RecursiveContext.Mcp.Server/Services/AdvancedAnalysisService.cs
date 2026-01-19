@@ -13,11 +13,15 @@ internal sealed class AdvancedAnalysisService : IAdvancedAnalysisService
 {
     private readonly PathResolver _pathResolver;
     private readonly IGuardrailService _guardrails;
+    private readonly ICompiledRegexCache _regexCache;
+    private readonly IFileStreamingService _streamingService;
 
-    public AdvancedAnalysisService(PathResolver pathResolver, IGuardrailService guardrails)
+    public AdvancedAnalysisService(PathResolver pathResolver, IGuardrailService guardrails, ICompiledRegexCache regexCache, IFileStreamingService streamingService)
     {
         _pathResolver = pathResolver;
         _guardrails = guardrails;
+        _regexCache = regexCache;
+        _streamingService = streamingService;
     }
 
     public async Task<Result<CompoundMatchResult>> CountCompoundPatternAsync(
@@ -28,23 +32,24 @@ internal sealed class AdvancedAnalysisService : IAdvancedAnalysisService
         if (regexResults.IsFailure)
             return Result.Failure<CompoundMatchResult>(regexResults.Error);
 
-        var pathResult = _pathResolver.ResolveAndValidateExists(path);
-        if (pathResult.IsFailure)
-            return Result.Failure<CompoundMatchResult>(pathResult.Error);
-
         var callCheck = _guardrails.CheckAndIncrementCallCount();
         if (callCheck.IsFailure)
             return Result.Failure<CompoundMatchResult>(callCheck.Error);
 
-        var lines = await File.ReadAllLinesAsync(pathResult.Value, ct).ConfigureAwait(false);
-        var regexList = regexResults.Value;
+        var streamResult = _streamingService.ReadLinesAsync(path, ct);
+        if (streamResult.IsFailure)
+            return Result.Failure<CompoundMatchResult>(streamResult.Error);
 
+        var regexList = regexResults.Value;
         var matchingLines = new List<(int LineNumber, string Text)>();
-        foreach (var (index, line) in lines.Index())
+        var lineNumber = 0;
+
+        await foreach (var line in streamResult.Value.ConfigureAwait(false))
         {
+            lineNumber++;
             if (LineMatchesCompound(line, regexList, matchMode))
             {
-                matchingLines.Add((index + 1, line));
+                matchingLines.Add((lineNumber, line));
             }
         }
 
@@ -211,25 +216,38 @@ internal sealed class AdvancedAnalysisService : IAdvancedAnalysisService
             return Result.Failure<CrossFileComparisonResult>(callCheck.Error);
 
         var regex = regexResult.Value;
-        var entries = new List<FileComparisonEntry>();
+        var entriesBag = new System.Collections.Concurrent.ConcurrentBag<FileComparisonEntry>();
 
-        foreach (var path in paths)
+        var parallelOptions = new ParallelOptions
         {
-            var pathResult = _pathResolver.ResolveAndValidateExists(path);
-            if (pathResult.IsFailure)
+            MaxDegreeOfParallelism = Environment.ProcessorCount,
+            CancellationToken = ct
+        };
+
+        await Parallel.ForEachAsync(paths, parallelOptions, async (path, token) =>
+        {
+            var streamResult = _streamingService.ReadLinesAsync(path, token);
+            if (streamResult.IsFailure)
             {
-                entries.Add(new FileComparisonEntry(path, -1, null));
-                continue;
+                entriesBag.Add(new FileComparisonEntry(path, -1, null));
+                return;
             }
 
-            var lines = await File.ReadAllLinesAsync(pathResult.Value, ct).ConfigureAwait(false);
-            var count = lines.Count(line => regex.IsMatch(line));
-            entries.Add(new FileComparisonEntry(path, count, null));
-        }
+            var count = 0;
+            await foreach (var line in streamResult.Value.ConfigureAwait(false))
+            {
+                if (regex.IsMatch(line))
+                    count++;
+            }
+            entriesBag.Add(new FileComparisonEntry(path, count, null));
+        }).ConfigureAwait(false);
+
+        // Sort results for deterministic output
+        var sortedEntries = entriesBag.OrderBy(e => e.Path).ToList();
 
         var entriesWithRatio = computeRatio
-            ? ComputeRatios(entries)
-            : entries.ToImmutableArray();
+            ? ComputeRatios(sortedEntries)
+            : sortedEntries.ToImmutableArray();
 
         var summary = GenerateComparisonSummary(entriesWithRatio, pattern);
 
@@ -239,24 +257,53 @@ internal sealed class AdvancedAnalysisService : IAdvancedAnalysisService
             summary));
     }
 
+
+    public async Task<Result<BatchPatternResult>> CountMultiplePatternsAsync(
+        string path, string[] patterns, CancellationToken ct)
+    {
+        var regexResults = CompileMultipleRegex(patterns);
+        if (regexResults.IsFailure)
+            return Result.Failure<BatchPatternResult>(regexResults.Error);
+
+        var callCheck = _guardrails.CheckAndIncrementCallCount();
+        if (callCheck.IsFailure)
+            return Result.Failure<BatchPatternResult>(callCheck.Error);
+
+        var streamResult = _streamingService.ReadLinesAsync(path, ct);
+        if (streamResult.IsFailure)
+            return Result.Failure<BatchPatternResult>(streamResult.Error);
+
+        var regexList = regexResults.Value;
+        var counts = new int[patterns.Length];
+        var totalLines = 0;
+
+        await foreach (var line in streamResult.Value.ConfigureAwait(false))
+        {
+            totalLines++;
+            for (var i = 0; i < regexList.Count; i++)
+            {
+                if (regexList[i].IsMatch(line))
+                    counts[i]++;
+            }
+        }
+
+        var patternCounts = patterns
+            .Select((p, i) => new PatternCount(p, counts[i]))
+            .ToImmutableArray();
+
+        return Result.Success(new BatchPatternResult(patternCounts, totalLines, path));
+    }
+
     // ============================================================================
     // Private Static Helper Methods
     // ============================================================================
 
-    private static Result<Regex> CompileRegex(string pattern)
+    private Result<Regex> CompileRegex(string pattern)
     {
-        try
-        {
-            var regex = new Regex(pattern, RegexOptions.Compiled | RegexOptions.Multiline, TimeSpan.FromSeconds(5));
-            return Result.Success(regex);
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<Regex>($"Invalid regex pattern: {ex.Message}");
-        }
+        return _regexCache.GetOrCompile(pattern);
     }
 
-    private static Result<List<Regex>> CompileMultipleRegex(string[] patterns)
+    private Result<List<Regex>> CompileMultipleRegex(string[] patterns)
     {
         var regexList = new List<Regex>();
         foreach (var pattern in patterns)

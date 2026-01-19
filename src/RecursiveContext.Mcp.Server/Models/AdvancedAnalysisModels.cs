@@ -100,3 +100,21 @@ public sealed record CrossFileComparisonResult(
     string Pattern,
     string ComparisonSummary
 );
+
+
+/// <summary>
+/// Entry containing pattern and its match count for batch pattern counting.
+/// </summary>
+public sealed record PatternCount(
+    string Pattern,
+    int Count
+);
+
+/// <summary>
+/// Result of counting multiple patterns in a single file pass.
+/// </summary>
+public sealed record BatchPatternResult(
+    ImmutableArray<PatternCount> PatternCounts,
+    int TotalLines,
+    string FilePath
+);

@@ -2,7 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol; 
 using ModelContextProtocol.Server; 
 using RecursiveContext.Mcp.Server.Config; 
-using RecursiveContext.Mcp.Server.Services; 
+using RecursiveContext.Mcp.Server.Services;
+using RecursiveContext.Mcp.Server.Services.Caching;
+using RecursiveContext.Mcp.Server.Services.Streaming; 
  
 namespace RecursiveContext.Mcp.Server.Server; 
  
@@ -22,6 +24,12 @@ internal static class ServerServices
         services.AddSingleton<IFileSystemService, FileSystemService>(); 
         services.AddSingleton<IContextMetadataService, ContextMetadataService>(); 
         services.AddSingleton<IPatternMatchingService, PatternMatchingService>();
+
+        // Caching services
+        services.AddSingleton<ICompiledRegexCache, CompiledRegexCache>();
+
+        // Streaming services
+        services.AddSingleton<IFileStreamingService, FileStreamingService>();
 
         // Analysis services
         services.AddSingleton<IAggregationService, AggregationService>();
