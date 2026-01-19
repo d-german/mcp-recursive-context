@@ -48,7 +48,8 @@ internal sealed class PatternMatchingService : IPatternMatchingService
     private static Regex GlobToRegex(string glob) 
     { 
         var pattern = "^" + Regex.Escape(glob) 
-            .Replace("\\*\\*", ".*") 
+            .Replace("\\*\\*/", "(.*/)?")   // **/ → optional path prefix (matches "foo/" or "")
+            .Replace("\\*\\*", ".*")        // ** (without trailing /) → match anything
             .Replace("\\*", "[^/\\\\]*") 
             .Replace("\\?", ".") + "$"; 
         return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled); 

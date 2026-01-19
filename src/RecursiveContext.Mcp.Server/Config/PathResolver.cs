@@ -43,6 +43,49 @@ internal sealed class PathResolver
                 return Result.Failure<string>($"Path does not exist: {relativePath}"); 
             }); 
     } 
+
+    /// <summary>
+    /// Converts an absolute or relative path to a relative path from the workspace root.
+    /// If the path equals the workspace root, returns ".".
+    /// If the path is already relative, returns it normalized.
+    /// </summary>
+    public Result<string> ToRelativePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return Result.Failure<string>("Path cannot be empty");
+
+        if (path == ".")
+            return Result.Success(".");
+
+        var normalized = path
+            .Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
+
+        // If not rooted, it's already relative
+        if (!Path.IsPathRooted(normalized))
+            return Result.Success(normalized.Replace(Path.DirectorySeparatorChar, '/'));
+
+        var fullPath = Path.GetFullPath(normalized);
+        var normalizedRoot = Path.GetFullPath(_workspaceRoot);
+
+        // Ensure consistent trailing separator handling
+        if (!normalizedRoot.EndsWith(Path.DirectorySeparatorChar))
+            normalizedRoot += Path.DirectorySeparatorChar;
+
+        // Check if path equals workspace root
+        if (string.Equals(fullPath.TrimEnd(Path.DirectorySeparatorChar), 
+                         _workspaceRoot.TrimEnd(Path.DirectorySeparatorChar), 
+                         StringComparison.OrdinalIgnoreCase))
+            return Result.Success(".");
+
+        // Check if path is within workspace
+        if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+            return Result.Failure<string>($"Path '{path}' is outside workspace");
+
+        // Extract relative portion
+        var relativePath = fullPath.Substring(normalizedRoot.Length);
+        return Result.Success(relativePath.Replace(Path.DirectorySeparatorChar, '/'));
+    }
  
     private bool IsWithinWorkspace(string fullPath) 
     { 

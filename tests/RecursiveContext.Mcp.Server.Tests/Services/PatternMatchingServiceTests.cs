@@ -65,7 +65,7 @@ public class PatternMatchingServiceTests : IDisposable
         var result = await _service.FindFilesAsync("**/*.txt", 100, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value.TotalMatches >= 2); // At least the nested ones
+        Assert.Equal(3, result.Value.TotalMatches); // All files including root.txt
     }
 
     [Fact]

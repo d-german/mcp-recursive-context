@@ -153,8 +153,8 @@ public class AggregationServiceTests : IDisposable
     [Fact]
     public async Task AggregateMatchesAsync_SingleFile_ReturnsCorrectCount()
     {
-        // Create file in subdirectory since **/*.txt pattern requires directory
-        CreateTestFile("subdir/test.txt", "class Foo { }\nclass Bar { }\nclass Baz { }");
+        // Now works with files at root level since GlobToRegex was fixed
+        CreateTestFile("test.txt", "class Foo { }\nclass Bar { }\nclass Baz { }");
 
         var result = await _service.AggregateMatchesAsync(
             ".", "*.txt", @"class\s+\w+", maxFiles: 100, CancellationToken.None);

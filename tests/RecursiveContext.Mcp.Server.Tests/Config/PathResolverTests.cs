@@ -174,4 +174,83 @@ public class PathResolverTests : IDisposable
         Assert.True(Path.IsPathRooted(resolver.WorkspaceRoot));
         Assert.Equal(Path.GetFullPath("./src"), resolver.WorkspaceRoot);
     }
+
+
+    #region ToRelativePath Tests
+
+    [Fact]
+    public void ToRelativePath_DotPath_ReturnsDot()
+    {
+        var result = _resolver.ToRelativePath(".");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(".", result.Value);
+    }
+
+    [Fact]
+    public void ToRelativePath_EmptyPath_ReturnsFailure()
+    {
+        var result = _resolver.ToRelativePath("");
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("cannot be empty", result.Error);
+    }
+
+    [Fact]
+    public void ToRelativePath_WorkspaceRootAbsolute_ReturnsDot()
+    {
+        var result = _resolver.ToRelativePath(_tempDir);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(".", result.Value);
+    }
+
+    [Fact]
+    public void ToRelativePath_WorkspaceRootWithTrailingSlash_ReturnsDot()
+    {
+        var result = _resolver.ToRelativePath(_tempDir + Path.DirectorySeparatorChar);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(".", result.Value);
+    }
+
+    [Fact]
+    public void ToRelativePath_AbsoluteSubPath_ReturnsRelative()
+    {
+        var absolutePath = Path.Combine(_tempDir, "sub", "dir");
+
+        var result = _resolver.ToRelativePath(absolutePath);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("sub/dir", result.Value);
+    }
+
+    [Fact]
+    public void ToRelativePath_AbsoluteOutsideWorkspace_ReturnsFailure()
+    {
+        var result = _resolver.ToRelativePath("C:\\Windows\\System32");
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("outside workspace", result.Error);
+    }
+
+    [Fact]
+    public void ToRelativePath_RelativePath_ReturnsNormalized()
+    {
+        var result = _resolver.ToRelativePath("sub\\dir\\file.txt");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("sub/dir/file.txt", result.Value);
+    }
+
+    [Fact]
+    public void ToRelativePath_RelativeWithForwardSlashes_ReturnsNormalized()
+    {
+        var result = _resolver.ToRelativePath("sub/dir/file.txt");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("sub/dir/file.txt", result.Value);
+    }
+
+    #endregion
 }

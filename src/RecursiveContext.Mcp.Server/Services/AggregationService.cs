@@ -44,10 +44,15 @@ internal sealed class AggregationService : IAggregationService
             return Result.Failure<AggregateResult>($"Invalid regex pattern: {ex.Message}");
         }
 
-        // Build glob pattern with directory
-        var globPattern = string.IsNullOrEmpty(directory) || directory == "."
+        // Convert directory to relative path from workspace root
+        var relativeDir = _pathResolver.ToRelativePath(directory);
+        if (relativeDir.IsFailure)
+            return Result.Failure<AggregateResult>(relativeDir.Error);
+
+        // Build glob pattern with relative directory
+        var globPattern = string.IsNullOrEmpty(relativeDir.Value) || relativeDir.Value == "."
             ? $"**/{filePattern}"
-            : $"{directory}/**/{filePattern}";
+            : $"{relativeDir.Value}/**/{filePattern}";
 
         // Find matching files
         var filesResult = await _patternService.FindFilesAsync(globPattern, maxFiles, ct)

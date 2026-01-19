@@ -63,10 +63,15 @@ sequenceDiagram
 | Run any LLM or AI model | Provide file system access via MCP |
 | Decide what files are relevant | Return exactly what was requested |
 | Remember previous tool calls | Process each call independently |
-| Perform code analysis | Return raw file contents |
+| Perform semantic code analysis | Return raw file contents and pattern matches |
+| Parse ASTs or type systems | Perform text-based pattern matching |
 | Make recommendations | Enforce guardrails (rate limits, sandboxing) |
 
 The intelligence comes from **your MCP client** (e.g., GitHub Copilot), not this server.
+
+### Text-Based Pattern Matching, Not Semantic Analysis
+
+This server provides **text-based search tools** (regex, glob patterns, line-by-line reading) as described in the [Recursive Language Models paper](https://arxiv.org/abs/2512.24601). It does not parse code into Abstract Syntax Trees (ASTs), understand type hierarchies, or perform semantic code analysis. Instead, it treats your codebase as **symbolic text** that the LLM can programmatically filter and explore—exactly as RLMs were designed to work.
 
 ---
 
@@ -273,9 +278,9 @@ Returns server metadata and guardrail status.
 
 ### 📊 Analysis Tools (RLM-Optimized)
 
-These tools are specifically designed for **Recursive Language Model** scenarios. They provide **deterministic, symbolic outputs** that an LLM can use for mathematical reasoning rather than text parsing.
+These tools are specifically designed for **Recursive Language Model** scenarios. They provide **deterministic, text-based pattern matching** that an LLM can use for symbolic reasoning and mathematical operations.
 
-> **Key Principle:** Each tool call produces the **exact same output** for the same input. No summaries, no interpretations—just precise data.
+> **Key Principle:** Each tool call produces the **exact same output** for the same input. No summaries, no interpretations—just precise counts and text matches. These are pattern-matching tools, not semantic analyzers.
 
 #### `count_pattern_matches`
 Counts regex pattern matches in a file. Returns exact count, not text to parse.
@@ -397,17 +402,17 @@ Counts pattern matches across multiple files. Perfect for codebase-wide analysis
 
 ---
 
-## Understanding Deterministic vs Navigation Tools
+## Understanding Text-Based Analysis
 
 This server provides two categories of tools:
 
 | Category | Purpose | Example Tools |
 |----------|---------|---------------|
 | **Navigation** | Explore structure, find files | `list_files`, `list_directories`, `find_files_by_pattern` |
-| **Analysis** | Get precise, countable data | `count_pattern_matches`, `count_lines`, `aggregate_matches` |
+| **Pattern Analysis** | Count regex matches, get precise data | `count_pattern_matches`, `count_lines`, `aggregate_matches` |
 
 **Navigation tools** help the LLM decide *where* to look.  
-**Analysis tools** give the LLM *exact data* to reason with.
+**Pattern analysis tools** give the LLM *exact counts and matches* from text-based searches.
 
 ### Why Determinism Matters
 
