@@ -132,5 +132,74 @@ from the workspace root. Modified `AggregateMatchesAsync` to call `ToRelativePat
 5. `tests/.../AggregationServiceTests.cs` - Updated test to use root-level file
 6. `tests/.../PathResolverTests.cs` - Added 8 new tests for `ToRelativePath`
 
+### Bug #3: File Enumeration Order Exhausts Limit on Bloat Directories
+When searching `C:\projects\github` with 248,797 files, the first 10,000 files enumerated were 
+almost entirely from `HCC-hc-core-ui` (94% - mostly node_modules), leaving no room for actual 
+source repositories like HHSS, PAX-*, HCC-onbase-*.
+
+**Fix**: Added exclusion patterns for common bloat directories in `FindMatchingFiles`:
+- node_modules
+- .git
+- \bin\
+- \obj\
+- \.vs\
+- \packages\
+- \TestResults\
+
+### Files Modified
+1. `src/RecursiveContext.Mcp.Server/Services/PatternMatchingService.cs` - Added skip patterns in `FindMatchingFiles`
+
 ### Verification
 All 249 tests pass after the fix.
+
+## Validation Testing - 2026-01-19
+
+### Before Bug #3 Fix (Per-Repository Search Strategy)
+The Claude model worked around Bug #3 by making 18 separate `aggregate_matches` calls targeting 
+specific repositories instead of one global search:
+
+| Repository | Files Searched | Matches Found |
+|------------|----------------|---------------|
+| HHSS | 948 | 116 |
+| HCC-hyland-healthcare-shared-services | 1,170 | 132 |
+| PAX-hcw-api | 356 | 42 |
+| HCC-onbase-healthcare-api | 636 | 36 |
+| PAX-astra-bff | 410 | 10 |
+| Others (0 matches) | ~15,600 | 0 |
+
+**Results:**
+- Files found: **85** (89.5% of ground truth)
+- Total matches: **336**
+- Duration: **49 seconds API / 3m 5s wall**
+- Strategy: Per-repository searches avoided global enumeration issues
+
+### Ground Truth Comparison
+| Metric | MCP Result | Ground Truth | Accuracy |
+|--------|-----------|--------------|----------|
+| Files with matches | 85 | 95 | 89.5% |
+| Total matches | 336 | 431 | 78% |
+| Files in filename | 20 | 20 | 100% |
+
+### Why Bug #3 Fix Is Still Valuable
+Even though per-repository searching worked around the issue:
+1. **Single global searches now work** - users don't need to know to split by repository
+2. **Performance** - no time wasted enumerating node_modules, .git, bin, obj
+3. **Reliability** - doesn't depend on model intelligence to work around the bug
+4. **Missing files** - 10 files (10.5%) were still missed because not all repos were searched
+
+### After Bug #3 Fix v1 (Initial skipPatterns - REGRESSION)
+Initial fix with 7 skip patterns found only **59 files** (vs 85 before), despite faster execution.
+Root cause: `.angular`, `dist`, `coverage` folders still consuming most of the 10,000 file limit.
+
+### After Bug #3 Fix v2 (Expanded skipPatterns)
+Added 5 more skip patterns:
+- `.angular` - Angular build cache (2,453+ files)
+- `dist` - Distribution/build output
+- `coverage` - Test coverage reports
+- `.idea` - JetBrains IDE cache
+- `_dist` - Alternative dist folder
+
+**Result:** 29 repos now covered in first 10,000 files (vs 6 repos before expansion).
+PAX-* repos now represented: PAX-hcw-api (1,134), PAX-astra (695), PAX-astra-bff (459).
+
+User needs to restart MCP server and re-run test to validate.

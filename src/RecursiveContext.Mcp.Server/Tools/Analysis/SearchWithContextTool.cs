@@ -15,7 +15,7 @@ internal static class SearchWithContextTool
         [Description("File path to search")] string path,
         [Description("Regex pattern to search for (.NET syntax)")] string pattern,
         [Description("Number of context lines before and after match. Default: 2")] int contextLines = 2,
-        [Description("Maximum results to return. Default: 100")] int maxResults = 100,
+        [Description("Maximum results to return. Default: 1000")] int maxResults = 1000,
         CancellationToken ct = default)
     {
         var result = await analysisService.SearchWithContextAsync(path, pattern, contextLines, maxResults, ct)

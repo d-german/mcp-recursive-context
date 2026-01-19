@@ -12,7 +12,7 @@ internal static class FindFilesByPatternTool
     public static async Task<string> FindFilesByPattern( 
         IPatternMatchingService patternService, 
         [Description("Glob pattern ^(e.g., *.cs, **/*.json, src/**/*Controller.cs^)")] string pattern, 
-        [Description("Maximum results to return. Default: 100")] int maxResults = 100, 
+        [Description("Maximum results to return. Default: 1000000")] int maxResults = 1000000, 
         CancellationToken ct = default) 
     { 
         var result = await patternService.FindFilesAsync(pattern, maxResults, ct).ConfigureAwait(false); 

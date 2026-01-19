@@ -58,14 +58,36 @@ internal sealed class PatternMatchingService : IPatternMatchingService
     private static List<string> FindMatchingFiles(string root, Regex regex, int maxResults, CancellationToken ct) 
     { 
         var results = new List<string>(); 
-        var rootLen = root.Length + 1; 
+        var rootLen = root.Length + 1;
+        
+        // Directories to skip for performance (common bloat directories)
+        // These are build outputs, caches, and dependencies that shouldn't contain source code
+        var skipPatterns = new[] 
+        { 
+            "node_modules",     // npm packages
+            ".git",             // Git repository data
+            "\\bin\\",          // .NET build output
+            "\\obj\\",          // .NET intermediate output
+            "\\.vs\\",          // Visual Studio cache
+            "\\packages\\",     // NuGet packages (old style)
+            "\\TestResults\\",  // Test output
+            "\\.angular\\",     // Angular build cache
+            "\\dist\\",         // Distribution/build output
+            "\\coverage\\",     // Test coverage reports
+            "\\.idea\\",        // JetBrains IDE cache
+            "\\_dist\\"         // Alternative dist folder
+        };
  
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)) 
         { 
             ct.ThrowIfCancellationRequested(); 
-            if (results.Count >= maxResults) break; 
+            if (results.Count >= maxResults) break;
+            
+            // Skip files in bloat directories
+            if (skipPatterns.Any(p => file.Contains(p, StringComparison.OrdinalIgnoreCase)))
+                continue;
  
-            var relativePath = file.Substring(rootLen).Replace('\\', '/'   ); 
+            var relativePath = file.Substring(rootLen).Replace('\\', '/'); 
             if (regex.IsMatch(relativePath)) 
                 results.Add(relativePath); 
         } 

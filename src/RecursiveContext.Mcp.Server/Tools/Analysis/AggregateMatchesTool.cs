@@ -15,7 +15,7 @@ internal static class AggregateMatchesTool
         [Description("Directory to search in")] string directory,
         [Description("File pattern (glob, e.g., *.cs)")] string filePattern,
         [Description("Regex pattern to search for")] string searchPattern,
-        [Description("Maximum files to search. Default: 100")] int maxFiles = 100,
+        [Description("Maximum files to search. Default: 1000000")] int maxFiles = 1000000,
         CancellationToken ct = default)
     {
         var result = await aggregationService.AggregateMatchesAsync(

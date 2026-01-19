@@ -21,7 +21,7 @@ internal sealed record RlmSettings(
         MaxToolCallsPerSession: 1000,
         TimeoutSeconds: 120,
         MaxDepth: 100,
-        MaxFilesPerAggregation: 10_000,
+        MaxFilesPerAggregation: 1_000_000,
         MaxMatchesPerSearch: 50_000,
         MaxChunkSize: 1000  // lines
     );

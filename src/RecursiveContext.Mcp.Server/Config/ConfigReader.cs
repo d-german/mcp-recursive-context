@@ -23,7 +23,7 @@ internal static class ConfigReader
             MaxToolCallsPerSession: GetIntOrDefault(MaxToolCallsKey, 1000),
             TimeoutSeconds: GetIntOrDefault(TimeoutSecondsKey, 120),
             MaxDepth: GetIntOrDefault(MaxDepthKey, 100),
-            MaxFilesPerAggregation: GetIntOrDefault(MaxFilesPerAggregationKey, 10_000),
+            MaxFilesPerAggregation: GetIntOrDefault(MaxFilesPerAggregationKey, 1_000_000),
             MaxMatchesPerSearch: GetIntOrDefault(MaxMatchesPerSearchKey, 50_000),
             MaxChunkSize: GetIntOrDefault(MaxChunkSizeKey, 1000)
         );
