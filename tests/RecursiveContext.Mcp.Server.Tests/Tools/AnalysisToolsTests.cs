@@ -55,7 +55,7 @@ public class AnalysisToolsTests : IDisposable
         var relativePath = CreateTestFile("test.cs", "class Foo { }\nclass Bar { }");
 
         var result = await CountPatternMatchesTool.CountPatternMatches(
-            _contentAnalysisService, relativePath, @"class\s+\w+", 100, CancellationToken.None);
+            _contentAnalysisService, relativePath, @"class\s+\w+", 100, true, true, CancellationToken.None);
 
         using var doc = JsonDocument.Parse(result);
         Assert.Equal(2, doc.RootElement.GetProperty("count").GetInt32());
@@ -67,7 +67,7 @@ public class AnalysisToolsTests : IDisposable
         var relativePath = CreateTestFile("test.txt", "content");
 
         var result = await CountPatternMatchesTool.CountPatternMatches(
-            _contentAnalysisService, relativePath, "[invalid", 100, CancellationToken.None);
+            _contentAnalysisService, relativePath, "[invalid", 100, true, true, CancellationToken.None);
 
         using var doc = JsonDocument.Parse(result);
         Assert.True(doc.RootElement.TryGetProperty("error", out _));
@@ -77,7 +77,7 @@ public class AnalysisToolsTests : IDisposable
     public async Task CountPatternMatches_NonexistentFile_ReturnsError()
     {
         var result = await CountPatternMatchesTool.CountPatternMatches(
-            _contentAnalysisService, "nonexistent.txt", "pattern", 100, CancellationToken.None);
+            _contentAnalysisService, "nonexistent.txt", "pattern", 100, true, true, CancellationToken.None);
 
         using var doc = JsonDocument.Parse(result);
         Assert.True(doc.RootElement.TryGetProperty("error", out _));
@@ -290,7 +290,7 @@ public class AnalysisToolsTests : IDisposable
         var relativePath = CreateTestFile("test.txt", "pattern content here");
 
         var countResult = await CountPatternMatchesTool.CountPatternMatches(
-            _contentAnalysisService, relativePath, "pattern", 100, CancellationToken.None);
+            _contentAnalysisService, relativePath, "pattern", 100, true, true, CancellationToken.None);
 
         using var countDoc = JsonDocument.Parse(countResult);
         Assert.False(countDoc.RootElement.TryGetProperty("error", out _));
@@ -300,7 +300,7 @@ public class AnalysisToolsTests : IDisposable
     public async Task AllErrorResults_HaveErrorProperty()
     {
         var countError = await CountPatternMatchesTool.CountPatternMatches(
-            _contentAnalysisService, "nonexistent.txt", "pattern", 100, CancellationToken.None);
+            _contentAnalysisService, "nonexistent.txt", "pattern", 100, true, true, CancellationToken.None);
         var lineError = await CountLinesTool.CountLines(
             _contentAnalysisService, "nonexistent.txt", CancellationToken.None);
 

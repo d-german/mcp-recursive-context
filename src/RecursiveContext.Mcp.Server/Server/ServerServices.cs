@@ -27,6 +27,7 @@ internal static class ServerServices
         services.AddSingleton<IAggregationService, AggregationService>();
         services.AddSingleton<IChunkingService, ChunkingService>();
         services.AddSingleton<IContentAnalysisService, ContentAnalysisService>();
+        services.AddSingleton<IAdvancedAnalysisService, AdvancedAnalysisService>();
 
         services.AddSingleton(metadata); 
  

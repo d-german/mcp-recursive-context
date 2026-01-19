@@ -65,7 +65,7 @@ public class DeterminismTests : IDisposable
         for (int i = 0; i < RepeatCount; i++)
         {
             var result = await CountPatternMatchesTool.CountPatternMatches(
-                _contentAnalysisService, relativePath, @"class\s+\w+", 100, CancellationToken.None);
+                _contentAnalysisService, relativePath, @"class\s+\w+", 100, true, true, CancellationToken.None);
             results.Add(result);
         }
 
@@ -89,7 +89,7 @@ public class DeterminismTests : IDisposable
         for (int i = 0; i < RepeatCount; i++)
         {
             var result = await CountPatternMatchesTool.CountPatternMatches(
-                _contentAnalysisService, relativePath, @"int\s+\w+\s*=\s*\d+", 100, CancellationToken.None);
+                _contentAnalysisService, relativePath, @"int\s+\w+\s*=\s*\d+", 100, true, true, CancellationToken.None);
             results.Add(result);
         }
 

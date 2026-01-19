@@ -21,7 +21,8 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
     }
 
     public async Task<Result<MatchCountResult>> CountPatternMatchesAsync(
-        string path, string pattern, int maxResults, CancellationToken ct)
+        string path, string pattern, int maxResults,
+        bool countUniqueLinesOnly, bool includeSamples, CancellationToken ct)
     {
         var regexResult = CompileRegex(pattern);
         if (regexResult.IsFailure)
@@ -38,6 +39,14 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
         var lines = await File.ReadAllLinesAsync(pathResult.Value, ct).ConfigureAwait(false);
         var regex = regexResult.Value;
 
+        // Count unique lines containing pattern (grep -c behavior) vs total match occurrences
+        if (countUniqueLinesOnly)
+        {
+            var lineCount = lines.Count(line => regex.IsMatch(line));
+            return Result.Success(new MatchCountResult(lineCount, ImmutableArray<MatchResult>.Empty, false));
+        }
+
+        // Count all match occurrences (original behavior)
         var matches = lines
             .Index()
             .SelectMany(item => regex.Matches(item.Item2)
@@ -53,7 +62,9 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
         var truncated = matchCheck.IsFailure;
         var effectiveMax = Math.Min(maxResults, _guardrails.MaxMatchesPerSearch);
 
-        var samples = matches.Take(effectiveMax).ToImmutableArray();
+        var samples = includeSamples
+            ? matches.Take(effectiveMax).ToImmutableArray()
+            : ImmutableArray<MatchResult>.Empty;
 
         return Result.Success(new MatchCountResult(matches.Count, samples, truncated));
     }
@@ -117,7 +128,7 @@ internal sealed class ContentAnalysisService : IContentAnalysisService
     {
         try
         {
-            var regex = new Regex(pattern, RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+            var regex = new Regex(pattern, RegexOptions.Compiled | RegexOptions.Multiline, TimeSpan.FromSeconds(5));
             return Result.Success(regex);
         }
         catch (ArgumentException ex)

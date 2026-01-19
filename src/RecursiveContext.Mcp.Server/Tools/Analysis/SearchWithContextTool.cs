@@ -9,11 +9,11 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class SearchWithContextTool
 {
     [McpServerTool(Name = "search_with_context")]
-    [Description("Search for regex pattern matches with surrounding context lines. Returns line numbers and context.")]
+    [Description("Search for regex pattern matches with surrounding context lines. Uses .NET regex: '.' is wildcard (use '\\\\.' for literal period), '^'/'$' match line boundaries.")]
     public static async Task<string> SearchWithContext(
         IContentAnalysisService analysisService,
         [Description("File path to search")] string path,
-        [Description("Regex pattern to search for")] string pattern,
+        [Description("Regex pattern to search for (.NET syntax)")] string pattern,
         [Description("Number of context lines before and after match. Default: 2")] int contextLines = 2,
         [Description("Maximum results to return. Default: 100")] int maxResults = 100,
         CancellationToken ct = default)

@@ -1,960 +1,83 @@
 {
   "tasks": [
     {
-      "id": "dc4fcdca-1c84-4695-96be-fecb6236e048",
-      "name": "1.0 Project Infrastructure Setup",
-      "description": "**WHAT**: Create the Visual Studio solution structure, project files, and configure build properties for the RecursiveContext.Mcp server.\n\n**WHY**: Establishes the foundation for all subsequent development. A well-structured solution ensures consistent builds, proper dependency management, and follows the established mcp-task-and-research architecture patterns. This is the first task because all other tasks depend on having a compilable project structure.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Solution structure separates concerns (src, tests)\n\u25A1 Open/Closed: Project structure allows adding new tools without modifying existing ones\n\u25A1 Dependency Inversion: Project references flow from tools to abstractions\n\u25A1 Immutability: Directory.Build.props enforces nullable and latest C# features",
+      "id": "40dc5d60-03cc-4dd4-b8ae-227ea0547a03",
+      "name": "Create AdvancedAnalysisModels.cs with immutable records",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Models/AdvancedAnalysisModels.cs\u0060 containing all the immutable record types needed for the 5 new analysis tools:\n\n1. \u0060CompoundMatchResult\u0060 - Result for compound pattern matching with count, matched lines, and samples\n2. \u0060ConsecutiveRun\u0060 - Represents a run of consecutive matching lines (startLine, length, sampleLines)\n3. \u0060ConsecutiveRunResult\u0060 - Result containing longest run and all runs list\n4. \u0060AggregateGroup\u0060 - Group with key, count, and optional sample match\n5. \u0060PatternAggregateResult\u0060 - Result with groups list, total count, pattern used\n6. \u0060DistributedSample\u0060 - Sample with line number, position percentage, and match text\n7. \u0060DistributedSampleResult\u0060 - Result with samples list and distribution info\n8. \u0060FileComparisonEntry\u0060 - Entry for a single file with path, count, and optional ratio\n9. \u0060CrossFileComparisonResult\u0060 - Result with file entries and comparison summary\n\n**WHY**: Following the project\u0027s immutable record pattern (see Models.cs), these DTOs provide type-safe, immutable return types for all 5 tools. Centralizing models in a dedicated file maintains separation of concerns and makes it easy to share types across the service and tool layers.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
       "dependencies": [],
-      "createdAt": "2026-01-18T13:02:56.8296584-06:00",
-      "updatedAt": "2026-01-18T13:21:09.6833289-06:00",
-      "completedAt": "2026-01-18T13:21:09.6833289-06:00",
-      "summary": "Created project infrastructure: RecursiveContext.Mcp.sln, Directory.Build.props with net9.0/nullable/latest lang/implicit usings, src/RecursiveContext.Mcp.Server project with NuGet packages (ModelContextProtocol 0.5.0-preview.1, CSharpFunctionalExtensions 3.4.0, Microsoft.Extensions.Hosting 10.0.1). Build succeeds with 0 warnings/errors. Folder structure includes Config/, Server/, Services/, Tools/, Models/.",
-      "relatedFiles": [
-        {
-          "path": "RecursiveContext.Mcp.sln",
-          "type": "OTHER",
-          "description": "Visual Studio solution file"
-        },
-        {
-          "path": "Directory.Build.props",
-          "type": "OTHER",
-          "description": "Shared MSBuild properties"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/RecursiveContext.Mcp.Server.csproj",
-          "type": "OTHER",
-          "description": "Main server project"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "implementationGuide": "1. Create solution file at repo root\n2. Create Directory.Build.props with shared settings\n3. Create src/RecursiveContext.Mcp.Server project\n4. Add NuGet references: ModelContextProtocol v0.5.0-preview.1, CSharpFunctionalExtensions v3.4.0, Microsoft.Extensions.Hosting v10.0.1\n5. Create folder structure: Config/, Server/, Services/, Tools/",
-      "verificationCriteria": "- Solution builds successfully with dotnet build\n- Project targets .NET 9.0\n- Nullable reference types enabled\n- Latest C# language version enabled\n- ImplicitUsings enabled\n- All required NuGet packages referenced (ModelContextProtocol, CSharpFunctionalExtensions, Microsoft.Extensions.Hosting)"
-    },
-    {
-      "id": "ca030437-5fa6-408e-bfb8-8767b6b205c7",
-      "name": "1.1 Create Program.cs Entry Point",
-      "description": "**WHAT**: Create the Program.cs entry point that bootstraps the MCP server using the hosting pattern from mcp-task-and-research.\n\n**WHY**: The entry point initializes the application host, configures dependency injection, and starts the MCP stdio transport. Following the established ServerHost pattern ensures consistency with existing MCP implementations and proper lifetime management.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Program.cs only bootstraps - no business logic\n\u25A1 Dependency Inversion: Uses IHostBuilder for DI configuration\n\u25A1 Static Methods: Entry point is static\n\u25A1 No hidden state: All configuration explicit",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "dc4fcdca-1c84-4695-96be-fecb6236e048"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8470222-06:00",
-      "updatedAt": "2026-01-18T13:22:15.0691409-06:00",
-      "completedAt": "2026-01-18T13:22:15.0691409-06:00",
-      "summary": "Created Program.cs entry point with: version display (--version/-v), help display (--help/-h/-?), ServerHost.RunAsync delegation. Also created stub ServerHost.cs, ServerServices.cs, LoggingConfiguration.cs to enable compilation. Build succeeds with 0 warnings/errors. Program.cs contains no business logic - only bootstrapping.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Program.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Program.cs",
-          "type": "REFERENCE",
-          "description": "Template pattern to follow"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Application starts without errors\n- Logs startup message\n- Gracefully handles Ctrl\u002BC shutdown\n- No business logic in Program.cs"
-    },
-    {
-      "id": "a7620601-e913-47a3-8ce8-974c5a4e2a1e",
-      "name": "1.2 Implement ServerHost and ServerServices",
-      "description": "**WHAT**: Create ServerHost.cs for hosting configuration and ServerServices.cs for dependency injection registration, following the mcp-task-and-research patterns.\n\n**WHY**: Centralizes DI configuration and server hosting logic. ServerHost configures the MCP server with stdio transport. ServerServices registers all tools and services. This separation ensures testability and clear responsibility boundaries.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: ServerHost handles hosting, ServerServices handles DI\n\u25A1 Open/Closed: New services added by registration, not modification\n\u25A1 Interface Segregation: Services registered by interface, not implementation\n\u25A1 Dependency Inversion: All dependencies registered as interfaces\n\u25A1 Static Methods: Configure methods are static",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "ca030437-5fa6-408e-bfb8-8767b6b205c7"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8512518-06:00",
-      "updatedAt": "2026-01-18T13:22:51.2683558-06:00",
-      "completedAt": "2026-01-18T13:22:51.2683558-06:00",
-      "summary": "Created ServerHost.cs (static RunAsync using Host.CreateEmptyApplicationBuilder with logging and services configuration), ServerServices.cs (MCP server configuration with AddMcpServer, WithStdioServerTransport, WithToolsFromAssembly), ServerMetadata.cs (server name/version info), and LoggingConfiguration.cs (stderr logging for MCP compliance). All methods are static. Build succeeds. Ready for service registrations in later tasks.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Server/ServerHost.cs",
-          "type": "TO_MODIFY"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Server/ServerServices.cs",
-          "type": "TO_MODIFY"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Server/ServerHost.cs",
-          "type": "REFERENCE"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Server/ServerServices.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- MCP server starts with stdio transport\n- All services registered in DI container\n- WithToolsFromAssembly() discovers tool classes\n- Logging configured to stderr (not stdout - reserved for MCP)"
-    },
-    {
-      "id": "63fb437c-1096-4140-987a-aa754f0adc04",
-      "name": "1.3 Create LoggingConfiguration and ServerMetadata",
-      "description": "**WHAT**: Create LoggingConfiguration.cs for logging setup and ServerMetadata.cs for version/name information.\n\n**WHY**: Proper logging is essential for debugging MCP servers (must go to stderr, not stdout). ServerMetadata provides version info for MCP capability negotiation. Both are infrastructure concerns that should be isolated.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Each class has one purpose\n\u25A1 Static Methods: Configuration methods are static\n\u25A1 Immutability: ServerMetadata is a static class with const values\n\u25A1 No side effects: Pure configuration",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "a7620601-e913-47a3-8ce8-974c5a4e2a1e"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8555256-06:00",
-      "updatedAt": "2026-01-18T13:23:23.7482564-06:00",
-      "completedAt": "2026-01-18T13:23:23.7482564-06:00",
-      "summary": "Enhanced LoggingConfiguration.cs with RLM_LOG_LEVEL environment variable support, stderr-only logging via LogToStandardErrorThreshold=Trace. Converted ServerMetadata to immutable record pattern with assembly version extraction. Both classes are static/sealed with single responsibilities. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Server/LoggingConfiguration.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Server/ServerMetadata.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Server/LoggingConfiguration.cs",
-          "type": "REFERENCE"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Server/ServerMetadata.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Logs written to stderr only\n- Log level configurable via environment variable\n- ServerMetadata exposes Name, Version constants\n- No stdout pollution (breaks MCP protocol)"
-    },
-    {
-      "id": "ff725891-52a1-4434-8e26-d62da0607287",
-      "name": "2.0 Create Configuration System",
-      "description": "**WHAT**: Create ConfigReader.cs and RlmSettings.cs for reading environment variables and defining server configuration options.\n\n**WHY**: Configuration externalizes guardrail limits (max bytes, max calls, timeouts) and workspace root detection. Using records for settings ensures immutability. Environment variables allow runtime configuration without recompilation.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: ConfigReader reads, RlmSettings holds values\n\u25A1 Immutability: RlmSettings is a record type\n\u25A1 Pure Functions: ConfigReader methods are static and pure\n\u25A1 No hidden state: All configuration explicit via environment variables",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "63fb437c-1096-4140-987a-aa754f0adc04"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8633795-06:00",
-      "updatedAt": "2026-01-18T13:24:00.0795098-06:00",
-      "completedAt": "2026-01-18T13:24:00.0795098-06:00",
-      "summary": "Created RlmSettings (immutable record with WorkspaceRoot, MaxBytesPerRead, MaxToolCallsPerSession, TimeoutSeconds, MaxDepth) and ConfigReader (static pure functions reading from environment: RLM_WORKSPACE_ROOT, RLM_MAX_BYTES_PER_READ, RLM_MAX_TOOL_CALLS, RLM_TIMEOUT_SECONDS, RLM_MAX_DEPTH). Sensible defaults: 1MB, 1000 calls, 30s timeout, 20 depth. No exceptions on missing env vars. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Config/ConfigReader.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Config/RlmSettings.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Config/ConfigReader.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Environment variables read: RLM_MAX_BYTES_PER_READ, RLM_MAX_TOOL_CALLS, RLM_TIMEOUT_SECONDS, RLM_WORKSPACE_ROOT\n- Sensible defaults: MaxBytesPerRead=1MB, MaxToolCalls=1000, TimeoutSeconds=30\n- RlmSettings is immutable record\n- No exceptions on missing env vars (use defaults)"
-    },
-    {
-      "id": "ba5f1b84-4004-4225-a44e-8d119058f5f3",
-      "name": "2.1 Create PathResolver Service",
-      "description": "**WHAT**: Create PathResolver.cs for workspace root detection and path validation/normalization.\n\n**WHY**: All file operations must be sandboxed to the workspace root. PathResolver ensures paths are normalized, validated, and within allowed boundaries. This prevents directory traversal attacks and ensures deterministic behavior.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only handles path resolution and validation\n\u25A1 Pure Functions: Path operations are static and side-effect free\n\u25A1 Railway-Oriented: Returns Result\u003Cstring\u003E for validation failures\n\u25A1 Immutability: No mutable state\n\u25A1 Security: Prevents directory traversal (../, etc.)",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "ff725891-52a1-4434-8e26-d62da0607287"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.875459-06:00",
-      "updatedAt": "2026-01-18T13:24:37.4683645-06:00",
-      "completedAt": "2026-01-18T13:24:37.4683645-06:00",
-      "summary": "Created PathResolver.cs with: ResolvePath (returns Result\u003Cstring\u003E for validation), ResolveAndValidateExists (checks file/directory exists), IsWithinWorkspace (prevents directory traversal attacks), NormalizePath (cross-platform separator handling). Uses RlmSettings for workspace root. Railway-oriented with Result\u003CT\u003E. Single responsibility. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Config/PathResolver.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/Mcp.TaskAndResearch/Config/PathResolver.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Resolves relative paths from workspace root\n- Rejects paths outside workspace (../ attacks)\n- Normalizes path separators for cross-platform\n- Returns Result.Failure for invalid paths\n- Handles both absolute and relative inputs"
-    },
-    {
-      "id": "c4e3af84-9c05-455a-ba7b-29d3ccff01ee",
-      "name": "3.0 Create Core Domain Models",
-      "description": "**WHAT**: Create record types for all tool inputs/outputs: FileInfo, DirectoryInfo, FileChunk, ContextInfo, ToolCallResult, ErrorInfo.\n\n**WHY**: Domain models define the contract between tools and services. Using records ensures immutability and value semantics. ImmutableArray\u003CT\u003E for collections prevents mutation. Clear models enable type-safe tool implementations.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Immutability: All models are records with init-only properties\n\u25A1 Pure Data: No behavior in models (DTOs only)\n\u25A1 Railway-Oriented: Result\u003CT\u003E wraps all service responses\n\u25A1 Collections: Use ImmutableArray\u003CT\u003E not List\u003CT\u003E",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "ba5f1b84-4004-4225-a44e-8d119058f5f3"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8788766-06:00",
-      "updatedAt": "2026-01-18T13:25:06.9742189-06:00",
-      "completedAt": "2026-01-18T13:25:06.9742189-06:00",
-      "summary": "Created Models.cs with immutable records: FileInfoModel (name, path, size, date, readonly), DirectoryInfoModel (name, path, counts), FileChunk (content with line range), ContextInfo (workspace metadata with ImmutableDictionary), FileListResult (paginated files with ImmutableArray), DirectoryListResult, PatternMatchResult. All use ImmutableArray/ImmutableDictionary for collections. Pure data, no behavior. XML documented. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Models/FileInfoModel.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Models/DirectoryInfoModel.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Models/FileChunk.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Models/ContextInfo.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Models/ToolErrors.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- All models are record types\n- Collections use ImmutableArray\u003CT\u003E\n- No mutable properties\n- Models are JSON-serializable\n- Clear XML documentation on each model"
-    },
-    {
-      "id": "12b8bd51-e2d5-4231-9885-a777a5fa87df",
-      "name": "3.1 Create Service Interfaces",
-      "description": "**WHAT**: Define interfaces for all services: IFileSystemService, IContextMetadataService, IPatternMatchingService, IGuardrailService.\n\n**WHY**: Interfaces enable dependency inversion, testability, and clear contracts. Tools depend on interfaces, not implementations. This allows swapping implementations (e.g., for testing) without changing tool code.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Interface Segregation: Small, focused interfaces\n\u25A1 Dependency Inversion: Tools depend on these interfaces\n\u25A1 Async-First: All methods return Task\u003CResult\u003CT\u003E\u003E\n\u25A1 CancellationToken: All methods accept CancellationToken",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "c4e3af84-9c05-455a-ba7b-29d3ccff01ee"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8812633-06:00",
-      "updatedAt": "2026-01-18T13:25:34.1320952-06:00",
-      "completedAt": "2026-01-18T13:25:34.1320952-06:00",
-      "summary": "Created Interfaces.cs with 4 interfaces: IFileSystemService (ListFilesAsync, ListDirectoriesAsync, ReadFileAsync, ReadFileChunkAsync), IContextMetadataService (GetContextInfoAsync), IPatternMatchingService (FindFilesAsync), IGuardrailService (CheckAndIncrementCallCount, CheckBytesLimit, properties). All async methods have CancellationToken, return Task\u003CResult\u003CT\u003E\u003E. Single responsibility per interface. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IFileSystemService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IContextMetadataService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IPatternMatchingService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IGuardrailService.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- All methods async with CancellationToken\n- Return types are Task\u003CResult\u003CT\u003E\u003E\n- No implementation details leaked\n- Clear method documentation\n- Single responsibility per interface"
-    },
-    {
-      "id": "b46a09a7-c607-4722-bc9d-be319e534b0d",
-      "name": "4.0 Implement GuardrailService",
-      "description": "**WHAT**: Implement IGuardrailService for enforcing rate limits, size limits, and timeouts. Track tool calls per session and enforce MaxToolCallsPerSession, MaxBytesPerRead.\n\n**WHY**: Guardrails prevent runaway sessions and resource exhaustion. This is critical for a server exposed to potentially unbounded LLM tool calls. The guardrail service is the central enforcement point - all tools check limits before executing.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only enforces limits, doesn\u0027t perform operations\n\u25A1 Thread-Safe: Uses Interlocked for counter updates\n\u25A1 Railway-Oriented: Returns Result.Failure when limits exceeded\n\u25A1 Stateful: Tracks call count per session (acceptable exception to statelessness)\n\u25A1 Cyclomatic Complexity: Keep methods under 5",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "12b8bd51-e2d5-4231-9885-a777a5fa87df"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8846698-06:00",
-      "updatedAt": "2026-01-18T13:26:01.0082485-06:00",
-      "completedAt": "2026-01-18T13:26:01.0082485-06:00",
-      "summary": "Implemented GuardrailService: CheckAndIncrementCallCount (thread-safe Interlocked.Increment, returns Result.Failure when exceeded), CheckBytesLimit (validates file size), Reset (for new sessions), RemainingCalls property. Uses RlmSettings for configuration. Single responsibility - only enforces limits. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/GuardrailService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IGuardrailService.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Tracks tool call count per session\n- Returns failure when MaxToolCallsPerSession exceeded\n- Returns failure when requested bytes \u003E MaxBytesPerRead\n- Creates CancellationTokenSource with timeout\n- Thread-safe counter increment\n- Resettable for new sessions"
-    },
-    {
-      "id": "198b4315-7536-4e7f-afff-03bd6d20fc8c",
-      "name": "4.1 Implement FileSystemService",
-      "description": "**WHAT**: Implement IFileSystemService for listing files/directories and reading file content. All operations are read-only and respect guardrails.\n\n**WHY**: This is the core service enabling context access. The client LLM uses these operations to explore and read the codebase. All operations must be bounded, cancellable, and return Result\u003CT\u003E for proper error handling.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only file system read operations\n\u25A1 Railway-Oriented: All methods return Result\u003CT\u003E\n\u25A1 Async: All I/O operations are async with ConfigureAwait(false)\n\u25A1 CancellationToken: All methods respect cancellation\n\u25A1 Pure Read: NO write/delete operations\n\u25A1 Bounded: Respects MaxBytesPerRead from guardrails",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "b46a09a7-c607-4722-bc9d-be319e534b0d"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8889176-06:00",
-      "updatedAt": "2026-01-18T13:27:09.73621-06:00",
-      "completedAt": "2026-01-18T13:27:09.73621-06:00",
-      "summary": "Implemented FileSystemService with: ListFilesAsync (paginated with ImmutableArray), ListDirectoriesAsync (with file/subdir counts), ReadFileAsync (with size check via guardrails), ReadFileChunkAsync (line range extraction). All operations validate paths via PathResolver, check guardrails, use Result\u003CT\u003E. Async I/O with ConfigureAwait(false). Pure read-only operations. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/FileSystemService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IFileSystemService.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- ListFilesAsync returns ImmutableArray\u003CFileInfoModel\u003E\n- ListDirectoriesAsync returns ImmutableArray\u003CDirectoryInfoModel\u003E\n- ReadFileAsync returns file content as string (with size check)\n- ReadFileChunkAsync returns specified line/byte range\n- All paths validated via PathResolver\n- All operations check guardrails first\n- Graceful handling of missing files (Result.Failure)\n- Proper CancellationToken propagation"
-    },
-    {
-      "id": "d2d80767-af11-4514-9b2a-4e6993708c10",
-      "name": "4.2 Implement ContextMetadataService",
-      "description": "**WHAT**: Implement IContextMetadataService for providing metadata about the workspace: total file count, total size, file type distribution, directory depth.\n\n**WHY**: Metadata enables the client LLM to make informed decisions about exploration strategy without reading entire files. This supports the RLM pattern of \u0027peeking\u0027 at context before committing to full reads.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only computes metadata, doesn\u0027t read content\n\u25A1 Lazy Computation: Uses IAsyncEnumerable for large enumerations\n\u25A1 Bounded: Respects depth limits to prevent infinite recursion\n\u25A1 Cacheable: Results are deterministic for same input\n\u25A1 Railway-Oriented: Returns Result\u003CContextInfo\u003E",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "198b4315-7536-4e7f-afff-03bd6d20fc8c"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.892559-06:00",
-      "updatedAt": "2026-01-18T13:27:47.6514859-06:00",
-      "completedAt": "2026-01-18T13:27:47.6514859-06:00",
-      "summary": "Implemented ContextMetadataService: GetContextInfoAsync computes TotalFiles, TotalSizeBytes, TotalDirectories, MaxDepthReached, FilesByExtension (ImmutableDictionary). Uses efficient Directory.EnumerateFiles/EnumerateDirectories. Respects maxDepth parameter. Recursive ComputeStats with WorkspaceStats helper class for aggregation. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/ContextMetadataService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IContextMetadataService.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- GetContextInfoAsync returns ContextInfo record\n- Computes: TotalFiles, TotalDirectories, TotalSizeBytes\n- Computes: FilesByExtension (ImmutableDictionary)\n- Respects MaxDepth parameter\n- Efficient enumeration (doesn\u0027t load file contents)\n- Cancellation support"
-    },
-    {
-      "id": "794f386b-2353-4ef7-a35a-fd86a911035c",
-      "name": "4.3 Implement PatternMatchingService",
-      "description": "**WHAT**: Implement IPatternMatchingService for finding files by glob patterns (*.cs, **/*.json) and optionally regex patterns.\n\n**WHY**: Pattern matching enables efficient navigation of large codebases without listing every directory. The client LLM can request \u0027find all controllers\u0027 or \u0027find all config files\u0027 and get targeted results.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only pattern matching, no file reading\n\u25A1 Bounded: MaxResults parameter prevents unbounded output\n\u25A1 Safe: Patterns validated before execution\n\u25A1 Railway-Oriented: Invalid patterns return Result.Failure\n\u25A1 Static Helpers: Pattern compilation is static pure function",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "198b4315-7536-4e7f-afff-03bd6d20fc8c"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.8955081-06:00",
-      "updatedAt": "2026-01-18T13:28:20.7975677-06:00",
-      "completedAt": "2026-01-18T13:28:20.7975677-06:00",
-      "summary": "Implemented PatternMatchingService: FindFilesAsync with glob pattern support (*, **, ?). Static GlobToRegex converts glob to regex. FindMatchingFiles enumerates all files recursively with maxResults limit. Returns PatternMatchResult with ImmutableArray\u003Cstring\u003E. Pattern validation with clear error messages. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/PatternMatchingService.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/IPatternMatchingService.cs",
-          "type": "REFERENCE"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- FindFilesByPatternAsync accepts glob patterns\n- Supports ** for recursive matching\n- MaxResults parameter limits output (default 1000)\n- Returns ImmutableArray\u003CFileInfoModel\u003E\n- Invalid patterns return clear error\n- Respects workspace root sandbox"
-    },
-    {
-      "id": "1c22b3cc-8c96-4eab-ba31-3edb81779f3e",
-      "name": "5.0 Create MCP Tool Base Infrastructure",
-      "description": "**WHAT**: Create base infrastructure for MCP tools: common response formatting, error handling helpers, tool attribute patterns.\n\n**WHY**: Consistent tool implementation requires shared infrastructure. This includes JSON response formatting, standardized error messages, and helper methods for common patterns. Reduces duplication across tool implementations.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only infrastructure, no business logic\n\u25A1 Static Helpers: Formatting methods are static pure functions\n\u25A1 Reusable: All tools can use these helpers\n\u25A1 Consistent: Standard error format across all tools",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "b46a09a7-c607-4722-bc9d-be319e534b0d"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9006587-06:00",
-      "updatedAt": "2026-01-18T13:28:51.2591313-06:00",
-      "completedAt": "2026-01-18T13:28:51.2591313-06:00",
-      "summary": "Created ToolResponseFormatter (static FormatSuccess\u003CT\u003E, FormatError, FormatResult\u003CT\u003E with camelCase JSON serialization) and ToolErrorMessages (standard error constants: PathNotFound, PathOutsideWorkspace, FileTooLarge, CallLimitExceeded, etc.). Pure static helpers with no business logic. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/ToolResponseFormatter.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/ToolErrorMessages.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- FormatSuccess\u003CT\u003E method for success responses\n- FormatError method for failure responses\n- Standard error message constants\n- JSON serialization configured correctly\n- No business logic in helpers"
-    },
-    {
-      "id": "9bb8e1ba-1f9c-4077-b8f5-826bea0442b3",
-      "name": "5.1 Implement list_files Tool",
-      "description": "**WHAT**: Implement the list_files MCP tool that returns files in a directory with metadata (name, size, modified date).\n\n**WHY**: This is a core tool for codebase exploration. The client LLM calls this repeatedly to navigate the directory tree. Must be deterministic, bounded, and return structured data.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only lists files, delegates to FileSystemService\n\u25A1 Thin Wrapper: Tool is thin, service has logic\n\u25A1 Railway-Oriented: Maps Result to MCP response\n\u25A1 Documented: [Description] attribute explains usage\n\u25A1 Bounded: Pagination via skip/take parameters",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "1c22b3cc-8c96-4eab-ba31-3edb81779f3e"
-        },
-        {
-          "taskId": "198b4315-7536-4e7f-afff-03bd6d20fc8c"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9052308-06:00",
-      "updatedAt": "2026-01-18T13:29:26.1037603-06:00",
-      "completedAt": "2026-01-18T13:29:26.1037603-06:00",
-      "summary": "Implemented list_files MCP tool with [McpServerToolType] and [McpServerTool(Name = \u0022list_files\u0022)] attributes. Parameters: path (required), skip/take (optional pagination). Thin wrapper delegating to IFileSystemService. Uses ToolResponseFormatter for JSON response. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/FileSystem/ListFilesTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerToolType] attribute on class\n- [McpServerTool(Name = \u0027list_files\u0027)] attribute on method\n- Parameters: path (required), skip (optional), take (optional)\n- Returns: JSON array of file info objects\n- Handles errors gracefully with descriptive messages\n- Respects guardrails (call count)"
-    },
-    {
-      "id": "ab7d24c9-e34c-4057-9ccf-00774412624a",
-      "name": "5.2 Implement list_directories Tool",
-      "description": "**WHAT**: Implement the list_directories MCP tool that returns subdirectories in a given path.\n\n**WHY**: Enables directory tree exploration. The client LLM uses this in combination with list_files to build a mental model of the codebase structure.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only lists directories\n\u25A1 Thin Wrapper: Delegates to FileSystemService\n\u25A1 Railway-Oriented: Maps Result to MCP response\n\u25A1 Bounded: Pagination support",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "9bb8e1ba-1f9c-4077-b8f5-826bea0442b3"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.910415-06:00",
-      "updatedAt": "2026-01-18T13:29:48.4760342-06:00",
-      "completedAt": "2026-01-18T13:29:48.4760342-06:00",
-      "summary": "Implemented list_directories MCP tool. Delegates to IFileSystemService.ListDirectoriesAsync. Returns JSON with directory info. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/FileSystem/ListDirectoriesTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027list_directories\u0027)] attribute\n- Parameters: path (required), skip (optional), take (optional)\n- Returns: JSON array of directory info objects\n- Does not recurse (client controls depth)\n- Handles missing directories gracefully"
-    },
-    {
-      "id": "c4d53643-9315-4b90-b742-e0651e7317d9",
-      "name": "5.3 Implement read_file Tool",
-      "description": "**WHAT**: Implement the read_file MCP tool that returns the full content of a file (subject to size limits).\n\n**WHY**: Core tool for reading source code. The client LLM reads files it has identified as relevant. Size limits prevent memory exhaustion on large files.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only reads files\n\u25A1 Bounded: Enforces MaxBytesPerRead\n\u25A1 Railway-Oriented: Returns error for oversized files\n\u25A1 Safe: Validates path is within workspace",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "ab7d24c9-e34c-4057-9ccf-00774412624a"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9148986-06:00",
-      "updatedAt": "2026-01-18T13:30:10.0564526-06:00",
-      "completedAt": "2026-01-18T13:30:10.0564526-06:00",
-      "summary": "Implemented read_file MCP tool. Delegates to IFileSystemService.ReadFileAsync which enforces size limits and path validation. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/FileSystem/ReadFileTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027read_file\u0027)] attribute\n- Parameters: path (required)\n- Returns: file content as string\n- Returns error if file \u003E MaxBytesPerRead\n- Returns error if file not found\n- Returns error if path outside workspace"
-    },
-    {
-      "id": "0c5e0c4a-6470-4555-9cfc-d0fc4a7d2ce0",
-      "name": "5.4 Implement read_file_chunk Tool",
-      "description": "**WHAT**: Implement the read_file_chunk MCP tool that returns a specific portion of a file by line or byte range.\n\n**WHY**: Enables reading large files in pieces. The client LLM can request specific sections (e.g., lines 100-200) without loading the entire file. Essential for the RLM pattern of chunked processing.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only reads file chunks\n\u25A1 Bounded: MaxBytesPerRead still applies to chunk\n\u25A1 Flexible: Supports line ranges and byte ranges\n\u25A1 Railway-Oriented: Returns error for invalid ranges",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "c4d53643-9315-4b90-b742-e0651e7317d9"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9198372-06:00",
-      "updatedAt": "2026-01-18T13:30:33.5413311-06:00",
-      "completedAt": "2026-01-18T13:30:33.5413311-06:00",
-      "summary": "Implemented read_file_chunk MCP tool with startLine/endLine parameters. Returns FileChunk with content, line info, and total lines. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/FileSystem/ReadFileChunkTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027read_file_chunk\u0027)] attribute\n- Parameters: path (required), startLine (optional), endLine (optional), startByte (optional), endByte (optional)\n- Returns: chunk content as string\n- Returns error if range exceeds MaxBytesPerRead\n- Returns error if range invalid (start \u003E end)\n- Includes metadata: actualStartLine, actualEndLine, hasMore"
-    },
-    {
-      "id": "eed2c755-973f-49a3-8c3d-341471a2d426",
-      "name": "5.5 Implement get_context_info Tool",
-      "description": "**WHAT**: Implement the get_context_info MCP tool that returns metadata about the workspace (file count, size, types).\n\n**WHY**: Provides high-level overview without reading file contents. The client LLM uses this to understand the scope of the codebase and plan its exploration strategy.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only returns metadata\n\u25A1 Efficient: Doesn\u0027t read file contents\n\u25A1 Bounded: MaxDepth parameter for recursion\n\u25A1 Informative: Rich metadata for planning",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "0c5e0c4a-6470-4555-9cfc-d0fc4a7d2ce0"
-        },
-        {
-          "taskId": "d2d80767-af11-4514-9b2a-4e6993708c10"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9242511-06:00",
-      "updatedAt": "2026-01-18T13:31:00.0170297-06:00",
-      "completedAt": "2026-01-18T13:31:00.0170297-06:00",
-      "summary": "Implemented get_context_info MCP tool with maxDepth parameter. Delegates to IContextMetadataService. Returns ContextInfo JSON. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Metadata/GetContextInfoTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027get_context_info\u0027)] attribute\n- Parameters: path (optional, defaults to root), maxDepth (optional)\n- Returns: ContextInfo JSON (totalFiles, totalDirs, totalBytes, filesByExtension)\n- Efficient enumeration (no content reading)\n- Respects maxDepth to bound recursion"
-    },
-    {
-      "id": "52808649-b129-42d0-9b1f-91050014e34f",
-      "name": "5.6 Implement find_files_by_pattern Tool",
-      "description": "**WHAT**: Implement the find_files_by_pattern MCP tool that searches for files matching a glob pattern.\n\n**WHY**: Enables targeted file discovery. The client LLM can request \u0027find all *.cs files\u0027 or \u0027find **/Controllers/*.cs\u0027 without manually traversing directories. Accelerates codebase exploration.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only pattern matching\n\u25A1 Bounded: MaxResults parameter\n\u25A1 Safe: Pattern validation before execution\n\u25A1 Flexible: Supports glob patterns with **",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "eed2c755-973f-49a3-8c3d-341471a2d426"
-        },
-        {
-          "taskId": "794f386b-2353-4ef7-a35a-fd86a911035c"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.929827-06:00",
-      "updatedAt": "2026-01-18T13:31:28.7030928-06:00",
-      "completedAt": "2026-01-18T13:31:28.7030928-06:00",
-      "summary": "Implemented find_files_by_pattern MCP tool with pattern and maxResults parameters. Supports glob patterns (*, **, ?). Delegates to IPatternMatchingService. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Search/FindFilesByPatternTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027find_files_by_pattern\u0027)] attribute\n- Parameters: pattern (required), basePath (optional), maxResults (optional)\n- Returns: JSON array of matching file info\n- Supports glob patterns: *.cs, **/*.json\n- Returns error for invalid patterns\n- Respects maxResults limit"
-    },
-    {
-      "id": "947d97da-f2b4-4617-9979-6933283dd07e",
-      "name": "5.7 Implement enumerate_controllers Tool (Optional)",
-      "description": "**WHAT**: Implement the enumerate_controllers MCP tool that finds ASP.NET controller classes by scanning for [ApiController] or [Controller] attributes.\n\n**WHY**: Domain-specific helper for API codebases. The client LLM can quickly discover all API controllers without parsing every C# file. This is a convenience tool built on pattern matching.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only finds controllers\n\u25A1 Deterministic: Pattern-based, no semantic analysis\n\u25A1 Optional: Graceful degradation if no controllers found\n\u25A1 Bounded: MaxResults applies",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "52808649-b129-42d0-9b1f-91050014e34f"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9355164-06:00",
-      "updatedAt": "2026-01-18T13:31:54.5565974-06:00",
-      "completedAt": "2026-01-18T13:31:54.5565974-06:00",
-      "summary": "Implemented enumerate_controllers MCP tool. Uses pattern **/*Controller.cs. Simple, deterministic, pattern-based. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/DotNet/EnumerateControllersTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027enumerate_controllers\u0027)] attribute\n- Searches for *Controller.cs files\n- Optionally grep for [ApiController] or [Controller] attribute\n- Returns: controller names and file paths\n- Works without Roslyn (simple pattern matching)\n- Returns empty array if none found (not error)"
-    },
-    {
-      "id": "48def040-eec5-42b0-a509-ab872f877429",
-      "name": "5.8 Implement enumerate_endpoints Tool (Optional)",
-      "description": "**WHAT**: Implement the enumerate_endpoints MCP tool that finds HTTP endpoints by scanning for [HttpGet], [HttpPost], etc. attributes.\n\n**WHY**: Domain-specific helper for API discovery. The client LLM can get a list of all API endpoints without reading every controller file in detail.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only finds endpoints\n\u25A1 Deterministic: Pattern-based, no semantic analysis\n\u25A1 Optional: Graceful degradation\n\u25A1 Bounded: MaxResults applies",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "947d97da-f2b4-4617-9979-6933283dd07e"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9394628-06:00",
-      "updatedAt": "2026-01-18T13:32:24.3247752-06:00",
-      "completedAt": "2026-01-18T13:32:24.3247752-06:00",
-      "summary": "Implemented enumerate_endpoints MCP tool. Scans controller files for [HttpGet/Post/Put/Delete/Patch] attributes using regex. Returns array of EndpointInfo (file path, attribute). Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/DotNet/EnumerateEndpointsTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027enumerate_endpoints\u0027)] attribute\n- Searches for [HttpGet], [HttpPost], [HttpPut], [HttpDelete], [HttpPatch]\n- Returns: endpoint method names, HTTP verbs, routes, file paths\n- Pattern-based extraction (regex, not Roslyn)\n- Returns empty array if none found"
-    },
-    {
-      "id": "c7b9b34c-56e8-4470-9fa6-b2283859de68",
-      "name": "6.0 Implement get_server_info Tool",
-      "description": "**WHAT**: Implement the get_server_info MCP tool that returns server metadata, capabilities, and current guardrail settings.\n\n**WHY**: Allows the client LLM to understand server capabilities and limits. Essential for self-aware tool usage - the client can check remaining call budget and adjust behavior.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only returns server info\n\u25A1 Transparent: Exposes all relevant limits\n\u25A1 Stateless: Reads current state, doesn\u0027t modify",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "1c22b3cc-8c96-4eab-ba31-3edb81779f3e"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.944407-06:00",
-      "updatedAt": "2026-01-18T13:32:51.4330318-06:00",
-      "completedAt": "2026-01-18T13:32:51.4330318-06:00",
-      "summary": "Implemented get_server_info MCP tool. Returns ServerName, ServerVersion, MaxBytesPerRead, MaxToolCallsPerSession, RemainingToolCalls. No parameters, always succeeds. Build succeeds.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Server/GetServerInfoTool.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- [McpServerTool(Name = \u0027get_server_info\u0027)] attribute\n- Returns: serverName, serverVersion, maxBytesPerRead, maxToolCalls, remainingToolCalls, timeoutSeconds\n- No parameters required\n- Always succeeds (no failure cases)"
-    },
-    {
-      "id": "145219d4-f83d-4a42-b549-1949ccc0ac08",
-      "name": "7.0 Create Unit Test Project",
-      "description": "**WHAT**: Create xUnit test project with proper structure for testing services and tools.\n\n**WHY**: Tests verify correctness and prevent regressions. Service tests verify business logic. Tool tests verify MCP contract. Test structure mirrors source structure for maintainability.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Test Organization: Mirrors source project structure\n\u25A1 Naming: *Tests suffix for test classes\n\u25A1 Isolation: Each test is independent\n\u25A1 Mocking: Use interfaces for dependency injection",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "48def040-eec5-42b0-a509-ab872f877429"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9478082-06:00",
-      "updatedAt": "2026-01-18T13:37:00.5235377-06:00",
-      "completedAt": "2026-01-18T13:37:00.5235377-06:00",
-      "summary": "Task 7.0 completed successfully. Created xUnit test project with proper structure:\n- tests/RecursiveContext.Mcp.Server.Tests project\n- Added project reference to main project\n- Added InternalsVisibleTo attribute to expose internal types\n- Created Services/GuardrailServiceTests.cs with 4 test methods\n- All 5 tests pass (1 sample \u002B 4 guardrail tests)\n- Build succeeds with 0 warnings/errors",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/RecursiveContext.Mcp.Server.Tests.csproj",
-          "type": "OTHER"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/FileSystemServiceTests.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/GuardrailServiceTests.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- xUnit 2.9\u002B referenced\n- Test project references main project\n- Tests for each service\n- Tests for guardrail enforcement\n- All tests pass"
-    },
-    {
-      "id": "e9c15d47-e3b0-4ff4-8ffc-fca1798b7759",
-      "name": "7.1 Write Service Unit Tests",
-      "description": "**WHAT**: Write comprehensive unit tests for FileSystemService, ContextMetadataService, PatternMatchingService, and GuardrailService.\n\n**WHY**: Services contain the core business logic. Tests ensure correct behavior for edge cases (empty directories, large files, invalid patterns, limit exceeded).\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Coverage: All public methods tested\n\u25A1 Edge Cases: Empty, null, boundary conditions\n\u25A1 Mocking: File system mocked for isolation\n\u25A1 Arrange-Act-Assert: Clear test structure",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "145219d4-f83d-4a42-b549-1949ccc0ac08"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9532987-06:00",
-      "updatedAt": "2026-01-18T13:39:38.4885017-06:00",
-      "completedAt": "2026-01-18T13:39:38.4885017-06:00",
-      "summary": "Task 7.1 completed successfully. Created comprehensive unit tests for all services:\n\n- FileSystemServiceTests.cs: 12 tests covering ListFilesAsync, ListDirectoriesAsync, ReadFileAsync, ReadFileChunkAsync with edge cases (empty dirs, pagination, path traversal, nonexistent paths, file size limits, line range clamping)\n- ContextMetadataServiceTests.cs: 8 tests covering GetContextInfoAsync with empty dirs, file counting, directory counting, extension grouping, max depth, cancellation\n- PatternMatchingServiceTests.cs: 12 tests covering glob patterns (*, **, ?), extension matching, exact names, empty patterns, max results, relative paths\n- PathResolverTests.cs: 14 tests covering path resolution, traversal prevention, normalization, workspace sandboxing\n- GuardrailServiceTests.cs: Expanded to 10 tests covering call limits, byte limits, remaining calls, reset\n\nAll 57 tests pass. Build succeeds with 0 warnings/errors.",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/FileSystemServiceTests.cs",
-          "type": "TO_MODIFY"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/ContextMetadataServiceTests.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/PatternMatchingServiceTests.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/GuardrailServiceTests.cs",
-          "type": "TO_MODIFY"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Test ListFilesAsync with empty directory\n- Test ListFilesAsync with nested files\n- Test ReadFileAsync with file \u003E MaxBytes\n- Test ReadFileChunkAsync with invalid range\n- Test pattern matching with various globs\n- Test guardrail call limit enforcement\n- All tests pass with dotnet test"
-    },
-    {
-      "id": "7a40300d-622b-4b09-bc4e-610012653902",
-      "name": "7.2 Write Tool Integration Tests",
-      "description": "**WHAT**: Write integration tests that verify MCP tools work correctly with real file system (using temp directories).\n\n**WHY**: Integration tests verify the full stack from tool to file system. Catches issues that unit tests with mocks might miss.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Isolation: Each test uses unique temp directory\n\u25A1 Cleanup: Temp files deleted after test\n\u25A1 Real I/O: Tests actual file operations\n\u25A1 End-to-End: Tool -\u003E Service -\u003E FileSystem",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "e9c15d47-e3b0-4ff4-8ffc-fca1798b7759"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9575581-06:00",
-      "updatedAt": "2026-01-18T13:44:49.2563533-06:00",
-      "completedAt": "2026-01-18T13:44:49.2563533-06:00",
-      "summary": "Created comprehensive integration tests for all 6 MCP tools: ListFilesTool (6 tests), ReadFileTool (8 tests), ReadFileChunkTool (9 tests), ListDirectoriesTool (4 tests), FindFilesByPatternTool (6 tests), and GetContextInfoTool (5 tests). All 94 tests pass (57 service tests \u002B 38 tool tests). Tests cover success scenarios, error handling, JSON response structure, pagination, path traversal protection, JSON serialization handling, and edge cases. Each test uses isolated temp directories with proper cleanup via IDisposable.",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Tools/ListFilesToolTests.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Tools/ReadFileToolTests.cs",
-          "type": "OTHER"
-        },
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Tools/ReadFileChunkToolTests.cs",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Create temp directory with test files\n- Verify list_files returns expected files\n- Verify read_file returns correct content\n- Verify read_file_chunk returns correct range\n- Verify errors for invalid paths\n- Cleanup temp directory after each test"
-    },
-    {
-      "id": "c4e8c7ca-4584-4c4f-9669-44f88ae96e5d",
-      "name": "8.0 Create README Documentation",
-      "description": "**WHAT**: Write comprehensive README.md explaining the server architecture, available tools, and critically, HOW the client LLM achieves RLM-style recursive reasoning by repeatedly calling MCP tools.\n\n**WHY**: Documentation is essential for users to understand how to use the server effectively. The README must clearly explain that recursive behavior emerges from client-side LLM reasoning, NOT from server logic. This is the conceptual core of the project.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Complete: Covers installation, usage, architecture\n\u25A1 Clear: Explains RLM concept without requiring paper\n\u25A1 Examples: Shows typical tool call sequences\n\u25A1 Honest: States what server does NOT do (no LLM)",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "7a40300d-622b-4b09-bc4e-610012653902"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9635913-06:00",
-      "updatedAt": "2026-01-18T13:47:18.1504941-06:00",
-      "completedAt": "2026-01-18T13:47:18.1504941-06:00",
-      "summary": "Created comprehensive README.md with: 1) Project overview and RLM concept explanation, 2) Mermaid sequence diagram showing how recursive reasoning emerges from client LLM repeatedly calling MCP tools, 3) \u0027What This Server Does NOT Do\u0027 section clarifying server is passive/deterministic, 4) Installation instructions for build-from-source and dotnet tool, 5) Configuration via environment variables, 6) MCP client configuration examples for GitHub Copilot and Claude Desktop, 7) Full tool reference with parameters, types, defaults, and example responses, 8) Example session showing typical tool call sequence, 9) Architecture diagram with design principles, 10) Security section covering sandboxing and rate limiting, 11) Development/build instructions.",
-      "relatedFiles": [
-        {
-          "path": "README.md",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Installation instructions (dotnet tool install or direct run)\n- Configuration via environment variables\n- Tool reference with parameters and examples\n- Architecture diagram (text or mermaid)\n- Section: \u0027How Recursive Reasoning Emerges\u0027\n- Section: \u0027What This Server Does NOT Do\u0027\n- Example session showing client LLM calling tools repeatedly"
-    },
-    {
-      "id": "4c8acc12-b94e-477a-8377-b7e4f5acd768",
-      "name": "8.1 Create MCP Configuration Examples",
-      "description": "**WHAT**: Create example MCP configuration files for GitHub Copilot (mcp.json) and other clients.\n\n**WHY**: Users need working configuration examples to integrate the server with their MCP clients. Reduces friction for adoption.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Working Examples: Tested configurations\n\u25A1 Documented: Comments explain each setting\n\u25A1 Cross-Platform: Works on Windows, macOS, Linux",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "c4e8c7ca-4584-4c4f-9669-44f88ae96e5d"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.967968-06:00",
-      "updatedAt": "2026-01-18T13:48:52.1025349-06:00",
-      "completedAt": "2026-01-18T13:48:52.1025349-06:00",
-      "summary": "Created examples/ directory with 7 files: 1) mcp.json - uses ${workspaceFolder} variable for portability, 2) mcp.windows.json - Windows-specific paths, 3) mcp.macos.json - macOS paths, 4) mcp.linux.json - Linux paths, 5) mcp.published-exe.json - uses pre-built executable instead of dotnet run, 6) claude_desktop_config.json - Claude Desktop format with mcpServers key, 7) README.md - comprehensive guide with troubleshooting section. All JSON files validated. Configurations include all environment variables with defaults commented.",
-      "relatedFiles": [
-        {
-          "path": "examples/mcp.json",
-          "type": "OTHER"
-        },
-        {
-          "path": "examples/README.md",
-          "type": "OTHER"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Valid mcp.json for GitHub Copilot\n- Stdio transport configuration\n- Environment variable examples\n- Works with dotnet run and published exe\n- Tested with actual client"
-    },
-    {
-      "id": "162f96de-9193-4ede-b894-8940010fee3e",
-      "name": "9.0 Final Integration and Smoke Testing",
-      "description": "**WHAT**: Perform end-to-end smoke testing of the complete server with a real MCP client. Verify all tools work, guardrails are enforced, and the server is stable.\n\n**WHY**: Final validation before release. Catches integration issues that isolated tests miss. Ensures the server works in real-world conditions.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Real Client: Test with GitHub Copilot or MCP inspector\n\u25A1 All Tools: Verify each tool responds correctly\n\u25A1 Guardrails: Verify limits are enforced\n\u25A1 Stability: No crashes or hangs",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "4c8acc12-b94e-477a-8377-b7e4f5acd768"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9736381-06:00",
-      "updatedAt": "2026-01-18T13:52:46.8928336-06:00",
-      "completedAt": "2026-01-18T13:52:46.8928336-06:00",
-      "summary": "Created comprehensive smoke test suite (10 tests) in Integration/SmokeTests.cs that validates: 1) GetServerInfo returns valid metadata, 2) GetContextInfo returns workspace stats, 3) FindFilesByPattern finds controllers, 4) ReadFile reads AuthService content, 5) ListFiles lists Services directory, 6) ListDirectories lists src directory, 7) ReadFileChunk reads partial file, 8) Guardrails track tool calls, 9) PathTraversal is blocked, 10) FullWorkflow simulates LLM finding auth logic through multiple tool calls. Server startup stability verified (runs 3\u002B seconds without crash). All 104 tests pass. Release build succeeds.",
-      "relatedFiles": [],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- Server starts and accepts connections\n- All tools return valid responses\n- Guardrail limits enforced (call count, byte limits)\n- Timeout handling works\n- Graceful shutdown on SIGTERM\n- No memory leaks in extended session\n- Error responses are informative"
-    },
-    {
-      "id": "d18e7001-a8cd-4361-9421-9c162b05afc4",
-      "name": "9.1 Create Release Package",
-      "description": "**WHAT**: Configure the project for distribution as a dotnet tool and/or standalone executable.\n\n**WHY**: Users need an easy way to install and run the server. Dotnet tool distribution is standard for .NET MCP servers.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Packaging: Proper NuGet metadata\n\u25A1 Versioning: SemVer in csproj\n\u25A1 Cross-Platform: Builds on all platforms\n\u25A1 Self-Contained: Option for standalone exe",
-      "status": "Completed",
-      "dependencies": [
-        {
-          "taskId": "162f96de-9193-4ede-b894-8940010fee3e"
-        }
-      ],
-      "createdAt": "2026-01-18T13:02:56.9799388-06:00",
-      "updatedAt": "2026-01-18T13:55:10.1280374-06:00",
-      "completedAt": "2026-01-18T13:55:10.1280374-06:00",
-      "summary": "Configured project for .NET tool distribution: 1) Updated csproj with PackAsTool=true, ToolCommandName=recursive-context, NuGet metadata (PackageId, Version, Description, Tags, License), 2) Created MIT LICENSE file, 3) dotnet pack produces valid RecursiveContext.Mcp.1.0.0.nupkg (2.07MB), 4) dotnet tool install --global works successfully, 5) Tool runs via \u0027recursive-context\u0027 command, 6) Version 1.0.0 confirmed in tool list, 7) README included in package via PackageReadmeFile. All 104 tests pass in Release configuration.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/RecursiveContext.Mcp.Server.csproj",
-          "type": "TO_MODIFY"
-        }
-      ],
-      "analysisResult": "A pure C# MCP tool server that enables Recursive Language Model (RLM)-style behavior through deterministic, read-only tools. The server acts as a passive environment providing context access - the client LLM (GitHub Copilot) drives all recursive reasoning by repeatedly calling MCP tools. NO LLM logic exists in the server. Architecture follows mcp-task-and-research patterns with Server/Tools/Services/Config layers, using Result\u003CT\u003E for railway-oriented error handling, immutable records, and async-first APIs with CancellationToken support.",
-      "verificationCriteria": "- dotnet pack produces valid .nupkg\n- dotnet tool install --global works\n- After install, tool runs via command name\n- Version number correct in package\n- License file included\n- README included in package"
-    },
-    {
-      "id": "50dd91fd-4eea-4384-8c92-044f3e863353",
-      "name": "1. Create Analysis Models",
-      "description": "**WHAT**: Create new immutable record structs in \u0060Models/\u0060 folder for analysis tool responses:\n- \u0060MatchCountResult(Count, SampleMatches, Truncated)\u0060\n- \u0060MatchResult(LineNumber, MatchText, ContextBefore, ContextAfter)\u0060\n- \u0060ChunkInfo(TotalLines, ChunkCount, ChunkBoundaries)\u0060\n- \u0060ChunkContent(ChunkIndex, StartLine, EndLine, Content)\u0060\n- \u0060AggregateResult(FilesSearched, TotalMatches, MatchesByFile)\u0060\n- \u0060FileMatchCount(Path, Count)\u0060\n\n**WHY**: These models are the foundation for all analysis tools. They ensure deterministic, structured responses instead of raw text. The LLM receives exact counts and positions, not text to parse. Using \u0060readonly record struct\u0060 ensures immutability and value semantics per project conventions.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Each record represents one domain concept\n\u25A1 Open/Closed: Records are sealed by design\n\u25A1 Liskov Substitution: N/A - no inheritance\n\u25A1 Interface Segregation: N/A - these are DTOs\n\u25A1 Dependency Inversion: N/A - no dependencies\n\u25A1 Cyclomatic Complexity: N/A - no logic\n\u25A1 Pure Functions: N/A - data only\n\u25A1 Immutability: Use \u0060readonly record struct\u0060 with \u0060IReadOnlyList\u003CT\u003E\u0060\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: N/A - models only",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.6310401-06:00",
-      "updatedAt": "2026-01-18T16:15:15.0400329-06:00",
-      "completedAt": "2026-01-18T16:15:15.0400329-06:00",
-      "summary": "Successfully created all 6 analysis model records in Models/Models.cs:\n\n1. **MatchResult** - Single match with line number, match text, and context (before/after)\n2. **MatchCountResult** - Count of matches with sample matches and truncation flag  \n3. **ChunkInfo** - File chunk metadata (total lines, chunk count, boundaries)\n4. **ChunkContent** - Specific chunk content with index and line range\n5. **FileMatchCount** - Match count for a single file\n6. **AggregateResult** - Cross-file aggregation results\n\n**Verification Results:**\n\u2705 All 6 record types compile without errors (dotnet build succeeded with 0 warnings, 0 errors)\n\u2705 Used \u0060sealed record\u0060 (consistent with existing codebase patterns)\n\u2705 Collection properties use \u0060ImmutableArray\u003CT\u003E\u0060 for immutability\n\u2705 Nullable reference types handled correctly\n\u2705 XML documentation added for all records\n\u2705 Follows project code style conventions",
+      "createdAt": "2026-01-18T20:09:37.9611929-06:00",
+      "updatedAt": "2026-01-18T20:10:36.1862321-06:00",
+      "completedAt": "2026-01-18T20:10:36.1862321-06:00",
+      "summary": "Created AdvancedAnalysisModels.cs with 10 immutable record types: CompoundMatchResult, CompoundMatchSample, ConsecutiveRun, ConsecutiveRunResult, AggregateGroup, PatternAggregateResult, DistributedSample, DistributedSampleResult, FileComparisonEntry, CrossFileComparisonResult. All records use init-only properties via positional parameters, use ImmutableArray\u003CT\u003E for collections, and have XML documentation. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Models/Models.cs",
-          "type": "TO_MODIFY",
-          "description": "Add new analysis model records alongside existing models"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- All 6 record structs compile without errors\n- All use \u0060readonly record struct\u0060\n- Collection properties use \u0060IReadOnlyList\u003CT\u003E\u0060\n- Nullable reference types handled correctly"
-    },
-    {
-      "id": "7b3bddcd-d336-479e-81d7-fd77f133a5c7",
-      "name": "2. Extend RlmSettings with Analysis Limits",
-      "description": "**WHAT**: Add new configuration properties to \u0060RlmSettings\u0060 record:\n- \u0060MaxFilesPerAggregation: int\u0060 (default: 500)\n- \u0060MaxMatchesPerSearch: int\u0060 (default: 10000)\n- \u0060MaxChunkSize: int\u0060 (default: 500 lines)\n\nUpdate the \u0060Default\u0060 static property to include these new values.\n\n**WHY**: These guardrails prevent runaway operations on massive codebases. Without limits, an \u0060aggregate_matches\u0060 call across thousands of files could exhaust memory. The server must be bounded and predictable - this is a non-negotiable architecture requirement.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: RlmSettings holds all configuration\n\u25A1 Open/Closed: Adding properties maintains backward compatibility\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - no logic\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: record with init-only properties\n\u25A1 Static Methods: Default is static property\n\u25A1 Railway-Oriented: N/A",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.6465302-06:00",
-      "updatedAt": "2026-01-18T16:16:51.820098-06:00",
-      "completedAt": "2026-01-18T16:16:51.820098-06:00",
-      "summary": "Added 3 new properties to RlmSettings record and updated ConfigReader:\n\n**RlmSettings changes:**\n- \u0060MaxFilesPerAggregation: int\u0060 (default: 500)\n- \u0060MaxMatchesPerSearch: int\u0060 (default: 10,000)  \n- \u0060MaxChunkSize: int\u0060 (default: 500 lines)\n\n**ConfigReader changes:**\n- Added 3 new environment variable keys for configuration\n- Updated ReadSettings() to include new parameters\n\nBuild succeeded with 0 warnings, 0 errors.",
-      "relatedFiles": [
+          "type": "REFERENCE",
+          "description": "Reference for existing model patterns"
+        },
         {
-          "path": "src/RecursiveContext.Mcp.Server/Config/RlmSettings.cs",
+          "path": "src/RecursiveContext.Mcp.Server/Models/AdvancedAnalysisModels.cs",
           "type": "TO_MODIFY",
-          "description": "Add three new properties to the record"
+          "description": "New file to create"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- RlmSettings record has 3 new properties\n- Default values are set (500, 10000, 500)\n- Existing functionality unaffected"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- All records use init-only properties\n- ImmutableArray\u003CT\u003E used for collections\n- XML documentation on all public types\n- No mutable state"
     },
     {
-      "id": "303d8f52-3e30-49d4-b023-1d41fae9e392",
-      "name": "3. Extend IGuardrailService Interface",
-      "description": "**WHAT**: Add new properties and methods to \u0060IGuardrailService\u0060 interface:\n- \u0060int MaxFilesPerAggregation { get; }\u0060\n- \u0060int MaxMatchesPerSearch { get; }\u0060\n- \u0060int MaxChunkSize { get; }\u0060\n- \u0060Result CheckFilesLimit(int fileCount)\u0060\n- \u0060Result CheckMatchesLimit(int matchCount)\u0060\n- \u0060Result CheckChunkSize(int chunkSize)\u0060\n\n**WHY**: The interface must expose the new limits so services can check them. Following Interface Segregation, we add specific check methods for each limit type rather than a generic checker. This enables clear error messages and Railway-oriented composition with \u0060.Bind()\u0060.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Interface defines guardrail contract\n\u25A1 Open/Closed: Adding methods extends without breaking\n\u25A1 Liskov Substitution: Implementations must fulfill contract\n\u25A1 Interface Segregation: Methods are focused on specific checks\n\u25A1 Dependency Inversion: Services depend on this interface\n\u25A1 Cyclomatic Complexity: N/A - interface only\n\u25A1 Pure Functions: Check methods should be pure\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Return Result for composition",
+      "id": "b65c9f3b-7357-4f7e-bb6f-78d215bdc2c9",
+      "name": "Create IAdvancedAnalysisService interface",
+      "description": "**WHAT**: Add a new interface \u0060IAdvancedAnalysisService\u0060 to \u0060src/RecursiveContext.Mcp.Server/Services/Interfaces.cs\u0060 with 5 method signatures:\n\n1. \u0060CountCompoundPatternAsync(string path, string[] patterns, string matchMode, bool includeSamples, int maxSamples, CancellationToken ct)\u0060 - Returns \u0060Result\u003CCompoundMatchResult\u003E\u0060\n2. \u0060FindConsecutiveRunsAsync(string path, string pattern, int minRunLength, bool returnLongestOnly, int maxRuns, CancellationToken ct)\u0060 - Returns \u0060Result\u003CConsecutiveRunResult\u003E\u0060\n3. \u0060AggregatePatternMatchesAsync(string path, string pattern, string groupBy, int topN, bool includeSamples, CancellationToken ct)\u0060 - Returns \u0060Result\u003CPatternAggregateResult\u003E\u0060\n4. \u0060SampleMatchesDistributedAsync(string path, string pattern, int sampleCount, string distribution, CancellationToken ct)\u0060 - Returns \u0060Result\u003CDistributedSampleResult\u003E\u0060\n5. \u0060ComparePatternAcrossFilesAsync(string[] paths, string pattern, bool computeRatio, CancellationToken ct)\u0060 - Returns \u0060Result\u003CCrossFileComparisonResult\u003E\u0060\n\n**WHY**: The interface defines the contract for advanced analysis operations, following the project\u0027s Dependency Inversion principle. All 5 tools will depend on this abstraction rather than the concrete implementation, enabling testability through mocking and future extensibility.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.6668439-06:00",
-      "updatedAt": "2026-01-18T16:17:16.8425602-06:00",
-      "completedAt": "2026-01-18T16:17:16.8425602-06:00",
-      "summary": "Extended IGuardrailService interface with:\n\n**New Properties:**\n- \u0060int MaxFilesPerAggregation { get; }\u0060\n- \u0060int MaxMatchesPerSearch { get; }\u0060\n- \u0060int MaxChunkSize { get; }\u0060\n\n**New Check Methods:**\n- \u0060Result CheckFilesLimit(int fileCount)\u0060\n- \u0060Result CheckMatchesLimit(int matchCount)\u0060\n- \u0060Result CheckChunkSize(int chunkSize)\u0060\n\nNote: Build fails because GuardrailService implementation needs updating (Task 4).",
-      "relatedFiles": [
+      "dependencies": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
-          "type": "TO_MODIFY",
-          "description": "Add new members to IGuardrailService interface"
+          "taskId": "40dc5d60-03cc-4dd4-b8ae-227ea0547a03"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Interface has 3 new properties\n- Interface has 3 new check methods\n- All return appropriate types (int, Result)"
-    },
-    {
-      "id": "d871dc83-d8c0-45b6-9c4d-3a3e16299053",
-      "name": "4. Implement GuardrailService Extensions",
-      "description": "**WHAT**: Implement the new \u0060IGuardrailService\u0060 members in \u0060GuardrailService\u0060 class:\n- Properties delegate to \u0060_settings\u0060\n- \u0060CheckFilesLimit\u0060 returns Failure if count \u003E MaxFilesPerAggregation\n- \u0060CheckMatchesLimit\u0060 returns Failure if count \u003E MaxMatchesPerSearch\n- \u0060CheckChunkSize\u0060 returns Failure if size \u003E MaxChunkSize\n\n**WHY**: These implementations enforce the limits defined in RlmSettings. Each check follows the same pattern as existing \u0060CheckBytesLimit\u0060 - compare value, return Result.Success() or Result.Failure() with descriptive message. Enables Railway-oriented chaining in service methods.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: GuardrailService validates limits\n\u25A1 Open/Closed: Adding methods, not modifying existing\n\u25A1 Liskov Substitution: Fulfills IGuardrailService contract\n\u25A1 Interface Segregation: Each method checks one limit\n\u25A1 Dependency Inversion: Depends on RlmSettings abstraction\n\u25A1 Cyclomatic Complexity: ~2 per method (if/else)\n\u25A1 Pure Functions: Check methods are deterministic\n\u25A1 Immutability: No new mutable state\n\u25A1 Static Methods: N/A - needs _settings\n\u25A1 Railway-Oriented: Return Result for composition",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.68463-06:00",
-      "updatedAt": "2026-01-18T16:17:46.2220978-06:00",
-      "completedAt": "2026-01-18T16:17:46.2220978-06:00",
-      "summary": "Implemented all new IGuardrailService members in GuardrailService:\n\n**Properties added:**\n- \u0060MaxFilesPerAggregation\u0060 \u2192 delegates to \u0060_settings\u0060\n- \u0060MaxMatchesPerSearch\u0060 \u2192 delegates to \u0060_settings\u0060\n- \u0060MaxChunkSize\u0060 \u2192 delegates to \u0060_settings\u0060\n\n**Check methods added:**\n- \u0060CheckFilesLimit(int)\u0060 - Returns Failure if \u003E MaxFilesPerAggregation\n- \u0060CheckMatchesLimit(int)\u0060 - Returns Failure if \u003E MaxMatchesPerSearch\n- \u0060CheckChunkSize(int)\u0060 - Returns Failure if \u003E MaxChunkSize\n\nAll methods follow the pattern of existing CheckBytesLimit with descriptive error messages. Build succeeded with 0 warnings, 0 errors.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/GuardrailService.cs",
-          "type": "TO_MODIFY",
-          "description": "Implement new interface members"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- All new interface members implemented\n- Error messages include limit values\n- Pattern matches existing CheckBytesLimit\n- Compiles without warnings"
-    },
-    {
-      "id": "75d9cc12-c578-4d7f-bd86-acfbe08b2a3b",
-      "name": "5. Create IContentAnalysisService Interface",
-      "description": "**WHAT**: Create new interface in \u0060Services/Interfaces.cs\u0060:\n\u0060\u0060\u0060csharp\npublic interface IContentAnalysisService\n{\n    Task\u003CResult\u003CMatchCountResult\u003E\u003E CountPatternMatchesAsync(\n        string path, string pattern, int maxResults, CancellationToken ct);\n    Task\u003CResult\u003CIReadOnlyList\u003CMatchResult\u003E\u003E\u003E SearchWithContextAsync(\n        string path, string pattern, int contextLines, int maxResults, CancellationToken ct);\n    Task\u003CResult\u003Cint\u003E\u003E CountLinesAsync(string path, CancellationToken ct);\n}\n\u0060\u0060\u0060\n\n**WHY**: Defines the contract for content analysis operations. Separating interface from implementation follows Dependency Inversion and enables testing with mocks. The methods return \u0060Result\u003CT\u003E\u0060 for Railway-oriented error handling.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Interface for content analysis only\n\u25A1 Open/Closed: Interface defines extension points\n\u25A1 Liskov Substitution: Any implementation substitutable\n\u25A1 Interface Segregation: Focused on content analysis\n\u25A1 Dependency Inversion: Tools depend on this interface\n\u25A1 Cyclomatic Complexity: N/A - interface\n\u25A1 Pure Functions: Methods should be deterministic\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: All methods return Result\u003CT\u003E",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.7074264-06:00",
-      "updatedAt": "2026-01-18T16:18:10.6278304-06:00",
-      "completedAt": "2026-01-18T16:18:10.6278304-06:00",
-      "summary": "Created IContentAnalysisService interface with 3 async methods:\n- \u0060CountPatternMatchesAsync\u0060 - Returns MatchCountResult with count and samples\n- \u0060SearchWithContextAsync\u0060 - Returns matches with context lines\n- \u0060CountLinesAsync\u0060 - Returns total line count\n\nAll methods return Task\u003CResult\u003CT\u003E\u003E and accept CancellationToken. XML documentation added. Build succeeded.",
+      "createdAt": "2026-01-18T20:09:37.9762443-06:00",
+      "updatedAt": "2026-01-18T20:11:07.8079001-06:00",
+      "completedAt": "2026-01-18T20:11:07.8079001-06:00",
+      "summary": "Added IAdvancedAnalysisService interface to Interfaces.cs with 5 methods: CountCompoundPatternAsync, FindConsecutiveRunsAsync, AggregatePatternMatchesAsync, SampleMatchesDistributedAsync, ComparePatternAcrossFilesAsync. All methods return Task\u003CResult\u003CT\u003E\u003E for railway-oriented programming, accept CancellationToken, and have full XML documentation. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
           "type": "TO_MODIFY",
           "description": "Add new interface"
+        },
+        {
+          "path": "src/RecursiveContext.Mcp.Server/Models/AdvancedAnalysisModels.cs",
+          "type": "REFERENCE",
+          "description": "Return types for methods"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Interface defined with 3 async methods\n- All return Task\u003CResult\u003CT\u003E\u003E\n- CancellationToken on all methods\n- XML documentation on interface and methods"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- Interface compiles without errors\n- All methods return Task\u003CResult\u003CT\u003E\u003E for railway-oriented programming\n- All methods accept CancellationToken\n- XML documentation on interface and all methods\n- Parameters follow existing naming conventions"
     },
     {
-      "id": "87010a13-5aec-4e79-8447-7b5096060f51",
-      "name": "6. Create IChunkingService Interface",
-      "description": "**WHAT**: Create new interface in \u0060Services/Interfaces.cs\u0060:\n\u0060\u0060\u0060csharp\npublic interface IChunkingService\n{\n    Task\u003CResult\u003CChunkInfo\u003E\u003E GetChunkInfoAsync(\n        string path, int chunkSize, CancellationToken ct);\n    Task\u003CResult\u003CChunkContent\u003E\u003E ReadChunkAsync(\n        string path, int chunkIndex, int chunkSize, CancellationToken ct);\n}\n\u0060\u0060\u0060\n\n**WHY**: Enables systematic traversal of large files. LLM can first call \u0060get_chunk_info\u0060 to plan, then iterate with \u0060read_chunk_by_index\u0060. Without this, LLM must guess file sizes or read entire files. This is the key to deterministic chunked processing.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Interface for chunking only\n\u25A1 Open/Closed: Interface defines extension points\n\u25A1 Liskov Substitution: Any implementation substitutable\n\u25A1 Interface Segregation: Focused on chunking operations\n\u25A1 Dependency Inversion: Tools depend on this interface\n\u25A1 Cyclomatic Complexity: N/A - interface\n\u25A1 Pure Functions: Methods should be deterministic\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: All methods return Result\u003CT\u003E",
+      "id": "f4aa28c7-3cd0-41af-8e09-d55496f9edd2",
+      "name": "Create AdvancedAnalysisService implementation",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Services/AdvancedAnalysisService.cs\u0060 implementing \u0060IAdvancedAnalysisService\u0060 with all 5 methods:\n\n1. **CountCompoundPatternAsync**: Match lines against multiple patterns with modes \u0022all\u0022 (AND), \u0022any\u0022 (OR), \u0022sequence\u0022 (patterns appear in order on line)\n2. **FindConsecutiveRunsAsync**: Scan file line-by-line, track consecutive matching lines, return runs of at least minRunLength\n3. **AggregatePatternMatchesAsync**: Group matches by regex capture group or first word, count each group, return top N\n4. **SampleMatchesDistributedAsync**: Get samples distributed across file using \u0022even\u0022, \u0022random\u0022, \u0022first\u0022, or \u0022last\u0022 strategies\n5. **ComparePatternAcrossFilesAsync**: Count pattern in each file, optionally compute relative ratios\n\n**WHY**: This service encapsulates the complex analysis logic, following Single Responsibility by focusing only on advanced pattern analysis. Injecting PathResolver and IGuardrailService follows existing patterns (see ContentAnalysisService). Using Result\u003CT\u003E monad enables clean error handling without exceptions.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.7293799-06:00",
-      "updatedAt": "2026-01-18T16:18:30.5608345-06:00",
-      "completedAt": "2026-01-18T16:18:30.5608345-06:00",
-      "summary": "Created IChunkingService interface with 2 async methods:\n- \u0060GetChunkInfoAsync\u0060 - Returns ChunkInfo with total lines, chunk count, boundaries\n- \u0060ReadChunkAsync\u0060 - Returns ChunkContent with content for specific chunk index\n\nAll methods return Task\u003CResult\u003CT\u003E\u003E and accept CancellationToken. XML documentation added. Build succeeded.",
+      "dependencies": [
+        {
+          "taskId": "b65c9f3b-7357-4f7e-bb6f-78d215bdc2c9"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:37.9907708-06:00",
+      "updatedAt": "2026-01-18T20:12:09.7380149-06:00",
+      "completedAt": "2026-01-18T20:12:09.7380149-06:00",
+      "summary": "Created AdvancedAnalysisService.cs implementing IAdvancedAnalysisService with all 5 methods: CountCompoundPatternAsync (AND/OR/SEQUENCE modes), FindConsecutiveRunsAsync (finds runs of matching lines), AggregatePatternMatchesAsync (groups matches by key), SampleMatchesDistributedAsync (even/random/first/last distribution), ComparePatternAcrossFilesAsync (cross-file comparison with ratios). Uses Result\u003CT\u003E monad consistently, ConfigureAwait(false) on all awaits, injects PathResolver and IGuardrailService, static helper methods for pure functions. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
+          "path": "src/RecursiveContext.Mcp.Server/Services/AdvancedAnalysisService.cs",
           "type": "TO_MODIFY",
-          "description": "Add new interface"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Interface defined with 2 async methods\n- All return Task\u003CResult\u003CT\u003E\u003E\n- CancellationToken on all methods\n- XML documentation on interface and methods"
-    },
-    {
-      "id": "05dcde22-04a4-444b-ba80-2491caee6d35",
-      "name": "7. Create IAggregationService Interface",
-      "description": "**WHAT**: Create new interface in \u0060Services/Interfaces.cs\u0060:\n\u0060\u0060\u0060csharp\npublic interface IAggregationService\n{\n    Task\u003CResult\u003CAggregateResult\u003E\u003E AggregateMatchesAsync(\n        string directory, string filePattern, string searchPattern,\n        int maxFiles, CancellationToken ct);\n    Task\u003CResult\u003Cint\u003E\u003E CountFilesAsync(\n        string directory, string pattern, bool recursive, CancellationToken ct);\n}\n\u0060\u0060\u0060\n\n**WHY**: Enables cross-file analysis in a single tool call. Questions like \u0027how many TODOs in the codebase?\u0027 become one operation returning exact count plus per-file breakdown. This eliminates the need for LLM to enumerate files and sum counts manually.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Interface for aggregation only\n\u25A1 Open/Closed: Interface defines extension points\n\u25A1 Liskov Substitution: Any implementation substitutable\n\u25A1 Interface Segregation: Focused on aggregation operations\n\u25A1 Dependency Inversion: Tools depend on this interface\n\u25A1 Cyclomatic Complexity: N/A - interface\n\u25A1 Pure Functions: Methods should be deterministic\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: All methods return Result\u003CT\u003E",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.7536053-06:00",
-      "updatedAt": "2026-01-18T16:18:50.2590391-06:00",
-      "completedAt": "2026-01-18T16:18:50.2590391-06:00",
-      "summary": "Created IAggregationService interface with 2 async methods:\n- \u0060AggregateMatchesAsync\u0060 - Aggregates pattern matches across files, returns AggregateResult\n- \u0060CountFilesAsync\u0060 - Counts files matching a pattern\n\nAll methods return Task\u003CResult\u003CT\u003E\u003E and accept CancellationToken. XML documentation added. Build succeeded.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
-          "type": "TO_MODIFY",
-          "description": "Add new interface"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Interface defined with 2 async methods\n- All return Task\u003CResult\u003CT\u003E\u003E\n- CancellationToken on all methods\n- XML documentation on interface and methods"
-    },
-    {
-      "id": "7ad1d548-7e53-41b0-a6af-9fb7e5fcdb76",
-      "name": "8. Implement ContentAnalysisService",
-      "description": "**WHAT**: Create \u0060Services/ContentAnalysisService.cs\u0060 implementing \u0060IContentAnalysisService\u0060:\n- Inject \u0060PathResolver\u0060, \u0060IGuardrailService\u0060\n- \u0060CountPatternMatchesAsync\u0060: Read file, compile regex, count matches, return first N as samples\n- \u0060SearchWithContextAsync\u0060: Find matches with surrounding lines\n- \u0060CountLinesAsync\u0060: Count lines efficiently without loading entire content\n\nUse LINQ \u0060.Index()\u0060 for line numbers, respect \u0060MaxMatchesPerSearch\u0060 guardrail.\n\n**WHY**: Core service enabling deterministic pattern counting. LLM asks \u0027how many classes?\u0027 and gets exact integer, not raw text to parse. This eliminates non-determinism from LLM text parsing. Must use Railway-oriented composition with Result\u003CT\u003E.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only content analysis logic\n\u25A1 Open/Closed: Implements interface, can be decorated\n\u25A1 Liskov Substitution: Fulfills IContentAnalysisService contract\n\u25A1 Interface Segregation: Uses focused interfaces for deps\n\u25A1 Dependency Inversion: Injects PathResolver, IGuardrailService\n\u25A1 Cyclomatic Complexity: Target ~5 per method, extract helpers\n\u25A1 Pure Functions: Static helpers for regex matching\n\u25A1 Immutability: Return immutable collections\n\u25A1 Static Methods: Regex compilation, line extraction helpers\n\u25A1 Railway-Oriented: Chain with Bind/Map, return Result\u003CT\u003E",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.7686721-06:00",
-      "updatedAt": "2026-01-18T16:19:57.4382801-06:00",
-      "completedAt": "2026-01-18T16:19:57.4382801-06:00",
-      "summary": "Created ContentAnalysisService implementing IContentAnalysisService with 3 methods:\n\n- \u0060CountPatternMatchesAsync\u0060: Counts regex matches, returns exact count \u002B samples\n- \u0060SearchWithContextAsync\u0060: Returns matches with N context lines before/after\n- \u0060CountLinesAsync\u0060: Counts total lines in file\n\nFeatures:\n- Railway-oriented Result\u003CT\u003E throughout\n- Regex compilation with error handling and 5s timeout\n- Guardrail checks (call count, matches limit)\n- PathResolver for safe path resolution\n- Static helper methods for regex compilation and context extraction\n\nBuild succeeded with 0 warnings, 0 errors.",
-      "relatedFiles": [
+          "description": "New file to create"
+        },
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/ContentAnalysisService.cs",
-          "type": "OTHER",
-          "description": "New service implementation"
+          "type": "REFERENCE",
+          "description": "Pattern for service implementation"
         },
         {
           "path": "src/RecursiveContext.Mcp.Server/Services/Interfaces.cs",
@@ -962,401 +85,287 @@
           "description": "Interface to implement"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Implements all 3 interface methods\n- Uses Railway-oriented Result\u003CT\u003E throughout\n- Checks guardrails before operations\n- Uses PathResolver for safe path resolution\n- Handles regex compilation errors gracefully\n- Returns deterministic results (same input = same output)"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- All 5 interface methods implemented\n- Uses Result\u003CT\u003E monad consistently\n- Uses ConfigureAwait(false) on all awaits\n- Injects PathResolver and IGuardrailService\n- Static helper methods for pure functions\n- Cyclomatic complexity ~5 or less per method"
     },
     {
-      "id": "5a052c72-c6a0-4d85-a1ac-d26bc847f83a",
-      "name": "9. Implement ChunkingService",
-      "description": "**WHAT**: Create \u0060Services/ChunkingService.cs\u0060 implementing \u0060IChunkingService\u0060:\n- Inject \u0060PathResolver\u0060, \u0060IGuardrailService\u0060\n- \u0060GetChunkInfoAsync\u0060: Read lines, use \u0060.Chunk(size)\u0060, calculate boundaries\n- \u0060ReadChunkAsync\u0060: Read lines, use \u0060.Chunk(size)\u0060, return specific chunk\n\nUse LINQ \u0060.Chunk()\u0060 (NET 6\u002B) and \u0060.Index()\u0060 (.NET 9) for clean implementation.\n\n**WHY**: Enables systematic file traversal without guessing. LLM can plan exact iteration strategy before reading. Chunk boundaries are deterministic - same file \u002B same chunk size = same boundaries. This is critical for reproducible recursive reasoning.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only chunking logic\n\u25A1 Open/Closed: Implements interface, can be decorated\n\u25A1 Liskov Substitution: Fulfills IChunkingService contract\n\u25A1 Interface Segregation: Uses focused interfaces for deps\n\u25A1 Dependency Inversion: Injects PathResolver, IGuardrailService\n\u25A1 Cyclomatic Complexity: Target ~5 per method\n\u25A1 Pure Functions: Chunk calculation is pure\n\u25A1 Immutability: Return immutable ChunkInfo, ChunkContent\n\u25A1 Static Methods: Boundary calculation helpers\n\u25A1 Railway-Oriented: Chain with Bind/Map, return Result\u003CT\u003E",
+      "id": "05aca5ef-c7cd-4af9-b83a-9d6c04680877",
+      "name": "Register AdvancedAnalysisService in DI container",
+      "description": "**WHAT**: Modify \u0060src/RecursiveContext.Mcp.Server/Server/ServerServices.cs\u0060 to register \u0060IAdvancedAnalysisService\u0060 with \u0060AdvancedAnalysisService\u0060 implementation:\n\n\u0060\u0060\u0060csharp\nservices.AddSingleton\u003CIAdvancedAnalysisService, AdvancedAnalysisService\u003E();\n\u0060\u0060\u0060\n\nAdd this in the \u0022Analysis services\u0022 section alongside the existing ContentAnalysisService registration.\n\n**WHY**: Without DI registration, the MCP tools cannot receive the service through constructor injection. Following the existing singleton pattern ensures one instance handles all requests, which is appropriate since the service is stateless and thread-safe.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.7873982-06:00",
-      "updatedAt": "2026-01-18T16:20:32.5293996-06:00",
-      "completedAt": "2026-01-18T16:20:32.5293996-06:00",
-      "summary": "Created ChunkingService implementing IChunkingService with 2 methods:\n\n- \u0060GetChunkInfoAsync\u0060: Returns total lines, chunk count, and exact boundaries\n- \u0060ReadChunkAsync\u0060: Returns content for specific chunk index with 1-based line numbers\n\nFeatures:\n- Uses LINQ .Chunk() for clean chunking\n- Validates chunk index bounds\n- Checks MaxChunkSize guardrail\n- Handles empty files gracefully\n- Deterministic boundaries (same file \u002B size = same result)\n- Static helper for boundary calculation\n\nBuild succeeded with 0 warnings, 0 errors.",
-      "relatedFiles": [
+      "dependencies": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Services/ChunkingService.cs",
-          "type": "OTHER",
-          "description": "New service implementation"
+          "taskId": "f4aa28c7-3cd0-41af-8e09-d55496f9edd2"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Implements both interface methods\n- Uses LINQ .Chunk() method\n- Validates chunk index bounds\n- Checks MaxChunkSize guardrail\n- Returns deterministic chunk boundaries\n- Handles empty files gracefully"
-    },
-    {
-      "id": "80dfa500-534a-4f4d-a743-162827c6b53a",
-      "name": "10. Implement AggregationService",
-      "description": "**WHAT**: Create \u0060Services/AggregationService.cs\u0060 implementing \u0060IAggregationService\u0060:\n- Inject \u0060PathResolver\u0060, \u0060IGuardrailService\u0060, \u0060IPatternMatchingService\u0060, \u0060IContentAnalysisService\u0060\n- \u0060AggregateMatchesAsync\u0060: Find files by pattern, count matches in each, aggregate totals\n- \u0060CountFilesAsync\u0060: Count matching files without returning paths\n\nUse LINQ for aggregation, respect \u0060MaxFilesPerAggregation\u0060 guardrail.\n\n**WHY**: Answers codebase-wide questions in one call. \u0027How many TODOs?\u0027 returns exact count plus breakdown by file. Without this, LLM must enumerate files (hitting pagination), read each file, count matches, sum - extremely expensive and error-prone.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Only aggregation logic\n\u25A1 Open/Closed: Implements interface, can be decorated\n\u25A1 Liskov Substitution: Fulfills IAggregationService contract\n\u25A1 Interface Segregation: Uses focused interfaces for deps\n\u25A1 Dependency Inversion: Injects multiple services\n\u25A1 Cyclomatic Complexity: Target ~5, extract processing helpers\n\u25A1 Pure Functions: Aggregation logic is pure\n\u25A1 Immutability: Return immutable AggregateResult\n\u25A1 Static Methods: Aggregation helpers\n\u25A1 Railway-Oriented: Chain operations, short-circuit on failure",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.8080238-06:00",
-      "updatedAt": "2026-01-18T16:21:49.040511-06:00",
-      "completedAt": "2026-01-18T16:21:49.040511-06:00",
-      "summary": "Created AggregationService implementing IAggregationService with 2 methods:\n\n- \u0060AggregateMatchesAsync\u0060: Finds files by glob, counts regex matches per file, returns totals \u002B breakdown\n- \u0060CountFilesAsync\u0060: Counts files matching pattern with recursive option\n\nFeatures:\n- Uses IPatternMatchingService for file discovery\n- Validates regex pattern upfront\n- Respects MaxFilesPerAggregation limit\n- Per-file match counts with total aggregation\n- Handles IO errors gracefully (skips unreadable files)\n- Railway-oriented with Result\u003CT\u003E\n\nBuild succeeded with 0 warnings, 0 errors.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Services/AggregationService.cs",
-          "type": "OTHER",
-          "description": "New service implementation"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Implements both interface methods\n- Respects MaxFilesPerAggregation limit\n- Uses IPatternMatchingService for file discovery\n- Uses IContentAnalysisService for counting\n- Returns per-file breakdown\n- Handles empty directories gracefully"
-    },
-    {
-      "id": "642b4f0b-02a1-4257-a0e2-dff91a57f446",
-      "name": "11. Register New Services in DI Container",
-      "description": "**WHAT**: Update \u0060Server/ServerServices.cs\u0060 to register new services:\n\u0060\u0060\u0060csharp\nservices.AddSingleton\u003CIContentAnalysisService, ContentAnalysisService\u003E();\nservices.AddSingleton\u003CIChunkingService, ChunkingService\u003E();\nservices.AddSingleton\u003CIAggregationService, AggregationService\u003E();\n\u0060\u0060\u0060\n\n**WHY**: MCP tools receive services via DI. Without registration, tools cannot access the analysis services. Following existing pattern of Singleton lifetime since services are stateless (except GuardrailService call counter).\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: ServerServices configures DI only\n\u25A1 Open/Closed: Adding registrations, not modifying\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Register interface-implementation pairs\n\u25A1 Dependency Inversion: Services registered by interface\n\u25A1 Cyclomatic Complexity: N/A - configuration only\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Configure is static\n\u25A1 Railway-Oriented: N/A",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.8270984-06:00",
-      "updatedAt": "2026-01-18T16:22:16.4795573-06:00",
-      "completedAt": "2026-01-18T16:22:16.4795573-06:00",
-      "summary": "Registered 3 new services in ServerServices.cs DI container:\n\n- \u0060IAggregationService\u0060 \u2192 \u0060AggregationService\u0060\n- \u0060IChunkingService\u0060 \u2192 \u0060ChunkingService\u0060\n- \u0060IContentAnalysisService\u0060 \u2192 \u0060ContentAnalysisService\u0060\n\nAll use Singleton lifetime consistent with existing services. Maintained alphabetical order within the new section. Build succeeded with 0 warnings, 0 errors.",
+      "createdAt": "2026-01-18T20:09:38.0065697-06:00",
+      "updatedAt": "2026-01-18T20:12:50.5791426-06:00",
+      "completedAt": "2026-01-18T20:12:50.5791426-06:00",
+      "summary": "Added DI registration for IAdvancedAnalysisService in ServerServices.cs alongside other analysis services. The line \u0027services.AddSingleton\u003CIAdvancedAnalysisService, AdvancedAnalysisService\u003E();\u0027 was added in the Analysis services section. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
           "path": "src/RecursiveContext.Mcp.Server/Server/ServerServices.cs",
           "type": "TO_MODIFY",
-          "description": "Add DI registrations"
+          "description": "Add DI registration"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- All 3 new services registered\n- Uses Singleton lifetime\n- Maintains alphabetical order of registrations\n- Project compiles without errors"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- Registration added in correct section\n- Uses AddSingleton pattern\n- Project compiles without errors"
     },
     {
-      "id": "51362b0b-083f-4af8-a21e-0fdb87fdce3c",
-      "name": "12. Create Tools/Analysis Folder Structure",
-      "description": "**WHAT**: Create new folder \u0060Tools/Analysis/\u0060 for analysis tool implementations. This follows the existing pattern where related tools are grouped (FileSystem, DotNet, Search, etc.).\n\n**WHY**: Organizational consistency with existing codebase. All analysis tools logically belong together. Makes navigation and maintenance easier. Follows Single Responsibility at the folder level.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Folder for analysis tools only\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: N/A",
+      "id": "1dc2d1eb-e0ec-4e01-91b9-a02f2c573c07",
+      "name": "Create CountCompoundPatternTool",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Tools/Analysis/CountCompoundPatternTool.cs\u0060 exposing the \u0060count_compound_pattern\u0060 MCP tool:\n\n- Tool name: \u0060count_compound_pattern\u0060\n- Description: \u0022Count lines matching multiple regex patterns. Supports AND (all patterns match), OR (any pattern matches), or SEQUENCE (patterns appear in order) modes.\u0022\n- Parameters: path, patterns (string array), matchMode (\u0022all\u0022|\u0022any\u0022|\u0022sequence\u0022), includeSamples (default: false), maxSamples (default: 5)\n\n**WHY**: This tool enables complex queries like \u0022lines where character speaks a question\u0022 without Python fallback. The matchMode parameter provides flexibility for different use cases while keeping a single tool interface.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.8446093-06:00",
-      "updatedAt": "2026-01-18T16:22:32.6583773-06:00",
-      "completedAt": "2026-01-18T16:22:32.6583773-06:00",
-      "summary": "Created Tools/Analysis folder alongside existing tool folders (DotNet, FileSystem, Metadata, Search, Server). Folder structure is consistent with project conventions. Ready for analysis tool implementations.",
+      "dependencies": [
+        {
+          "taskId": "05aca5ef-c7cd-4af9-b83a-9d6c04680877"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.0206998-06:00",
+      "updatedAt": "2026-01-18T20:13:11.8754996-06:00",
+      "completedAt": "2026-01-18T20:13:11.8754996-06:00",
+      "summary": "Created CountCompoundPatternTool.cs with [McpServerToolType] and [McpServerTool] attributes. Tool name: count_compound_pattern. Static class with static method, [Description] on class, method, and all 6 parameters (path, patterns, matchMode, includeSamples, maxSamples, ct). Uses ToolResponseFormatter.FormatResult. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis",
-          "type": "OTHER",
-          "description": "New folder for analysis tools"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Folder exists at correct path\n- Follows existing naming conventions"
-    },
-    {
-      "id": "af0f5c3c-069d-4887-b323-4c089a2bbb59",
-      "name": "13. Implement CountPatternMatchesTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/CountPatternMatchesTool.cs\u0060:\n\u0060\u0060\u0060csharp\n[McpServerToolType]\ninternal static class CountPatternMatchesTool\n{\n    [McpServerTool(Name = \u0022count_pattern_matches\u0022)]\n    [Description(\u0022Count regex pattern matches in a file. Returns exact count, not estimates.\u0022)]\n    public static async Task\u003Cstring\u003E CountPatternMatches(\n        IContentAnalysisService analysisService,\n        [Description(\u0022File path to search\u0022)] string path,\n        [Description(\u0022Regex pattern to count\u0022)] string pattern,\n        [Description(\u0022Max matches to count. Default: 1000\u0022)] int maxResults = 1000,\n        CancellationToken ct = default)\n}\n\u0060\u0060\u0060\n\n**WHY**: THE core tool for deterministic counting. \u0027How many classes?\u0027 returns exact integer. This is the primary success criterion - LLM must be able to get exact counts without parsing raw text.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IContentAnalysisService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2 (call service, format result)\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.8628799-06:00",
-      "updatedAt": "2026-01-18T16:22:58.9420527-06:00",
-      "completedAt": "2026-01-18T16:22:58.9420527-06:00",
-      "summary": "Created CountPatternMatchesTool with [McpServerToolType] and [McpServerTool(Name = \u0022count_pattern_matches\u0022)] attributes. Tool delegates to IContentAnalysisService and returns JSON via ToolResponseFormatter. All parameters have [Description] attributes. Follows existing tool patterns exactly. Build succeeded.",
-      "relatedFiles": [
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountCompoundPatternTool.cs",
+          "type": "TO_MODIFY",
+          "description": "New tool file to create"
+        },
         {
           "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountPatternMatchesTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
+          "type": "REFERENCE",
+          "description": "Pattern for tool structure"
+        }
+      ],
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- [McpServerToolType] and [McpServerTool] attributes present\n- [Description] attributes on class, method, and all parameters\n- Static class with static method\n- Returns string via ToolResponseFormatter.FormatResult"
+    },
+    {
+      "id": "f631b3d1-740b-4d5d-a504-117d8c363fde",
+      "name": "Create FindConsecutiveRunsTool",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Tools/Analysis/FindConsecutiveRunsTool.cs\u0060 exposing the \u0060find_consecutive_runs\u0060 MCP tool:\n\n- Tool name: \u0060find_consecutive_runs\u0060\n- Description: \u0022Find runs of consecutive lines matching a regex pattern. Useful for finding longest speeches, repeated sections, or blocks of similar content.\u0022\n- Parameters: path, pattern, minRunLength (default: 2), returnLongestOnly (default: true), maxRuns (default: 10)\n\n**WHY**: This tool enables unique analysis like \u0022which character has the longest consecutive speech\u0022 that is impossible with simple pattern counting. Finding consecutive matching lines is a common text analysis need.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
+      "status": "Completed",
+      "dependencies": [
+        {
+          "taskId": "05aca5ef-c7cd-4af9-b83a-9d6c04680877"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.0393502-06:00",
+      "updatedAt": "2026-01-18T20:13:33.8169949-06:00",
+      "completedAt": "2026-01-18T20:13:33.8169949-06:00",
+      "summary": "Created FindConsecutiveRunsTool.cs with [McpServerToolType] and [McpServerTool] attributes. Tool name: find_consecutive_runs. Static class with static method, [Description] on class, method, and all parameters. Uses ToolResponseFormatter.FormatResult. Build succeeded with 0 errors and 0 warnings.",
+      "relatedFiles": [
+        {
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/FindConsecutiveRunsTool.cs",
+          "type": "TO_MODIFY",
+          "description": "New tool file to create"
         },
         {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Search/FindFilesByPatternTool.cs",
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountPatternMatchesTool.cs",
           "type": "REFERENCE",
-          "description": "Pattern to follow"
+          "description": "Pattern for tool structure"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Tool has [McpServerToolType] and [McpServerTool] attributes\n- All parameters have [Description]\n- Returns JSON via ToolResponseFormatter\n- Follows existing tool patterns exactly"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- [McpServerToolType] and [McpServerTool] attributes present\n- [Description] attributes on class, method, and all parameters\n- Static class with static method\n- Returns string via ToolResponseFormatter.FormatResult"
     },
     {
-      "id": "8f7ab315-b2ea-4227-8b6c-b3a77589c925",
-      "name": "14. Implement SearchWithContextTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/SearchWithContextTool.cs\u0060:\n- Tool name: \u0060search_with_context\u0060\n- Parameters: path, pattern (regex), contextLines (default 2), maxResults (default 100)\n- Returns: Array of matches with line numbers and context\n\n**WHY**: Enables precise navigation to specific code locations. LLM can search for \u0027TODO\u0027 and get exact line numbers plus surrounding context to understand each occurrence. Deterministic: same pattern = same matches with same line numbers.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IContentAnalysisService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
+      "id": "51e1e569-3bfb-4559-862a-a25c1839ee0a",
+      "name": "Create AggregatePatternMatchesTool",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Tools/Analysis/AggregatePatternMatchesTool.cs\u0060 exposing the \u0060aggregate_pattern_matches\u0060 MCP tool:\n\n- Tool name: \u0060aggregate_pattern_matches\u0060\n- Description: \u0022Group and count pattern matches, returning top N groups. Useful for word frequency, categorization, or breakdown analysis.\u0022\n- Parameters: path, pattern (regex with optional capture group), groupBy (\u0022captureGroup1\u0022|\u0022firstWord\u0022|\u0022fullMatch\u0022), topN (default: 10), includeSamples (default: true)\n\n**WHY**: This is the highest priority tool as grouped analysis is the most common complex query type. It enables queries like \u0022break down biblical words by word and show top 3\u0022 without Python fallback.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.8845609-06:00",
-      "updatedAt": "2026-01-18T16:23:21.3794472-06:00",
-      "completedAt": "2026-01-18T16:23:21.3794472-06:00",
-      "summary": "Created SearchWithContextTool (search_with_context) with parameters: path, pattern, contextLines (default 2), maxResults (default 100). Returns matches with line numbers and surrounding context. All parameters documented. Build succeeded.",
+      "dependencies": [
+        {
+          "taskId": "05aca5ef-c7cd-4af9-b83a-9d6c04680877"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.0543533-06:00",
+      "updatedAt": "2026-01-18T20:14:01.6441911-06:00",
+      "completedAt": "2026-01-18T20:14:01.6441911-06:00",
+      "summary": "Created AggregatePatternMatchesTool.cs with [McpServerToolType] and [McpServerTool] attributes. Tool name: aggregate_pattern_matches. Static class with static method, [Description] on class, method, and all parameters. Uses ToolResponseFormatter.FormatResult. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/SearchWithContextTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/AggregatePatternMatchesTool.cs",
+          "type": "TO_MODIFY",
+          "description": "New tool file to create"
+        },
+        {
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountPatternMatchesTool.cs",
+          "type": "REFERENCE",
+          "description": "Pattern for tool structure"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Proper MCP attributes\n- All parameters documented\n- Returns structured JSON with line numbers\n- Follows existing tool patterns"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- [McpServerToolType] and [McpServerTool] attributes present\n- [Description] attributes on class, method, and all parameters\n- Static class with static method\n- Returns string via ToolResponseFormatter.FormatResult"
     },
     {
-      "id": "2c956e83-e2f9-42ea-8812-0d74333ef2bf",
-      "name": "15. Implement CountLinesTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/CountLinesTool.cs\u0060:\n- Tool name: \u0060count_lines\u0060\n- Parameters: path\n- Returns: int (total line count)\n\n**WHY**: Know file size before deciding how to process. LLM can check line count before deciding whether to read whole file or use chunking. Simple but essential for planning recursive traversal strategies.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IContentAnalysisService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
+      "id": "c937e843-b7ca-46e2-9d11-0aa98859b28b",
+      "name": "Create SampleMatchesDistributedTool",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Tools/Analysis/SampleMatchesDistributedTool.cs\u0060 exposing the \u0060sample_matches_distributed\u0060 MCP tool:\n\n- Tool name: \u0060sample_matches_distributed\u0060\n- Description: \u0022Get diverse sample matches spread across the file. Useful for getting examples from different sections of large documents.\u0022\n- Parameters: path, pattern, sampleCount (default: 5), distribution (\u0022even\u0022|\u0022random\u0022|\u0022first\u0022|\u0022last\u0022)\n\n**WHY**: Current sampling takes first N matches, which may all be from the beginning of a file. Distributed sampling provides more representative examples from different parts of the document, improving analysis quality.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.9192066-06:00",
-      "updatedAt": "2026-01-18T16:23:42.2505878-06:00",
-      "completedAt": "2026-01-18T16:23:42.2505878-06:00",
-      "summary": "Created CountLinesTool (count_lines) with path parameter. Returns exact line count for file size planning. Follows existing tool patterns. Build succeeded.",
+      "dependencies": [
+        {
+          "taskId": "05aca5ef-c7cd-4af9-b83a-9d6c04680877"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.0714536-06:00",
+      "updatedAt": "2026-01-18T20:14:22.3526769-06:00",
+      "completedAt": "2026-01-18T20:14:22.3526769-06:00",
+      "summary": "Created SampleMatchesDistributedTool.cs with [McpServerToolType] and [McpServerTool] attributes. Tool name: sample_matches_distributed. Static class with static method, [Description] on class, method, and all parameters. Uses ToolResponseFormatter.FormatResult. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountLinesTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/SampleMatchesDistributedTool.cs",
+          "type": "TO_MODIFY",
+          "description": "New tool file to create"
+        },
+        {
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountPatternMatchesTool.cs",
+          "type": "REFERENCE",
+          "description": "Pattern for tool structure"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Proper MCP attributes\n- Returns exact line count\n- Handles empty files (returns 0)\n- Follows existing tool patterns"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- [McpServerToolType] and [McpServerTool] attributes present\n- [Description] attributes on class, method, and all parameters\n- Static class with static method\n- Returns string via ToolResponseFormatter.FormatResult"
     },
     {
-      "id": "ce526d91-2dde-4ccf-8f88-f66bc4893a0e",
-      "name": "16. Implement GetChunkInfoTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/GetChunkInfoTool.cs\u0060:\n- Tool name: \u0060get_chunk_info\u0060\n- Parameters: path, chunkSizeLines (default 50)\n- Returns: { totalLines, chunkCount, chunkBoundaries[] }\n\n**WHY**: LLM can plan systematic traversal without guessing. Returns exact chunk boundaries for deterministic iteration. Pairs with \u0060read_chunk_by_index\u0060 for systematic file processing.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IChunkingService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
+      "id": "cba18b4a-64f5-489b-8ade-c3071972df94",
+      "name": "Create ComparePatternAcrossFilesTool",
+      "description": "**WHAT**: Create a new file \u0060src/RecursiveContext.Mcp.Server/Tools/Analysis/ComparePatternAcrossFilesTool.cs\u0060 exposing the \u0060compare_pattern_across_files\u0060 MCP tool:\n\n- Tool name: \u0060compare_pattern_across_files\u0060\n- Description: \u0022Compare pattern match counts across multiple files. Useful for comparing word usage or content patterns between documents.\u0022\n- Parameters: paths (string array), pattern, computeRatio (default: false)\n\n**WHY**: While this could be done with multiple count_pattern_matches calls, a dedicated tool provides cleaner output with comparison summary and optional ratio computation, reducing token usage and improving user experience.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.9455512-06:00",
-      "updatedAt": "2026-01-18T16:24:03.9563909-06:00",
-      "completedAt": "2026-01-18T16:24:03.9563909-06:00",
-      "summary": "Created GetChunkInfoTool (get_chunk_info) with path and chunkSizeLines parameters. Returns totalLines, chunkCount, and chunkBoundaries for planning systematic traversal. Build succeeded.",
+      "dependencies": [
+        {
+          "taskId": "05aca5ef-c7cd-4af9-b83a-9d6c04680877"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.0852414-06:00",
+      "updatedAt": "2026-01-18T20:14:43.0840846-06:00",
+      "completedAt": "2026-01-18T20:14:43.0840846-06:00",
+      "summary": "Created ComparePatternAcrossFilesTool.cs with [McpServerToolType] and [McpServerTool] attributes. Tool name: compare_pattern_across_files. Static class with static method, [Description] on class, method, and all parameters. Uses ToolResponseFormatter.FormatResult. Build succeeded with 0 errors and 0 warnings.",
       "relatedFiles": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/GetChunkInfoTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/ComparePatternAcrossFilesTool.cs",
+          "type": "TO_MODIFY",
+          "description": "New tool file to create"
+        },
+        {
+          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountPatternMatchesTool.cs",
+          "type": "REFERENCE",
+          "description": "Pattern for tool structure"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Proper MCP attributes\n- Returns all chunk boundary info\n- Deterministic (same file \u002B size = same boundaries)\n- Follows existing tool patterns"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- File compiles without errors\n- [McpServerToolType] and [McpServerTool] attributes present\n- [Description] attributes on class, method, and all parameters\n- Static class with static method\n- Returns string via ToolResponseFormatter.FormatResult"
     },
     {
-      "id": "5b60baa4-8ff4-4786-8ca0-4149f371fe61",
-      "name": "17. Implement ReadChunkByIndexTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/ReadChunkByIndexTool.cs\u0060:\n- Tool name: \u0060read_chunk_by_index\u0060\n- Parameters: path, chunkIndex, chunkSizeLines (default 50)\n- Returns: { chunkIndex, startLine, endLine, content }\n\n**WHY**: Companion to \u0060get_chunk_info\u0060 for systematic iteration. LLM can iterate: \u0060for i in 0..chunk_count: read_chunk_by_index(path, i)\u0060. Enables processing files larger than context window through deterministic chunking.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IChunkingService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
+      "id": "f74e0f3b-ed81-4788-a203-45f417fcbb70",
+      "name": "Create AdvancedAnalysisServiceTests",
+      "description": "**WHAT**: Create a new test file \u0060tests/RecursiveContext.Mcp.Server.Tests/Services/AdvancedAnalysisServiceTests.cs\u0060 with comprehensive unit tests for all 5 service methods:\n\n1. CountCompoundPatternAsync tests:\n   - Test \u0022all\u0022 mode (AND logic)\n   - Test \u0022any\u0022 mode (OR logic)\n   - Test \u0022sequence\u0022 mode\n   - Test with includeSamples true/false\n   - Test invalid pattern handling\n\n2. FindConsecutiveRunsAsync tests:\n   - Test finding single run\n   - Test finding multiple runs\n   - Test minRunLength filtering\n   - Test returnLongestOnly flag\n\n3. AggregatePatternMatchesAsync tests:\n   - Test groupBy captureGroup1\n   - Test groupBy firstWord\n   - Test topN limiting\n   - Test includeSamples\n\n4. SampleMatchesDistributedAsync tests:\n   - Test \u0022even\u0022 distribution\n   - Test \u0022random\u0022 distribution\n   - Test \u0022first\u0022 and \u0022last\u0022 distributions\n\n5. ComparePatternAcrossFilesAsync tests:\n   - Test comparing two files\n   - Test computeRatio flag\n   - Test handling missing files\n\n**WHY**: Unit tests ensure the service logic is correct and provides a safety net for future changes. Following xUnit patterns already established in the project (see ContentAnalysisServiceTests.cs).\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.9621416-06:00",
-      "updatedAt": "2026-01-18T16:24:27.8300579-06:00",
-      "completedAt": "2026-01-18T16:24:27.8300579-06:00",
-      "summary": "Created ReadChunkByIndexTool (read_chunk_by_index) with path, chunkIndex, chunkSizeLines parameters. Returns chunk content with startLine, endLine metadata. Pairs with get_chunk_info for iteration. Build succeeded.",
+      "dependencies": [
+        {
+          "taskId": "f4aa28c7-3cd0-41af-8e09-d55496f9edd2"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.1181989-06:00",
+      "updatedAt": "2026-01-18T20:16:09.3135332-06:00",
+      "completedAt": "2026-01-18T20:16:09.3135332-06:00",
+      "summary": "Created AdvancedAnalysisServiceTests.cs with 22 comprehensive unit tests covering all 5 service methods: CountCompoundPatternAsync (5 tests), FindConsecutiveRunsAsync (4 tests), AggregatePatternMatchesAsync (4 tests), SampleMatchesDistributedAsync (4 tests), ComparePatternAcrossFilesAsync (4 tests), plus error handling tests. All tests pass using xUnit [Fact] pattern with temp files for file-based testing.",
       "relatedFiles": [
         {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/ReadChunkByIndexTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Proper MCP attributes\n- Returns exact chunk content with metadata\n- Validates chunk index bounds\n- Follows existing tool patterns"
-    },
-    {
-      "id": "d3a26b59-c97a-42de-b78c-b159c48b23ca",
-      "name": "18. Implement CountFilesTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/CountFilesTool.cs\u0060:\n- Tool name: \u0060count_files\u0060\n- Parameters: directory, pattern (glob, default \u0027*\u0027), recursive (bool, default true)\n- Returns: int (file count)\n\n**WHY**: Know scope before enumerating. LLM can check \u0027how many files match?\u0027 before deciding to list them. Prevents wasted tool calls when there are thousands of matches. Simple planning aid.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IAggregationService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:18.9847492-06:00",
-      "updatedAt": "2026-01-18T16:24:51.2849002-06:00",
-      "completedAt": "2026-01-18T16:24:51.2849002-06:00",
-      "summary": "Created CountFilesTool (count_files) with directory, pattern, recursive parameters. Returns exact file count for scope checking before enumeration. Build succeeded.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/CountFilesTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Proper MCP attributes\n- Returns exact file count\n- Supports recursive flag\n- Follows existing tool patterns"
-    },
-    {
-      "id": "549b6e36-f57b-458f-a4c4-927d1861fb76",
-      "name": "19. Implement AggregateMatchesTool",
-      "description": "**WHAT**: Create \u0060Tools/Analysis/AggregateMatchesTool.cs\u0060:\n- Tool name: \u0060aggregate_matches\u0060\n- Parameters: directory, filePattern (glob), searchPattern (regex), maxFiles (default 100)\n- Returns: { filesSearched, totalMatches, matchesByFile[] }\n\n**WHY**: Answer codebase-wide questions in one call. \u0027How many TODOs in the codebase?\u0027 returns exact count plus breakdown. Most powerful analysis tool - eliminates need for LLM to enumerate and aggregate manually.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: One tool per file\n\u25A1 Open/Closed: Static class, no inheritance\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: Uses IAggregationService\n\u25A1 Dependency Inversion: Injects service interface\n\u25A1 Cyclomatic Complexity: ~2\n\u25A1 Pure Functions: Delegates to service\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: Class and method are static\n\u25A1 Railway-Oriented: Uses ToolResponseFormatter.FormatResult",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.0049573-06:00",
-      "updatedAt": "2026-01-18T16:25:14.7995105-06:00",
-      "completedAt": "2026-01-18T16:25:14.7995105-06:00",
-      "summary": "Created AggregateMatchesTool (aggregate_matches) with directory, filePattern, searchPattern, maxFiles parameters. Returns filesSearched, totalMatches, matchesByFile breakdown. Most powerful analysis tool for codebase-wide queries. Build succeeded.",
-      "relatedFiles": [
-        {
-          "path": "src/RecursiveContext.Mcp.Server/Tools/Analysis/AggregateMatchesTool.cs",
-          "type": "OTHER",
-          "description": "New tool implementation"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Proper MCP attributes\n- Returns total and per-file breakdown\n- Respects maxFiles limit\n- Follows existing tool patterns"
-    },
-    {
-      "id": "ec5a3b06-9ea1-43ae-8c99-0336ab8ac969",
-      "name": "20. Create ContentAnalysisService Tests",
-      "description": "**WHAT**: Create \u0060tests/RecursiveContext.Mcp.Server.Tests/Services/ContentAnalysisServiceTests.cs\u0060:\n- Test \u0060CountPatternMatchesAsync\u0060 with various patterns\n- Test \u0060SearchWithContextAsync\u0060 with context lines\n- Test \u0060CountLinesAsync\u0060 with empty/normal files\n- Prove determinism: same input = same output across runs\n\n**WHY**: Tests prove deterministic behavior - the core requirement. Must verify same file \u002B same pattern = same count every time. Tests also cover edge cases: empty files, no matches, invalid regex, files exceeding limits.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Tests for one service\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - tests\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Test both success and failure paths",
-      "status": "InProgress",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.0215808-06:00",
-      "updatedAt": "2026-01-18T16:25:19.4641518-06:00",
-      "relatedFiles": [
+          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/AdvancedAnalysisServiceTests.cs",
+          "type": "TO_MODIFY",
+          "description": "New test file to create"
+        },
         {
           "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/ContentAnalysisServiceTests.cs",
-          "type": "OTHER",
-          "description": "New test file"
+          "type": "REFERENCE",
+          "description": "Pattern for test structure"
+        }
+      ],
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- All tests pass\n- Tests cover all 5 methods\n- Tests cover success and failure paths\n- Uses xUnit [Fact] and [Theory] appropriately\n- Uses temp files for file-based testing"
+    },
+    {
+      "id": "f5f3100c-332e-4b32-8056-9196c9e67a3a",
+      "name": "Build solution and fix compilation errors",
+      "description": "**WHAT**: Run \u0060dotnet build\u0060 on the solution and fix any compilation errors that arise from the new code.\n\n**WHY**: This is a critical integration verification step. All the new files must compile together without errors before running tests. Any issues with namespaces, missing usings, or type mismatches need to be resolved.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
+      "status": "Completed",
+      "dependencies": [
+        {
+          "taskId": "f74e0f3b-ed81-4788-a203-45f417fcbb70"
         },
         {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/PatternMatchingServiceTests.cs",
-          "type": "REFERENCE",
-          "description": "Pattern to follow"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Tests for all 3 service methods\n- Determinism test: run same operation twice, assert equal results\n- Edge case tests: empty file, no matches, invalid regex\n- Binary file handling test\n- Uses temp directory pattern from existing tests"
-    },
-    {
-      "id": "7e0ad9f8-1519-4ab8-8281-2451ea451546",
-      "name": "21. Create ChunkingService Tests",
-      "description": "**WHAT**: Create \u0060tests/RecursiveContext.Mcp.Server.Tests/Services/ChunkingServiceTests.cs\u0060:\n- Test \u0060GetChunkInfoAsync\u0060 returns correct boundaries\n- Test \u0060ReadChunkAsync\u0060 returns correct content\n- Prove chunk boundaries are deterministic\n- Test invalid chunk index handling\n\n**WHY**: Chunking must be 100% deterministic. Same file \u002B same chunk size = same boundaries every time. Tests verify mathematical correctness of chunk calculation and proper error handling for out-of-bounds indices.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Tests for one service\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - tests\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Test both success and failure paths",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.0374534-06:00",
-      "updatedAt": "2026-01-18T16:32:44.0163756-06:00",
-      "completedAt": "2026-01-18T16:32:44.0163756-06:00",
-      "summary": "Created ChunkingServiceTests.cs with 19 tests covering GetChunkInfoAsync (7 tests), ReadChunkAsync (6 tests), and determinism verification (4 tests). All tests pass. Mathematical correctness of boundaries verified.",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/ChunkingServiceTests.cs",
-          "type": "OTHER",
-          "description": "New test file"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Tests for both service methods\n- Boundary calculation verified mathematically\n- Empty file test\n- Out-of-bounds chunk index returns failure\n- MaxChunkSize guardrail test"
-    },
-    {
-      "id": "df0b31fd-bf43-4b51-a23a-a7903b64741b",
-      "name": "22. Create AggregationService Tests",
-      "description": "**WHAT**: Create \u0060tests/RecursiveContext.Mcp.Server.Tests/Services/AggregationServiceTests.cs\u0060:\n- Test \u0060AggregateMatchesAsync\u0060 across multiple files\n- Test \u0060CountFilesAsync\u0060 with various patterns\n- Verify totals equal sum of per-file counts\n- Test MaxFilesPerAggregation limit\n\n**WHY**: Aggregation is the most complex service - it coordinates file discovery and content analysis. Tests verify correct aggregation logic and that guardrails are respected. Must prove reproducibility.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Tests for one service\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - tests\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Test both success and failure paths",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.0642384-06:00",
-      "updatedAt": "2026-01-18T16:35:36.2576729-06:00",
-      "completedAt": "2026-01-18T16:35:36.2576729-06:00",
-      "summary": "Created AggregationServiceTests.cs with 18 tests covering CountFilesAsync (7 tests), AggregateMatchesAsync (8 tests), determinism verification (2 tests), and guardrail limit tests (1 test). All tests pass.",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/AggregationServiceTests.cs",
-          "type": "OTHER",
-          "description": "New test file"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Tests for both service methods\n- Verify total = sum of per-file counts\n- Empty directory test\n- MaxFilesPerAggregation limit enforced\n- Recursive/non-recursive count test"
-    },
-    {
-      "id": "1f157c49-6e80-40c0-b93c-454e0ffc618c",
-      "name": "23. Create GuardrailService Extension Tests",
-      "description": "**WHAT**: Update \u0060tests/RecursiveContext.Mcp.Server.Tests/Services/GuardrailServiceTests.cs\u0060:\n- Test new \u0060CheckFilesLimit\u0060 method\n- Test new \u0060CheckMatchesLimit\u0060 method\n- Test new \u0060CheckChunkSize\u0060 method\n- Verify failure when limits exceeded\n\n**WHY**: Guardrails are critical for server safety. Tests ensure limits are enforced correctly. Without these, runaway operations could exhaust memory on large codebases.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Tests for one service\n\u25A1 Open/Closed: Adding tests, not modifying existing\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - tests\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Test Result.Success and Result.Failure",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.0821561-06:00",
-      "updatedAt": "2026-01-18T16:36:21.4104136-06:00",
-      "completedAt": "2026-01-18T16:36:21.4104136-06:00",
-      "summary": "Extended GuardrailServiceTests.cs with 13 new tests for CheckFilesLimit (4 tests), CheckMatchesLimit (4 tests), and CheckChunkSize (5 tests). All 23 total tests pass. Tests cover under-limit, at-limit, over-limit scenarios and verify error messages contain limit values.",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Services/GuardrailServiceTests.cs",
-          "type": "TO_MODIFY",
-          "description": "Add tests for new methods"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Tests for all 3 new check methods\n- At-limit value returns Success\n- Over-limit value returns Failure\n- Error message includes limit value"
-    },
-    {
-      "id": "ad830461-e863-4f6d-9a28-983df93a2447",
-      "name": "24. Create Analysis Tool Integration Tests",
-      "description": "**WHAT**: Create \u0060tests/RecursiveContext.Mcp.Server.Tests/Tools/AnalysisToolsTests.cs\u0060:\n- Test each of the 7 new tools end-to-end\n- Verify correct JSON response format\n- Test error cases return proper error JSON\n\n**WHY**: Integration tests verify tools work with real services. Catches DI wiring issues and ensures ToolResponseFormatter produces expected output. End-to-end validation before release.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Tests for analysis tools\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - tests\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: Test both success and error JSON",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.0987107-06:00",
-      "updatedAt": "2026-01-18T16:38:37.4168944-06:00",
-      "completedAt": "2026-01-18T16:38:37.4168944-06:00",
-      "summary": "Created AnalysisToolsTests.cs with 18 integration tests covering all 7 analysis tools (CountPatternMatches, SearchWithContext, CountLines, GetChunkInfo, ReadChunkByIndex, CountFiles, AggregateMatches). Tests verify valid JSON responses and error handling. All tests pass.",
-      "relatedFiles": [
-        {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Tools/AnalysisToolsTests.cs",
-          "type": "OTHER",
-          "description": "New test file"
+          "taskId": "1dc2d1eb-e0ec-4e01-91b9-a02f2c573c07"
         },
         {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Tools/FindFilesByPatternToolTests.cs",
+          "taskId": "f631b3d1-740b-4d5d-a504-117d8c363fde"
+        },
+        {
+          "taskId": "51e1e569-3bfb-4559-862a-a25c1839ee0a"
+        },
+        {
+          "taskId": "c937e843-b7ca-46e2-9d11-0aa98859b28b"
+        },
+        {
+          "taskId": "cba18b4a-64f5-489b-8ade-c3071972df94"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.134193-06:00",
+      "updatedAt": "2026-01-18T20:16:23.0072033-06:00",
+      "completedAt": "2026-01-18T20:16:23.0072033-06:00",
+      "summary": "Full solution build succeeded with 0 errors and 0 warnings. All new files (AdvancedAnalysisModels.cs, AdvancedAnalysisService.cs, IAdvancedAnalysisService interface, 5 tool files, and test file) compile correctly together.",
+      "relatedFiles": [
+        {
+          "path": "src/RecursiveContext.Mcp.Server/RecursiveContext.Mcp.Server.csproj",
           "type": "REFERENCE",
-          "description": "Pattern to follow"
+          "description": "Main project file"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- At least one test per tool\n- Valid JSON in responses\n- Error responses have consistent format\n- Tests run in isolation with temp dirs"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- \u0060dotnet build\u0060 succeeds with no errors\n- No warnings (project has TreatWarningsAsErrors=true)\n- All new files are included in compilation"
     },
     {
-      "id": "c515aa5c-5a27-4649-a8e4-d84a9f4ee6aa",
-      "name": "25. Create Determinism Proof Tests",
-      "description": "**WHAT**: Create \u0060tests/RecursiveContext.Mcp.Server.Tests/Integration/DeterminismTests.cs\u0060:\n- Run same operation 10 times, assert all results equal\n- Test count_pattern_matches determinism\n- Test get_chunk_info determinism\n- Test aggregate_matches determinism\n\n**WHY**: THE critical requirement. These tests prove that same input = same output every time. If any test fails, the fundamental principle is violated. This is the acceptance criterion for the entire implementation.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Tests for determinism only\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A - tests\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: N/A",
+      "id": "637a42c2-5737-42be-bb66-3e3137f2d566",
+      "name": "Run all unit tests and fix failures",
+      "description": "**WHAT**: Run \u0060dotnet test\u0060 to execute all unit tests including the new AdvancedAnalysisServiceTests and fix any test failures.\n\n**WHY**: Running the full test suite ensures no regressions were introduced and that all new functionality works as expected. Test failures indicate bugs that need to be fixed before the feature is complete.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
       "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.1236178-06:00",
-      "updatedAt": "2026-01-18T16:40:38.4011241-06:00",
-      "completedAt": "2026-01-18T16:40:38.4011241-06:00",
-      "summary": "Created DeterminismTests.cs with 11 comprehensive tests proving same input = same output. Each test runs operations 10\u002B times and asserts all results are identical. Covers: CountPatternMatches (2 tests), SearchWithContext (1), CountLines (1), GetChunkInfo (2), ReadChunkByIndex (1), CountFiles (1), AggregateMatches (2), and Cross-Tool Consistency (1). All tests passed.",
-      "relatedFiles": [
+      "dependencies": [
         {
-          "path": "tests/RecursiveContext.Mcp.Server.Tests/Integration/DeterminismTests.cs",
-          "type": "OTHER",
-          "description": "New test file for determinism proofs"
+          "taskId": "f5f3100c-332e-4b32-8056-9196c9e67a3a"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- Each operation run 10\u002B times\n- All runs produce identical results\n- Tests cover counting, chunking, and aggregation\n- Uses fixed test data to eliminate file system variance"
-    },
-    {
-      "id": "145b75fa-5955-40f8-a19c-d5b97d3a7847",
-      "name": "26. Update README with Analysis Tools Documentation",
-      "description": "**WHAT**: Update \u0060README.md\u0060 to document:\n- List of all 7 new analysis tools with signatures\n- Explanation of deterministic vs navigation tools\n- Example: counting classes in large file using chunk traversal\n- How client LLM achieves recursive reasoning via tool calls\n\n**WHY**: Documentation enables users to understand and use the tools correctly. The README should explain the RLM concept: the server is the environment, the LLM is the reasoner. Examples show the intended usage patterns.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: N/A - documentation\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: N/A",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.1446662-06:00",
-      "updatedAt": "2026-01-18T16:42:15.0699147-06:00",
-      "completedAt": "2026-01-18T16:42:15.0699147-06:00",
-      "summary": "Updated README.md with comprehensive analysis tools documentation: (1) All 7 analysis tools documented with parameters, examples, and response formats, (2) Added \u0027Deterministic vs Navigation Tools\u0027 explanation section, (3) Added \u0027Systematic Large File Analysis\u0027 example showing chunk traversal workflow, (4) Updated Architecture section to include new services, (5) Added 4 new configuration variables for analysis limits.",
+      "createdAt": "2026-01-18T20:09:38.1500898-06:00",
+      "updatedAt": "2026-01-18T20:16:38.2505483-06:00",
+      "completedAt": "2026-01-18T20:16:38.2505483-06:00",
+      "summary": "All 227 unit tests passed: 205 existing tests (no regressions) \u002B 22 new AdvancedAnalysisServiceTests. Zero failures. Full test suite confirms all new functionality works correctly and existing functionality is unchanged.",
       "relatedFiles": [
         {
-          "path": "README.md",
-          "type": "TO_MODIFY",
-          "description": "Add analysis tools documentation"
-        }
-      ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- All 7 tools documented\n- Example workflow included\n- Determinism principle explained\n- Client LLM usage pattern described"
-    },
-    {
-      "id": "89b10577-0d89-490a-a713-c0bbe74cad0a",
-      "name": "27. Final Verification and Build",
-      "description": "**WHAT**: Run full verification:\n1. \u0060dotnet build\u0060 - ensure no compiler errors or warnings\n2. \u0060dotnet test\u0060 - all tests pass\n3. Manual test: verify success criteria scenario works\n\n**WHY**: Final gate before considering implementation complete. Must verify the success criteria: \u0060count_pattern_matches(\u0027file.cs\u0027, \u0027class.*\u0027)\u0060 returns exact count, not text to parse. Build must be clean with no warnings (TreatWarningsAsErrors is enabled).\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: N/A - verification\n\u25A1 Open/Closed: N/A\n\u25A1 Liskov Substitution: N/A\n\u25A1 Interface Segregation: N/A\n\u25A1 Dependency Inversion: N/A\n\u25A1 Cyclomatic Complexity: N/A\n\u25A1 Pure Functions: N/A\n\u25A1 Immutability: N/A\n\u25A1 Static Methods: N/A\n\u25A1 Railway-Oriented: N/A",
-      "status": "Completed",
-      "dependencies": [],
-      "createdAt": "2026-01-18T16:12:19.1652299-06:00",
-      "updatedAt": "2026-01-18T16:43:13.1442923-06:00",
-      "completedAt": "2026-01-18T16:43:13.1442923-06:00",
-      "summary": "Final verification complete: (1) \u0060dotnet build\u0060 succeeded with 0 warnings, 0 errors, (2) \u0060dotnet test\u0060 passed all 205 tests, (3) Success criteria verified - \u0060count_pattern_matches(\u0027file.cs\u0027, \u0027class\\s\u002B\\w\u002B\u0027)\u0060 returns \u0060{\u0022count\u0022: 2}\u0060 - exact count in JSON format, ready for mathematical reasoning.",
-      "relatedFiles": [
-        {
-          "path": "RecursiveContext.Mcp.sln",
+          "path": "tests/RecursiveContext.Mcp.Server.Tests/RecursiveContext.Mcp.Server.Tests.csproj",
           "type": "REFERENCE",
-          "description": "Solution to build and test"
+          "description": "Test project file"
         }
       ],
-      "analysisResult": "Implementation of RLM-Enabled MCP Server analysis tools to provide deterministic, symbolic operations for recursive reasoning. The project uses .NET 9.0, CSharpFunctionalExtensions for railway-oriented programming, and follows MCP tool conventions with static classes and DI-injected services. Need to add 7 new analysis tools, 3 new services, 6 new model records, extend GuardrailService with new limits, and comprehensive tests.",
-      "verificationCriteria": "- \u0060dotnet build\u0060 succeeds with 0 warnings\n- \u0060dotnet test\u0060 shows all tests pass\n- Success criteria scenario verified manually\n- No analyzer/style warnings"
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- All existing tests pass (no regressions)\n- All new AdvancedAnalysisServiceTests pass\n- Zero test failures"
+    },
+    {
+      "id": "2eb4076b-c6b0-407d-8168-03ccc0a6af59",
+      "name": "Update project memory with new tools documentation",
+      "description": "**WHAT**: Update the Serena memory file \u0060proposed_new_analysis_tools\u0060 to reflect that the tools have been implemented. Change status from \u0027proposed\u0027 to \u0027implemented\u0027 and add any notes about implementation decisions.\n\n**WHY**: Keeping project memories up-to-date ensures future conversations have accurate context about what has been built. This prevents duplicate work and provides a reference for how the tools work.\n\n\uD83D\uDCCB CODE QUALITY CHECKLIST:\n\u25A1 Single Responsibility: Does this class/method do one thing?\n\u25A1 Open/Closed: Is this open for extension, closed for modification?\n\u25A1 Liskov Substitution: Are derived classes substitutable for base classes?\n\u25A1 Interface Segregation: Are interfaces specific rather than general-purpose?\n\u25A1 Dependency Inversion: Are dependencies injected, not created?\n\u25A1 Cyclomatic Complexity: Is complexity around 5 or less?\n\u25A1 Pure Functions: Are there unnecessary side effects?\n\u25A1 Immutability: Can data structures be immutable?\n\u25A1 Static Methods: Should any methods be static (no instance state)?\n\u25A1 Railway-Oriented: Use Result\u003CT\u003E with Bind/Map/Tap instead of try-catch where appropriate",
+      "status": "Completed",
+      "dependencies": [
+        {
+          "taskId": "637a42c2-5737-42be-bb66-3e3137f2d566"
+        }
+      ],
+      "createdAt": "2026-01-18T20:09:38.166907-06:00",
+      "updatedAt": "2026-01-18T20:17:13.35892-06:00",
+      "completedAt": "2026-01-18T20:17:13.35892-06:00",
+      "summary": "Updated project memory: deleted \u0027proposed_new_analysis_tools\u0027 and created \u0027implemented_advanced_analysis_tools\u0027 with full documentation of all 5 implemented tools, architecture, implementation decisions, and test coverage.",
+      "relatedFiles": [],
+      "analysisResult": "Creating 5 new advanced analysis tools for the RecursiveContext.Mcp.Server project as proposed in the Serena memory. These tools will enable complex pattern matching, aggregation, consecutive run detection, distributed sampling, and cross-file comparison - eliminating the need for AI to fall back to Python/PowerShell for complex analysis queries. Following the existing project patterns: IAdvancedAnalysisService interface, AdvancedAnalysisService implementation with DI registration, immutable models, MCP tool classes with Description attributes, and xUnit tests.",
+      "verificationCriteria": "- Memory file updated with implementation status\n- Any design decisions documented"
     }
   ]
 }

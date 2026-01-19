@@ -42,7 +42,7 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "hello world hello there hello again");
 
-        var result = await _service.CountPatternMatchesAsync(relativePath, "hello", 100, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync(relativePath, "hello", 100, false, true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value.Count);
@@ -53,7 +53,7 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "hello world");
 
-        var result = await _service.CountPatternMatchesAsync(relativePath, "goodbye", 100, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync(relativePath, "goodbye", 100, false, true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value.Count);
@@ -64,7 +64,7 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "test1\ntest2\ntest99\ntesting");
 
-        var result = await _service.CountPatternMatchesAsync(relativePath, @"test\d+", 100, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync(relativePath, @"test\d+", 100, false, true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value.Count);
@@ -75,7 +75,7 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "content");
 
-        var result = await _service.CountPatternMatchesAsync(relativePath, "[invalid", 100, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync(relativePath, "[invalid", 100, false, true, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Contains("Invalid regex", result.Error);
@@ -84,7 +84,7 @@ public class ContentAnalysisServiceTests : IDisposable
     [Fact]
     public async Task CountPatternMatchesAsync_NonexistentFile_ReturnsFailure()
     {
-        var result = await _service.CountPatternMatchesAsync("nonexistent.txt", "pattern", 100, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync("nonexistent.txt", "pattern", 100, false, true, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Contains("does not exist", result.Error);
@@ -95,7 +95,7 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "Hello\nHELLO\nhello\nHeLLo");
 
-        var result = await _service.CountPatternMatchesAsync(relativePath, "(?i)hello", 100, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync(relativePath, "(?i)hello", 100, false, true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(4, result.Value.Count);
@@ -106,7 +106,7 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "match\nmatch\nmatch\nmatch\nmatch");
 
-        var result = await _service.CountPatternMatchesAsync(relativePath, "match", 2, CancellationToken.None);
+        var result = await _service.CountPatternMatchesAsync(relativePath, "match", 2, false, true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(5, result.Value.Count);
@@ -252,9 +252,9 @@ public class ContentAnalysisServiceTests : IDisposable
     {
         var relativePath = CreateTestFile("test.txt", "pattern\npattern\npattern");
 
-        var result1 = await _service.CountPatternMatchesAsync(relativePath, "pattern", 100, CancellationToken.None);
-        var result2 = await _service.CountPatternMatchesAsync(relativePath, "pattern", 100, CancellationToken.None);
-        var result3 = await _service.CountPatternMatchesAsync(relativePath, "pattern", 100, CancellationToken.None);
+        var result1 = await _service.CountPatternMatchesAsync(relativePath, "pattern", 100, false, true, CancellationToken.None);
+        var result2 = await _service.CountPatternMatchesAsync(relativePath, "pattern", 100, false, true, CancellationToken.None);
+        var result3 = await _service.CountPatternMatchesAsync(relativePath, "pattern", 100, false, true, CancellationToken.None);
 
         Assert.Equal(result1.Value.Count, result2.Value.Count);
         Assert.Equal(result2.Value.Count, result3.Value.Count);

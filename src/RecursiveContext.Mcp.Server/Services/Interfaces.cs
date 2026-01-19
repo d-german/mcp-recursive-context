@@ -37,10 +37,17 @@ public interface IPatternMatchingService
 public interface IContentAnalysisService
 {
     /// <summary>
-    /// Counts pattern matches in a file, returning exact count and sample matches.
+    /// Counts pattern matches in a file, returning exact count and optionally sample matches.
     /// </summary>
+    /// <param name="path">File path to search.</param>
+    /// <param name="pattern">Regex pattern to count.</param>
+    /// <param name="maxResults">Maximum results to return.</param>
+    /// <param name="countUniqueLinesOnly">When true, count lines containing pattern instead of total matches.</param>
+    /// <param name="includeSamples">When true, include sample matches in response.</param>
+    /// <param name="ct">Cancellation token.</param>
     Task<Result<MatchCountResult>> CountPatternMatchesAsync(
-        string path, string pattern, int maxResults, CancellationToken ct);
+        string path, string pattern, int maxResults,
+        bool countUniqueLinesOnly, bool includeSamples, CancellationToken ct);
 
     /// <summary>
     /// Searches for pattern matches with surrounding context lines.
@@ -96,6 +103,74 @@ public interface IAggregationService
 /// <summary> 
 /// Service for enforcing rate limits and guardrails. 
 /// </summary> 
+
+/// <summary>
+/// Service for advanced pattern analysis operations (compound patterns, consecutive runs, aggregation, distributed sampling).
+/// </summary>
+public interface IAdvancedAnalysisService
+{
+    /// <summary>
+    /// Counts lines matching multiple compound patterns.
+    /// </summary>
+    /// <param name="path">File path to search.</param>
+    /// <param name="patterns">Array of regex patterns to match.</param>
+    /// <param name="matchMode">Match mode: "all" (AND), "any" (OR), or "sequence" (patterns in order).</param>
+    /// <param name="includeSamples">When true, include sample matches in response.</param>
+    /// <param name="maxSamples">Maximum number of samples to return.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<CompoundMatchResult>> CountCompoundPatternAsync(
+        string path, string[] patterns, string matchMode,
+        bool includeSamples, int maxSamples, CancellationToken ct);
+
+    /// <summary>
+    /// Finds runs of consecutive lines matching a pattern.
+    /// </summary>
+    /// <param name="path">File path to search.</param>
+    /// <param name="pattern">Regex pattern to match.</param>
+    /// <param name="minRunLength">Minimum consecutive matches to form a run.</param>
+    /// <param name="returnLongestOnly">When true, only return the longest run.</param>
+    /// <param name="maxRuns">Maximum number of runs to return.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<ConsecutiveRunResult>> FindConsecutiveRunsAsync(
+        string path, string pattern, int minRunLength,
+        bool returnLongestOnly, int maxRuns, CancellationToken ct);
+
+    /// <summary>
+    /// Aggregates pattern matches by groups and returns top N.
+    /// </summary>
+    /// <param name="path">File path to search.</param>
+    /// <param name="pattern">Regex pattern with optional capture group.</param>
+    /// <param name="groupBy">Grouping mode: "captureGroup1", "firstWord", or "fullMatch".</param>
+    /// <param name="topN">Number of top groups to return.</param>
+    /// <param name="includeSamples">When true, include sample match per group.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<PatternAggregateResult>> AggregatePatternMatchesAsync(
+        string path, string pattern, string groupBy,
+        int topN, bool includeSamples, CancellationToken ct);
+
+    /// <summary>
+    /// Gets distributed sample matches spread across the file.
+    /// </summary>
+    /// <param name="path">File path to search.</param>
+    /// <param name="pattern">Regex pattern to match.</param>
+    /// <param name="sampleCount">Number of samples to return.</param>
+    /// <param name="distribution">Distribution mode: "even", "random", "first", or "last".</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<DistributedSampleResult>> SampleMatchesDistributedAsync(
+        string path, string pattern, int sampleCount,
+        string distribution, CancellationToken ct);
+
+    /// <summary>
+    /// Compares pattern match counts across multiple files.
+    /// </summary>
+    /// <param name="paths">Array of file paths to compare.</param>
+    /// <param name="pattern">Regex pattern to count.</param>
+    /// <param name="computeRatio">When true, compute relative ratios.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<CrossFileComparisonResult>> ComparePatternAcrossFilesAsync(
+        string[] paths, string pattern, bool computeRatio, CancellationToken ct);
+}
+
 public interface IGuardrailService
 {
     Result CheckAndIncrementCallCount();
