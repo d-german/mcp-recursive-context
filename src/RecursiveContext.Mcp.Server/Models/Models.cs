@@ -73,3 +73,63 @@ public sealed record PatternMatchResult(
     ImmutableArray<string> MatchingPaths, 
     int TotalMatches 
 );
+
+
+// ============================================================================
+// Analysis Tool Models
+// ============================================================================
+
+/// <summary>
+/// A single match result with line number and surrounding context.
+/// </summary>
+public sealed record MatchResult(
+    int LineNumber,
+    string MatchText,
+    ImmutableArray<string> ContextBefore,
+    ImmutableArray<string> ContextAfter
+);
+
+/// <summary>
+/// Result of counting pattern matches in a file.
+/// </summary>
+public sealed record MatchCountResult(
+    int Count,
+    ImmutableArray<MatchResult> SampleMatches,
+    bool Truncated
+);
+
+/// <summary>
+/// Information about chunk boundaries for a file.
+/// </summary>
+public sealed record ChunkInfo(
+    int TotalLines,
+    int ChunkCount,
+    ImmutableArray<(int StartLine, int EndLine)> ChunkBoundaries
+);
+
+/// <summary>
+/// Content of a specific chunk from a file.
+/// </summary>
+public sealed record ChunkContent(
+    int ChunkIndex,
+    int StartLine,
+    int EndLine,
+    string Content
+);
+
+/// <summary>
+/// Count of matches in a single file.
+/// </summary>
+public sealed record FileMatchCount(
+    string Path,
+    int Count
+);
+
+/// <summary>
+/// Aggregated match results across multiple files.
+/// </summary>
+public sealed record AggregateResult(
+    int FilesSearched,
+    int TotalMatches,
+    ImmutableArray<FileMatchCount> MatchesByFile
+);

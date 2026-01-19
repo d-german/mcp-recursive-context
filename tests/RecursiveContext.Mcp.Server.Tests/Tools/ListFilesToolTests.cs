@@ -19,7 +19,7 @@ public class ListFilesToolTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), $"listfiles_tool_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
-        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20);
+        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         var pathResolver = new PathResolver(settings);
         var guardrails = new GuardrailService(settings);
         _fileSystemService = new FileSystemService(pathResolver, guardrails);

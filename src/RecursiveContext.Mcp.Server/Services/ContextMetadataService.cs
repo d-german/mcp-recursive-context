@@ -39,37 +39,94 @@ internal sealed class ContextMetadataService : IContextMetadataService
         return Task.FromResult(Result.Success(contextInfo)); 
     } 
  
-    private static WorkspaceStats ComputeStats(string path, int maxDepth, int currentDepth) 
-    { 
-        var stats = new WorkspaceStats(); 
- 
-        if (currentDepth > maxDepth) return stats; 
- 
-        try 
-        { 
-            foreach (var file in Directory.EnumerateFiles(path)) 
-            { 
-                var fi = new FileInfo(file); 
-                stats.FileCount++; 
-                stats.TotalBytes += fi.Length; 
-                var ext = fi.Extension.ToLowerInvariant(); 
-                if (string.IsNullOrEmpty(ext)) ext = "[no extension]"; 
-                stats.ExtensionCounts.TryGetValue(ext, out var count); 
-                stats.ExtensionCounts[ext] = count + 1; 
-            } 
- 
-            foreach (var dir in Directory.EnumerateDirectories(path)) 
-            { 
-                stats.DirCount++; 
-                var subStats = ComputeStats(dir, maxDepth, currentDepth + 1); 
-                stats.Merge(subStats); 
-            } 
- 
-            stats.MaxDepthReached = Math.Max(stats.MaxDepthReached, currentDepth); 
-        } 
-        catch { } 
- 
-        return stats; 
+    private static WorkspaceStats ComputeStats(string rootPath, int maxDepth, int initialDepth)
+    {
+        var globalStats = new WorkspaceStats();
+        
+        // Get top-level directories for parallel processing
+        var topLevelDirs = new List<(string path, int depth)>();
+        
+        try
+        {
+            // Process root files sequentially first
+            foreach (var file in Directory.EnumerateFiles(rootPath))
+            {
+                var fi = new FileInfo(file);
+                globalStats.FileCount++;
+                globalStats.TotalBytes += fi.Length;
+                var ext = fi.Extension.ToLowerInvariant();
+                if (string.IsNullOrEmpty(ext)) ext = "[no extension]";
+                globalStats.ExtensionCounts.TryGetValue(ext, out var count);
+                globalStats.ExtensionCounts[ext] = count + 1;
+            }
+            globalStats.MaxDepthReached = initialDepth;
+
+            // Collect top-level directories
+            foreach (var dir in Directory.EnumerateDirectories(rootPath))
+            {
+                globalStats.DirCount++;
+                if (initialDepth + 1 <= maxDepth)
+                {
+                    topLevelDirs.Add((dir, initialDepth + 1));
+                }
+            }
+        }
+        catch { }
+
+        if (topLevelDirs.Count == 0)
+            return globalStats;
+
+        // Process directories in parallel
+        var lockObj = new object();
+        Parallel.ForEach(topLevelDirs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, dirInfo =>
+        {
+            var localStats = ComputeStatsSequential(dirInfo.path, maxDepth, dirInfo.depth);
+            lock (lockObj)
+            {
+                globalStats.Merge(localStats);
+            }
+        });
+
+        return globalStats;
+    }
+
+    private static WorkspaceStats ComputeStatsSequential(string rootPath, int maxDepth, int initialDepth)
+    {
+        var stats = new WorkspaceStats();
+        var stack = new Stack<(string path, int depth)>();
+        stack.Push((rootPath, initialDepth));
+
+        while (stack.Count > 0)
+        {
+            var (path, currentDepth) = stack.Pop();
+            
+            if (currentDepth > maxDepth) continue;
+
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(path))
+                {
+                    var fi = new FileInfo(file);
+                    stats.FileCount++;
+                    stats.TotalBytes += fi.Length;
+                    var ext = fi.Extension.ToLowerInvariant();
+                    if (string.IsNullOrEmpty(ext)) ext = "[no extension]";
+                    stats.ExtensionCounts.TryGetValue(ext, out var count);
+                    stats.ExtensionCounts[ext] = count + 1;
+                }
+
+                foreach (var dir in Directory.EnumerateDirectories(path))
+                {
+                    stats.DirCount++;
+                    stack.Push((dir, currentDepth + 1));
+                }
+
+                stats.MaxDepthReached = Math.Max(stats.MaxDepthReached, currentDepth);
+            }
+            catch { }
+        }
+
+        return stats;
     } 
  
     private sealed class WorkspaceStats 

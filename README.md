@@ -105,6 +105,10 @@ Configure via environment variables:
 | `RLM_MAX_TOOL_CALLS` | Maximum tool calls per session | `1000` |
 | `RLM_TIMEOUT_SECONDS` | Timeout for long operations | `30` |
 | `RLM_MAX_DEPTH` | Maximum directory depth for recursion | `20` |
+| `RLM_MAX_FILES_PER_OP` | Maximum files per single operation | `20` |
+| `RLM_MAX_FILES_PER_AGG` | Maximum files for aggregation operations | `500` |
+| `RLM_MAX_MATCHES` | Maximum pattern matches to return | `10000` |
+| `RLM_MAX_CHUNK_SIZE` | Maximum lines per chunk | `500` |
 
 ---
 
@@ -267,6 +271,185 @@ Returns server metadata and guardrail status.
 }
 ```
 
+### 📊 Analysis Tools (RLM-Optimized)
+
+These tools are specifically designed for **Recursive Language Model** scenarios. They provide **deterministic, symbolic outputs** that an LLM can use for mathematical reasoning rather than text parsing.
+
+> **Key Principle:** Each tool call produces the **exact same output** for the same input. No summaries, no interpretations—just precise data.
+
+#### `count_pattern_matches`
+Counts regex pattern matches in a file. Returns exact count, not text to parse.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Relative path to file | Required |
+| `pattern` | string | Regular expression pattern | Required |
+| `maxMatches` | int | Safety limit to prevent runaway | `1000` |
+
+**Example:**
+```
+count_pattern_matches("Services/AuthService.cs", "class\\s+\\w+", 100)
+→ {"count": 3, "pattern": "class\\s+\\w+", "truncated": false}
+```
+
+#### `search_with_context`
+Finds pattern matches with surrounding lines for context.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Relative path to file | Required |
+| `pattern` | string | Search pattern (regex) | Required |
+| `contextLines` | int | Lines before/after match | `2` |
+| `maxMatches` | int | Maximum matches to return | `50` |
+
+**Example Response:**
+```json
+[
+  {"line": 42, "content": "public class AuthService : IAuthService", "context": ["using System;", "namespace Services", "{", "public class AuthService : IAuthService", "{"]}
+]
+```
+
+#### `count_lines`
+Returns the exact line count of a file.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Relative path to file | Required |
+
+**Returns:** `1247` (just the number, ready for arithmetic)
+
+#### `get_chunk_info`
+Returns deterministic chunk boundaries for a file. Essential for systematic traversal.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Relative path to file | Required |
+| `chunkSize` | int | Lines per chunk | `100` |
+
+**Example Response:**
+```json
+{
+  "totalLines": 1247,
+  "chunkCount": 13,
+  "chunkSize": 100,
+  "chunkBoundaries": [
+    {"index": 0, "startLine": 1, "endLine": 100},
+    {"index": 1, "startLine": 101, "endLine": 200},
+    ...
+    {"index": 12, "startLine": 1201, "endLine": 1247}
+  ]
+}
+```
+
+#### `read_chunk_by_index`
+Reads a specific chunk by index. Designed for iterative traversal.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Relative path to file | Required |
+| `chunkIndex` | int | 0-based chunk index | Required |
+| `chunkSize` | int | Lines per chunk (must match get_chunk_info) | `100` |
+
+**Example Response:**
+```json
+{
+  "chunkIndex": 5,
+  "startLine": 501,
+  "endLine": 600,
+  "totalChunks": 13,
+  "content": "// Lines 501-600..."
+}
+```
+
+#### `count_files`
+Counts files matching a glob pattern across directories.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Starting directory | Required |
+| `pattern` | string | Glob pattern (`*.cs`, `**/*.json`) | Required |
+| `recursive` | bool | Search subdirectories | `true` |
+
+**Returns:** `892` (exact count for reasoning)
+
+#### `aggregate_matches`
+Counts pattern matches across multiple files. Perfect for codebase-wide analysis.
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `path` | string | Starting directory | Required |
+| `filePattern` | string | Glob pattern for files | Required |
+| `searchPattern` | string | Regex to count matches | Required |
+| `maxMatches` | int | Safety limit | `10000` |
+
+**Example Response:**
+```json
+{
+  "totalMatches": 47,
+  "filesSearched": 12,
+  "truncated": false,
+  "matchesByFile": [
+    {"path": "Services/AuthService.cs", "count": 8},
+    {"path": "Services/UserService.cs", "count": 5}
+  ]
+}
+```
+
+---
+
+## Understanding Deterministic vs Navigation Tools
+
+This server provides two categories of tools:
+
+| Category | Purpose | Example Tools |
+|----------|---------|---------------|
+| **Navigation** | Explore structure, find files | `list_files`, `list_directories`, `find_files_by_pattern` |
+| **Analysis** | Get precise, countable data | `count_pattern_matches`, `count_lines`, `aggregate_matches` |
+
+**Navigation tools** help the LLM decide *where* to look.  
+**Analysis tools** give the LLM *exact data* to reason with.
+
+### Why Determinism Matters
+
+When an LLM calls `count_pattern_matches("file.cs", "class\\s+\\w+")`:
+- It gets `{"count": 5}`, not "there are approximately 5 classes"
+- The same input **always** produces the same output
+- The LLM can use this in calculations: "5 classes × ~50 lines each = ~250 lines to review"
+
+---
+
+## Example: Systematic Large File Analysis
+
+Here's how an LLM uses chunk traversal to analyze a file too large to read at once:
+
+```
+User: "How many TODO comments are in the large DataProcessor.cs file?"
+
+LLM thinking: I need to count TODOs but the file might be huge. Let me check.
+
+[Tool Call] count_lines("src/DataProcessor.cs")
+→ 2,847
+
+LLM thinking: 2,847 lines is too large to read at once. I'll use chunk traversal.
+
+[Tool Call] get_chunk_info("src/DataProcessor.cs", 100)
+→ {"totalLines": 2847, "chunkCount": 29, "chunkBoundaries": [...]}
+
+LLM thinking: 29 chunks. I could read each and count, or use aggregate analysis.
+
+[Tool Call] count_pattern_matches("src/DataProcessor.cs", "TODO|FIXME|HACK", 1000)
+→ {"count": 23, "truncated": false}
+
+LLM: "DataProcessor.cs contains exactly 23 TODO/FIXME/HACK comments across its 2,847 lines."
+```
+
+The LLM used **symbolic reasoning**:
+1. Check file size → decide strategy
+2. Use specialized counting tool → get exact answer
+3. Combine facts → provide precise response
+
+No guessing, no parsing text, no "approximately"—just math.
+
 ---
 
 ## Example Session: Finding Authentication Logic
@@ -307,21 +490,25 @@ RecursiveContext.Mcp.Server/
 │   ├── ServerHost.cs          # MCP server setup and DI
 │   └── ServerMetadata.cs      # Server name and version
 ├── Config/
-│   ├── RlmSettings.cs         # Configuration record
+│   ├── RlmSettings.cs         # Configuration record (8 guardrail limits)
 │   ├── ConfigReader.cs        # Environment variable reader
 │   └── PathResolver.cs        # Path sandboxing and resolution
 ├── Services/
 │   ├── FileSystemService.cs   # File/directory operations
 │   ├── PatternMatchingService.cs  # Glob pattern matching
 │   ├── ContextMetadataService.cs  # Workspace statistics
-│   └── GuardrailService.cs    # Rate limiting and byte limits
+│   ├── GuardrailService.cs    # Rate limiting and byte limits
+│   ├── ContentAnalysisService.cs  # Pattern counting, line counting
+│   ├── ChunkingService.cs     # Deterministic chunk boundaries
+│   └── AggregationService.cs  # Cross-file pattern aggregation
 ├── Tools/
 │   ├── FileSystem/            # list_files, read_file, etc.
 │   ├── Search/                # find_files_by_pattern
 │   ├── Metadata/              # get_context_info
+│   ├── Analysis/              # count_pattern_matches, get_chunk_info, etc.
 │   └── Server/                # get_server_info
-└── Domain/
-    └── Models/                # FileInfo, DirectoryInfo, etc.
+└── Models/
+    └── Models.cs              # All model records (FileInfo, ChunkInfo, etc.)
 ```
 
 ### Design Principles

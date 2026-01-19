@@ -12,7 +12,7 @@ public class PathResolverTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), $"path_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
-        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20);
+        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         _resolver = new PathResolver(settings);
     }
 
@@ -155,7 +155,7 @@ public class PathResolverTests : IDisposable
     public void Constructor_RelativeWorkspaceRoot_ResolvesToAbsolutePath()
     {
         // Simulates RLM_WORKSPACE_ROOT="."
-        var settings = new RlmSettings(".", 1_000_000, 100, 30, 20);
+        var settings = new RlmSettings(".", 1_000_000, 100, 30, 20, 500, 10_000, 500);
         var resolver = new PathResolver(settings);
 
         // Should resolve to current directory as absolute path
@@ -167,7 +167,7 @@ public class PathResolverTests : IDisposable
     public void Constructor_RelativeSubdirectoryWorkspaceRoot_ResolvesToAbsolutePath()
     {
         // Simulates RLM_WORKSPACE_ROOT="./src"
-        var settings = new RlmSettings("./src", 1_000_000, 100, 30, 20);
+        var settings = new RlmSettings("./src", 1_000_000, 100, 30, 20, 500, 10_000, 500);
         var resolver = new PathResolver(settings);
 
         // Should resolve to absolute path

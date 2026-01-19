@@ -32,7 +32,7 @@ public class SmokeTests : IDisposable
         // Create a realistic project structure
         CreateTestProjectStructure();
 
-        _settings = new RlmSettings(_tempDir, 1_048_576, 100, 30, 20);
+        _settings = new RlmSettings(_tempDir, 1_048_576, 100, 30, 20, 500, 10_000, 500);
         _pathResolver = new PathResolver(_settings);
         _guardrails = new GuardrailService(_settings);
         _fileSystemService = new FileSystemService(_pathResolver, _guardrails);

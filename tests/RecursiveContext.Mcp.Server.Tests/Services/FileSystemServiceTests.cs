@@ -15,7 +15,7 @@ public class FileSystemServiceTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), $"fs_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
-        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20);
+        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         _pathResolver = new PathResolver(settings);
         _guardrails = new GuardrailService(settings);
         _service = new FileSystemService(_pathResolver, _guardrails);
@@ -128,7 +128,7 @@ public class FileSystemServiceTests : IDisposable
     [Fact]
     public async Task ReadFileAsync_FileTooLarge_ReturnsFailure()
     {
-        var smallSettings = new RlmSettings(_tempDir, 10, 100, 30, 20);
+        var smallSettings = new RlmSettings(_tempDir, 10, 100, 30, 20, 500, 10_000, 500);
         var smallGuardrails = new GuardrailService(smallSettings);
         var service = new FileSystemService(_pathResolver, smallGuardrails);
 

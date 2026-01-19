@@ -21,8 +21,13 @@ internal static class ServerServices
         services.AddSingleton<IGuardrailService, GuardrailService>(); 
         services.AddSingleton<IFileSystemService, FileSystemService>(); 
         services.AddSingleton<IContextMetadataService, ContextMetadataService>(); 
-        services.AddSingleton<IPatternMatchingService, PatternMatchingService>(); 
- 
+        services.AddSingleton<IPatternMatchingService, PatternMatchingService>();
+
+        // Analysis services
+        services.AddSingleton<IAggregationService, AggregationService>();
+        services.AddSingleton<IChunkingService, ChunkingService>();
+        services.AddSingleton<IContentAnalysisService, ContentAnalysisService>();
+
         services.AddSingleton(metadata); 
  
         services.AddMcpServer(options => 

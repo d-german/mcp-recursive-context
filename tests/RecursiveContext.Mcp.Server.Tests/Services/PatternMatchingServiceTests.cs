@@ -15,7 +15,7 @@ public class PatternMatchingServiceTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), $"pattern_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
-        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20);
+        var settings = new RlmSettings(_tempDir, 1_000_000, 100, 30, 20, 500, 10_000, 500);
         _pathResolver = new PathResolver(settings);
         _guardrails = new GuardrailService(settings);
         _service = new PatternMatchingService(_pathResolver, _guardrails);
