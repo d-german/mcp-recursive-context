@@ -9,11 +9,11 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class SearchWithContextTool
 {
     [McpServerTool(Name = "search_with_context")]
-    [Description("Search for regex pattern matches with surrounding context lines. Uses .NET regex: '.' is wildcard (use '\\\\.' for literal period), '^'/'$' match line boundaries.")]
+    [Description("Search for regex pattern matches with surrounding context lines. IMPORTANT: The 'path' must be relative to workspace root (RLM_WORKSPACE_ROOT), not the current shell directory. Use 'list_directories' to discover paths first.")]
     public static async Task<string> SearchWithContext(
         IContentAnalysisService analysisService,
-        [Description("File path to search")] string path,
-        [Description("Regex pattern to search for (.NET syntax)")] string pattern,
+        [Description("File path relative to workspace root. Example: 'mcp-recursive-context/qasper-test-workspace/train/1909.00694.txt'. NOT just the filename.")] string path,
+        [Description("Regex pattern to search for (.NET syntax). '.' matches any char, use '\\\\.' for literal period, '^'/'$' match line boundaries.")] string pattern,
         [Description("Number of context lines before and after match. Default: 2")] int contextLines = 2,
         [Description("Maximum results to return. Default: 1000")] int maxResults = 1000,
         CancellationToken ct = default)

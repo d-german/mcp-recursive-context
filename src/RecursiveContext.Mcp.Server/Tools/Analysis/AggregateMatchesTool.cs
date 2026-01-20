@@ -9,12 +9,12 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class AggregateMatchesTool
 {
     [McpServerTool(Name = "aggregate_matches")]
-    [Description("Count regex pattern matches across multiple files. Returns total count plus per-file breakdown.")]
+    [Description("Count regex pattern matches across multiple files. Returns total count plus per-file breakdown. IMPORTANT: All paths are relative to the workspace root (RLM_WORKSPACE_ROOT). Use 'list_directories' with path='.' first to discover the directory structure.")]
     public static async Task<string> AggregateMatches(
         IAggregationService aggregationService,
-        [Description("Directory to search in")] string directory,
-        [Description("File pattern (glob, e.g., *.cs)")] string filePattern,
-        [Description("Regex pattern to search for")] string searchPattern,
+        [Description("Directory to search in, relative to workspace root. Example: 'src/components' or 'qasper-test-workspace/train'. Use '.' for workspace root.")] string directory,
+        [Description("File pattern (glob, e.g., *.txt, *.cs, **/*.json)")] string filePattern,
+        [Description("Regex pattern to search for (.NET syntax). Use \\b for word boundaries, (?i) for case-insensitive.")] string searchPattern,
         [Description("Maximum files to search. Default: 1000000")] int maxFiles = 1000000,
         CancellationToken ct = default)
     {

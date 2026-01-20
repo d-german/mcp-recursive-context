@@ -11,10 +11,10 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class SampleMatchesDistributedTool
 {
     [McpServerTool(Name = "sample_matches_distributed")]
-    [Description("Get diverse sample matches spread across the file. Useful for getting examples from different sections of large documents instead of just the first N matches. Uses .NET regex syntax.")]
+    [Description("Get diverse sample matches spread across a single file. Useful for getting examples from different sections of large documents. IMPORTANT: The 'path' must be the full path relative to workspace root, not just the filename.")]
     public static async Task<string> SampleMatchesDistributed(
         IAdvancedAnalysisService analysisService,
-        [Description("File path to search")] string path,
+        [Description("Full file path relative to workspace root. Example: 'project/data/train/file.txt'. NOT just 'file.txt'.")] string path,
         [Description("Regex pattern to match (.NET syntax)")] string pattern,
         [Description("Number of samples to return. Default: 5")] int sampleCount = 5,
         [Description("Distribution mode: 'even' (evenly spaced), 'random', 'first' (first N), 'last' (last N). Default: even")] string distribution = "even",

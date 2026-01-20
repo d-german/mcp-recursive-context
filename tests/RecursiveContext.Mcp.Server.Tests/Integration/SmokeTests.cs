@@ -197,7 +197,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
     public void GetServerInfo_ReturnsValidMetadata()
     {
         // Act
-        var result = GetServerInfoTool.GetServerInfo(_serverMetadata, _guardrails);
+        var result = GetServerInfoTool.GetServerInfo(_serverMetadata, _settings, _guardrails);
 
         // Assert
         using var doc = JsonDocument.Parse(result);
@@ -364,7 +364,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
         Assert.Contains("HashPassword", authContent);
 
         // Step 4: Verify server info shows usage
-        var serverInfoResult = GetServerInfoTool.GetServerInfo(_serverMetadata, _guardrails);
+        var serverInfoResult = GetServerInfoTool.GetServerInfo(_serverMetadata, _settings, _guardrails);
         using var serverDoc = JsonDocument.Parse(serverInfoResult);
         Assert.True(serverDoc.RootElement.GetProperty("remainingToolCalls").GetInt32() >= 0);
     }
