@@ -1,0 +1,175 @@
+# Features in Extractive Supervised Single-document Summarization: Case of Persian News
+
+**Paper ID:** 1909.02776
+
+## Abstract
+
+Text summarization has been one of the most challenging areas of research in NLP. Much effort has been made to overcome this challenge by using either the abstractive or extractive methods. Extractive methods are more popular, due to their simplicity compared with the more elaborate abstractive methods. In extractive approaches, the system will not generate sentences. Instead, it learns how to score sentences within the text by using some textual features and subsequently selecting those with the highest-rank. Therefore, the core objective is ranking and it highly depends on the document. This dependency has been unnoticed by many state-of-the-art solutions. In this work, the features of the document are integrated into vectors of every sentence. In this way, the system becomes informed about the context, increases the precision of the learned model and consequently produces comprehensive and brief summaries.
+
+## Introduction
+
+From the early days of artificial intelligence, automatically summarizing a text was an interesting task for many researchers. Followed by the advance of the World Wide Web and the advent of concepts such as Social networks, Big Data, and Cloud computing among others, text summarization became a crucial task in many applications BIBREF0, BIBREF1, BIBREF2. For example, it is essential, in many search engines and text retrieval systems to display a portion of each result entry which is representative of the whole text BIBREF3, BIBREF4. It is also becoming essential for managers and the general public to gain the gist of news and articles immediately, in order to save time, while being inundated with information on social media BIBREF5.
+
+Researchers have approached this challenge from various perspectives and have obtained some promising results BIBREF6, BIBREF7. However, this area continues to present more research challenges and has a long path to maturity.
+
+One method of investigating this challenge, is (supervised) extractive summarization. Extractive implementations use a ranking mechanism and select top-n-ranked sentences as the summary BIBREF8. Sentences of a document are represented as vectors of features. Using summarization corpora, a rank will be assigned to each sentence, based on its presence in several human-written summaries (golden summaries). The system should then learn how to use those features to predict the rank of sentences in any given text. Various machine learning approaches such as regression and classification algorithms are used to perform the ranking task BIBREF9, BIBREF10.
+
+As far as our knowledge goes, in all current implementations, sets of sentence vectors of every document are merged together to compose a larger set, which is then passed to the learning model as a matrix. In this approach, the locality of ranks is disregarded. In other words, the rank of sentences is highly relative to the context and document. A sentence might be ranked high in one document while being ranked lower in another. As a result, merging sentences of a whole dataset into a matrix removes document boundaries and a main source of information will be lost.
+
+We addressed this issue by taking certain features of documents into account, such as its length, topical category and so on in addition to some new sentence features that also reflect document properties. Thus, more information will be provided to the model, and ranking could be done with respect to local features of the document. Our experiments show that this rectification leads to improvement in both the performance of the learned model and the quality of produced summaries. We also represent a new baseline for the evaluation of extractive text summarizers which can be used to measure the performance of any summarizing method more accurately.
+
+The remainder of this paper is organized as follows. (Section SECREF2) reviews related works. (Section SECREF3) presents the proposed method and evaluation measures. (Section SECREF5) discusses how the experiments are set up. The results are discussed in (Section SECREF5), and finally (Section SECREF6) concludes the paper.
+
+## Related works
+
+Text summarization has been widely studied by both academic and enterprise disciplines. Text summarization methods may be classified into different types. Based on input type, there are single-document BIBREF11, BIBREF12 vs multi-document summarization methods BIBREF13, BIBREF14, BIBREF15. Based on language, there are mono-lingual, bilingual and multi-lingual methods BIBREF16. There are also “query focused” methods in which a summary relevant to a given query is produced BIBREF17. From the perspective of procedure, however, there are two main approaches: abstractive vs extractive BIBREF18.
+
+Abstractive approaches try to generate a new short text based on the concepts understood from the original text BIBREF19. This usually requires a full pass through NLP pipeline and is faced with many complexities and challenges BIBREF20. The abstractive approach relies on linguistic methods to examine and interpret the text in order to find new concepts and expressions. The output is a new shorter text which consists of the most important information from the original text document BIBREF8.
+
+Extractive approaches, on the other hand, select a few sentences from the document based on some measures in order to place them in a summary BIBREF8.
+
+A broad range of methods has been examined in this approach, including graph-based BIBREF8, BIBREF21, unsupervised BIBREF21, BIBREF22 and supervised (corpus-based) methods BIBREF9, BIBREF23, BIBREF24. In supervised methods, training data is generally needed to select important content from the documents. In these methods, usually, the problem is reduced to a classification or regression problem, and machine learning techniques applied to the dataset of documents and their gold summaries represented by some features. Support Vector Machines (SVM) BIBREF25 and neural networks BIBREF26 are more popular sentence classification algorithms.
+
+The key step in extractive summarization is to determine the importance of sentences in the document BIBREF27. Previous studies examine the ordinal position of sentences BIBREF28, BIBREF29, length of sentences BIBREF9, the ratio of nouns, the Ratio of Verbs, Ratio of Adjectives, Ratio of Adverbs BIBREF30, the Ratio of Numerical entities BIBREF31, BIBREF32 and Cue Words BIBREF28.
+
+Gupta and Lehal in their survey of text summarization techniques list the following groups of features: content-based, title-based, location-based, length-based, proper noun and upper-case word-based, font-based, specific phrase-based, and features based on sentence similarity to other sentences in a text BIBREF8. Previous studies use different sentence features such as terms from keywords/key phrases, terms from user queries, frequency of words, and position of words/sentences for text summarization BIBREF33.
+
+However, in most cases, selection and weighting of features are an important matter of debate. Some works have been carried out with respect to this BIBREF34, but none, to the best of our knowledge, has shown that target attribute is highly related to the scope of the document. It is occasionally mentioned but not included in practice. For instance, Ferreira et al studied various combinations of sentence scoring methods on three types of documents in BIBREF6 and BIBREF31 and concluded that the weight of features varies, dependent on the properties of context: “the effectiveness of sentence scoring methods for automatic extractive text summarization algorithms depends on the kind of text one wants to summarize, the length of documents, the kind of language used, and their structure.”. JY Yeh et al in BIBREF35 utilized a Genetic Algorithm (GA) to find the weight of features for calculating sentence scores. However, their following statement implies that performance of weights is generally dependent to genre, that could be seen as a feature of context: “It cannot be guaranteed that the score function whose feature weights are obtained by GA definitely performs well for the test corpus; nevertheless, if the genre of the test corpus is close to that of the training corpus, we can make a prediction that the score function will work well.” BIBREF35. Berenjkoub et al studied the effectiveness of various subsets of features in summarization of distinct sections of scientific papers BIBREF36. They showed that some features work well only in some specific portion of text, for example, on the abstract section, while others perform better on the methodology section. This could be considered to be a consequence of differences in the structure and context of each section.
+
+All the above studies imply the significance of document context in ranking. Nevertheless, it has not been given enough attention in the NLP community, and even sometimes is neglected. For instance, authors in BIBREF30 suggest the use of a wide range of various features. Among these, seventeen part-of-speech based sentences features have been introduced, all of which are sentence-normalized, but not document-normalized, i.e. they count the ratio of a syntactic unit e.g. verbs, divided by the number of words in a sentence. Such features do not consider the total number of those units, e.g. verbs, in the whole document.
+
+Our work contributes to this line of research and includes document features in the learning and ranking processes.
+
+## Incorporating Document Features
+
+As a way to investigate the need for document features in sentence ranking (as explained in the introduction and related works), we introduced several document-level features and incorporated them in the summarization process. These features are listed under subsection (SECREF4). Although stages of our method do not differ from general supervised extractive summarization, the whole process is explained in order to clarify the method of investigation.
+
+Every supervised summarization has two phases. The first is the “Learning Phase”, a corpus of ideal summaries is used to train the system how to rank sentences. The second is the “Summarization Phase”, where the system applies its learning gained from the first phase, in order to rank the sentences of a new given text. A process of selection is then performed to form a summary. Each of these phases has several intricacies which are briefly described in the following sections.
+
+## Incorporating Document Features ::: Learning Phase
+
+The input to this phase is a dataset of documents, each of which is associated with several human-written summaries. The output is a learned model with a good level of accuracy that is able to reliably predict the rank of sentences, in almost the same way that a human may rank them. To accomplish this, it is necessary to first perform normalization and transform various forms of phrases into their canonical form. Then, every text should be tokenized to sentences, and further tokenized to words. Another prerequisite is to remove stop words. The following subtasks should be carried out next.
+
+## Incorporating Document Features ::: Learning Phase ::: Feature Extraction
+
+Foremost, it is necessary to represent each sentence with those features that have the most distinguishing effect on the prediction of the rank. Many features have been examined in the literature. We entitle some as “document-aware” because they do implicitly represent some information about a document. However, other features have been used, that say nothing about the document in which they appeared. We call them “document-unaware”. In the previous sections, we argued that this lack of information might be misleading for the system, especially when we train it with sample sentences from different documents. Thus, we modified some document-unaware features and derived new features that cover document properties. We also examined the effect of incorporating explicit features of a document into vectors of its sentences. The following sub-sections describe the features mentioned above in more detail.
+
+## Incorporating Document Features ::: Learning Phase ::: Feature Extraction ::: Document-unaware Features
+
+Ordinal position: It is shown that inclusion of sentence, in summary, is relevant to its position in the document or even in a paragraph. Intuitively, sentences at the beginning or the end of a text are more likely to be included in the summary. Depending on how it is defined, this feature might be document-unaware or not. For example, in BIBREF29 and BIBREF37 it is defined as $\frac{5}{5}$ for the first sentence, $\frac{4}{5}$ for the second, and so on to $\frac{1}{5}$ for fifth and zero for remaining sentences. In another research conducted by Wong et al. BIBREF9, it is defined as $\frac{1}{sentence\ number}$. With such a definition, we may have several sentences, for example, with position=$\frac{1}{5}$ in the training set, these may not have the same sense of position. While a sentence position=$\frac{1}{5}$ means “among the firsts” in a document with 40 sentences, it has a totally different meaning of “in the middle”, in another document containing 10 sentences. Thus, a useful feature formula should involve differences of documents which may change the meaning of information within it. In our experiments, we used the definition of BIBREF9. A document-aware version of position will be introduced in (SECREF6).
+
+Length of sentence: the intuition behind this feature is that sentences of too long or too short length are less likely to be included in the summary. Like sentence position, this feature is also subject to the wrong definition that makes it document-unaware. For example, in BIBREF9 it is defined as a number of words in a sentence. Such a definition does not take into account that a sentence with, say 15 words may be considered long if all other sentences of document have fewer words. Another sentence with the same number of words may be regarded as short, because other sentences in that document have more than 15 words. This might occur due to different writing styles. However, we included this in our experiments to compare its effect with that of its document-aware counterpart, which will be listed in (SECREF6).
+
+The Ratio of Nouns: is defined in BIBREF30 as the number of nouns divided by total number of words in the sentence, after stop-words are removed. Three other features, Ratio of Verbs, Ratio of Adjectives, and Ratio of Adverbs are defined in the same manner and proved to have a positive effect on ranking performance. From our perspective, however, a sentence with a ratio of nouns =0.5, for example, in a document containing many nouns, must be discriminated in the training set from another sentence with the same ratio of nouns, that appeared in another document having fewer nouns. This feature does not represent how many nouns are there in the document, which is important in sentence ranking. The same discussion goes on to justify the need to consider the number of verbs, adjectives, and adverbs in the document. The impact of these features is examined in our experiments and compared to that of their document-aware counterparts.
+
+The Ratio of Numerical entities: assuming that sentences containing more numerical data are probably giving us more information, this feature may help us in ranking BIBREF31, BIBREF32. For calculation, we count the occurrences of numbers and digits proportional to the length of sentence. This feature must be less weighted if almost all sentences of a document have numerical data. However, it does not count numbers and digits in other sentences of the document.
+
+Cue Words: if a sentence contains special phrases such as “in conclusion”, “overall”, “to summarize”, “in a nutshell” and so forth, its selection as a part of the summary is more probable than others. The number of these phrases is counted for this feature.
+
+## Incorporating Document Features ::: Learning Phase ::: Feature Extraction ::: Document-aware Features
+
+Cosine position: As mentioned in (SECREF5) a good definition of position should take into account document length. A well-known formula used in the literature BIBREF38, BIBREF7 is
+
+in which index is an integer representing the order of sentences and T is the total number of sentences in document. This feature ranges from 0 to 1, the closer to the beginning or to the end, the higher value this feature will take. $\alpha $ is a tuning parameter. As it increases, the value of this feature will be distributed more equally over sentences. In this manner, equal values of this feature in the training set represent a uniform notion of position in a document, so it becomes document-aware.
+
+Relative Length: the intuition behind this feature is explained in (SECREF5). A discussion went there that a simple count of words does not take into account that a sentence with a certain number of words may be considered long or short, based on the other sentences appeared the document. Taking this into consideration, we divided the number of words in the sentence by the average length of sentences in the document. More formally, the formula is:
+
+in which n is number of sentences in the document and $s_i$ is the i’th sentence of it. Values greater than 1 could be interpreted as long and vice versa.
+
+TF-ISF: this feature counts the frequency of terms in a document and assigns higher values to sentences having more frequent terms. It also discounts terms which appear in more sentences. Since it is well explained in the literature, we have not included details and formula which are in references BIBREF34 and BIBREF39. Nonetheless, the aspect that matters in our discussion is that both frequency and inverse sentence frequency are terms which involve properties of context, and consequently are document-aware.
+
+POS features: Here we introduce another way to include the ratio of part of speech (POS) units in features and keep them document-normalized. To do this, the number of occurrences of each POS unit should be divided by the number of them in the document, instead of that occurring in a sentence. The formal definition of the new document-aware features are as follows:
+
+## Incorporating Document Features ::: Learning Phase ::: Feature Extraction ::: Explicit Document Features
+
+In order to further investigate how effective are document specific features in sentence ranking, we defined several features for documents. These features are then calculated for each document and repeated in the feature vector of every sentence of that document. Their formal definition is described below and their effect is examined in the result and discussion section (SECREF5):
+
+Document sentences: An important property of a document that affects summarization is the total number of sentences participating in sentence ranking. As this number grows, a summarizer should be more selective and precise. Also, some sentence features such as cue words, maybe more weighted for longer documents. In addition, the main contextual information is probably more distributed over sentences. In such a case even lower values of other features should be considered important.
+
+Document words: the number of words in the document is another notion of document length. Since the number of sentences alone is not enough to represent document length, this feature should also be considered.
+
+Topical category: different topics such as political, economic, etc. have different writing styles and this might affect sentence ranking. For instance, numerical entities may appear more in economic or sport reports than in religious or social news. Therefore the weight of this attribute should be more or less, based on a document’s category. So it needs to be included.
+
+An overview of our feature set is represented by example in figure FIGREF15. Column ID is just for enumeration and column Target is explained in the next section.
+
+## Incorporating Document Features ::: Learning Phase ::: Target Assignment
+
+Every feature vector needs a target value from which the system should learn how to rank sentences. The value of target is usually determined based on golden summaries. If a sentence is included in a majority of human-written extracts, its target is near to 1. In contrast, it would be closer to 0 if the sentence could not be found in any human-made summaries. In some datasets, like the one we used, golden summaries are not absolutely extractive, and they are not composed of exact copies of sentences in the original text. In such cases, a measure of similarity between the sentence whose target we are looking for, and each ideal summaries’ sentence will be calculated. This results in real values between 0 and 1 for this attribute. Section (SECREF4) includes more details about target assignment.
+
+## Incorporating Document Features ::: Learning Phase ::: Training Model
+
+Since target attribute values vary between zero and one, we opted to use regression methods for the learning task. To build a training and a test set, a global matrix is composed in which every row corresponds to a sentence in the corpus and each column corresponds to a feature. The last column is for target attribute which will be omitted in the test set. It might be required to perform scaling on certain columns, depending on its corresponding feature and range of values.
+
+In cases where the dataset is large, the total number of sentences which are not included in golden summaries, and consequently have lower targets, is many times larger than the number of included sentences. This might lead the regression bias toward lower target values. To avoid this, dataset balancing is needed. That is to leave aside a portion of not included sentences and not to feed them to learner model.
+
+Lastly, in this phase, the regression model should be fitted on training set and be evaluated on a test set as described in sections (SECREF4) and (SECREF5).
+
+## Incorporating Document Features ::: Summarization Phase
+
+Having acquired a model that can precisely rank sentences, we can apply it to any new given text and use ranked sentences in order to create a summary. This summarization process could also be executed on dataset texts, in order to evaluate how precisely our method resembles human-written summaries. In this section, we briefly describe the summarization process. The evaluation process is explained in section (SECREF22).
+
+## Incorporating Document Features ::: Summarization Phase ::: Feature Extraction
+
+Initially, sentence features need to be extracted. Again, normalization, sentence tokenization, word tokenization, and stop words removal are preliminary steps. The same features used in the learning phase should be calculated.
+
+## Incorporating Document Features ::: Summarization Phase ::: Sentence Ranking
+
+In comparison with learning phase, in which a global matrix was used, this time a local matrix is composed whose rows correspond with the sentences of the input text. If during learning, any scaling was performed on features, they should be carried out here in the same manner. The matrix is then fed to the regressor obtained in the previous phase, and a rank value between zero and one will be predicted for each sentence.
+
+## Incorporating Document Features ::: Summarization Phase ::: Sentence Selection
+
+By sorting sentences based on their ranks, the most appropriate sentences for being included in summary will be determined. To preserve readability, however, it is important to place them in the summary in the same order they appeared in the input document.
+
+Another consideration is the cut-off length. How many of the top sentences should we select for summary? The answer should be as simple as a constant number, a percentage of total sentences, or it could be determined by more advanced heuristics. We allowed cut-off length to be an input parameter. This allows us, in the evaluation phase, to produce summaries of dataset documents in the same length as golden summaries. This makes the comparison more equitable.
+
+## Incorporating Document Features ::: Evaluation Measures
+
+In this section, some measures are described to evaluate the performance of both phases explained in the previous section: the learning phase and summarization phase. The former is evaluated using common regression metrics such as mean square error (MSE) and coefficient of determination (R2). The latter is carried out using ROUGE which is a well-known metric for evaluating summarization systems.
+
+Mean Square Error (MSE) is the average of squared errors in all estimated targets. An ideal regressor tends to make this measure as near as possible to zero. Though, an exact zero for MSE is not desirable, because it is suspected to be due to over fitting.
+
+The coefficient of determination is another metric for evaluating how well a regression model is fitted to data. It ranges from $-\infty $ to 1. As it approaches 1, “goodness-of-fit” is increased, while negative values show that the mean of data is a better estimator for target BIBREF40.
+
+ROUGE is proposed in BIBREF41 as an evaluation metric for summaries. It matches n-grams in both system produced summaries and reference summaries and returns the percentage of matching in terms of precision, recall and f-measure. There is a variety of ROUGE family metrics, namely ROUGE-1, ROUGE-2, and ROUGE-L. In ROUGE-1 the overlap of 1-grams, each word, is calculated. In ROUGE-2 the bigrams are considered as units of comparison. The ROUGE-L uses the Longest Common Subsequence (LCS) to measure resemblance. Nevertheless, we found that ROUGE assessments are always relatively high, even for a summary that is produced perfunctorily. Hence, we also designed a random summarizer that selects random sentences for the summary, and evaluated it by ROUGE. This could be used as a baseline for comparison.
+
+## Experiments
+
+Two experiments were set up to verify our hypothesis: “sentence ranking is highly dependent to document, and features must also represent context”. The first experiment involves document-unaware features (listed in section SECREF5) alongside TF-ISF. In the second experiment, document-aware features were used instead of document-unaware ones. We also set up a random summarizer based on a random regressor that acts as a baseline for comparisons. More details are recorded in section (SECREF25).
+
+A good experimental study should be as reproducible as possible. Here we explain the technical details that are more specific to our dataset, to allow the interested user to set up the same experiments for further research.
+
+## Experiments ::: Dataset
+
+We used the Pasokh dataset BIBREF42 that contains 100 Persian news documents each of which is associated with 5 summaries. Each summary consists of several sentences of the original text, selected by a human expert. Some sentences are slightly modified and are not, therefore, an exact copy of any original sentences. Documents are categorized into six categories such as political, economic and so on. The length of documents ranges from 4 to 156 sentences. Overall, it has about 2,500 sentences.
+
+## Experiments ::: Extracting Features and Scaling
+
+All features introduced in section SECREF4 are calculated. Pre-processing, sentence and word tokenization, stop words removal, and part of speech tagging is performed using the Hazm library BIBREF43. The majority of features have a range between zero and one. Other features are passed to a min-max scaler to transform into the same range. For the category feature which is nominal, the one-hot-encoding method applied and six flag features used instead.
+
+## Experiments ::: Target Assignment
+
+In assigning the target to a sentence, as mentioned in section (SECREF16), the goal is to assign a number between 0 and 1, with higher values as an indicator that the sentence is present in the majority of golden summaries. Because exact matching between sentences is not possible, to resolve the question of presence in a single golden summary such as $g$, we calculated the cosine similarity of the desired sentence with each sentence: $s_j\in g$ . Then the maximum value of these similarities is selected as an indicator of presence. This indicator is then calculated for other golden summaries and their average is assigned to the sentence as the target.
+
+in which G is set of summaries written for the document containing s. This is an additional explicit evidence that target (and subsequently, ranking) is related to the document.
+
+## Experiments ::: Training Model
+
+A vast collection of scikit-learn tools were used for the learning phase. K-fold cross-validation is applied with k=4 and split size of 0.25. Three different regression methods were applied, including Linear Regression, Decision Tree Regression, and Epsilon-Support Vector Regression(SVR). Overall results were the same with minor differences. Thus only the SVR result is reported. Various values for parameters were examined but the best results were achieved by epsilon=0.01, kernel=rbf, and default values for other parameters. With the aim of evaluating summary qualities, the fitted regressor of each run was used to rank documents sentences in the test set. To compare with each standard summary, a summary with the same count of sentences was produced, and compared by ROUGE. Averaging these ROUGE scores over each document and then over the dataset, the overall quality of summaries produced by the model can be obtained.
+
+The same process was repeated with a random regressor that needed no training, and which simply assigns a random number between zero and one to any given sample. Apart from measuring the performance of this regressor on the test set, the quality of summaries produced is evaluated and reported as a baseline. The juxtaposition of this baseline and our measured results will demonstrate how effective our feature set was and how intelligent our whole system worked.
+
+## Results and Discussion
+
+In section (SECREF22) MSE, R2 and ROUGE scores are remarked as evaluation measures. The results of our experiments are reported below in terms of these measures. For better comparison, we also ran another experiment in which the random regressor was used for ranking sentences and producing summaries. Table TABREF28 shows and compares MSE and R2 reported from these experiments. The results show that in experiment 2, the mean squared error is reduced and the r2 score is increased. This means that using document-aware features leads to a more accurate learned model, proving our hypothesis about the relationship between document features and target ranks.
+
+ROUGE scores are displayed separately in terms of precision, recall and f-measure in Figures FIGREF29 to FIGREF31 respectively. F-measure scores are displayed in the figure FIGREF29, comparing ROUGE-1, ROUGE-2 and ROUGE-L. Figures FIGREF30 and FIGREF31 allow comparison of precision and recall scores. The higher values gained in experiment 2, confirm that document-aware features perform better than unaware features.
+
+These results are also interpretable from viewpoint of entropy-based decision tree methods. In learning phase, impurity of features within the whole dataset will be measured, and features having higher information gain will take place in upper levels of tree. But in summarization phase, within which decisions have to be made within a single document, impurity of those features may be low, causing less effective decisions and precision's. By incorporating document features, we help model to use different features (thus different trees) for different documents.
+
+Another insight gained from these charts is that a random summarizer resulted in scores more than 50% in all measures, and without using document-aware features, the model achieves a small improvement over a random summarizer.
+
+## Conclusion
+
+This paper has discussed that in supervised extractive summarization, we cannot learn to rank by considering dataset sentences as independent educational examples. The rank of sentences is dependent on each other within a document. To overcome this issue, we suggested incorporating document features explicitly in the feature vector of sentences. We also suggested using features that take into account the properties of document. We named this kind of features as document-aware. Conducted experiments demonstrated the benefit of adding explicit document features, as well as document-aware features, both in model precision and summary quality. For future work, more document-aware features can be examined. It is also possible to run the same experiments on an English (or any other language) dataset, if available. Another clue for study is measuring degree of entropy difference between dataset and single documents, in a standard dataset.
+
+Our source code is hosted on GitHub and is published for later reference, further experiments and reproducing results. A web interface and a Telegram bot is also implemented as demo.

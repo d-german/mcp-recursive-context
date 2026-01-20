@@ -1,0 +1,207 @@
+# Information-Theoretic Probing for Linguistic Structure
+
+**Paper ID:** 2004.03061
+
+## Abstract
+
+The success of neural networks on a diverse set of NLP tasks has led researchers to question how much do these networks actually know about natural language. Probes are a natural way of assessing this. When probing, a researcher chooses a linguistic task and trains a supervised model to predict annotation in that linguistic task from the network's learned representations. If the probe does well, the researcher may conclude that the representations encode knowledge related to the task. A commonly held belief is that using simpler models as probes is better; the logic is that such models will identify linguistic structure, but not learn the task itself. We propose an information-theoretic formalization of probing as estimating mutual information that contradicts this received wisdom: one should always select the highest performing probe one can, even if it is more complex, since it will result in a tighter estimate. The empirical portion of our paper focuses on obtaining tight estimates for how much information BERT knows about parts of speech in a set of five typologically diverse languages that are often underrepresented in parsing research, plus English, totaling six languages. We find BERT accounts for only at most 5% more information than traditional, type-based word embeddings.
+
+## Introduction
+
+Neural networks are the backbone of modern state-of-the-art Natural Language Processing (NLP) systems. One inherent by-product of training a neural network is the production of real-valued representations. Many speculate that these representations encode a continuous analogue of discrete linguistic properties, e.g., part-of-speech tags, due to the networks' impressive performance on many NLP tasks BIBREF0. As a result of this speculation, one common thread of research focuses on the construction of probes, i.e., supervised models that are trained to extract the linguistic properties directly BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5. A syntactic probe, then, is a model for extracting syntactic properties, such as part-of-speech, from the representations BIBREF6.
+
+In this work, we question what the goal of probing for linguistic properties ought to be. Informally, probing is often described as an attempt to discern how much information representations encode about a specific linguistic property. We make this statement more formal: We assert that the goal of probing ought to be estimating the mutual information BIBREF7 between a representation-valued random variable and a linguistic property-valued random variable. This formulation gives probing a clean, information-theoretic foundation, and allows us to consider what “probing” actually means.
+
+Our analysis also provides insight into how to choose a probe family: We show that choosing the highest-performing probe, independent of its complexity, is optimal for achieving the best estimate of mutual information (MI). This contradicts the received wisdom that one should always select simple probes over more complex ones BIBREF8, BIBREF9, BIBREF10. In this context, we also discuss the recent work of hewitt-liang-2019-designing who propose selectivity as a criterion for choosing families of probes. hewitt-liang-2019-designing define selectivity as the performance difference between a probe on the target task and a control task, writing “[t]he selectivity of a probe puts linguistic task accuracy in context with the probe's capacity to memorize from word types.” They further ponder: “when a probe achieves high accuracy on a linguistic task using a representation, can we conclude that the representation encodes linguistic structure, or has the probe just learned the task?” Information-theoretically, there is no difference between learning the task and probing for linguistic structure, as we will show; thus, it follows that one should always employ the best possible probe for the task without resorting to artificial constraints.
+
+In support of our discussion, we empirically analyze word-level part-of-speech labeling, a common syntactic probing task BIBREF6, BIBREF11, within our framework. Working on a typologically diverse set of languages (Basque, Czech, English, Finnish, Tamil, and Turkish), we show that the representations from BERT, a common contextualized embedder, only account for at most $5\%$ more of the part-of-speech tag entropy than a control. These modest improvements suggest that most of the information needed to tag part-of-speech well is encoded at the lexical level, and does not require the sentential context of the word. Put more simply, words are not very ambiguous with respect to part of speech, a result known to practitioners of NLP BIBREF12. We interpret this to mean that part-of-speech labeling is not a very informative probing task.
+
+We also remark that formulating probing information-theoretically gives us a simple, but stunning result: contextual word embeddings, e.g., BERT BIBREF13 and ELMo BIBREF14, contain the same amount of information about the linguistic property of interest as the original sentence. This follows naturally from the data-processing inequality under a very mild assumption. What this suggests is that, in a certain sense, probing for linguistic properties in representations may not be a well grounded enterprise at all.
+
+## Word-Level Syntactic Probes for Contextual Embeddings
+
+Following hewitt-liang-2019-designing, we consider probes that examine syntactic knowledge in contextualized embeddings. These probes only consider a single token's embedding and try to perform the task using only that information. Specifically, in this work, we consider part-of-speech (POS) labeling: determining a word's part of speech in a given sentence. For example, we wish to determine whether the word love is a noun or a verb. This task requires the sentential context for success. As an example, consider the utterance “love is blind” where, only with the context, is it clear that love is a noun. Thus, to do well on this task, the contextualized embeddings need to encode enough about the surrounding context to correctly guess the POS.
+
+## Word-Level Syntactic Probes for Contextual Embeddings ::: Notation
+
+Let $S$ be a random variable ranging over all possible sequences of words. For the sake of this paper, we assume the vocabulary $\mathcal {V}$ is finite and, thus, the values $S$ can take are in $\mathcal {V}^*$. We write $\mathbf {s}\in S$ as $\mathbf {s}= w_1 \cdots w_{|\mathbf {s}|}$ for a specific sentence, where each $w_i \in \mathcal {V}$ is a specific word in the sentence and the position $i \in \mathbb {N}^{+}$. We also define the random variable $W$ that ranges over the vocabulary $\mathcal {V}$. We define both a sentence-level random variable $S$ and a word-level random variable $W$ since each will be useful in different contexts during our exposition.
+
+Next, let $T$ be a random variable whose possible values are the analyses $t$ that we want to consider for word $w_i$ in its sentential context, $\mathbf {s}= w_1 \cdots w_i \cdots w_{|\mathbf {s}|}$. In this work, we will focus on predicting the part-of-speech tag of the $i^\text{th}$ word $w_i$. We denote the set of values $T$ can take as the set $\mathcal {T}$. Finally, let $R$ be a representation-valued random variable for the $i^\text{th}$ word $w_i$ in a sentence derived from the entire sentence $\mathbf {s}$. We write $\mathbf {r}\in \mathbb {R}^d$ for a value of $R$. While any given value $\mathbf {r}$ is a continuous vector, there are only a countable number of values $R$ can take. To see this, note there are only a countable number of sentences in $\mathcal {V}^*$.
+
+Next, we assume there exists a true distribution $p(t, \mathbf {s}, i)$ over analyses $t$ (elements of $\mathcal {T}$), sentences $\mathbf {s}$ (elements of $\mathcal {V}^*$), and positions $i$ (elements of $\mathbb {N}^{+}$). Note that the conditional distribution $p(t \mid \mathbf {s}, i)$ gives us the true distribution over analyses $t$ for the $i^{\text{th}}$ word in the sentence $\mathbf {s}$. We will augment this distribution such that $p$ is additionally a distribution over $\mathbf {r}$, i.e.,
+
+where we define the augmentation as a Dirac's delta function
+
+Since contextual embeddings are a deterministic function of a sentence $\mathbf {s}$, the augmented distribution in eq:true has no more randomness than the original—its entropy is the same. We assume the values of the random variables defined above are distributed according to this (unknown) $p$. While we do not have access to $p$, we assume the data in our corpus were drawn according to it. Note that $W$—the random variable over possible words—is distributed according to the marginal distribution
+
+where we define the deterministic distribution
+
+## Word-Level Syntactic Probes for Contextual Embeddings ::: Probing as Mutual Information
+
+The task of supervised probing is an attempt to ascertain how much information a specific representation $\mathbf {r}$ tells us about the value of $t$. This is naturally expressed as the mutual information, a quantity from information theory:
+
+where we define the entropy, which is constant with respect to the representations, as
+
+and where we define the conditional entropy as
+
+the point-wise conditional entropy inside the sum is defined as
+
+Again, we will not know any of the distributions required to compute these quantities; the distributions in the formulae are marginals and conditionals of the true distribution discussed in eq:true.
+
+## Word-Level Syntactic Probes for Contextual Embeddings ::: Bounding Mutual Information
+
+The desired conditional entropy, $\mathrm {H}(T \mid R)$ is not readily available, but with a model $q_{{\theta }}(\mathbf {t}\mid \mathbf {r})$ in hand, we can upper-bound it by measuring their empirical cross entropy
+
+where $\mathrm {H}_{q_{{\theta }}}(T \mid R)$ is the cross-entropy we obtain by using $q_{{\theta }}$ to get this estimate. Since the KL divergence is always positive, we may lower-bound the desired mutual information
+
+This bound gets tighter, the more similar (in the sense of the KL divergence) $q_{{\theta }}(\cdot \mid \mathbf {r})$ is to the true distribution $p(\cdot \mid \mathbf {r})$.
+
+## Word-Level Syntactic Probes for Contextual Embeddings ::: Bounding Mutual Information ::: Bigger Probes are Better.
+
+If we accept mutual information as a natural measure for how much representations encode a target linguistic task (§SECREF6), then the best estimate of that mutual information is the one where the probe $q_{{\theta }}(t \mid \mathbf {r})$ is best at the target task. In other words, we want the best probe $q_{{\theta }}(t \mid \mathbf {r})$ such that we get the tightest bound to the actual distribution $p(t\mid \mathbf {r})$. This paints the question posed by hewitt-liang-2019-designing, who write “when a probe achieves high accuracy on a linguistic task using a representation, can we conclude that the representation encodes linguistic structure, or has the probe just learned the task?” as a false dichotomy. From an information-theoretic view, we will always prefer the probe that does better at the target task, since there is no difference between learning a task and the representations encoding the linguistic structure.
+
+## Control Functions
+
+To place the performance of a probe in perspective, hewitt-liang-2019-designing develop the notion of a control task. Inspired by this, we develop an analogue we term control functions, which are functions of the representation-valued random variable $R$. Similar to hewitt-liang-2019-designing's control tasks, the goal of a control function $\mathbf {c}(\cdot )$ is to place the mutual information $\mathrm {I}(T; R)$ in the context of a baseline that the control function encodes. Control functions have their root in the data-processing inequality BIBREF7, which states that, for any function $\mathbf {c}(\cdot )$, we have
+
+In other words, information can only be lost by processing data. A common adage associated with this inequality is “garbage in, garbage out.”
+
+## Control Functions ::: Type-Level Control Functions
+
+We will focus on type-level control functions in this paper; these functions have the effect of decontextualizing the embeddings. Such functions allow us to inquire how much the contextual aspect of the contextual embeddings help the probe perform the target task. To show that we may map from contextual embeddings to the identity of the word type, we need the following assumption about the embeddings.
+
+Assumption 1 Every contextualized embedding is unique, i.e., for any pair of sentences $\mathbf {s}, \mathbf {s}^{\prime } \in \mathcal {V}^*$, we have $(\mathbf {s}\ne \mathbf {s}^{\prime }) \mid \mid (i \ne j) \Rightarrow \textsc {bert} (\mathbf {s})_i \ne \textsc {bert} (\mathbf {s}^{\prime })_j$ for all $i \in \lbrace 1, \ldots |\mathbf {s}|\rbrace $ and $j \in \lbrace 1, \ldots , |\mathbf {s}^{\prime }|\rbrace $.
+
+We note that ass:one is mild. Contextualized word embeddings map words (in their context) to $\mathbb {R}^d$, which is an uncountably infinite space. However, there are only a countable number of sentences, which implies only a countable number of sequences of real vectors in $\mathbb {R}^d$ that a contextualized embedder may produce. The event that any two embeddings would be the same across two distinct sentences is infinitesimally small. ass:one yields the following corollary.
+
+Corollary 1 There exists a function $\emph {\texttt {id} } : \mathbb {R}^d \rightarrow V$ that maps a contextualized embedding to its word type. The function $\emph {\texttt {id} }$ is not a bijection since multiple embeddings will map to the same type.
+
+Using cor:one, we can show that any non-contextualized word embedding will contain no more information than a contextualized word embedding. More formally, we do this by constructing a look-up function $\mathbf {e}: V \rightarrow \mathbb {R}^d$ that maps a word to a word embedding. This embedding may be one-hot, randomly generated ahead of time, or the output of a data-driven embedding method, e.g. fastText BIBREF15. We can then construct a control function as the composition of the look-up function $\mathbf {e}$ and the id function $\texttt {id} $. Using the data-processing inequality, we can prove that in a word-level prediction task, any non-contextual (type level) word-embedding will contain no more information than a contextualized (token level) one, such as BERT and ELMo. Specifically, we have
+
+This result is intuitive and, perhaps, trivial—context matters information-theoretically. However, it gives us a principled foundation by which to measure the effectiveness of probes as we will show in sec:gain.
+
+## Control Functions ::: How Much Information Did We Gain?
+
+We will now quantify how much a contextualized word embedding knows about a task with respect to a specific control function $\mathbf {c}(\cdot )$. We term how much more information the contextualized embeddings have about a task than a control variable the gain, which we define as
+
+The gain function will be our method for measuring how much more information contextualized representations have over a controlled baseline, encoded as the function $\mathbf {c}$. We will empirically estimate this value in sec:experiments.
+
+Interestingly enough, the gain has a straightforward interpretation.
+
+Proposition 1 The gain function is equal to the following conditional mutual information
+
+The jump from the first to the second equality follows since $R$ encodes all the information about $T$ provided by $\mathbf {c}(R)$ by construction. prop:interpretation gives us a clear understanding of the quantity we wish to estimate: It is how much information about a task is encoded in the representations, given some control knowledge. If properly designed, this control transformation will remove information from the probed representations.
+
+## Control Functions ::: Approximating the Gain
+
+The gain, as defined in eq:gain, is intractable to compute. In this section we derive a pair of variational bounds on $\mathcal {G}(T, R, \mathbf {e})$—one upper and one lower. To approximate the gain, we will simultaneously minimize an upper and a lower-bound on eq:gain. We begin by approximating the gain in the following manner
+
+these cross-entropies can be empirically estimated. We will assume access to a corpus $\lbrace (t_i, \mathbf {r}_i)\rbrace _{i=1}^N$ that is human-annotated for the target linguistic property; we further assume that these are samples $(t_i, \mathbf {r}_i) \sim p(\cdot , \cdot )$ from the true distribution. This yields a second approximation that is tractable:
+
+This approximation is exact in the limit $N \rightarrow \infty $ by the law of large numbers.
+
+We note the approximation given in eq:approx may be either positive or negative and its estimation error follows from eq:entestimate
+
+where we abuse the KL notation to simplify the equation. This is an undesired behavior since we know the gain itself is non-negative, by the data-processing inequality, but we have yet to devise a remedy.
+
+We justify the approximation in eq:approx with a pair of variational bounds. The following two corollaries are a result of thm:variationalbounds in appendix:a.
+
+Corollary 2 We have the following upper-bound on the gain
+
+Corollary 3 We have the following lower-bound on the gain
+
+The conjunction of cor:upper and cor:lower suggest a simple procedure for finding a good approximation: We choose $q_{{\theta }1}(\cdot \mid r)$ and $q_{{\theta }2}(\cdot \mid r)$ so as to minimize eq:upper and maximize eq:lower, respectively. These distributions contain no overlapping parameters, by construction, so these two optimization routines may be performed independently. We will optimize both with a gradient-based procedure, discussed in sec:experiments.
+
+## Understanding Probing Information-Theoretically
+
+In sec:control-functions we developed an information-theoretic framework for thinking about probing contextual word embeddings for linguistic structure. However, we now cast doubt on whether probing makes sense as a scientific endeavour. We prove in sec:context that contextualized word embeddings, by construction, contain no more information about a word-level syntactic task than the original sentence itself. Nevertheless, we do find a meaningful scientific interpretation of control functions. We expound upon this in sec:control-functions-meaning, arguing that control functions are useful, not for understanding representations, but rather for understanding the influence of sentential context on word-level syntactic tasks, e.g., labeling words with their part of speech.
+
+## Understanding Probing Information-Theoretically ::: You Know Nothing, BERT
+
+To start, we note the following corollary
+
+Corollary 4 It directly follows from ass:one that $\textsc {bert} $ is a bijection between sentences $\mathbf {s}$ and sequences of embeddings $\langle \mathbf {r}_1, \ldots , \mathbf {r}_{|\mathbf {s}|} \rangle $. As $\textsc {bert} $ is a bijection, it has an inverse, which we will denote as $\textsc {bert}^{-1} $.
+
+Theorem 1 The function $\textsc {bert} (S)$ cannot provide more information about $T$ than the sentence $S$ itself.
+
+This implies $\mathrm {I}(T ; S) = \mathrm {I}(T; \textsc {bert} (S))$. We remark this is not a BERT-specific result—it rests on the fact that the data-processing inequality is tight for bijections. While thm:bert is a straightforward application of the data-processing inequality, it has deeper ramifications for probing. It means that if we search for syntax in the contextualized word embeddings of a sentence, we should not expect to find any more syntax than is present in the original sentence. In a sense, thm:bert is a cynical statement: the endeavour of finding syntax in contextualized embeddings sentences is nonsensical. This is because, under ass:one, we know the answer a priori—the contextualized word embeddings of a sentence contain exactly the same amount of information about syntax as does the sentence itself.
+
+## Understanding Probing Information-Theoretically ::: What Do Control Functions Mean?
+
+Information-theoretically, the interpretation of control functions is also interesting. As previously noted, our interpretation of control functions in this work does not provide information about the representations themselves. Actually, the same reasoning used in cor:one could be used to devise a function $\texttt {id} _s(\mathbf {r})$ which led from a single representation back to the whole sentence. For a type-level control function $\mathbf {c}$, by the data-processing inequality, we have that $\mathrm {I}(T; W) \ge \mathrm {I}(T; \mathbf {c}(R))$. Consequently, we can get an upper-bound on how much information we can get out of a decontextualized representation. If we assume we have perfect probes, then we get that the true gain function is $\mathrm {I}(T; S) - \mathrm {I}(T; W) = \mathrm {I}(T; S \mid W)$. This quantity is interpreted as the amount of knowledge we gain about the word-level task $T$ by knowing $S$ (i.e., the sentence) in addition to $W$ (i.e., the word). Therefore, a perfect probe would provide insights about language and not about the actual representations, which are no more than a means to an end.
+
+## Understanding Probing Information-Theoretically ::: Discussion: Ease of Extraction
+
+We do acknowledge another interpretation of the work of hewitt-liang-2019-designing inter alia; BERT makes the syntactic information present in an ordered sequence of words more easily extractable. However, ease of extraction is not a trivial notion to formalize, and indeed, we know of no attempt to do so; it is certainly more complex to determine than the number of layers in a multi-layer perceptron (MLP). Indeed, a MLP with a single hidden layer can represent any function over the unit cube, with the caveat that we may need a very large number of hidden units BIBREF16.
+
+Although for perfect probes the above results should hold, in practice $\texttt {id} (\cdot )$ and $\mathbf {c}(\cdot )$ may be hard to approximate. Furthermore, if these functions were to be learned, they might require an unreasonably large dataset. A random embedding control function, for example, would require an infinitely large dataset to be learned—or at least one that contained all words in the vocabulary $V$. “Better” representations should make their respective probes more easily learnable—and consequently their encoded information more accessible.
+
+We suggest that future work on probing should focus on operationalizing ease of extraction more rigorously—even though we do not attempt this ourselves. The advantage of simple probes is that they may reveal something about the structure of the encoded information—i.e., is it structured in such a way that it can be easily taken advantage of by downstream consumers of the contextualized embeddings? We suspect that many researchers who are interested in less complex probes have implicitly had this in mind.
+
+## A Critique of Control Tasks
+
+While this paper builds on the work of hewitt-liang-2019-designing, and we agree with them that we should have control tasks when probing for linguistic properties, we disagree with parts of the methodology for the control task construction. We present these disagreements here.
+
+## A Critique of Control Tasks ::: Structure and Randomness
+
+hewitt-liang-2019-designing introduce control tasks to evaluate the effectiveness of probes. We draw inspiration from this technique as evidenced by our introduction of control functions. However, we take issue with the suggestion that controls should have structure and randomness, to use the terminology from hewitt-liang-2019-designing. They define structure as “the output for a word token is a deterministic function of the word type.” This means that they are stripping the language of ambiguity with respect to the target task. In the case of part-of-speech labeling, love would either be a noun or a verb in a control task, never both: this is a problem. The second feature of control tasks is randomness, i.e., “the output for each word type is sampled independently at random.” In conjunction, structure and randomness may yield a relatively trivial task that does not look at all like natural language.
+
+What is more, there is a closed-form solution for an optimal, retrieval-based “probe” that has zero parameters: If a word type appears in the training set, return the label with which it was annotated there, otherwise return the most frequently occurring label across all words in the training set. This probe will achieve an accuracy that is 1 minus the out-of-vocabulary rate (the number of tokens in the test set that correspond to novel types divided by the number of tokens) times the percentage of tags in the test set that do not correspond to the most frequent tag (the error rate of the guess-the-most-frequent-tag classifier). In short, the best model for a control task is a pure memorizer that guesses the most frequent tag for out-of-vocabulary words.
+
+## A Critique of Control Tasks ::: What's Wrong with Memorization?
+
+hewitt-liang-2019-designing propose that probes should be optimised to maximise accuracy and selectivity. Recall selectivity is given by the distance between the accuracy on the original task and the accuracy on the control task using the same architecture. Given their characterization of control tasks, maximising selectivity leads to a selection of a model that is bad at memorization. But why should we punish memorization? Much of linguistic competence is about generalization, however memorization also plays a key role BIBREF17, BIBREF18, BIBREF19, with word learning BIBREF20 being an obvious example. Indeed, maximizing selectivity as a criterion for creating probes seems to artificially disfavor this property.
+
+## A Critique of Control Tasks ::: What Low-Selectivity Means
+
+hewitt-liang-2019-designing acknowledge that for the more complex task of dependency edge prediction, a MLP probe is more accurate and, therefore, preferable despite its low selectivity. However, they offer two counter-examples where the less selective neural probe exhibits drawbacks when compared to its more selective, linear counterpart. We believe both examples are a symptom of using a simple probe rather than of selectivity being a useful metric for probe selection. First, [§3.6]hewitt-liang-2019-designing point out that, in their experiments, the MLP-1 model frequently mislabels the word with suffix -s as NNPS on the POS labeling task. They present this finding as a possible example of a less selective probe being less faithful in representing what linguistic information has the model learned. Our analysis leads us to believe that, on contrary, this shows that one should be using the best possible probe to minimize the chance of misrepresentation. Since more complex probes achieve higher accuracy on the task, as evidence by the findings of hewitt-liang-2019-designing, we believe that the overall trend of misrepresentation is higher for the probes with higher selectivity. The same applies for the second example discussed in section [§4.2]hewitt-liang-2019-designing where a less selective probe appears to be less faithful. The authors show that the representations on ELMo's second layer fail to outperform its word type ones (layer zero) on the POS labeling task when using the MLP-1 probe. While they argue this is evidence for selectivity being a useful metric in choosing appropriate probes, we argue that this demonstrates yet again that one needs to use a more complex probe to minimize the chances of misrepresenting what the model has learned. The fact that the linear probe shows a difference only demonstrates that the information is perhaps more accessible with ELMo, not that it is not present; see sec:ease-extract.
+
+## Experiments
+
+We consider the task of POS labeling and use the universal POS tag information BIBREF21 from the Universal Dependencies 2.4 BIBREF22. We probe the multilingual release of BERT on six typologically diverse languages: Basque, Czech, English, Finnish, Tamil, and Turkish; and we compute the contextual representations of each sentence by feeding it into BERT and averaging the output word piece representations for each word, as tokenized in the treebank.
+
+## Experiments ::: Control Functions
+
+We will consider three different control functions. Each is defined as the composition $\mathbf {c}= \mathbf {e}\circ \texttt {id} $ with a different look-up function. These look-up functions are
+
+$\mathbf {e}_\textit {fastText}$ returns a language specific fastText embedding BIBREF15;
+
+$\mathbf {e}_\textit {onehot}$ returns a one-hot embedding;
+
+$\mathbf {e}_\textit {random}$ returns a fixed random embedding.
+
+All of these functions are type level in that they remove the influence of the context on the word.
+
+## Experiments ::: Probe Architecture
+
+As expounded upon above, our purpose is to achieve the best bound on mutual information we can. To this end, we employ a deep MLP as our probe. We define the probe as
+
+an $m$-layer neural network with the non-linearity $\sigma (\cdot ) = \mathrm {ReLU}(\cdot )$. The initial projection matrix is $W^{(1)} \in \mathbb {R}^{r_1 \times d}$ and the final projection matrix is $W^{(m)} \in \mathbb {R}^{|\mathcal {T}| \times r_{m-1}}$, where $r_i=\frac{r}{2^{i-1}}$. The remaining matrices are $W^{(i)} \in \mathbb {R}^{r_i \times r_{i-1}}$, so we half the number of hidden states in each layer. We optimize over the hyperparameters—number of layers, hidden size, one-hot embedding size, and dropout—by using random search. For each estimate, we train 50 models and choose the one with the best validation cross-entropy. The cross-entropy in the test set is then used as our entropy estimate.
+
+## Experiments ::: Results
+
+We know $\textsc {bert} $ can generate text in many languages, here we assess how much does it actually know about syntax in those languages. And how much more does it know than simple type-level baselines. tab:results-full presents this results, showing how much information $\textsc {bert} $, fastText and onehot embeddings encode about POS tagging. We see that—in all analysed languages—type level embeddings can already capture most of the uncertainty in POS tagging. We also see that BERT only shares a small amount of extra information with the task, having small (or even negative) gains in all languages.
+
+$\textsc {bert} $ presents negative gains in some of the analysed languages. Although this may seem to contradict the information processing inequality, it is actually caused by the difficulty of approximating $\texttt {id} $ and $\mathbf {c}(\cdot )$ with a finite training set—causing $\mathrm {KL}_{q_{{\theta }1}}(T \mid R)$ to be larger than $\mathrm {KL}_{q_{{\theta }2}}(T \mid \mathbf {c}(R))$. We believe this highlights the need to formalize ease of extraction, as discussed in sec:ease-extract.
+
+Finally, when put into perspective, multilingual $\textsc {bert} $'s representations do not seem to encode much more information about syntax than a trivial baseline. $\textsc {bert} $ only improves upon fastText in three of the six analysed languages—and even in those, it encodes at most (in English) $5\%$ additional information.
+
+## Conclusion
+
+We proposed an information-theoretic formulation of probing: we define probing as the task of estimating conditional mutual information. We introduce control functions, which allows us to put the amount of information encoded in contextual representations in the context of knowledge judged to be trivial. We further explored this formalization and showed that, given perfect probes, probing can only yield insights into the language itself and tells us nothing about the representations under investigation. Keeping this in mind, we suggested a change of focus—instead of focusing on probe size or information, we should look at ease of extraction going forward.
+
+On another note, we apply our formalization to evaluate multilingual $\textsc {bert} $'s syntax knowledge on a set of six typologically diverse languages. Although it does encode a large amount of information about syntax (more than $81\%$ in all languages), it only encodes at most $5\%$ more information than some trivial baseline knowledge (a type-level representation). This indicates that the task of POS labeling (word-level POS tagging) is not an ideal task for contemplating the syntactic understanding of contextual word embeddings.
+
+## Variational Bounds
+
+Theorem 2 The estimation error between $\mathcal {G}_{q_{{\theta }}}(T, R, \mathbf {e})$ and the true gain can be upper- and lower-bounded by two distinct Kullback–Leibler divergences.
+
+We first find the error given by our estimate
+
+Making use of this error, we trivially find an upper-bound on the estimation error as
+
+which follows since KL divergences are never negative. Analogously, we find a lower-bound as
+
+## Further Results
+
+In this section, we present accuracies for the models trained using $\textsc {bert} $, fastText and onehot embeddings, and the full results on random embeddings. tab:results-extra shows that both BERT and fastText present high accuracies in all languages, except Tamil. Onehot and random results are considerably worse, as expected, since they could not do more than take random guesses (e.g. guessing the most frequent label in the training test) in any word which was not seen during training.

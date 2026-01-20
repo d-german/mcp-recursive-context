@@ -1,0 +1,131 @@
+# An Annotated Corpus of Emerging Anglicisms in Spanish Newspaper Headlines
+
+**Paper ID:** 2004.02929
+
+## Abstract
+
+The extraction of anglicisms (lexical borrowings from English) is relevant both for lexicographic purposes and for NLP downstream tasks. We introduce a corpus of European Spanish newspaper headlines annotated with anglicisms and a baseline model for anglicism extraction. In this paper we present: (1) a corpus of 21,570 newspaper headlines written in European Spanish annotated with emergent anglicisms and (2) a conditional random field baseline model with handcrafted features for anglicism extraction. We present the newspaper headlines corpus, describe the annotation tagset and guidelines and introduce a CRF model that can serve as baseline for the task of detecting anglicisms. The presented work is a first step towards the creation of an anglicism extractor for Spanish newswire.
+
+## Introduction
+
+The study of English influence in the Spanish language has been a hot topic in Hispanic linguistics for decades, particularly concerning lexical borrowing or anglicisms BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5, BIBREF6.
+
+Lexical borrowing is a phenomenon that affects all languages and constitutes a productive mechanism for word-formation, especially in the press. chesleypaulapredicting2010 estimated that a reader of French newspapers encountered a new lexical borrowing for every 1,000 words. In Chilean newspapers, lexical borrowings account for approximately 30% of neologisms, 80% of those corresponding to English loanwords BIBREF7.
+
+Detecting lexical borrowings is relevant both for lexicographic purposes and for NLP downstream tasks BIBREF8, BIBREF9. However, strategies to track and register lexical borrowings have traditionally relied on manual review of corpora.
+
+In this paper we present: (1) a corpus of newspaper headlines in European Spanish annotated with emerging anglicisms and (2) a CRF baseline model for anglicism automatic extraction in Spanish newswire.
+
+## Related Work
+
+Corpus-based studies of English borrowings in Spanish media have traditionally relied on manual evaluation of either previously compiled general corpora such as CREA BIBREF10, BIBREF11, BIBREF12, BIBREF13, either new tailor-made corpora designed to analyze specific genres, varieties or phenomena BIBREF14, BIBREF15, BIBREF16, BIBREF17, BIBREF18, BIBREF19, BIBREF20.
+
+In terms of automatic detection of anglicisms, previous approaches in different languages have mostly depended on resource lookup (lexicon or corpus frequencies), character n-grams and pattern matching. alex-2008-comparing combined lexicon lookup and a search engine module that used the web as a corpus to detect English inclusions in a corpus of German texts and compared her results with a maxent Markov model. furiassi2007retrieval explored corpora lookup and character n-grams to extract false anglicisms from a corpus of Italian newspapers. andersen2012semi used dictionary lookup, regular expressions and lexicon-derived frequencies of character n-grams to detect anglicism candidates in the Norwegian Newspaper Corpus (NNC) BIBREF21, while losnegaard2012data explored a Machine Learning approach to anglicism detection in Norwegian by using TiMBL (Tilburg Memory-Based Learner, an implementation of a k-nearest neighbor classifier) with character trigrams as features. garley-hockenmaier-2012-beefmoves trained a maxent classifier with character n-gram and morphological features to identify anglicisms in German online communities. In Spanish, serigos2017using extracted anglicisms from a corpus of Argentinian newspapers by combining dictionary lookup (aided by TreeTagger and the NLTK lemmatizer) with automatic filtering of capitalized words and manual inspection. In serigos2017applying, a character n-gram module was added to estimate the probabilities of a word being English or Spanish. moreno2018configuracion used different pattern-matching filters and lexicon lookup to extract anglicism cadidates from a corpus of tweets in US Spanish.
+
+Work within the code-switching community has also dealt with language identification on multilingual corpora. Due to the nature of code-switching, these models have primarily focused on oral copora and social media datasets BIBREF22, BIBREF23, BIBREF24. In the last shared task of language identification in code-switched data BIBREF23, approaches to English-Spanish included CRFs models BIBREF25, BIBREF26, BIBREF27, BIBREF28, logistic regression BIBREF29 and LSTMs models BIBREF30, BIBREF31.
+
+The scope and nature of lexical borrowing is, however, somewhat different to that of code-switching. In fact, applying code-switching models to lexical borrowing detection has previously proved to be unsuccessful, as they tend to overestimate the number of anglicisms BIBREF32. In the next section we address the differences between both phenomena and set the scope of this project.
+
+## Anglicism: Scope of the Phenomenon
+
+Linguistic borrowing can be defined as the transference of linguistic elements between two languages. Borrowing and code-switching have frequently been described as a continuum BIBREF33, with a fuzzy frontier between the two. As a result, a precise definition of what borrowing is remains elusive BIBREF34 and some authors prefer to talk about code-mixing in general BIBREF35 or “lone other-language incorporations" BIBREF36.
+
+Lexical borrowing in particular involves the incorporation of single lexical units from one language into another language and is usually accompanied by morphological and phonological modification to conform with the patterns of the recipient language BIBREF37, BIBREF38. By definition, code-switches are not integrated into a recipient language, unlike established loanwords BIBREF39. While code-switches are usually fluent multiword interferences that normally comply with grammatical restrictions in both languages and that are produced by bilingual speakers in bilingual discourses, lexical borrowings are words used by monolingual individuals that eventually become lexicalized and assimilated as part of the recipient language lexicon until the knowledge of “foreign" origin disappears BIBREF40.
+
+In terms of approaching the problem, automatic code-switching identification has been framed as a sequence modeling problem where every token receives a language ID label (as in a POS-tagging task). Borrowing detection, on the other hand, while it can also be transformed into a sequence labeling problem, is an extraction task, where only certain spans of texts will be labeled (in the fashion of a NER task).
+
+Various typologies have been proposed that aim to classify borrowings according to different criteria, both with a cross-linguistic perspective and also specifically aimed to characterize English inclusions in Spanish BIBREF34, BIBREF41, BIBREF42, BIBREF5. In this work, we will be focusing on unassimilated lexical borrowings (sometimes called foreignisms), i.e. words from English origin that are introduced into Spanish without any morphological or orthographic adaptation.
+
+## Corpus description and annotation ::: Corpus description
+
+In this subsection we describe the characteristics of the corpus. We first introduce the main corpus, with the usual train/development/test split that was used to train, tune and evaluate the model. We then present an additional test set that was designed to assess the performance of the model on more naturalistic data.
+
+## Corpus description and annotation ::: Corpus description ::: Main Corpus
+
+The main corpus consists of a collection of monolingual newspaper headlines written in European Spanish. The corpus contains 16,553 headlines, which amounts to 244,114 tokens. Out of those 16,553 headlines, 1,109 contain at least one anglicism. The total number of anglicisms is 1,176 (most of them are a single word, although some of them were multiword expressions). The corpus was divided into training, development and test set. The proportions of headlines, tokens and anglicisms in each corpus split can be found in Table TABREF6.
+
+The headlines in this corpus come from the Spanish newspaper eldiario.es, a progressive online newspaper based in Spain. eldiario.es is one of the main national newspapers from Spain and, to the best of our knowledge, the only one that publishes its content under a Creative Commons license, which made it ideal for making the corpus publicly available.
+
+The headlines were extracted from the newspaper website through web scraping and range from September 2012 to January 2020. Only the following sections were included: economy, technology, lifestyle, music, TV and opinion. These sections were chosen as they were the most likely to contain anglicisms. The proportion of headlines with anglicisms per section can be found in Table TABREF7.
+
+Using headlines (instead of full articles) was beneficial for several reasons. First of all, annotating a headline is faster and easier than annotating a full article; this helps ensure that a wider variety of topics will be covered in the corpus. Secondly, anglicisms are abundant in headlines, because they are frequently used as a way of calling the attention of the reader BIBREF43. Finally, borrowings that make it to the headline are likely to be particularly salient or relevant, and therefore are good candidates for being extracted and tracked.
+
+## Corpus description and annotation ::: Corpus description ::: Supplemental Test Set
+
+In addition to the usual train/development/test split we have just presented, a supplemental test set of 5,017 headlines was collected. The headlines included in this additional test set also belong to eldiario.es. These headlines were retrieved daily through RSS during February 2020 and included all sections from the newspaper. The headlines in the supplemental corpus therefore do not overlap in time with the main corpus and include more sections. The number of headlines, tokens and anglicisms in the supplemental test set can be found in Table TABREF6.
+
+The motivation behind this supplemental test set is to assess the model performance on more naturalistic data, as the headlines in the supplemental corpus (1) belong to the future of the main corpus and (2) come from a less borrowing-dense sample. This supplemental test set better mimics the real scenario that an actual anglicism extractor would face and can be used to assess how well the model generalizes to detect anglicisms in any section of the daily news, which is ultimately the aim of this project.
+
+## Corpus description and annotation ::: Annotation guidelines
+
+The term anglicism covers a wide range of linguistic phenomena. Following the typology proposed by gomez1997towards, we focused on direct, unadapted, emerging Anglicisms, i.e. lexical borrowings from the English language into Spanish that have recently been imported and that have still not been assimilated into Spanish. Other phenomena such as semantic calques, syntactic anglicisms, acronyms and proper names were considered beyond the scope of this annotation project.
+
+Lexical borrowings can be adapted (the spelling of the word is modified to comply with the phonological and orthographic patterns of the recipient language) or unadapted (the word preserves its original spelling). For this annotation task, adapted borrowings were ignored and only unadapted borrowings were annotated. Therefore, Spanish adaptations of anglicisms like fútbol (from football), mitin (from meeting) and such were not annotated as borrowings. Similarly, words derived from foreign lexemes that do not comply with Spanish orthotactics but that have been morphologically derived following the Spanish paradigm (hacktivista, hackear, shakespeariano) were not annotated either. However, pseudo-anglicisms (words that are formed as if they were English, but do not exist in English, such as footing or balconing) were annotated.
+
+Words that were not adapted but whose original spelling complies with graphophonological rules of Spanish (and are therefore unlikely to be ever adapted, such as web, internet, fan, club, videoclip) were annotated or not depending on how recent or emergent they were. After all, a word like club, that has been around in Spanish language for centuries, cannot be considered emergent anymore and, for this project, would not be as interesting to retrieve as real emerging anglicisms. The notion of emergent is, however, time-dependent and quite subjective: in order to determine which unadapted, graphophonologically acceptable borrowings were to be annotated, the online version of the Diccionario de la lengua española dle was consulted. This dictionary is compiled by the Royal Spanish Academy, a prescriptive institution on Spanish language. This decision was motivated by the fact that, if a borrowing was already registered by this dictionary (that has conservative approach to language change) and is considered assimilated (that is, the institution recommended no italics or quotation marks to write that word) then it could be inferred that the word was not emergent anymore.
+
+Although the previous guidelines covered most cases, they proved insufficient. Some anglicisms were unadapted (they preserved their original spelling), unacceptable according to the Spanish graphophonological rules, and yet did not satisfy the condition of being emergent. That was the case of words like jazz or whisky, words that do not comply with Spanish graphophonological rules but that were imported decades ago, cannot be considered emergent anymore and are unlikely to ever be adapted into the Spanish spelling system. To adjudicate these examples on those cases, the criterion of pragmatic markedness proposed by winter2012proposing (that distinguishes between catachrestic and non-catachrestic borrowing) was applied: if a borrowing was not adapted (i.e. its form remained exactly as it came from English) but referred to a particular invention or innovation that came via the English language, that was not perceived as new anymore and that had never competed with a Spanish equivalent, then it was ignored. This criteria proved to be extremely useful to deal with old unadapted anglicisms in the fields of music and food. Figure 1 summarizes the decision steps followed during the annotation process.
+
+The corpus was annotated by a native speaker of Spanish using Doccano doccano. The annotation tagset includes two labels: ENG, to annotate the English borrowings just described, and OTHER. This OTHER tag was used to tag lexical borrowings from languages other than English. After all, although English is today by far the most prevalent donor of borrowings, there are other languages that also provide new borrowings to Spanish. Furthermore, the tag OTHER allows to annotate borrowings such as première or tempeh, borrowings that etymologically do not come from English but that have entered the Spanish language via English influence, even when their spelling is very different to English borrowings. In general, we considered that having such a tag could also help assess how successful a classifier is detecting foreign borrowings in general in Spanish newswire (without having to create a label for every possible donor language, as the number of examples would be too sparse). In total, the training set contained 40 entities labeled as OTHER, the development set contained 14 and the test set contained 13. The supplemental test set contained 35 OTHER entities.
+
+## Baseline Model
+
+A baseline model for automatic extraction of anglicisms was created using the annotated corpus we just presented as training material. As mentioned in Section 3, the task of detecting anglicisms can be approached as a sequence labeling problem where only certain spans of texts will be labeled as anglicism (in a similar way to an NER task). The chosen model was conditional random field model (CRF), which was also the most popular model in both Shared Tasks on Language Identification for Code-Switched Data BIBREF23, BIBREF24.
+
+The model was built using pycrfsuite korobov2014python, the Python wrapper for crfsuite CRFsuite that implements CRF for labeling sequential data. It also used the Token and Span utilities from spaCy library honnibal2017spacy.
+
+The following handcrafted features were used for the model:
+
+Bias feature
+
+Token feature
+
+Uppercase feature (y/n)
+
+Titlecase feature (y/n)
+
+Character trigram feature
+
+Quotation feature (y/n)
+
+Word suffix feature (last three characters)
+
+POS tag (provided by spaCy utilities)
+
+Word shape (provided by spaCy utilities)
+
+Word embedding (see Table TABREF26)
+
+Given that anglicisms can be multiword expressions (such as best seller, big data) and that those units should be treated as one borrowing and not as two independent borrowings, we used multi-token BIO encoding to denote the boundaries of each span BIBREF44. A window of two tokens in each direction was set for the feature extractor. The algorithm used was gradient descent with the L-BFGS method.
+
+The model was tuned on the development set doing grid search; the hyperparameters considered were c1 (L1 regularization coefficient: $0.01$, $0.05$, $0.1$, $0.5$, $1.0$), c2 (L2 regularization coefficient: $0.01$, $0.05$, $0.1$, $0.5$, $1.0$), embedding scaling ($0.5$, $1.0$, $2.0$, $4.0$), and embedding type bojanowski2017enriching,josecanete20193255001,cardellinoSBWCE,grave2018learning,honnibal2017spacy,perezfasttext,perezglove (see Table TABREF26). The best results were obtained with c1 = $0.05$, c2 = $0.01$, scaling = $0.5$ and word2vec Spanish embeddings by cardellinoSBWCE. The threshold for the stopping criterion delta was selected through observing the loss during preliminary experiments (delta = $1\mathrm {e}-3$).
+
+In order to assess the significance of the the handcrafted features, a feature ablation study was done on the tuned model, ablating one feature at a time and testing on the development set. Due to the scarcity of spans labeled with the OTHER tag on the development set (only 14) and given that the main purpose of the model is to detect anglicisms, the baseline model was run ignoring the OTHER tag both during tuning and the feature ablation experiments. Table TABREF27 displays the results on the development set with all features and for the different feature ablation runs. The results show that all features proposed for the baseline model contribute to the results, with the character trigram feature being the one that has the biggest impact on the feature ablation study.
+
+## Results
+
+The baseline model was then run on the test set and the supplemental test set with the set of features and hyperparameters mentioned on Section SECREF5 Table TABREF28 displays the results obtained. The model was run both with and without the OTHER tag. The metrics for ENG display the results obtained only for the spans labeled as anglicisms; the metrics for OTHER display the results obtained for any borrowing other than anglicisms. The metrics for BORROWING discard the type of label and consider correct any labeled span that has correct boundaries, regardless of the label type (so any type of borrowing, regardless if it is ENG or OTHER). In all cases, only full matches were considered correct and no credit was given to partial matching, i.e. if only fake in fake news was retrieved, it was considered wrong and no partial score was given.
+
+Results on all sets show an important difference between precision and recall, precision being significantly higher than recall. There is also a significant difference between the results obtained on development and test set (F1 = 89.60, F1 = 87.82) and the results on the supplemental test set (F1 = 71.49). The time difference between the supplemental test set and the development and test set (the headlines from the the supplemental test set being from a different time period to the training set) can probably explain these differences.
+
+Comparing the results with and without the OTHER tag, it seems that including it on the development and test set produces worse results (or they remain roughly the same, at best). However, the best precision result on the supplemental test was obtained when including the OTHER tag and considering both ENG and OTHER spans as BORROWING (precision = 87.62). This is caused by the fact that, while the development and test set were compiled from anglicism-rich newspaper sections (similar to the training set), the supplemental test set contained headlines from all the sections in the newspaper, and therefore included borrowings from other languages such as Catalan, Basque or French. When running the model without the OTHER tag on the supplemental test set, these non-English borrowings were labeled as anglicisms by the model (after all, their spelling does not resemble Spanish spelling), damaging the precision score. When the OTHER tag was included, these non-English borrowings got correctly labeled as OTHER, improving the precision score. This proves that, although the OTHER tag might be irrelevant or even damaging when testing on the development or test set, it can be useful when testing on more naturalistic data, such as the one in the supplemental test set.
+
+Concerning errors, two types of errors were recurrent among all sets: long titles of songs, films or series written in English were a source of false positives, as the model tended to mistake some of the uncapitalized words in the title for anglicisms (for example, it darker in “`You want it darker', la oscura y brillante despedida de Leonard Cohen"). On the other hand, anglicisms that appear on the first position of the sentence (and were, therefore, capitalized) were consistently ignored (as the model probably assumed they were named entities) and produced a high number of false negatives (for example, vamping in “Vamping: la recurrente leyenda urbana de la luz azul `asesina'").
+
+The results on Table TABREF28 cannot, however, be compared to the ones reported by previous work: the metric that we report is span F-measure, as the evaluation was done on span level (instead of token level) and credit was only given to full matches. Secondly, there was no Spanish tag assigned to non-borrowings, that means that no credit was given if a Spanish token was identified as such.
+
+## Future Work
+
+This is an on-going project. The corpus we have just presented is a first step towards the development of an extractor of emerging anglicisms in the Spanish press. Future work includes: assessing whether to keep the OTHER tag, improving the baseline model (particularly to improve recall), assessing the suitability and contribution of different sets of features and exploring different models. In terms of the corpus development, the training set is now closed and stable, but the test set could potentially be increased in order to have more and more diverse anglicisms.
+
+## Conclusions
+
+In this paper we have presented a new corpus of 21,570 newspaper headlines written in European Spanish. The corpus is annotated with emergent anglicisms and, up to our very best knowledge, is the first corpus of this type to be released publicly. We have presented the annotation scope, tagset and guidelines, and we have introduced a CRF baseline model for anglicism extraction trained with the described corpus. The results obtained show that the the corpus and baseline model are appropriate for automatic anglicism extraction.
+
+## Acknowledgements
+
+The author would like to thank Constantine Lignos for his feedback and advice on this project.
+
+## Language Resource References
+
+lrec

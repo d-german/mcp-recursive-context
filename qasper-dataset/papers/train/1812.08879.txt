@@ -1,0 +1,74 @@
+# Variational Cross-domain Natural Language Generation for Spoken Dialogue Systems
+
+**Paper ID:** 1812.08879
+
+## Abstract
+
+Cross-domain natural language generation (NLG) is still a difficult task within spoken dialogue modelling. Given a semantic representation provided by the dialogue manager, the language generator should generate sentences that convey desired information. Traditional template-based generators can produce sentences with all necessary information, but these sentences are not sufficiently diverse. With RNN-based models, the diversity of the generated sentences can be high, however, in the process some information is lost. In this work, we improve an RNN-based generator by considering latent information at the sentence level during generation using the conditional variational autoencoder architecture. We demonstrate that our model outperforms the original RNN-based generator, while yielding highly diverse sentences. In addition, our model performs better when the training data is limited.
+
+## Introduction
+
+Conventional spoken dialogue systems (SDS) require a substantial amount of hand-crafted rules to achieve good interaction with users. The large amount of required engineering limits the scalability of these systems to settings with new or multiple domains. Recently, statistical approaches have been studied that allow natural, efficient and more diverse interaction with users without depending on pre-defined rules BIBREF0 , BIBREF1 , BIBREF2 .
+
+Natural language generation (NLG) is an essential component of an SDS. Given a semantic representation (SR) consisting of a dialogue act and a set of slot-value pairs, the generator should produce natural language containing the desired information. Traditionally NLG was based on templates BIBREF3 , which produce grammatically-correct sentences that contain all desired information. However, the lack of variation of these sentences made these systems seem tedious and monotonic. Trainable generators BIBREF4 , BIBREF5 can generate several sentences for the same SR, but the dependence on pre-defined operations limits their potential. Corpus-based approaches BIBREF6 , BIBREF7 learn to generate natural language directly from data without pre-defined rules. However, they usually require alignment between the sentence and the SR. Recently, Wen et al. wensclstm15 proposed an RNN-based approach, which outperformed previous methods on several metrics. However, the generated sentences often did not include all desired attributes.
+
+The variational autoencoder BIBREF8 enabled for the first time the generation of complicated, high-dimensional data such as images. The conditional variational autoencoder (CVAE) BIBREF9 , firstly proposed for image generation, has a similar structure to the VAE with an additional dependency on a condition. Recently, the CVAE has been applied to dialogue systems BIBREF10 , BIBREF11 , BIBREF12 using the previous dialogue turns as the condition. However, their output was not required to contain specific information.
+
+In this paper, we improve RNN-based generators by adapting the CVAE to the difficult task of cross-domain NLG. Due to the additional latent information encoded by the CVAE, our model outperformed the SCLSTM at conveying all information. Furthermore, our model reaches better results when the training data is limited.
+
+## Variational Autoencoder
+
+The VAE is a generative latent variable model. It uses a neural network (NN) to generate $\hat{x}$ from a latent variable $z$ , which is sampled from the prior $p_{\theta }(z)$ . The VAE is trained such that $\hat{x}$ is a sample of the distribution $p_{D}(x)$ from which the training data was collected. Generative latent variable models have the form $p_{\theta }(x)=\int _{z}p_{\theta }(x|z)p_{\theta }(z) dz$ . In a VAE an NN, called the decoder, models $p_{\theta }(x|z)$ and would ideally be trained to maximize the expectation of the above integral $E\left[p_{\theta }(x)\right]$ . Since this is intractable, the VAE uses another NN, called the encoder, to model $q_{\phi }(z|x)$ which should approximate the posterior $p_{\theta }(z|x)$ . The NNs in the VAE are trained to maximise the variational lower bound (VLB) to $z$0 , which is given by: 
+
+$$\begin{aligned}
+L_{VAE}(\theta , \phi ; x) = -KL(q_{\phi }(z|x)||p_{\theta }(z)) \\
++ E_{q_{\phi }(z|x)}[\log p_{\theta }(x|z)]
+
+\end{aligned}$$   (Eq. 2) 
+
+The first term is the KL-divergence between the approximated posterior and the prior, which encourages similarity between the two distributions. The second term is the likelihood of the data given samples from the approximated posterior. The CVAE has a similar structure, but the prior is modelled by another NN, called the prior network. The prior network is conditioned on $c$ . The new objective function can now be written as: 
+
+$$L_{CVAE}(\theta , \phi ; x, c) = -KL(q_{\phi }(z|x, c)||p_{\theta }(z|c)) \\
++ E_{q_{\phi }(z|x,c)}[\log p_{\theta }(x|z,c)]$$   (Eq. 3) 
+
+When generating data, the encoder is not used and $z$ is sampled from $p_{\theta }(z|c)$ .
+
+## Semantically Conditioned VAE
+
+The structure of our model is depicted in Fig. 1 , which, conditioned on an SR, generates the system's word-level response $x$ . An SR consists of three components: the domain, a dialogue act and a set of slot-value pairs. Slots are attributes required to appear in $x$ (e.g. a hotel's area). A slot can have a value. Then the two are called a slot-value pair (e.g. area=north). $x$ is delexicalised, which means that slot values are replaced by corresponding slot tokens. The condition $c$ of our model is the SR represented as two 1-hot vectors for the domain and the dialogue act as well as a binary vector for the slots. During training, $x$ is first passed through a single layer bi-directional LSTM, the output of which is concatenated with $c$ and passed to the recognition network. The recognition network parametrises a Gaussian distribution $\mathcal {N}(\mu _{post}, \sigma _{post})$ which is the posterior.The prior network only has $c$ as its input and parametrises a Gaussian distribution $\mathcal {N}(\mu _{prior}, \sigma _{prior})$ which is the prior. Both networks are fully-connected (FC) NNs with one and two layers respectively. During training, $z$ is sampled from the posterior. When the model is used for generation, $x$0 is sampled from the prior. The decoder is an SCLSTM BIBREF13 using $x$1 as its initial hidden state and initial cell vector. The first input to the SCLSTM is a start-of-sentence (sos) token and the model generates words until it outputs an end-of-sentence (eos) token.
+
+## Optimization
+
+When the decoder in the CVAE is powerful on its own, it tends to ignore the latent variable $z$ since the encoder fails to encode enough information into $z$ . Regularization methods can be introduced in order to push the encoder towards learning a good representation of the latent variable $z$ . Since the KL-component of the VLB does not contribute towards learning a meaningful $z$ , increasing the weight of it gradually from 0 to 1 during training helps to encode a better representation in $z$ . This method is termed KL-annealing BIBREF14 . In addition, inspired by BIBREF12 , we introduce a regularization method using another NN which is trained to use $z$ to recover the condition $c$ . The NN is split into three separate FC NNs of one layer each, which independently recover the domain, dialogue-act and slots components of $c$ . The objective of our model can be written as: 
+
+$$L_{SCVAE}(\theta , \phi ;x, c) = L_{CVAE}(\theta , \phi ;x, c) \\
++ E_{q_{\phi }(z|x, c)}[\log p(x_{D}|z)+\log p(x_{A}|z)+ \\
+\log \prod _{i=1}^{|S|} p(x_{S_{i}}|z)]$$   (Eq. 7) 
+
+where $x_{D}$ is the domain label, $x_{A}$ is the dialogue act label and $x_{S_{i}}$ are the slot labels with $|S|$ slots in the SR. In the proposed model, the CVAE learns to encode information about both the sentence and the SR into $z$ . Using $z$ as its initial state, the decoder is better at generating sentences with desired attributes. In section "Visualization of Latent Variable zz" a visualization of the latent space demonstrates that a semantically meaningful representation for $z$ was learned.
+
+## Dataset and Setup
+
+The proposed model is used for an SDS that provides information about restaurants, hotels, televisions and laptops. It is trained on a dataset BIBREF15 , which consists of sentences with corresponding semantic representations. Table 1 shows statistics about the corpus which was split into a training, validation and testing set according to a 3:1:1 split. The dataset contains 14 different system dialogue acts. The television and laptop domains are much more complex than other domains. There are around 7k and 13k different SRs possible for the TV and the laptop domain respectively. For the restaurant and hotel domains only 248 and 164 unique SRs are possible. This imbalance makes the NLG task more difficult.
+
+The generators were implemented using the PyTorch Library BIBREF16 . The size of decoder SCLSTM and thus of the latent variable was set to 128. KL-annealing was used, with the weight of the KL-loss reaching 1 after 5k mini-batch updates. The slot error rate (ERR), used in BIBREF6 , BIBREF17 , is the metric that measures the model's ability to convey the desired information. ERR is defined as: $(p+q)/N$ , where $N$ is the number of slots in the SR, $p$ and $q$ are the number of missing and redundant slots in the generated sentence. The BLEU-4 metric and perplexity (PPL) are also reported. The baseline SCLSTM is optimized, which has shown to outperform template-based methods and trainable generators BIBREF13 . NLG often uses the over-generation and reranking paradigm BIBREF6 . The SCVAE can generate multiple sentences by sampling multiple $z$ , while the SCLSTM has to sample different words from the output distribution.In our experiments ten sentences are generated per SR. Table 4 in the appendix shows one SR in each domain with five illustrative sentences generated by our model.
+
+## Visualization of Latent Variable zz
+
+2D-projections of $z$ for each data point in the test set are shown in Fig. 2 , by using PCA for dimensionality reduction. In Fig. 2 a, data points of the restaurant, hotel, TV and laptop domain are marked as blue, green, red and yellow respectively. As can be seen, data points from the laptop domain are contained within four distinct clusters. In addition, there is a large overlap of the TV and laptop domains, which is not surprising as they share all dialogue acts (DAs). Similarly, there is overlap of the restaurant and hotel domains. In Fig. 2 b, the eight most frequent DAs are color-coded. recommend, depicted as green, has a similar distribution to the laptop domain in Fig. 2 a, since recommend happens mostly in the laptop domain. This suggests that our model learns to map similar SRs into close regions within the latent space. Therefore, $z$ contains meaningful information in regards to the domain, DAs and slots.
+
+## Empirical Comparison
+
+Table 2 shows the comparison between SCVAE and SCLSTM. Both are trained on the full cross-domain dataset, and tested on the four domains individually. The SCVAE outperforms the SCLSTM on all metrics. For the highly complex TV and laptop domains, the SCVAE leads to dramatic improvements in ERR. This shows that the additional sentence level conditioning through $z$ helps to convey all desired attributes.
+
+Fig. 3 shows BLEU and ERR results when the SCVAE and SCLSTM are trained on varying amounts of data. The SCVAE has a lower ERR than the SCLSTM across the varying amounts of training data. For very slow amounts of data the SCVAE outperforms the SCLSTM even more. In addition, our model consistently achieves better results on the BLEU metric.
+
+For the K-shot learning experiments, we trained the model using all training examples from three domains and only 300 examples from the target domain. The target domain is the domain we test on. As seen from Table 3 , the SCVAE outperforms the SCLSTM in all domains except hotel. This might be because the hotel domain is the simplest and the model does not need to rely on the knowledge from other domains. The SCVAE strongly outperforms the SCLSTM for the complex TV and laptop domains where the number of distinct SRs is large. This suggests that the SCVAE is better at transferring knowledge between domains.
+
+## Conclusion
+
+In this paper, we propose a semantically conditioned variational autoencoder (SCVAE) for natural language generation. The SCVAE encodes information about both the semantic representation and the sentence into a latent variable $z$ . Due to a newly proposed regularization method, the latent variable $z$ contains semantically meaningful information. Therefore, conditioning on $z$ leads to a strong improvement in generating sentences with all desired attributes. In an extensive comparison the SCVAE outperforms the SCLSTM on a range of metrics when training on different sizes of data and for K-short learning. Especially, when testing the ability to convey all desired information within complex domains, the SCVAE shows significantly better results.
+
+## Acknowledgments
+
+Bo-Hsiang Tseng is supported by Cambridge Trust and the Ministry of Education, Taiwan. This research was partly funded by the EPSRC grant EP/M018946/1 Open Domain Statistical Spoken Dialogue Systems. Florian Kreyssig is supported by the Studienstiftung des Deutschen Volkes. Paweł Budzianowski is supported by the EPSRC and Toshiba Research Europe Ltd.

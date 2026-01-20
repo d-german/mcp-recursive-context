@@ -1,0 +1,201 @@
+# Ask to Learn: A Study on Curiosity-driven Question Generation
+
+**Paper ID:** 1911.03350
+
+## Abstract
+
+We propose a novel text generation task, namely Curiosity-driven Question Generation. We start from the observation that the Question Generation task has traditionally been considered as the dual problem of Question Answering, hence tackling the problem of generating a question given the text that contains its answer. Such questions can be used to evaluate machine reading comprehension. However, in real life, and especially in conversational settings, humans tend to ask questions with the goal of enriching their knowledge and/or clarifying aspects of previously gathered information. We refer to these inquisitive questions as Curiosity-driven: these questions are generated with the goal of obtaining new information (the answer) which is not present in the input text. In this work, we experiment on this new task using a conversational Question Answering (QA) dataset; further, since the majority of QA dataset are not built in a conversational manner, we describe a methodology to derive data for this novel task from non-conversational QA data. We investigate several automated metrics to measure the different properties of Curious Questions, and experiment different approaches on the Curiosity-driven Question Generation task, including model pre-training and reinforcement learning. Finally, we report a qualitative evaluation of the generated outputs.
+
+## Introduction
+
+The growing interest in Machine Reading Comprehension (MRC) has sparked significant research efforts on Question Generation (QG), the dual task to Question Answering (QA). In QA, the objective is to produce an adequate response given a query and a text; conversely, for QG, the task is generally defined as generating relevant question given a source text, focusing on a specific answer span. To our knowledge, all works tackling QG have thus far focused exclusively on generating relevant questions which can be answered given the source text: for instance, given AAAI was founded in 1979 as input, a question likely to be automatically generated would be When was AAAI founded?, where the answer 1979 is a span of the input. Such questions are useful to evaluate reading comprehension for both machines BIBREF0, BIBREF1 and humans BIBREF2.
+
+However, the human ability of asking questions goes well beyond evaluation: asking questions is essential in education BIBREF3 and has been proven to be fundamental for children cognitive development BIBREF4. Curiosity is baked into the human experience. It allows to extend one's comprehension and knowledge by asking questions that, while being relevant to context, are not directly answerable by it, thus being inquisitive and curious. The significance of such kind of questions is two-fold: first, they allow for gathering novel relevant information, e.g. a student asking for clarification; second, they are also tightly linked to one's understanding of the context, e.g. a teacher testing a student's knowledge by asking questions whose answers require a deeper understanding of the context and more complex reasoning.
+
+From an applicative point of view, we deem the ability to generate curious, inquisitive, questions as highly beneficial for a broad range of scenarios: i) in the context of human-machine interaction (e.g. robots, chat-bots, educational tools), where the communication with the users could be more natural; ii) during the learning process itself, which could be partially driven in a self-supervised manner, reminiscent of how humans learn by exploring and interacting with their environment.
+
+To our knowledge, this is the first paper attempting to tackle Curiosity-driven neural question generation. The contributions of this paper can be summarized as follow:
+
+we propose a new natural language generation task: curiosity-driven question generation;
+
+we propose a method to derive data for the task from popular non-conversational QA datasets;
+
+we experiment using language model pre-training and reinforcement learning, on two different datasets;
+
+we report a human evaluation analysis to assess both the pertinence of the automatic metrics used and the efficacy of the proposed dataset-creation method above.
+
+## Related Works
+
+Deep learning models have been widely applied to text generation tasks such as machine translation BIBREF5, abstractive summarization BIBREF6 or dialog BIBREF7, providing significant gains in performance. The state of the art approaches are based on sequence to sequence models BIBREF8, BIBREF9. In recent years, significant research efforts have been directed to the tasks of Machine Reading Comprehension (MRC) and Question Answering (QA) BIBREF0, BIBREF10. The data used for tackling these tasks are usually composed of $\lbrace context, question, answer\rbrace $ triplets: given a context and the question, a model is trained to predict the answer.
+
+Conversely, the Question Generation (QG) task introduced by BIBREF11, BIBREF12 can be considered as the dual task for QA BIBREF13: thus, given a context and (optionally) an answer, the model is trained to generate the question. Following QA, research on QG BIBREF14 has also seen increasing interest from the community. One of the main motivations is that an effective QG model can be used to generate synthetic data in order to augment existing QA datasets BIBREF15, BIBREF16. For instance, BIBREF15 proposed a reinforcement learning setup trained using a QA-based metric reward: given a paragraph and an answer, the model first generates questions; then, the paragraph and the corresponding generated questions are given to a pre-trained QA model which predicts an answer; finally, the reward is computed as the number of overlapping words between the ground truth answer and the predicted answer. For an extensive evalution of models trained with different rewards we refer the reader to BIBREF17. Most of these works followed BIBREF18, who applied reinforcement to neural machine translation. First, a sequence to sequence model is trained under teacher forcing BIBREF19 to optimize cross-entropy, hence helping to reduce the action space (i.e. the vocabulary size). Then, the model is finetuned with a mix of teacher forcing and REINFORCE BIBREF20.
+
+For automatic evaluation, all previous works on QG resort to BLEU metrics BIBREF21, originally developed and widely used in Machine Translation. However, how to evaluate text generation models remains an open research question: BIBREF22 pointed out that, on QG tasks, the correlation between BLEU and human evaluation was poor.
+
+A thorough investigation of the behavior of open-domain conversational agents has been recently presented by BIBREF23. Using controllable neural text generation methods, the authors control important attributes for chit-chat dialogues, including question-asking behavior. Among the take-away messages of this work, is that question-asking represents an essential component in an engaging chit-chat pipeline: the authors find, via a large-scale human validation study, that agents with higher rates of question-asking obtain qualitative improvements in terms of inquisitiveness, interestingness and engagingness.
+
+Indeed, in a conversational setting, it can be expected that the nature of follow-up questions significantly differs from those used as target in a traditional QG training setup: as mentioned earlier, QG has so far been tackled as the dual task to QA, hence training models to generate questions whose answer is present in the input context. On the contrary, we argue that in natural conversations the questions follow the input context but are rather a mean to augment one's knowledge (thus, their answer is not present in the input context). In this work, we thus define the task as Curiosity-driven Question Generation.
+
+## Dataset
+
+Question Answering datasets are usually composed of a set of questions associated with the corresponding answers and the reading passages (the context) containing the answer. The QA task is defined as finding the answer to a question given the context. As opposed, the Question Generation (QG) task is to generate the question given the input and (optionally) the answer. Most previous efforts on the QG task have resorted to the widely used Stanford Question Answering Dataset (SQuAD) BIBREF10. It contains roughly 100,000 questions posed by crowd-workers on selected sample of Wikipedia articles. Several other QA datasets have also been recently published accounting for characteristic such as requiring multi-passage or discrete reasoning BIBREF24, BIBREF25; further, conversational QA datasets have been made available: CoQA BIBREF26 and QuAC BIBREF27 have the desirable property to be in a dialogue-like setting.
+
+In our scenario, Curiosity-driven QG, the reading passage associated with a question should not contain the answer, but rather pave the way for asking a new question – whose answer would eventually enrich the knowledge on the matter at hand. Therefore, a natural choice to build QG data would be to rely on existing datasets for conversational QA. A detailed comparison of the above-mentioned CoQA and QuAC datasets is provided by BIBREF28, who reports the proportion of Topic Error (questions unlikely to be asked in the context) and Entity Salad (i.e. questions unanswerable for any context): CoQA includes a significantly higher proportion Topic Error and Entity Salad compared to QuAC. For this reason, we resort to QuAC in order to derive data Curiosity-driven QG.
+
+Furthermore, recognizing the fact that the great majority of QA datasets available does not account for conversational characteristics, we propose a methodology to derive data for Curiosity-driven Question Generation from standard QA datasets, applying it to the popular SQuAD BIBREF10.
+
+For both our data sources, and consistently with standard QA and QG tasks, we encode each sample as a triplet $\lbrace P, q, a\rbrace $ where the paragraph $P$ comprises $n$ sentences $[s_0,..., s_n]$, and $a$ represents the answer to the question $q$. A canonical QG approach would thus use $s_a$, i.e. the sentence of $P$ that contains the answer, as source, and $q$ as generation target. On the contrary, for Curiosity-driven QG, any sentence $s_x$ from $P$ can potentially be used as the source sequence, as long as it does not contain the answer – i.e. under the necessary constraint of $x \ne a$. In the following subsections, we elaborate on additional constraints depending on the nature of the source data.
+
+In general, we define samples as triplets
+
+where $s_x$ and $P^{\prime }$ are, respectively, the input sentence and the paragraph $P$ modified according to the appropriate dataset-depending constraint, and $y$ is the reference (target) question.
+
+## Dataset ::: Conversational QA Data
+
+As mentioned above, we first derive our data from the QuAC dataset, which is built from Wikipedia articles by iterating over the following procedure: given a sentence, a student annotator asks a relevant question for which he does not have the answer; then, the teacher – annotator – retrieves a sentence that contains the answer. Thus, a QuAC question is curious by design, given the text that precedes it. More formally, for the question $q$ (i.e. our target), the source $s_x$ is composed by the concatenation of the sentences of $P$ which appear before the sentence $s_a$ that contains the answer. Therefore, our QuAC-derived dataset is built by applying the stricter constraint $x < a$.
+
+Numerically, the QuAC dataset compounds to 83,568 questions (on 11,567 articles) for the train set, 7,354 for the validation set and 7,353 for the test set (1,000 articles each). Since the test set is not public, we use the original QuAC validation set to build our test set. From the training set, we randomly drop 1,000 articles (hence, 7,224 samples) which we use to derive our validation set, thus resulting in 76,345 questions for training.
+
+## Dataset ::: Standard QA Data
+
+Most of the available QA datasets are not conversational. Thus, we propose a simple method to obtain data for Curiosity-driven QG from standard QA datasets. For this, we use the widely popular SQuADBIBREF10, and specifically the original splits released by BIBREF11 which is commonly used for Question Generation.
+
+As opposed to QuAC, the questions in SQuAD do not follow logical ordering. Therefore, any sentence $s_x$ from $P$ can potentially be used as the source sequence, as long as it does not contain the answer $a$ (constraint: $x \ne a$). Nonetheless, as is reasonable for factoid QA datasets, several questions are so specific to their associated sentence $s_a$ that they would be extremely unlikely to be asked without knowing the contents of $s_a$ itself.
+
+To exemplify this issue, take the following paragraph from SQuAD:
+
+Tesla was the fourth of five children. He had an older brother named Dane and three sisters, Milka, Angelina and Marica. Dane was killed in a horse-riding accident when Nikola was five. In 1861, Tesla attended the “Lower" or “Primary" School in Smiljan where he studied German, arithmetic, and religion. In 1862, the Tesla family moved to Gospić, Austrian Empire, where Tesla's father worked as a pastor. Nikola completed “Lower" or “Primary" School, followed by the “Lower Real Gymnasium" or “Normal School.
+
+Given “Dane was killed in a horse-riding accident when Nikola was five." as $s_a$, and operating under the sole constraint of $x \ne a$, the sentence “Tesla was the fourth of five children" would be eligible as a source $s_x$ for the target question “What happened to Dane?". This question can only be asked if either contextual information or background knowledge is available, since it requires to know that Dane was among Tesla's four siblings.
+
+To overcome this problem, we added an additional constraint based on Named Entity Recognition (NER): $s_x$ is an acceptable input only if all the entities present in the question $q$ are also present in the input sentence $s_x$. In the previous example, this would thus filter out the target “What happened to Dane?" while allowing for “What was Tesla's brother's name?".
+
+For our experiments we used spaCy.
+
+In Table TABREF10 we report the number of samples we obtained from SQuAD before and after applying NER filtering. After applying the above methodology to construct a dataset for Curiosity-driven QG, our training dataset contains 25,356 samples for training, 2,076 for development, and 2,087 for testing.
+
+## Metrics
+
+Automatic evaluation of Natural Language Generation (NLG) systems is a challenging task BIBREF22. For QG, $n$-gram based similarity metrics are commonly used. These measures evaluate how similar the generated text is to the corresponding reference(s). While they are known to suffer from several shortcomings BIBREF29, BIBREF30, they allow to evaluate specific properties of the developed models. In this work, the metrics detailed below are proposed and we evaluate their quality through a human evaluation in subsection SECREF32.
+
+## Metrics ::: BLEU
+
+One of the most popular metrics for QG, BLEU BIBREF21 provides a set of measures to compare automatically generated texts against one or more references. In particular, BLEU-N is based on the count of overlapping n-grams between the candidate and its corresponding reference(s).
+
+## Metrics ::: Self-BLEU
+
+Within the field of Computational Creativity, Diversity is considered a desirable property BIBREF31. Indeed, generating always the same question such as “What is the meaning of the universe?" would be an undesirable behavior, reminiscent of the “collapse mode" observed in Generative Adversarial Networks (GAN) BIBREF32. Therefore, we adopt Self-BLEU, originally proposed by BIBREF33, as a measure of diversity for the generated text sequences. Self-BLEU is computed as follows: for each generated sentence $s_i$, a BLEU score is computed using $s_i$ as hypothesis while the other generated sentences are used as reference. When averaged over all the references, it thus provides a measure of how diverse the sentences are. Lower Self-BLEU scores indicate more diversity. We refer to these metrics as Self-B* throughout this paper.
+
+## Metrics ::: QA-based metrics
+
+Given a text, a question can be considered curious if the answer is not contained in the input text. In our task, this implies that a question $q$ should not be answerable given its corresponding input sentence $s_x$. Thanks to the recent improvements obtained on Question Answering tasks – for instance, human-level performance has been achieved on SQuAD-v1 – the answerability of a question can be automatically measured.
+
+Therefore, given a question-context pair as input to a QA model, two type of metrics can be computed:
+
+n-gram based score: measuring the average overlap between the retrieved answer and the ground truth.
+
+probability score: the confidence of the QA model for its retrieved answer; this corresponds to the probability of being the correct answer assigned by the QA model to the retrieved answer.
+
+Since several diverse questions can be generated for a given input, we consider the latter metric (probability score) to better fit the Curiosity-driven QG task.
+
+Hence, given the evaluated question $q$ and the input text $s_x$, we define a metric QA_prob as the confidence of the QA model that its predicted answer is correct. This metric measures answerability of $q$ given $s_x$: therefore, the lower this score, the less likely the answer is contained in the input text.
+
+While being non-answerable represents a necessary condition for $q$ being a curious question with respect to its context $s_x$, we also want $q$ to be as relevant and useful as possible. To this end, we compute the above QA_prob for question $q$ on $P^{\prime }$, which represents the source paragraph stripped from the sentence containing the answer (see Eq. DISPLAY_FORM6). The higher this score, the more likely the question is relevant and useful to augment the knowledge provided by $s_x$.
+
+Thus, the two proposed metrics are defined as
+
+and
+
+Under our definition, Curiosity-driven questions are those that minimize $QA_{source}$ while maximizing $QA_{context}$. To compute these QA-based metrics, we use the HuggingFace implementation of BERT BIBREF34.
+
+## Experiments ::: Baseline model
+
+As baseline architecture we adopt the popular Transformer BIBREF35, which proved to perform well on a wide range of text generation tasks. Among these, neural machine translation BIBREF36, automatic summarization BIBREF37, and question generation BIBREF38, BIBREF39. It can be briefly described as a sequence-to-sequence model with a symmetric encoder and decoder based on a self-attention mechanism, which allows to overcome the inherent obstacles to parallelism present in recurrent models such as Long Short Time Memory (LSTM) networks BIBREF40.
+
+The copy mechanism BIBREF41 proved beneficial for QG BIBREF42, BIBREF39: indeed, the QG task is very sensitive to rare and out of vocabulary words such as named entities and such a mechanism help deal with it efficiently: more than 50% of the answers in the SQuAD dataset, for instance, correspond to named entities (see Table 2 in BIBREF10. Hence, following BIBREF37, BIBREF39, we include a copy mechanism in our Transformer architecture.
+
+For our experiments, we used the following hyper-parameters for the transformer: N = 2 (number of blocks); d_model = 256 (hidden state dimension); d_ff = 512 (position-wise feed-forward networks dimension); and, h = 2 (number of attention heads).
+
+Experiments run with the original hyper-parameters as proposed by BIBREF35 obtained consistent and numerically similar results. During training, we used mini batches of size 64 and the Adam optimizer BIBREF43. At generation time, the decoding steps are computed trough the beam search algorithm with $k=5$ beams by default.
+
+## Experiments ::: Reinforcement
+
+Reinforcement Learning (RL) is an efficient technique to maximize discrete metrics for text generation. Previously, BIBREF18 used the REINFORCE algorithm BIBREF20 to train RNNs for several generation tasks, showing improvements over previous supervised approaches. Moreover, BIBREF29 combined supervised and reinforcement learning, demonstrating improvements over competing approaches both in terms of ROUGE and on human evaluation.
+
+However, the metrics used as reward are often overfit, leading to numerical improvements which do not translate to increased – and, rather, contribute to degrading – output quality, thus leading to reduced effectiveness of the trained models for practical applications. On this matter, and with a particular focus on QG, BIBREF17 performed a human evaluation on RL models trained with several metrics as reward, finding them to be indeed poorly aligned with human judgments: the models appear to learn to exploit the weaknesses of the reward source.
+
+To overcome this issue, we propose to use a balanced reward:
+
+thus maximizing the probability of finding an answer to the generated question within the input paragraph but not inside the source sentence.
+
+In our experiments, we follow the approach proposed by BIBREF18, BIBREF29, considering a mixed loss $L_{ml+rl}$ which combines supervised and reinforcement learning schemes:
+
+where the maximum likelihood $L_{ml}$ is defined as
+
+where $X=[x_1,...,x_n]$ represents the source text of length $n$ and $Y=[y_1,...,y_m]$ the corresponding reference question of length $m$.
+
+Conversely, we define the reinforcement loss $L_{rl}$ to be minimized according to the standard RL actor-critic scheme, where $r(q, P, P^{\prime })$ is the reward function defined in DISPLAY_FORM23:
+
+Greedy decoding according to the conditional distribution $p(y|X)$ is used to obtain a sequence $\widehat{Y}$. The model is sampled using its Markov property, that is, one token at a time, giving rise to the sequence $Y^s$.
+
+## Experiments ::: Pretraining (PT)
+
+As shown in Table TABREF10, the constrained dataset amounts to roughly three times less samples than both QuAC and the original SQuAD dataset it derives from. We thus investigate, for this dataset, the effect of pretraining the model under the traditional (i.e. not Curiosity-driven) QG training setup, using the training set as provided by BIBREF11). Then we resume training on the final dataset obtained after applying the NER-based constraint for Curiosity-driven QG on the same training samples.
+
+For the QuAC Curiosity-driven dataset, the amount of data is comparable to the original dataset, given the conversational nature of QuAC. Therefore, we do not use pretraining for the experiments on QuAC.
+
+## Results ::: Automatic metrics
+
+In Table TABREF29 we report the results of our experiments on QuAC for the baseline model (base) and the RL model. We use a beam $k$, and compute the results for $k=[1,3,5]$. In addition the generated questions with a beam $k=5$, we also computed the results for $k=1$ and $k=3$. While one would expect to see for all the metrics a slight improvement, with increasing beam size, we observe a strong divergence among the results: increasing values for $k$ correspond to a significant improvements in terms of BLEU-4 and notable drops for BLEU-1. A similar phenomena was observed by BIBREF44 in the context of machine translation: in this work, the presence of 1 or 2% of noisy data is found to be enough to significantly degrade the beam search results. In our case, one of most frequent generated question is Are there any other interesting aspects about this article ?. Indeed, the frequency of this question in our training set amounts to 4.18% of the questions. On the test set we see that roughly 80% of the generated questions start with the token “are" . Generating this sequence is not very likely with a greedy search ($k=1$): at any time step during the generation, if any other token has a higher probability, this question will be dismissed. On the other hand, with a higher beam, it is likely to be kept and eventually result as the most probable sequence, among the different remaining beams at the end of the inference.
+
+Moving to our SQuAD-based experiments, we observe that the models trained on SQuAD do not seem to suffer from this issue since all the metrics improved when increasing the beam size from $k=1$ to $k=5$. This is consistent with the results reported by BIBREF42 where improving the beam improve slightly all the metrics. Thus, we only report the results with $k=5$ in Table TABREF30. A possible explanation is that SQuAD, as opposed to QuAC, only contains factoid questions.
+
+We observe that the models trained with RL obtain, as could be expected, higher scores for QAcontext with respect to those trained without RL. A higher QAcontext implies that the QA model is more likely to find an answer in the near context of the source. QAsource is lower, as expected, for SQuAD based models, though comparatively higher than the models trained with RL on QuAC. We identify two possible reasons for this: first, the QA model is trained on answerable questions; second, the nature of the QUaC questions is less factoid than the SQuAD ones, and non-factoid questions can arguably be harder for the QA model to evaluate. This could explain why, in the RL setting, QAcontext (the evaluation on answerable questions) is higher for both SQuAD and QUaC models, but only SQuAD models achieve a lower QA_source (the evaluation on non answerable questions).
+
+Furthermore, we see that pretraining allows to achieve higher BLEU scores, at the cost of lower Self-BLEU, thus showing an increased accuracy but less diversity in the generated questions. Indeed, we find that pretrained models tend to generate a higher number of questions starting with “What” compared to both other models and the references; the distribution for the first words of the human questions appears closer to that non pretrained models.
+
+In Figure FIGREF31 we report the distribution of the first word frequency for the different models trained: the models without pretraining appear closer to the human-quality samples and also show more diversity.
+
+## Results ::: Human Evaluation
+
+In addition to the automatic metrics, we proceeded to a human evaluation. We chose to use the data from our SQuAD-based experiments in order to also to measure the effectiveness of the proposed approach to derive Curiosity-driven QG data from a standard, non-conversational, QA dataset. We randomly sampled 50 samples from the test set. Three professional English speakers were asked to evaluate the questions generated by: humans (i.e. the reference questions), and models trained using pre-training (PT) or (RL), and all combinations of those methods.
+
+Before submitting the samples for human evaluation, the questions were shuffled. Ratings were collected on a 1-to-5 likert scale, to measure to what extent the generated questions were: answerable by looking at their context; grammatically correct; how much external knowledge is required to answer; relevant to their context; and, semantically sound. The results of the human evaluation are reported in Table TABREF33.
+
+## Discussion ::: What is the impact of the pretraining?
+
+We observe that for pretrained models (i.e. PT and PT+RL) the Correctness is significantly higher than the models without pretraining (i.e. base and RL). It corroborates the higher BLEU observed for these models in Table TABREF30. An other observation is that the External Knowledge is lower for the pretrained models while the Relevance is slightly higher. It could be due to the nature of the pretraing for which the models learn to generate non curious questions that focus on their inputs. It correlates with the significantly higher QA_source reported in Table TABREF30 for those pretrained models.
+
+## Discussion ::: Does Reinforcement help?
+
+From the human assessment we conducted – see Table TABREF33, we observe for the models trained with RL obtain higher scores for Relevance and lower Soundness as compared to their non-reinforced counterparts. Further, the results reported in Table TABREF30 show reinforced model obtaining lower BLEU and $QA_{source}$ source; conversely they score higher when it comes to $QA_{context}$. To summarize those results, we conclude that reinforcement brings improvements in terms of diversity of the generated questions, at the price of slightly degraded formulations in the outputs.
+
+## Discussion ::: How effective is our dataset creation methodology?
+
+Looking at the bottom row of Table TABREF33, which shows the results obtained by the reference (i.e. human-generated) questions, we observe the highest relative score for all assessed dimensions, with the exception of Answerability. This indicates that the data we derived seem to fit well the task of Curiosity-driven question generation. As a sidenote, we remark that the models built obtain even lower scores in terms of Answerability than humans, a fact we hypothesize due to the lower quality of the generated questions: the less sound and correct, the less answerable a question would be, regardless of its context.
+
+## Discussion ::: How well do the metrics fit human judgement?
+
+We report the pairwise Spearman correlation and p-value among all the different metrics and human measures in Figure FIGREF37. Correlation analysis on the human assessment data shows that BLEU correlates positively with Relevance, Answerability, Soundness and Unexpectedness. Self-BLEU metrics correlate significantly with Soundness and Correctness and QAcontext with Relevance. The only human measure that does not correlate significantly with any automatic metric is External knowledge. It is indeed one of the most challenging aspect to evaluate, even for humans. However, as expected, it correlates negatively with Answerability.
+
+## Conclusions
+
+The human skill of asking inquisitive questions allows them to learn from the other and increase their knowledge. Curiosity-driven question generation could be a key component for several human-machine interaction scenarios. We thus proposed a new task: Curiosity-driven Question Generation. In absence of data directly usable for this task, we propose an automatic method to derive it from conversational QA datasets. Recognizing that the great majority of QA datasets are not dialogue-based, we also extend the method to standard QA data. Our experiments, including strategies as pretraining and reinforcement, show promising results under both automatic and human evaluation.
+
+In future works, we plan to extend the approach to conditional generation of Curiosity-driven questions.
+
+## Computational Costs
+
+All our experiments were run on a single nVidia 2080ti gpu. For SQuAD experiments, training time amounted to circa 45 minutes and 12 hours for the model built without and with reinforcement, respectively. The additional pretraining step took roughly 2 hours. For QuAC experiments, training time amounted to circa 2 hours and 15 hours for the models built without and with reinforcement, respectively.
+
+## Sample Outputs ::: From QuAC (test set):
+
+Context ($P^{\prime }$):Discovery in the United KingdomThe Seekers were offered a twelve-month position as on-board entertainment on the Sitmar Line passenger cruise ship Fairsky in March 1964. In May, they travelled to the U.K. and had intended to return to Australia after staying ten weeks, but upon arrival they were offered work by a London booking agency, the Grade Organisation.Model $\Rightarrow $ Outputs:base_beam1 $\Rightarrow $ what was the name of the band ?base_beam3 $\Rightarrow $ are there any other interesting aspects about this article ?base_beam5 $\Rightarrow $ are there any other interesting aspects about this article ?RL_beam1 $\Rightarrow $ what was the name of the album ?RL_beam3 $\Rightarrow $ did they have any other albums ?RL_beam5 $\Rightarrow $ are there any other interesting aspects about this article ?Human reference:human $\Rightarrow $ what else can you tell me about thier discovery ?
+
+Context ($P^{\prime }$):1977-1980: Death of a Ladies' Man and End of the CenturyPhillip Harvey Spector (born Harvey Phillip Spector, December 26, 1939) is an American record producer, musician, and songwriter who developed the Wall of Sound, a music production formula he described as a "Wagnerian" approach to rock and roll. Spector is considered the first auteur among musical artists for the unprecedented freedom and control he had over every phase of the recording process. Additionally, he helped engender the idea of the studio as its own distinct instrument. For these contributions, he is acknowledged as one of the most influential figures in pop music history. Model $\Rightarrow $ Outputs:base_beam1 $\Rightarrow $ what was his first album ?base_beam3 $\Rightarrow $ what happened in 1985 ?base_beam5 $\Rightarrow $ are there any other interesting aspects about this article ?RL_beam1 $\Rightarrow $ what was the name of the album ?RL_beam3 $\Rightarrow $ what was the name of the album ?RL_beam5 $\Rightarrow $ did he have any other albums ?Human reference:human $\Rightarrow $ was death of a ladies man an album ?
+
+## Sample Outputs ::: From SQuAD (test set):
+
+Context ($P^{\prime }$):The Broncos defeated the Pittsburgh Steelers in the divisional round, 23–16, by scoring 11 points in the final three minutes of the game.Model $\Rightarrow $ Outputs:base $\Rightarrow $ who was the head of the steelers ?PT $\Rightarrow $ what was the name of the game ?RT $\Rightarrow $ when was the broncos game ?PT+RT $\Rightarrow $ what was the name of the steelers ?Human reference:human $\Rightarrow $ how many seconds were left in the game when the broncos intercepted the pass that won the game ?
+
+Context ($P^{\prime }$):More than 1 million people are expected to attend the festivities in San Francisco during Super Bowl Week.Model $\Rightarrow $ Outputs:base $\Rightarrow $ how many people live in san diego ?PT $\Rightarrow $ how many people live in san diego ?RT $\Rightarrow $ what is the average rainfall in san diego ?PT+RT $\Rightarrow $ how many people live in san diego ?Human reference:human $\Rightarrow $ who is the mayor of san francisco ?

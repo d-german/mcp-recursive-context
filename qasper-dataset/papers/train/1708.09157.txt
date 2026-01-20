@@ -1,0 +1,157 @@
+# Cross-lingual, Character-Level Neural Morphological Tagging
+
+**Paper ID:** 1708.09157
+
+## Abstract
+
+Even for common NLP tasks, sufficient supervision is not available in many languages -- morphological tagging is no exception. In the work presented here, we explore a transfer learning scheme, whereby we train character-level recurrent neural taggers to predict morphological taggings for high-resource languages and low-resource languages together. Learning joint character representations among multiple related languages successfully enables knowledge transfer from the high-resource languages to the low-resource ones, improving accuracy by up to 30%
+
+## Introduction
+
+State-of-the-art morphological taggers require thousands of annotated sentences to train. For the majority of the world's languages, however, sufficient, large-scale annotation is not available and obtaining it would often be infeasible. Accordingly, an important road forward in low-resource NLP is the development of methods that allow for the training of high-quality tools from smaller amounts of data. In this work, we focus on transfer learning—we train a recurrent neural tagger for a low-resource language jointly with a tagger for a related high-resource language. Forcing the models to share character-level features among the languages allows large gains in accuracy when tagging the low-resource languages, while maintaining (or even improving) accuracy on the high-resource language.
+
+Recurrent neural networks constitute the state of the art for a myriad of tasks in NLP, e.g., multi-lingual part-of-speech tagging BIBREF0 , syntactic parsing BIBREF1 , BIBREF2 , morphological paradigm completion BIBREF3 , BIBREF4 and language modeling BIBREF5 , BIBREF6 ; recently, such models have also improved morphological tagging BIBREF7 , BIBREF8 . In addition to increased performance over classical approaches, neural networks also offer a second advantage: they admit a clean paradigm for multi-task learning. If the learned representations for all of the tasks are embedded jointly into a shared vector space, the various tasks reap benefits from each other and often performance improves for all BIBREF9 . We exploit this idea for language-to-language transfer to develop an approach for cross-lingual morphological tagging.
+
+We experiment on 18 languages taken from four different language families. Using the Universal Dependencies treebanks, we emulate a low-resource setting for our experiments, e.g., we attempt to train a morphological tagger for Catalan using primarily data from a related language like Spanish. Our results demonstrate the successful transfer of morphological knowledge from the high-resource languages to the low-resource languages without relying on an externally acquired bilingual lexicon or bitext. We consider both the single- and multi-source transfer case and explore how similar two languages must be in order to enable high-quality transfer of morphological taggers.
+
+## Morphological Tagging
+
+Many languages in the world exhibit rich inflectional morphology: the form of individual words mutates to reflect the syntactic function. For example, the Spanish verb soñar will appear as sueño in the first person present singular, but soñáis in the second person present plural, depending on the bundle of syntaco-semantic attributes associated with the given form (in a sentential context). For concreteness, we list a more complete table of Spanish verbal inflections in tab:paradigm. [author=Ryan,color=purple!40,size=,fancyline,caption=,]Notation in table is different. Note that some languages, e.g. the Northeastern Caucasian language Archi, display a veritable cornucopia of potential forms with the size of the verbal paradigm exceeding 10,000 BIBREF10 .
+
+Standard NLP annotation, e.g., the scheme in sylakglassman-EtAl:2015:ACL-IJCNLP, marks forms in terms of universal key–attribute pairs, e.g., the first person present singular is represented as $\left[\right.$ pos=V, per=1, num=sg, tns=pres $\left.\right]$ . This bundle of key–attributes pairs is typically termed a morphological tag and we may view the goal of morphological tagging to label each word in its sentential context with the appropriate tag BIBREF11 , BIBREF12 . As the part-of-speech (POS) is a component of the tag, we may view morphological tagging as a strict generalization of POS tagging, where we have significantly refined the set of available tags. All of the experiments in this paper make use of the universal morphological tag set available in the Universal Dependencies (UD) BIBREF13 . As an example, we have provided a Russian sentence with its UD tagging in fig:russian-sentence.
+
+## Character-Level Neural Transfer
+
+Our formulation of transfer learning builds on work in multi-task learning BIBREF15 , BIBREF9 . We treat each individual language as a task and train a joint model for all the tasks. We first discuss the current state of the art in morphological tagging: a character-level recurrent neural network. After that, we explore three augmentations to the architecture that allow for the transfer learning scenario. All of our proposals force the embedding of the characters for both the source and the target language to share the same vector space, but involve different mechanisms, by which the model may learn language-specific features.
+
+## Character-Level Neural Networks
+
+Character-level neural networks currently constitute the state of the art in morphological tagging BIBREF8 . We draw on previous work in defining a conditional distribution over taggings ${t}$ for a sentence ${w}$ of length $|{w}| = N$ as 
+
+$$p_{{\theta }}({{t}} \mid {{w}}) = \prod _{i=1}^N p_{{\theta }}(t_i \mid {{w}}), $$   (Eq. 12) 
+
+which may be seen as a $0^\text{th}$ order conditional random field (CRF) BIBREF16 with parameter vector ${{\theta }}$ . Importantly, this factorization of the distribution $p_{{\theta }}({{t}} \mid {{w}})$ also allows for efficient exact decoding and marginal inference in ${\cal O}(N)$ -time, but at the cost of not admitting any explicit interactions in the output structure, i.e., between adjacent tags. We parameterize the distribution over tags at each time step as 
+
+$$p_{{\theta }}(t_i \mid {{w}}) = \text{softmax}\left(W {e}_i + {b}\right), $$   (Eq. 15) 
+
+where $W \in \mathbb {R}^{|{\cal T}| \times n}$ is an embedding matrix, ${b}\in \mathbb {R}^{|{\cal T}|}$ is a bias vector and positional embeddings ${e}_i$ are taken from a concatenation of the output of two long short-term memory recurrent neural networks (LSTMs) BIBREF18 , folded forward and backward, respectively, over a sequence of input vectors. This constitutes a bidirectional LSTM BIBREF19 . We define the positional embedding vector as follows 
+
+$${e}_i = \left[{\text{LSTM}}({v}_{1:i});
+{\text{LSTM}}({v}_{i+1:N})\right], $$   (Eq. 17) 
+
+where each ${v}_i \in \mathbb {R}^n$ is, itself, a word embedding. Note that the function $\text{LSTM}$ returns the last final hidden state vector of the network. This architecture is the context bidirectional recurrent neural network of plank-sogaard-goldberg:2016:P16-2. Finally, we derive each word embedding vector ${v}_i$ from a character-level bidirectional LSTM embedder. Namely, we define each word embedding as the concatenation 
+
+$${v}_i = &\left[ {\text{LSTM}}\left(\langle c_{i_1}, \ldots ,
+c_{i_{M_i}}\rangle \right); \right. \\
+&\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\, \left. {\text{LSTM}} \left(\langle c_{i_{M_i}}, \ldots , c_{i_1}\rangle \right) \right]. \nonumber $$   (Eq. 18) 
+
+ In other words, we run a bidirectional LSTM over the character stream. This bidirectional LSTM is the sequence bidirectional recurrent neural network of plank-sogaard-goldberg:2016:P16-2. Note a concatenation of the sequence of character symbols $\langle c_{i_1}, \ldots , c_{i_{M_i}} \rangle $ results in the word string $w_i$ . Each of the $M_i$ characters $c_{i_k}$ is a member of the set $\Sigma $ . We take $\Sigma $ to be the union of sets of characters in the languages considered.
+
+We direct the reader to heigold2017 for a more in-depth discussion of this and various additional architectures for the computation of ${v}_i$ ; the architecture we have presented in eq:embedder-v is competitive with the best performing setting in Heigold et al.'s study.
+
+## Cross-Lingual Morphological Transfer as Multi-Task Learning
+
+Cross-lingual morphological tagging may be formulated as a multi-task learning problem. We seek to learn a set of shared character embeddings for taggers in both languages together through optimization of a joint loss function that combines the high-resource tagger and the low-resource one. The first loss function we consider is the following: 
+
+$${\cal L}_{\textit {multi}}({\theta }) = -\!\!\!\sum _{({t}, {w}) \in {\cal D}_s} \!\!\!\! \log &\, p_{{\theta }} ({t}\mid {w}, \ell _s ) \\[-5]
+\nonumber & -\!\!\!\!\sum _{({t}, {w}) \in {\cal D}_t} \!\!
+\log p_{{\theta }}\left({t}\mid {w}, \ell _t \right).$$   (Eq. 20) 
+
+ Crucially, our cross-lingual objective forces both taggers to share part of the parameter vector ${\theta }$ , which allows it to represent morphological regularities between the two languages in a common embedding space and, thus, enables transfer of knowledge. This is no different from monolingual multi-task settings, e.g., jointly training a chunker and a tagger for the transfer of syntactic information BIBREF9 . We point out that, in contrast to our approach, almost all multi-task transfer learning, e.g., for dependency parsing BIBREF20 , has shared word-level embeddings rather than character-level embeddings. See sec:related-work for a more complete discussion.
+
+We consider two parameterizations of this distribution $p_{{\theta }}(t_i
+\mid {w}, \ell )$ . First, we modify the initial character-level LSTM embedding such that it also encodes the identity of the language. Second, we modify the softmax layer, creating a language-specific softmax.
+
+Our first architecture has one softmax, as in eq:tagger, over all morphological tags in ${\cal T}$ (shared among all the languages). To allow the architecture to encode morphological features specific to one language, e.g., the third person present plural ending in Spanish is -an, but -ão in Portuguese, we modify the creation of the character-level embeddings. Specifically, we augment the character alphabet $\Sigma $ with a distinguished symbol that indicates the language: $\text{{\tt id}}_\ell $ . We then pre- and postpend this symbol to the character stream for every word before feeding the characters into the bidirectional LSTM Thus, we arrive at the new language-specific word embeddings, 
+
+$${v}^{\ell }_i = &\left[ {\text{LSTM}}\left(\langle \text{{\tt id}}_\ell , c_{i_1}, \ldots ,
+c_{i_{M_i}}, \text{{\tt id}}_\ell \rangle \right); \right. \\
+&\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\, \left. {\text{LSTM}} \left(\langle \text{{\tt id}}_\ell , c_{i_{M_i}}, \ldots , c_{i_1}, \text{{\tt id}}_\ell \rangle \right) \right]. \nonumber $$   (Eq. 22) 
+
+ This model creates a language-specific embedding vector ${v}_i$ , but the individual embeddings for a given character are shared among the languages jointly trained on. The remainder of the architecture is held constant.
+
+Next, inspired by the architecture of heigold2013multilingual, we consider a language-specific softmax layer, i.e., we define a new output layer for every language: 
+
+$$p_{{\theta }}\left(t_i \mid {w}, \ell \right) = \text{softmax}\left(W_{\ell } {e}_i + {b}_{\ell }\right),$$   (Eq. 24) 
+
+where $W_{\ell } \in \mathbb {R}^{|{\cal T}| \times n}$ and ${b}_{\ell } \in \mathbb {R}^{|{\cal T}|}$ are now language-specific. In this architecture, the embeddings ${e}_i$ are the same for all languages—the model has to learn language-specific behavior exclusively through the output softmax of the tagging LSTM.
+
+The third model we exhibit is a joint architecture for tagging and language identification. We consider the following loss function: 
+
+$${\cal L}_{\textit {joint}} ({\theta }) = -\!\!\!\sum _{({t}, {w}) \in {\cal D}_s} \!\!\! \log \, & p_{{\theta }}(\ell _s, {t}\mid {w}) \\[-5] \nonumber &-\!\sum _{({t}, {w}) \in {\cal D}_t} \!\!\!\!\! \log p_{{\theta }}\left(\ell _t, {t}\mid {w}\right),$$   (Eq. 26) 
+
+ where we factor the joint distribution as 
+
+$$p_{{\theta }}\left(\ell , {t}\mid {w}\right) &= p_{{\theta }}\left(\ell \mid {w}\right) \cdot p_{{\theta }}\left({t}\mid {w}, \ell \right).$$   (Eq. 27) 
+
+ Just as before, we define $p_{{\theta }}\left({t}\mid {w}, \ell \right)$ above as in eq:lang-specific and we define 
+
+$$p_{{\theta }}(\ell \mid {w}) = \text{softmax}\left(U\tanh (V{e}_i)\right),$$   (Eq. 28) 
+
+which is a multi-layer perceptron with a binary softmax (over the two languages) as an output layer; we have added the additional parameters $V \in \mathbb {R}^{2 \times n}$ and $U \in \mathbb {R}^{2 \times 2}$ . In the case of multi-source transfer, this is a softmax over the set of languages.
+
+The first two architectures discussed in par:arch1 represent two possibilities for a multi-task objective, where we condition on the language of the sentence. The first integrates this knowledge at a lower level and the second at a higher level. The third architecture discussed in sec:joint-arch takes a different tack—rather than conditioning on the language, it predicts it. The joint model offers one interesting advantage over the two architectures proposed. Namely, it allows us to perform a morphological analysis on a sentence where the language is unknown. This effectively alleviates an early step in the NLP pipeline, where language id is performed and is useful in conditions where the language to be tagged may not be known a-priori, e.g., when tagging social media data.
+
+While there are certainly more complex architectures one could engineer for the task, we believe we have found a relatively diverse sampling, enabling an interesting experimental comparison. Indeed, it is an important empirical question which architectures are most appropriate for transfer learning. Since transfer learning affords the opportunity to reduce the sample complexity of the “data-hungry” neural networks that currently dominate NLP research, finding a good solution for cross-lingual transfer in state-of-the-art neural models will likely be a boon for low-resource NLP in general.
+
+## Experiments
+
+Empirically, we ask three questions of our architectures. i) How well can we transfer morphological tagging models from high-resource languages to low-resource languages in each architecture? (Does one of the three outperform the others?) ii) How many annotated data in the low-resource language do we need? iii) How closely related do the languages need to be to get good transfer?
+
+## Experimental Languages
+
+We experiment with the language families: Romance (Indo-European), Northern Germanic (Indo-European), Slavic (Indo-European) and Uralic. In the Romance sub-grouping of the wider Indo-European family, we experiment on Catalan (ca), French (fr), Italian (it), Portuguese (pt), Romanian (ro) and Spanish (es). In the Northern Germanic family, we experiment on Danish (da), Norwegian (no) and Swedish (sv). In the Slavic family, we experiment on Bulgarian (bg), Czech (bg), Polish (pl), Russian (ru), Slovak (sk) and Ukrainian (uk). Finally, in the Uralic family we experiment on Estonian (et), Finnish (fi) and Hungarian (hu).
+
+## Datasets
+
+We use the morphological tagging datasets provided by the Universal Dependencies (UD) treebanks (the concatenation of the $4^\text{th}$ and $6^\text{th}$ columns of the file format) BIBREF13 . We list the size of the training, development and test splits of the UD treebanks we used in tab:lang-size. Also, we list the number of unique morphological tags in each language in tab:num-tags, which serves as an approximate measure of the morphological complexity each language exhibits. Crucially, the data are annotated in a cross-linguistically consistent manner, such that words in the different languages that have the same syntacto-semantic function have the same bundle of tags (see sec:morpho-tagging for a discussion). Potentially, further gains would be possible by using a more universal scheme, e.g., the UniMorph scheme.
+
+## Baselines
+
+We consider two baselines in our work. First, we consider the MarMoT tagger BIBREF17 , which is currently the best performing non-neural model. The source code for MarMoT is freely available online, which allows us to perform fully controlled experiments with this model. Second, we consider the alignment-based projection approach of buys-botha:2016:P16-1. We discuss each of the two baselines in turn.
+
+The MarMoT tagger is the leading non-neural approach to morphological tagging. This baseline is important since non-neural, feature-based approaches have been found empirically to be more efficient, in the sense that their learning curves tend to be steeper. Thus, in the low-resource setting we would be remiss to not consider a feature-based approach. Note that this is not a transfer approach, but rather only uses the low-resource data.
+
+The projection approach of buys-botha:2016:P16-1 provides an alternative method for transfer learning. The idea is to construct pseudo-annotations for bitext given an alignments BIBREF21 . Then, one trains a standard tagger using the projected annotations. The specific tagger employed is the wsabie model of DBLP:conf/ijcai/WestonBU11, which—like our approach— is a $0^\text{th}$ -order discriminative neural model. In contrast to ours, however, their network is shallow. We compare the two methods in more detail in sec:related-work.
+
+Additionally, we perform a thorough study of the neural transfer learner, considering all three architectures. A primary goal of our experiments is to determine which of our three proposed neural transfer techniques is superior. Even though our experiments focus on morphological tagging, these architectures are more general in that they may be easily applied to other tasks, e.g., parsing or machine translation. We additionally explore the viability of multi-source transfer, i.e., the case where we have multiple source languages. All of our architectures generalize to the multi-source case without any complications.
+
+## Experimental Details
+
+We train our models with the following conditions.
+
+We evaluate using average per token accuracy, as is standard for both POS tagging and morphological tagging, and per feature $F_1$ as employed in buys-botha:2016:P16-1. The per feature $F_1$ calculates a key $F^k_1$ for each key in the target language's tags by asking if the key-attribute pair $k_i$ $=$ $v_i$ is in the predicted tag. Then, the key-specific $F^k_1$ values are averaged equally. Note that $F_1$ is a more flexible metric as it gives partial credit for getting some of the attributes in the bundle correct, where accuracy does not.
+
+[author=Ryan,color=purple!40,size=,fancyline,caption=,]Georg needs to check. Taken from: http://www.dfki.de/ neumann/publications/new-ps/BigNLP2016.pdf Our networks are four layers deep (two LSTM layers for the character embedder, i.e., to compute ${v_i}$ and two LSTM layers for the tagger, i.e., to compute ${e_i}$ ) and we use an embedding size of 128 for the character input vector size and hidden layers of 256 nodes in all other cases. All networks are trained with the stochastic gradient method RMSProp BIBREF22 , with a fixed initial learning rate and a learning rate decay that is adjusted for the other languages according to the amount of training data. The batch size is always 16. Furthermore, we use dropout BIBREF23 . The dropout probability is set to 0.2. We used Torch 7 BIBREF24 to configure the computation graphs implementing the network architectures.
+
+## Results and Discussion
+
+[author=Ryan,color=purple!40,size=,fancyline,caption=,]Needs to be updated! We report our results in two tables. First, we report a detailed cross-lingual evaluation in tab:results. Secondly, we report a comparison against two baselines in tab:baseline-table1 (accuracy) and tab:baseline-table2 ( $F_1$ ). We see two general trends of the data. First, we find that genetically closer languages yield better source languages. Second, we find that the multi-softmax architecture is the best in terms of transfer ability, as evinced by the results in tab:results. We find a wider gap between our model and the baselines under the accuracy than under $F_1$ . We attribute this to the fact that $F_1$ is a softer metric in that it assigns credit to partially correct guesses.
+
+## Related Work
+
+We divide the discussion of related work topically into three parts for ease of intellectual digestion.
+
+## Alignment-Based Distant Supervision.
+
+Most cross-lingual work in NLP—focusing on morphology or otherwise—has concentrated on indirect supervision, rather than transfer learning. The goal in such a regime is to provide noisy labels for training the tagger in the low-resource language through annotations projected over aligned bitext with a high-resource language. This method of projection was first introduced by DBLP:conf/naacl/YarowskyN01 for the projection of POS annotation. While follow-up work BIBREF26 , BIBREF27 , BIBREF28 has continually demonstrated the efficacy of projecting simple part-of-speech annotations, buys-botha:2016:P16-1 were the first to show the use of bitext-based projection for the training of a morphological tagger for low-resource languages.
+
+As we also discuss the training of a morphological tagger, our work is most closely related to buys-botha:2016:P16-1 in terms of the task itself. We contrast the approaches. The main difference lies therein, that our approach is not projection-based and, thus, does not require the construction of a bilingual lexicon for projection based on bitext. Rather, our method jointly learns multiple taggers and forces them to share features—a true transfer learning scenario. In contrast to projection-based methods, our procedure always requires a minimal amount of annotated data in the low-resource target language—in practice, however, this distinction is non-critical as projection-based methods without a small mount of seed target language data perform poorly BIBREF29 .
+
+## Character-level NLP.
+
+Our work also follows a recent trend in NLP, whereby traditional word-level neural representations are being replaced by character-level representations for a myriad tasks, e.g., POS tagging DBLP:conf/icml/SantosZ14, parsing BIBREF30 , language modeling BIBREF31 , sentiment analysis BIBREF32 as well as the tagger of heigold2017, whose work we build upon. Our work is also related to recent work on character-level morphological generation using neural architectures BIBREF33 , BIBREF34 .
+
+## Neural Cross-lingual Transfer in NLP.
+
+In terms of methodology, however, our proposal bears similarity to recent work in speech and machine translation–we discuss each in turn. In speech recognition, heigold2013multilingual train a cross-lingual neural acoustic model on five Romance languages. The architecture bears similarity to our multi-language softmax approach. Dependency parsing benefits from cross-lingual learning in a similar fashion BIBREF35 , BIBREF20 .
+
+In neural machine translation BIBREF36 , BIBREF37 , recent work BIBREF38 , BIBREF39 , BIBREF40 has explored the possibility of jointly train translation models for a wide variety of languages. Our work addresses a different task, but the undergirding philosophical motivation is similar, i.e., attack low-resource NLP through multi-task transfer learning. kann-cotterell-schutze:2017:ACL2017 offer a similar method for cross-lingual transfer in morphological inflection generation.
+
+## Conclusion
+
+We have presented three character-level recurrent neural network architectures for multi-task cross-lingual transfer of morphological taggers. We provided an empirical evaluation of the technique on 18 languages from four different language families, showing wide-spread applicability of the method. We found that the transfer of morphological taggers is an eminently viable endeavor among related language and, in general, the closer the languages, the easier the transfer of morphology becomes. Our technique outperforms two strong baselines proposed in previous work. Moreover, we define standard low-resource training splits in UD for future research in low-resource morphological tagging. Future work should focus on extending the neural morphological tagger to a joint lemmatizer BIBREF41 and evaluate its functionality in the low-resource setting.
+
+## Acknowledgements
+
+RC acknowledges the support of an NDSEG fellowship. Also, we would like to thank Jan Buys and Jan Botha who helped us compare to the numbers reported in their paper. We would also like to thank Hinrich Schütze for reading an early draft and Tim Vieira and Jason Naradowsky for helpful initial discussions.

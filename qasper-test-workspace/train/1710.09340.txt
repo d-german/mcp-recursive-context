@@ -1,0 +1,85 @@
+# Non-Projective Dependency Parsing with Non-Local Transitions
+
+**Paper ID:** 1710.09340
+
+## Abstract
+
+We present a novel transition system, based on the Covington non-projective parser, introducing non-local transitions that can directly create arcs involving nodes to the left of the current focus positions. This avoids the need for long sequences of No-Arc transitions to create long-distance arcs, thus alleviating error propagation. The resulting parser outperforms the original version and achieves the best accuracy on the Stanford Dependencies conversion of the Penn Treebank among greedy transition-based algorithms.
+
+## Introduction
+
+Greedy transition-based parsers are popular in NLP, as they provide competitive accuracy with high efficiency. They syntactically analyze a sentence by greedily applying transitions, which read it from left to right and produce a dependency tree.
+
+However, this greedy process is prone to error propagation: one wrong choice of transition can lead the parser to an erroneous state, causing more incorrect decisions. This is especially crucial for long attachments requiring a larger number of transitions. In addition, transition-based parsers traditionally focus on only two words of the sentence and their local context to choose the next transition. The lack of a global perspective favors the presence of errors when creating arcs involving multiple transitions. As expected, transition-based parsers build short arcs more accurately than long ones BIBREF0 .
+
+Previous research such as BIBREF1 and BIBREF2 proves that the widely-used projective arc-eager transition-based parser of Nivre2003 benefits from shortening the length of transition sequences by creating non-local attachments. In particular, they augmented the original transition system with new actions whose behavior entails more than one arc-eager transition and involves a context beyond the traditional two focus words. attardi06 and sartorio13 also extended the arc-standard transition-based algorithm BIBREF3 with the same success.
+
+In the same vein, we present a novel unrestricted non-projective transition system based on the well-known algorithm by covington01fundamental that shortens the transition sequence necessary to parse a given sentence by the original algorithm, which becomes linear instead of quadratic with respect to sentence length. To achieve that, we propose new transitions that affect non-local words and are equivalent to one or more Covington actions, in a similar way to the transitions defined by Qi2017 based on the arc-eager parser. Experiments show that this novel variant significantly outperforms the original one in all datasets tested, and achieves the best reported accuracy for a greedy dependency parser on the Stanford Dependencies conversion of the WSJ Penn Treebank.
+
+## Non-Projective Covington Parser
+
+The original non-projective parser defined by covington01fundamental was modelled under the transition-based parsing framework by Nivre2008. We only sketch this transition system briefly for space reasons, and refer to BIBREF4 for details.
+
+Parser configurations have the form INLINEFORM0 , where INLINEFORM1 and INLINEFORM2 are lists of partially processed words, INLINEFORM3 a list (called buffer) of unprocessed words, and INLINEFORM4 the set of dependency arcs built so far. Given an input string INLINEFORM5 , the parser starts at the initial configuration INLINEFORM6 and runs transitions until a terminal configuration of the form INLINEFORM7 is reached: at that point, INLINEFORM8 contains the dependency graph for the input.
+
+The set of transitions is shown in the top half of Figure FIGREF1 . Their logic can be summarized as follows: when in a configuration of the form INLINEFORM0 , the parser has the chance to create a dependency involving words INLINEFORM1 and INLINEFORM2 , which we will call left and right focus words of that configuration. The INLINEFORM3 and INLINEFORM4 transitions are used to create a leftward ( INLINEFORM5 ) or rightward arc ( INLINEFORM6 ), respectively, between these words, and also move INLINEFORM7 from INLINEFORM8 to the first position of INLINEFORM9 , effectively moving the focus to INLINEFORM10 and INLINEFORM11 . If no dependency is desired between the focus words, the INLINEFORM12 transition makes the same modification of INLINEFORM13 and INLINEFORM14 , but without building any arc. Finally, the INLINEFORM15 transition moves the whole content of the list INLINEFORM16 plus INLINEFORM17 to INLINEFORM18 when no more attachments are pending between INLINEFORM19 and the words of INLINEFORM20 , thus reading a new input word and placing the focus on INLINEFORM21 and INLINEFORM22 . Transitions that create arcs are disallowed in configurations where this would violate the single-head or acyclicity constraints (cycles and nodes with multiple heads are not allowed in the dependency graph). Figure FIGREF4 shows the transition sequence in the Covington transition system which derives the dependency graph in Figure FIGREF3 .
+
+The resulting parser can generate arbitrary non-projective trees, and its complexity is INLINEFORM0 .
+
+## Non-Projective NL-Covington Parser
+
+The original logic described by covington01fundamental parses a sentence by systematically traversing every pair of words. The INLINEFORM0 transition, introduced by Nivre2008 in the transition-based version, is an optimization that avoids the need to apply a sequence of INLINEFORM1 transitions to empty the list INLINEFORM2 before reading a new input word.
+
+However, there are still situations where sequences of INLINEFORM0 transitions are needed. For example, if we are in a configuration INLINEFORM1 with focus words INLINEFORM2 and INLINEFORM3 and the next arc we need to create goes from INLINEFORM4 to INLINEFORM5 INLINEFORM6 , then we will need INLINEFORM7 consecutive INLINEFORM8 transitions to move the left focus word to INLINEFORM9 and then apply INLINEFORM10 . This could be avoided if a non-local INLINEFORM11 transition could be undertaken directly at INLINEFORM12 , creating the required arc and moving INLINEFORM13 words to INLINEFORM14 at once. The advantage of such approach would be twofold: (1) less risk of making a mistake at INLINEFORM15 due to considering a limited local context, and (2) shorter transition sequence, alleviating error propagation.
+
+We present a novel transition system called NL-Covington (for “non-local Covington”), described in the bottom half of Figure FIGREF1 . It consists in a modification of the non-projective Covington algorithm where: (1) the INLINEFORM0 and INLINEFORM1 transitions are parameterized with INLINEFORM2 , allowing the immediate creation of any attachment between INLINEFORM3 and the INLINEFORM4 th leftmost word in INLINEFORM5 and moving INLINEFORM6 words to INLINEFORM7 at once, and (2) the INLINEFORM8 transition is removed since it is no longer necessary.
+
+This new transition system can use some restricted global information to build non-local dependencies and, consequently, reduce the number of transitions needed to parse the input. For instance, as presented in Figure FIGREF5 , the NL-Covington parser will need 9 transitions, instead of 12 traditional Covington actions, to analyze the sentence in Figure FIGREF3 .
+
+In fact, while in the standard Covington algorithm a transition sequence for a sentence of length INLINEFORM0 has length INLINEFORM1 in the worst case (if all nodes are connected to the first node, then we need to traverse every node to the left of each right focus word); for NL-Covington the sequence length is always INLINEFORM2 : one INLINEFORM3 transition for each of the INLINEFORM4 words, plus one arc-building transition for each of the INLINEFORM5 arcs in the dependency tree. Note, however, that this does not affect the parser's time complexity, which is still quadratic as in the original Covington parser. This is because the algorithm has INLINEFORM6 possible transitions to be scored at each configuration, while the original Covington has INLINEFORM7 transitions due to being limited to creating local leftward/rightward arcs between the focus words.
+
+The completeness and soundness of NL-Covington can easily be proved as there is a mapping between transition sequences of both parsers, where a sequence of INLINEFORM0 INLINEFORM1 and one arc transition in Covington is equivalent to a INLINEFORM2 or INLINEFORM3 in NL-Covington.
+
+## Data and Evaluation
+
+We use 9 datasets from the CoNLL-X BIBREF5 and all datasets from the CoNLL-XI shared task BIBREF6 . To compare our system to the current state-of-the-art transition-based parsers, we also evaluate it on the Stanford Dependencies BIBREF7 conversion (using the Stanford parser v3.3.0) of the WSJ Penn Treebank BIBREF8 , hereinafter PT-SD, with standard splits. Labelled and Unlabelled Attachment Scores (LAS and UAS) are computed excluding punctuation only on the PT-SD, for comparability. We repeat each experiment with three independent random initializations and report the average accuracy. Statistical significance is assessed by a paired test with 10,000 bootstrap samples.
+
+## Model
+
+To implement our approach we take advantage of the model architecture described in Qi2017 for the arc-swift parser, which extends the architecture of Kiperwasser2016 by applying a biaffine combination during the featurization process. We implement both the Covington and NL-Covington parsers under this architecture, adapt the featurization process with biaffine combination of Qi2017 to these parsers, and use their same training setup. More details about these model parameters are provided in Appendix SECREF6 .
+
+Since this architecture uses batch training, we train with a static oracle. The NL-Covington algorithm has no spurious ambiguity at all, so there is only one possible static oracle: canonical transition sequences are generated by choosing the transition that builds the shortest pending gold arc involving the current right focus word INLINEFORM0 , or INLINEFORM1 if there are no unbuilt gold arcs involving INLINEFORM2 .
+
+We note that a dynamic oracle can be obtained for the NL-Covington parser by adapting the one for standard Covington of GomFerACL2015. As NL-Covington transitions are concatenations of Covington ones, their loss calculation algorithm is compatible with NL-Covington. Apart from error exploration, this also opens the way to incorporating non-monotonicity BIBREF9 . While these approaches have shown to improve accuracy under online training settings, here we prioritize homogeneous comparability to BIBREF2 , so we use batch training and a static oracle, and still obtain state-of-the-art accuracy for a greedy parser.
+
+## Results
+
+Table TABREF10 presents a comparison between the Covington parser and the novel variant developed here. The NL-Covington parser outperforms the original version in all datasets tested, with all improvements statistically significant ( INLINEFORM0 ).
+
+Table TABREF12 compares our novel system with other state-of-the-art transition-based dependency parsers on the PT-SD. Greedy parsers are in the first block, beam-search and dynamic programming parsers in the second block. The third block shows the best result on this benchmark, obtained with constituent parsing with generative re-ranking and conversion to dependencies. Despite being the only non-projective parser tested on a practically projective dataset, our parser achieves the highest score among greedy transition-based models (even above those trained with a dynamic oracle).
+
+We even slightly outperform the arc-swift system of Qi2017, with the same model architecture, implementation and training setup, but based on the projective arc-eager transition-based parser instead. This may be because our system takes into consideration any permissible attachment between the focus word INLINEFORM0 and any word in INLINEFORM1 at each configuration, while their approach is limited by the arc-eager logic: it allows all possible rightward arcs (possibly fewer than our approach as the arc-eager stack usually contains a small number of words), but only one leftward arc is permitted per parser state. It is also worth noting that the arc-swift and NL-Covington parsers have the same worst-case time complexity, ( INLINEFORM2 ), as adding non-local arc transitions to the arc-eager parser increases its complexity from linear to quadratic, but it does not affect the complexity of the Covington algorithm. Thus, it can be argued that this technique is better suited to Covington than to arc-eager parsing.
+
+We also compare NL-Covington to the arc-swift parser on the CoNLL datasets (Table TABREF15 ). For fairness of comparison, we projectivize (via maltparser) all training datasets, instead of filtering non-projective sentences, as some of the languages are significantly non-projective. Even doing that, the NL-Covington parser improves over the arc-swift system in terms of UAS in 14 out of 19 datasets, obtaining statistically significant improvements in accuracy on 7 of them, and statistically significant decreases in just one.
+
+Finally, we analyze how our approach reduces the length of the transition sequence consumed by the original Covington parser. In Table TABREF16 we report the transition sequence length per sentence used by the Covington and the NL-Covington algorithms to analyze each dataset from the same benchmark used for evaluating parsing accuracy. As seen in the table, NL-Covington produces notably shorter transition sequences than Covington, with a reduction close to 50% on average.
+
+## Conclusion
+
+We present a novel variant of the non-projective Covington transition-based parser by incorporating non-local transitions, reducing the length of transition sequences from INLINEFORM0 to INLINEFORM1 . This system clearly outperforms the original Covington parser and achieves the highest accuracy on the WSJ Penn Treebank (Stanford Dependencies) obtained to date with greedy dependency parsing.
+
+## Acknowledgments
+
+This work has received funding from the European Research Council (ERC), under the European Union's Horizon 2020 research and innovation programme (FASTPARSE, grant agreement No 714150), from the TELEPARES-UDC (FFI2014-51978-C2-2-R) and ANSWER-ASAP (TIN2017-85160-C2-1-R) projects from MINECO, and from Xunta de Galicia (ED431B 2017/01).
+
+## Model Details
+
+We provide more details of the neural network architecture used in this paper, which is taken from Qi2017.
+
+The model consists of two blocks of 2-layered bidirectional long short-term memory (BiLSTM) networks BIBREF23 with 400 hidden units in each direction. The first block is used for POS tagging and the second one, for parsing. As the input of the tagging block, we use words represented as word embeddings, and BiLSTMs are employed to perform feature extraction. The resulting output is fed into a multi-layer perceptron (MLP), with a hidden layer of 100 rectified linear units (ReLU), that provides a POS tag for each input token in a 32-dimensional representation. Word embeddings concatenated to these POS tag embeddings serve as input of the second block of BiLSTMs to undertake the parsing stage. Then, the output of the parsing block is fed into a MLP with two separate ReLU hidden layers (one for deriving the representation of the head, and the other for the dependency label) that, after being merged and by means of a softmax function, score all the feasible transitions, allowing to greedily choose and apply the highest-scoring one.
+
+Moreover, we adapt the featurization process with biaffine combination described in Qi2017 for the arc-swift system to be used on the original Covington and NL-Covington parsers. In particular, arc transitions are featurized by the concatenation of the representation of the head and dependent words of the arc to be created, the INLINEFORM0 transition is featurized by the rightmost word in INLINEFORM1 and the leftmost word in the buffer INLINEFORM2 and, finally, for the INLINEFORM3 transition only the leftmost word in INLINEFORM4 is used. Unlike Qi2017 do for baseline parsers, we do not use the featurization method detailed in Kiperwasser2016 for the original Covington parser, as we observed that this results in lower scores and then the comparison would be unfair in our case. We implement both systems under the same framework, with the original Covington parser represented as the NL-Covington system plus the INLINEFORM5 transition and with INLINEFORM6 limited to 1. A thorough description of the model architecture and featurization mechanism can be found in Qi2017.
+
+Our training setup is exactly the same used by Qi2017, training the models during 10 epochs for large datasets and 30 for small ones. In addition, we initialize word embeddings with 100-dimensional GloVe vectors BIBREF25 for English and use 300-dimensional Facebook vectors BIBREF20 for other languages. The other parameters of the neural network keep the same values.
+
+The parser's source code is freely available at https://github.com/danifg/Non-Local-Covington.

@@ -1,0 +1,85 @@
+# Back Attention Knowledge Transfer for Low-resource Named Entity Recognition
+
+**Paper ID:** 1906.01183
+
+## Abstract
+
+In recent years, great success has been achieved in the field of natural language processing (NLP), thanks in part to the considerable amount of annotated resources. For named entity recognition (NER), most languages do not have such an abundance of labeled data, so the performances of those languages are comparatively lower. To improve the performance, we propose a general approach called Back Attention Network (BAN). BAN uses translation system to translate other language sentences into English and utilizes the pre-trained English NER model to get task-specific information. After that, BAN applies a new mechanism named back attention knowledge transfer to improve the semantic representation, which aids in generation of the result. Experiments on three different language datasets indicate that our approach outperforms other state-of-the-art methods.
+
+## Introduction
+
+Named entity recognition (NER) is a sequence tagging task that extracts the continuous tokens into specified classes, such as person names, organizations and locations. Current state-of-the-art approaches for NER usually base themselves on long short-term memory recurrent neural networks (LSTM RNNs) and a subsequent conditional random field (CRF) to predict the sequence labels BIBREF0 . Performances of neural NER methods are compromised if the training data are not enough BIBREF1 . This problem is severe for many languages due to a lack of labeled datasets, e.g., German and Spanish. In comparison, NER on English is well developed and there exist abundant labeled data for training purpose. Therefore, in this work, we regard English as a high-resource language, while other languages, even Chinese, as low-resource languages.
+
+There is an intractable problem when leveraging English NER system for other languages. The sentences with the same meaning in different languages may have different lengths and the positions of words in these sentences usually do not correspond. Previous work such as BIBREF2 used each single word translation information to enrich the monolingual word embedding. To our knowledge, there is no approach that employs the whole translation information to improve the performance of the monolingual NER system.
+
+To address above problem, we introduce an extension to the BiLSTM-CRF model, which could obtain transferred knowledge from a pre-trained English NER system. First, we translate other languages into English. Since the proposed models of BIBREF3 and BIBREF4 , the performance of attention-based machine translation systems is close to the human level. The attention mechanism can make the translation results more accurate. Furthermore, this mechanism has another useful property: the attention weights can represent the alignment information. After translating the low-resource language into English, we utilize the pre-trained English NER model to predict the sentences and record the output states of BiLSTM in this model. The states contain the semantic and task-specific information of the sentences. By using soft alignment attention weights as a transformation matrix, we manage to transfer the knowledge of high resource language — English to other languages. Finally, using both word vectors and the transfer knowledge, we obtain new state-of-the-art results on four datasets.
+
+## Model
+
+In this section, we will introduce the BAN in three parts. Our model is based on the mainstream NER model BIBREF5 , using BiLSTM-CRF as the basic network structure. Given a sentence INLINEFORM0 and corresponding labels INLINEFORM1 , where INLINEFORM2 denotes the INLINEFORM3 th token and INLINEFORM4 denotes the INLINEFORM5 th label. The NER task is to estimate the probability INLINEFORM6 . Figure FIGREF1 shows the main architecture of our model.
+
+## Pre-trained Translation and NER Model
+
+Attention-base translation model We use the system of BIBREF6 , a convolutional sequence to sequence model. It divides translation process into two steps. First, in the encoder step, given an input sentence INLINEFORM0 of length INLINEFORM1 , INLINEFORM2 represents each word as word embedding INLINEFORM3 . After that, we obtain the absolute position of input elements INLINEFORM4 . Both vectors are concatenated to get input sentence representations INLINEFORM5 . Similarly, output elements INLINEFORM6 generated from decoder network have the same structure. A convolutional neural network (CNN) is used to get the hidden state of the sentence representation from left to right. Second, in the decoder step, attention mechanism is used in each CNN layer. In order to acquire the attention value, we combine the current decoder state INLINEFORM7 with the embedding of previous decoder output value INLINEFORM8 : DISPLAYFORM0 
+
+For INLINEFORM0 th layer, the attention INLINEFORM1 of the INLINEFORM2 th source element and INLINEFORM3 th state is computed as a dot-product between the decoder state summary INLINEFORM4 and each output INLINEFORM5 of the last encoder layer: DISPLAYFORM0 
+
+Then we follow the normal decoder implementation and get target sentence INLINEFORM0 by beam search algorithm.
+
+Pre-trained English NER model We construct the English NER system following BIBREF7 . This system uses a bidirectional LSTM as a character-level language model to take context information for word embedding generation. The hidden states of the character language model (CharLM) are used to create contextualized word embeddings. The final embedding INLINEFORM0 is concatenated by the CharLM embedding INLINEFORM1 and GLOVE embedding INLINEFORM2 BIBREF8 . A standard BiLSTM-CRF named entity recognition model BIBREF0 takes INLINEFORM3 to address the NER task.
+
+## Back Attention Knowledge Transfer
+
+The sentences in low-resource languages are used as input to the model. Given a input sentence INLINEFORM0 in low-resource language, we use pre-trained translation model to translate INLINEFORM1 into English and the output is INLINEFORM2 . Simultaneously, we record the average of values for all INLINEFORM3 attention layers: DISPLAYFORM0 
+
+After that, we use the pre-trained English NER model to predict the translated sentence INLINEFORM0 . Then, we have the BiLSTM output states: DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 denote the INLINEFORM2 th forward and backward outputs, respectively. INLINEFORM3 contains the semantic and task-specific information of the translated sentence. And the INLINEFORM4 th row of attention weights matrix INLINEFORM5 represents the correlation between source word INLINEFORM6 with all words in target sentence INLINEFORM7 . Thereafter, to obtain the transfer information INLINEFORM8 of source word, we reversely use the attention weights: DISPLAYFORM0 
+
+where INLINEFORM0 represent the whole outputs of BiLSTM, and INLINEFORM1 , INLINEFORM2 . INLINEFORM3 denotes the transfer information of INLINEFORM4 th word in low-resource language and has the same dimensions with INLINEFORM5 .
+
+## Named Entity Recognition Architecture
+
+The low-resource language named entity recognition architecture is based on BIBREF5 . The word embeddings of low-resource language are passed into a BiLSTM-CRF sequence labeling network. The embeddings INLINEFORM0 are used as inputs to the BiLSTM. Then we have: DISPLAYFORM0 
+
+Before passing the forward and backward output states INLINEFORM0 into CRF, we concatenate INLINEFORM1 and INLINEFORM2 as a new representation: DISPLAYFORM0 
+
+CRF model uses INLINEFORM0 to give the final sequence probability on the possible sequence label INLINEFORM1 : DISPLAYFORM0 
+
+At last, the named entity labels are predicted by: DISPLAYFORM0 
+
+## Experiments
+
+We use experiments to evaluate the effectiveness of our proposed method on NER task. On three different low-resource languages, we conducted an experimental evaluation to prove the effectiveness of our back attention mechanism on the NER task. Four datasets are used in our work, including CoNLL 2003 German BIBREF9 , CoNLL 2002 Spanish BIBREF10 , OntoNotes 4 BIBREF11 and Weibo NER BIBREF12 . All the annotations are mapped to the BIOES format. Table TABREF14 shows the detailed statistics of the datasets.
+
+## Experimental Setup
+
+We implement the basic BiLSTM-CRF model using PyTorch framework. FASTTEXT embeddings are used for generating word embeddings. Translation models are trained on United Nation Parallel Corpus. For pre-trained English NER system, we use the default NER model of Flair.
+
+## Settings
+
+We train our NER model using vanilla SGD with no momentum for 150 epochs, with an initial learning rate of 0.1 and a learning rate annealing method in which the train loss does not fall in 3 consecutive epochs. The hidden size of BiLSTM model is set to 256 and mini-batch size is set to 16. Dropout is applied to word embeddings with a rate of 0.1 and to BiLSTM with a rate of 0.5. We repeat each experiment 5 times under different random seeds and report the average of test set as final performance.
+
+## German and Spanish NER
+
+Experimental results of German and Spanish are shown in table TABREF20 . Evaluation metric is F1-score. We can find that our method CharLM+BiLSTM-CRF+BAN yields the best performance on two languages. And after adding our network to each of the basic models, the performance of each model has been improved. This suggests that the transfer information, obtained from BAN, is helpful for low-resource NER.
+
+## Chinese NER
+
+Chinese is distinct from Latin-based languages. Thence, there are some tricks when processing Chinese corpus. But we only suppose to verify the validity of our method, so we just use the character-level embeddings.
+
+Table TABREF22 shows the results on Chinese OntoNotes 4.0. Adding BAN to baseline model leads to an increase from 63.25% to 72.15% F1-score. In order to further improve the performance, we use the BERT model BIBREF20 to produce word embeddings. With no segmentation, we surpass the previous state-of-the-art approach by 6.33% F1-score. For Weibo dataset, the experiment results are shown in Table TABREF23 , where NE, NM and Overall denote named entities, nominal entities and both. The baseline model gives a 33.18% F1-score. Using the transfer knowledge by BAN, the baseline model achieves an immense improvement in F1-score, rising by 10.39%. We find that BAN still gets consistent improvement on a strong model. With BAN, the F1-score of BERT+BiLSTM+CRF increases to 70.76%.
+
+## Task-Specific Information from Back Attention Network
+
+ BIBREF21 indicates that the representations from higher-level layers of NLP models are more task-specific. Although we do the same task among different languages, the target domains of different datasets are slightly different. So, to prove that back attention knowledge generated by BAN could capture valuable task-specific information between different languages, we use the back attention knowledge alone as word embedding to predict Weibo dataset. We compare three different word embeddings on the baseline model. Experimental results are shown in Table TABREF25 and illustrate that back attention knowledge from BAN has inherent semantic information.
+
+## Analysis
+
+Our proposed approach is the first to leverage hidden states of NER model from another language to improve monolingual NER performance. The training time with or without BAN is almost the same due to the translation module and the English NER module are pre-trained.
+
+On large datasets, our model makes a small improvement because some of transfer knowledge obtained from our method is duplicated with the information learned by the monolingual models. On small datasets, e.g., Weibo dataset, a great improvement has been achieved after adding transfer knowledge to the baseline model. The reason maybe is that these datasets are too small to be fully trained and the test datasets have many non-existent characters of the training dataset, even some unrecognized characters. Therefore, some tags labeled incorrectly by monolingual models could be labeled correctly with the additional transfer knowledge which contains task-specific information obtained from BAN. So, the transfer information plays an important role in this dataset.
+
+## Conclusion
+
+In this paper, we seek to improve the performance of NER on low-resource languages by leveraging the well-trained English NER system. This is achieved by way of BAN, which is a simple but extensible approach. It can transfer information between different languages. Empirical experiments show that, on small datasets, our approach can lead to significant improvement on the performance. This property is of great practical importance for low-resource languages. In future work, we plan to extend our method on other NLP tasks, e.g., relation extraction, coreference resolution.

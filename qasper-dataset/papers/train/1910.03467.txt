@@ -1,0 +1,139 @@
+# Overcoming the Rare Word Problem for Low-Resource Language Pairs in Neural Machine Translation
+
+**Paper ID:** 1910.03467
+
+## Abstract
+
+Among the six challenges of neural machine translation (NMT) coined by (Koehn and Knowles, 2017), rare-word problem is considered the most severe one, especially in translation of low-resource languages. In this paper, we propose three solutions to address the rare words in neural machine translation systems. First, we enhance source context to predict the target words by connecting directly the source embeddings to the output of the attention component in NMT. Second, we propose an algorithm to learn morphology of unknown words for English in supervised way in order to minimize the adverse effect of rare-word problem. Finally, we exploit synonymous relation from the WordNet to overcome out-of-vocabulary (OOV) problem of NMT. We evaluate our approaches on two low-resource language pairs: English-Vietnamese and Japanese-Vietnamese. In our experiments, we have achieved significant improvements of up to roughly +1.0 BLEU points in both language pairs.
+
+## Introduction
+
+NMT systems have achieved better performance compared to statistical machine translation (SMT) systems in recent years not only on available data language pairs BIBREF1, BIBREF2, but also on low-resource language pairs BIBREF3, BIBREF4. Nevertheless, NMT still exists many challenges which have adverse effects on its effectiveness BIBREF0. One of these challenges is that NMT has biased tend in translating high-frequency words, thus words which have lower frequencies are often translated incorrectly. This challenge has also been confirmed again in BIBREF3, and they have proposed two strategies to tackle this problem with modifications on the model's output distribution: one for normalizing some matrices by fixing them to constants after several training epochs and another for adding a direct connection from source embeddings through a simple feed forward neural network (FFNN). These approaches increase the size and the training time of their NMT systems. In this work, we follow their second approach but simplify the computations by replacing FFNN with two single operations.
+
+Despite above approaches can improve the prediction of rare words, however, NMT systems often use limited vocabularies in their sizes, from 30K to 80K most frequent words of the training data, in order to reduce computational complexity and the sizes of the models BIBREF5, BIBREF6, so the rare-word translation are still problematic in NMT. Even when we use a larger vocabulary, this situation still exists BIBREF7. A word which has not seen in the vocabulary of the input text (called unknown word) are presented by the $unk$ symbol in NMT systems. Inspired by alignments and phrase tables in phrase-based machine translation (SMT) as suggested by BIBREF8, BIBREF6 proposed to address OOV words using an annotated training corpus. They then used a dictionary generated from alignment model or maps between source and target words to determine the translations of $unks$ if translations are not found. BIBREF9 proposed to reduce unknown words using Gage's Byte Pair Encoding (BPE) algorithm BIBREF10, but NMT systems are less effective for low-resource language pairs due to the lack of data and also for other languages that sub-word are not the optimal translation unit. In this paper, we employ several techniques inspired by the works from NMT and the traditional SMT mentioned above. Instead of a loosely unsupervised approach, we suggest a supervised approach to solve this trouble using synonymous relation of word pairs from WordNet on Japanese$\rightarrow $Vietnamese and English$\rightarrow $Vietnamese systems. To leverage effectiveness of this relation in English, we transform variants of words in the source texts to their original forms by separating their affixes collected by hand.
+
+Our contributes in this work are:
+
+We release the state-of-the-art for Japanese-Vietnamese NMT systems.
+
+We proposed the approach to deal with the rare word translation by integrating source embeddings to the attention component of NMT.
+
+We present a supervised algorithm to reduce the number of unknown words for the English$\rightarrow $Vietnamese translation system.
+
+We demonstrate the effectiveness of leveraging linguistic information from WordNet to alleviate the rare-word problem in NMT.
+
+## Neural Machine Translation
+
+Our NMT system use a bidirectional recurrent neural network (biRNN) as an encoder and a single-directional RNN as a decoder with input feeding of BIBREF11 and the attention mechanism of BIBREF5. The Encoder's biRNN are constructed by two RNNs with the hidden units in the LSTM cell, one for forward and the other for backward of the source sentence $\mathbf {x}=(x_1, ...,x_n)$. Every word $x_i$ in sentence is first encoded into a continuous representation $E_s(x_i)$, called the source embedding. Then $\mathbf {x}$ is transformed into a fixed-length hidden vector $\mathbf {h}_i$ representing the sentence at the time step $i$, which called the annotation vector, combined by the states of forward $\overrightarrow{\mathbf {h}}_i$ and backward $\overleftarrow{\mathbf {h}}_i$:
+
+$\overrightarrow{\mathbf {h}}_i=f(E_s(x_i),\overrightarrow{\mathbf {h}}_{i-1})$
+
+$\overleftarrow{\mathbf {h}}_i=f(E_s(x_i),\overleftarrow{\mathbf {h}}_{i+1})$
+
+The decoder generates the target sentence $\mathbf {y}={(y_1, ..., y_m)}$, and at the time step $j$, the predicted probability of the target word $y_j$ is estimated as follows:
+
+where $\mathbf {z}_j$ is the output hidden states of the attention mechanism and computed by the previous output hidden states $\mathbf {z}_{j-1}$, the embedding of previous target word $E_t(y_{j-1})$ and the context $\mathbf {c}_j$:
+
+$\mathbf {z}_j=g(E_t(y_{j-1}), \mathbf {z}_{j-1}, \mathbf {c}_j)$
+
+The source context $\mathbf {c}_j$ is the weighted sum of the encoder's annotation vectors $\mathbf {h}_i$:
+
+$\mathbf {c}_j=\sum ^n_{i=1}\alpha _{ij}\mathbf {h}_i$
+
+where $\alpha _{ij}$ are the alignment weights, denoting the relevance between the current target word $y_j$ and all source annotation vectors $\mathbf {h}_i$.
+
+## Rare Word translation
+
+In this section, we present the details about our approaches to overcome the rare word situation. While the first strategy augments the source context to translate low-frequency words, the remaining strategies reduce the number of OOV words in the vocabulary.
+
+## Rare Word translation ::: Low-frequency Word Translation
+
+The attention mechanism in RNN-based NMT maps the target word into source context corresponding through the annotation vectors $\mathbf {h}_i$. In the recurrent hidden unit, $\mathbf {h}_i$ is computed from the previous state $\mathbf {h}_{t-1}$. Therefore, the information flow of the words in the source sentence may be diminished over time. This leads to the accuracy reduction when translating low-frequency words, since there is no direct connection between the target word and the source word. To alleviate the adverse impact of this problem, BIBREF3 combined the source embeddings with the predictive distribution over the output target word in several following steps:
+
+Firstly, the weighted average vector of the source embeddings is computed as follows:
+
+where $\alpha _j(e)$ are alignment weights in the attention component and $f_e = E_s(x)$, are the embeddings of the source words.
+
+Then $l_j$ is transformed through one-hidden-layer FFNN with residual connection proposed by BIBREF12:
+
+Finally, the output distribution over the target word is calculated by:
+
+The matrices $\mathbf {W}_l$, $\mathbf {W}_t$ and $\mathbf {b}_t$ are trained together with other parameters of the NMT model.
+
+This approach improves the performance of the NMT systems but introduces more computations as the model size increase due to the additional parameters $\mathbf {W}_l$, $\mathbf {W}_t$ and $\mathbf {b}_t$. We simplify this method by using the weighted average of source embeddings directly in the softmax output layer:
+
+Our method does not learn any additional parameters. Instead, it requires the source embedding size to be compatible with the decoder's hidden states. With the additional information provided from the source embeddings, we achieve similar improvements compared to the more expensive method described in BIBREF3.
+
+## Rare Word translation ::: Reducing Unknown Words
+
+In our previous experiments for English$\rightarrow $Vietnamese, BPE algorithm BIBREF9 applied to the source side does not significantly improves the systems despite it is able to reduce the number of unknown English words. We speculate that it might be due to the morphological differences between the source and the target languages (English and Vietnamese in this case). The unsupervised way of BPE while learning sub-words in English thus might be not explicit enough to provide the morphological information to the Vietnamese side. In this work, we would like to attempt a more explicit, supervised way. We collect 52 popular affixes (prefixes and suffixes) in English and then apply the separating affixes algorithm (called SAA) to reduce the number of unknown words as well as to force our NMT systems to learn better morphological mappings between two languages.
+
+The main ideal of our SAA is to separate affixes of unknown words while ensuring that the rest of them still exists in the vocabulary. Let the vocabulary $V$ containing $K$ most frequency words from the training set $T1$, a set of prefixes $P$, a set of suffixes $S$, we call word $w^{\prime }$ is the rest of an unknown word or rare word $w$ after delimiting its affixes. We iteratively pick a $w$ from $N$ words (including unknown words and rare words) of the source text $T2$ to consider if $w$ starts with a prefix $p$ in $P$ or ends with a suffix $s$ in $S$, we then determine splitting its affixes if $w^{\prime }$ in $V$. A rare word in $V$ also can be separated its affixes if its frequency is less than the given threshold. We set this threshold by 2 in our experiments. Similarly to BPE approach, we also employ a pair of the special symbol $@$ for separating affixes from the word. Listing SECREF6 shows our SAA algorithm.
+
+## Rare Word translation ::: Dealing with OOV using WordNet
+
+WordNet is a lexical database grouping words into sets which share some semantic relations. Its version for English is proposed for the first time by BIBREF13. It becomes a useful resource for many tasks of natural language processing BIBREF14, BIBREF15, BIBREF16. WordNet are available mainly for English and German, the version for other languages are being developed including some Asian languages in such as Japanese, Chinese, Indonesian and Vietnamese. Several works have employed WordNet in SMT systemsBIBREF17, BIBREF18 but to our knowledge, none of the work exploits the benefits of WordNet in order to ease the rare word problem in NMT. In this work, we propose the learning synonymous algorithm (called LSW) from the WordNet of English and Japanese to handle unknown words in our NMT systems.
+
+In WordNet, synonymous words are organized in groups which are called synsets. Our aim is to replace an OOV word by its synonym which appears in the vocabulary of the translation system. From the training set of the source language $T1$, we extract the vocabulary $V$ in size of $K$ most frequent words. For each OOV word from $T1$, we learn its synonyms which exist in the $V$ from the WordNet $W$. The synonyms are then arranged in the descending order of their frequencies to facilitate selection of the $n$ best words which have the highest frequencies. The output file $C$ of the algorithm contains OOV words and its corresponding synonyms and then it is applied to the input text $T2$. We also utilize a frequency threshold for rare words in the same way as in SAA algorithm. In practice, we set this threshold as 0, meaning no words on $V$ is replaced by its synonym. If a source sentence has $m$ unknown words and each of them has $n$ best synonyms, it would generate $m^n$ sentences. Translation process allow us to select the best hypothesis based on their scores. Because of each word in the WordNet can belong to many synsets with different meanings, thus an inappropriate word can be placed in the current source context. We will solve this situation in the further works. Our systems only use 1-best synonym for each OOV word. Listing SECREF7 presents the LSW algorithm.
+
+## Experiments
+
+We evaluate our approaches on the English-Vietnamese and the Japanese-Vietnamese translation systems. Translation performance is measured in BLEU BIBREF19 by the multi-BLEU scripts from Moses.
+
+## Experiments ::: Datasets
+
+We consider two low-resource language pairs: Japanese-Vietnamese and English-Vietnamese. For Japanese-Vietnamese, we use the TED data provided by WIT3 BIBREF20 and compiled by BIBREF21. The training set includes 106758 sentence pairs, the validation and test sets are dev2010 (568 pairs) and tst2010 (1220 pairs). For English$\rightarrow $Vietnamese, we use the dataset from IWSLT 2015 BIBREF22 with around 133K sentence pairs for the training set, 1553 pairs in tst2012 as the validation and 1268 pairs in tst2013 as the test sets.
+
+For LSW algorithm, we crawled pairs of synonymous words from Japanese-English WordNet and achieved 315850 pairs for English and 1419948 pairs for Japanese.
+
+## Experiments ::: Preprocessing
+
+For English and Vietnamese, we tokenized the texts and then true-cased the tokenized texts using Moses script. We do not use any word segmentation tool for Vietnamese. For comparison purpose, Sennrich's BPE algorithm is applied for English texts. Following the same preprocessing steps for Japanese (JPBPE) in BIBREF21, we use KyTea BIBREF23 to tokenize texts and then apply BPE on those texts. The number of BPE merging operators are 50k for both Japanese and English.
+
+## Experiments ::: Systems and Training
+
+We implement our NMT systems using OpenNMT-py framework BIBREF24 with the same settings as in BIBREF21 for our baseline systems. Our system are built with two hidden layers in both encoder and decoder, each layer has 512 hidden units. In the encoder, a BiLSTM architecture is used for each layer and in the decoder, each layer are basically an LSTM layer. The size of embedding layers in both source and target sides is also 512. Adam optimizer is used with the initial learning rate of $0.001$ and then we apply learning rate annealing. We train our systems for 16 epochs with the batch size of 32. Other parameters are the same as the default settings of OpenNMT-py.
+
+We then modify the baseline architecture with the alternative proposed in Section SECREF5 in comparison to our baseline systems. All settings are the same as the baseline systems.
+
+## Experiments ::: Results
+
+In this section, we show the effectiveness of our methods on two low-resource language pairs and compare them to the other works. The empirical results are shown in Table TABREF15 for Japanese-Vietnamese and in Table TABREF20 for English-Vietnamese. Note that, the Multi-BLEU is only measured in the Japanese$\rightarrow $Vietnamese direction and the standard BLEU points are written in brackets.
+
+## Experiments ::: Results ::: Japanese-Vietnamese Translation
+
+We conduct two out of the three proposed approaches for Japanese-Vietnamese translation systems and the results are given in the Table TABREF15.
+
+Baseline Systems. We find that our translation systems which use Sennrich's BPE method for Japanese texts and do not use word segmentation for Vietnamese texts are neither better or insignificant differences compare to those systems used word segmentation in BIBREF21. Particularly, we obtained +0.38 BLEU points between (1) and (4) in the Japanese$\rightarrow $Vietnamese and -0.18 BLEU points between (1) and (3) in the Vietnamese$\rightarrow $Japanese.
+
+Our Approaches. On the systems trained with the modified architecture mentioned in the section SECREF5, we obtained an improvements of +0.54 BLEU points in the Japanese$\rightarrow $Vietnamese and +0.42 BLEU points on the Vietnamese$\rightarrow $Japanese compared to the baseline systems.
+
+Due to the fact that Vietnamese WordNet is not available, we only exploit WordNet to tackle unknown words of Japanese texts in our Japanese$\rightarrow $Vietnamese translation system. After using Kytea, Japanese texts are applied LSW algorithm to replace OOV words by their synonyms. We choose 1-best synonym for each OOV word. Table TABREF18 shows the number of OOV words replaced by their synonyms. The replaced texts are then BPEd and trained on the proposed architecture. The largest improvement is +0.92 between (1) and (3). We observed an improvement of +0.7 BLEU points between (3) and (5) without using data augmentation described in BIBREF21.
+
+## Experiments ::: Results ::: English-Vietnamese Translation
+
+We examine the effect of all approaches presented in Section SECREF3 for our English-Vietnamese translation systems. Table TABREF20 summarizes those results and the scores from other systems BIBREF3, BIBREF25.
+
+Baseline systems. After preprocessing data using Moses scripts, we train the systems of English$\leftrightarrow $Vietnamese on our baseline architecture. Our translation system obtained +0.82 BLEU points compared to BIBREF3 in the English$\rightarrow $Vietnamese and this is lower than the system of BIBREF25 with neural phrase-based translation architecture.
+
+Our approaches. The datasets from the baseline systems are trained on our modified NMT architecture. The improvements can be found as +0.55 BLEU points between (1) and (2) in the English$\rightarrow $Vietnamese and +0.45 BLEU points (in tst2012) between (1) and (2) in the Vietnamese$\rightarrow $English.
+
+For comparison purpose, English texts are split into sub-words using Sennrich's BPE methods. We observe that, the achieved BLEU points are lower Therefore, we then apply the SAA algorithm on the English texts from (2) in the English$\rightarrow $Vietnamese. The number of applied words are listed in Table TABREF21. The improvement in BLEU are +0.74 between (4) and (1).
+
+Similarly to the Japanese$\rightarrow $Vietnamese system, we apply LSW algorithm on the English texts from (4) while selecting 1-best synonym for each OOV word. The number of replaced words on English texts are indicated in the Table TABREF22. Again, we obtained a bigger gain of +0.99 (+1.02) BLEU points in English$\rightarrow $Vietnamese direction. Compared to the most recent work BIBREF25, our system reports an improvement of +0.47 standard BLEU points on the same dataset.
+
+We investigate some examples of translations generated by the English$\rightarrow $Vietnamese systems with our proposed methods in the Table TABREF23. The bold texts in red color present correct or approximate translations while the italic texts in gray color denote incorrect translations. The first example, we consider two words: presentation and the unknown word applauded. The word presentation is predicted correctly as Vietnamese"bài thuyết trình" in most cases when we combined source context through embeddings. The unknown word applauded which has not seen in the vocabulary is ignored in the first two cases (baseline and source embedding) but it is roughly translated as Vietnamese"hoan nghênh" in the SAA because it is separated into applaud and ed. In the second example, we observe the translations of the unknown word tryout, they are mistaken in the first three cases but in the LSW, it is predicted with a closer meaning as Vietnamese"bài kiểm tra" due to the replacement by its synonymous word as test.
+
+## Related Works
+
+Addressing unknown words was mentioned early in the Statistical Machine Translation (SMT) systems. Some typical studies as: BIBREF26 proposed four techniques to overcome this situation by extend the morphology and spelling of words or using a bilingual dictionary or transliterating for names. These approaches are difficult when manipulate to different domains. BIBREF27 trained word embedding models to learn word similarity from monolingual data and an unknown word are then replaced by a its similar word. BIBREF28 used a linear model to learn maps between source and target spaces base on a small initial bilingual dictionary to find the translations of source words. However, in NMT, there are not so many works tackling this problem. BIBREF7 use a very large vocabulary to solve unknown words. BIBREF6 generate a dictionary from alignment data based on annotated corpus to decide the hypotheses of unknown words. BIBREF3 have introduced the solutions for dealing with the rare word problem, however, their models require more parameters, thus, decreasing the overall efficiency.
+
+In another direction, BIBREF9 exploited the BPE algorithm to reduce number of unknown words in NMT and achieved significant efficiency on many language pairs. The second approach presented in this works follows this direction when instead of using an unsupervised method to split rare words and unknown words into sub-words that are able to translate, we use a supervised method. Our third approach using WordNet can be seen as a smoothing way, when we use the translations of the synonymous words to approximate the translation of an OOV word. Another work followed this direction is worth to mention is BIBREF29, when they use the morphological and semantic information as the factors of the words to help translating rare words.
+
+## Conclusion
+
+In this study, we have proposed three difference strategies to handle rare words in NMT, in which the combination of methods brings significant improvements to the NMT systems on two low-resource language pairs. In future works, we will consider selecting some appropriate synonymous words for the source sentence from n-best synonymous words to further improve the performance of the NMT systems and leverage more unsupervised methods based on monolingual data to address rare word problem.
+
+## Acknowledgments
+
+This work is supported by the project "Building a machine translation system to support translation of documents between Vietnamese and Japanese to help managers and businesses in Hanoi approach to Japanese market", No. TC.02-2016-03.

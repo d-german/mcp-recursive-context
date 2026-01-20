@@ -1,0 +1,167 @@
+# Can neural networks understand monotonicity reasoning?
+
+**Paper ID:** 1906.06448
+
+## Abstract
+
+Monotonicity reasoning is one of the important reasoning skills for any intelligent natural language inference (NLI) model in that it requires the ability to capture the interaction between lexical and syntactic structures. Since no test set has been developed for monotonicity reasoning with wide coverage, it is still unclear whether neural models can perform monotonicity reasoning in a proper way. To investigate this issue, we introduce the Monotonicity Entailment Dataset (MED). Performance by state-of-the-art NLI models on the new test set is substantially worse, under 55%, especially on downward reasoning. In addition, analysis using a monotonicity-driven data augmentation method showed that these models might be limited in their generalization ability in upward and downward reasoning.
+
+## Introduction
+
+Natural language inference (NLI), also known as recognizing textual entailment (RTE), has been proposed as a benchmark task for natural language understanding. Given a premise $P$ and a hypothesis $H$ , the task is to determine whether the premise semantically entails the hypothesis BIBREF0 . A number of recent works attempt to test and analyze what type of inferences an NLI model may be performing, focusing on various types of lexical inferences BIBREF1 , BIBREF2 , BIBREF3 and logical inferences BIBREF4 , BIBREF5 .
+
+Concerning logical inferences, monotonicity reasoning BIBREF6 , BIBREF7 , which is a type of reasoning based on word replacement, requires the ability to capture the interaction between lexical and syntactic structures. Consider examples in ( "Introduction" ) and ( "Introduction" ).
+
+All [ workers $\leavevmode {\color {blue!80!black}\downarrow }$ ] [joined for a French dinner $\leavevmode {\color {red!80!black}\uparrow }$ ] All workers joined for a dinner All new workers joined for a French dinner Not all [new workers $\leavevmode {\color {red!80!black}\uparrow }$ ] joined for a dinner Not all workers joined for a dinner 
+
+A context is upward entailing (shown by [... $\leavevmode {\color {red!80!black}\uparrow }$ ]) that allows an inference from ( "Introduction" ) to ( "Introduction" ), where French dinner is replaced by a more general concept dinner. On the other hand, a downward entailing context (shown by [... $\leavevmode {\color {blue!80!black}\downarrow }$ ]) allows an inference from ( "Introduction" ) to ( "Introduction" ), where workers is replaced by a more specific concept new workers. Interestingly, the direction of monotonicity can be reversed again by embedding yet another downward entailing context (e.g., not in ( "Introduction" )), as witness the fact that ( "Introduction" ) entails ( "Introduction" ). To properly handle both directions of monotonicity, NLI models must detect monotonicity operators (e.g., all, not) and their arguments from the syntactic structure.
+
+For previous datasets containing monotonicity inference problems, FraCaS BIBREF8 and the GLUE diagnostic dataset BIBREF9 are manually-curated datasets for testing a wide range of linguistic phenomena. However, monotonicity problems are limited to very small sizes (FraCaS: 37/346 examples and GLUE: 93/1650 examples). The limited syntactic patterns and vocabularies in previous test sets are obstacles in accurately evaluating NLI models on monotonicity reasoning.
+
+To tackle this issue, we present a new evaluation dataset that covers a wide range of monotonicity reasoning that was created by crowdsourcing and collected from linguistics publications (Section "Dataset" ). Compared with manual or automatic construction, we can collect naturally-occurring examples by crowdsourcing and well-designed ones from linguistics publications. To enable the evaluation of skills required for monotonicity reasoning, we annotate each example in our dataset with linguistic tags associated with monotonicity reasoning.
+
+We measure the performance of state-of-the-art NLI models on monotonicity reasoning and investigate their generalization ability in upward and downward reasoning (Section "Results and Discussion" ). The results show that all models trained with SNLI BIBREF4 and MultiNLI BIBREF10 perform worse on downward inferences than on upward inferences.
+
+In addition, we analyzed the performance of models trained with an automatically created monotonicity dataset, HELP BIBREF11 . The analysis with monotonicity data augmentation shows that models tend to perform better in the same direction of monotonicity with the training set, while they perform worse in the opposite direction. This indicates that the accuracy on monotonicity reasoning depends solely on the majority direction in the training set, and models might lack the ability to capture the structural relations between monotonicity operators and their arguments.
+
+## Monotonicity
+
+As an example of a monotonicity inference, consider the example with the determiner every in ( "Monotonicity" ); here the premise $P$ entails the hypothesis $H$ .
+
+ $P$ : Every [ $_{\scriptsize \mathsf {NP}}$ person $\leavevmode {\color {blue!80!black}\downarrow }$ ] [ $_{\scriptsize \mathsf {VP}}$ bought a movie ticket $\leavevmode {\color {red!80!black}\uparrow }$ ] $H$ : Every young person bought a ticket 
+
+Every is downward entailing in the first argument ( $\mathsf {NP}$ ) and upward entailing in the second argument ( $\mathsf {VP}$ ), and thus the term person can be more specific by adding modifiers (person $\sqsupseteq $ young person), replacing it with its hyponym (person $\sqsupseteq $ spectator), or adding conjunction (person $\sqsupseteq $ person and alien). On the other hand, the term buy a ticket can be more general by removing modifiers (bought a movie ticket $\sqsubseteq $ bought a ticket), replacing it with its hypernym (bought a movie ticket $\sqsubseteq $ bought a show ticket), or adding disjunction (bought a movie ticket $\sqsubseteq $ bought or sold a movie ticket). Table 1 shows determiners modeled as binary operators and their polarities with respect to the first and second arguments.
+
+There are various types of downward operators, not limited to determiners (see Table 2 ). As shown in ( "Monotonicity" ), if a propositional object is embedded in a downward monotonic context (e.g., when), the polarity of words over its scope can be reversed.
+
+ $P$ : When [every [ $_{\scriptsize \mathsf {NP}}$ young person $\leavevmode {\color {red!80!black}\uparrow }$ ] [ $_{\scriptsize \mathsf {VP}}$ bought a ticket $\leavevmode {\color {blue!80!black}\downarrow }$ ]], [that shop was open] $H$ : When [every [ $_{\scriptsize \mathsf {NP}}$ person] [ $_{\scriptsize \mathsf {VP}}$ bought a movie ticket]], [that shop was open] 
+
+Thus, the polarity ( $\leavevmode {\color {red!80!black}\uparrow }$ and $\leavevmode {\color {blue!80!black}\downarrow }$ ), where the replacement with more general (specific) phrases licenses entailment, needs to be determined by the interaction of monotonicity properties and syntactic structures; polarity of each constituent is calculated based on a monotonicity operator of functional expressions (e.g., every, when) and their function-term relations.
+
+## Human-oriented dataset
+
+To create monotonicity inference problems, we should satisfy three requirements: (a) detect the monotonicity operators and their arguments; (b) based on the syntactic structure, induce the polarity of the argument positions; and (c) replace the phrase in the argument position with a more general or specific phrase in natural and various ways (e.g., by using lexical knowledge or logical connectives). For (a) and (b), we first conduct polarity computation on a syntactic structure for each sentence, and then select premises involving upward/downward expressions.
+
+For (c), we use crowdsourcing to narrow or broaden the arguments. The motivation for using crowdsourcing is to collect naturally alike monotonicity inference problems that include various expressions. One problem here is that it is unclear how to instruct workers to create monotonicity inference problems without knowledge of natural language syntax and semantics. We must make tasks simple for workers to comprehend and provide sound judgements. Moreover, recent studies BIBREF12 , BIBREF3 , BIBREF13 point out that previous crowdsourced datasets, such as SNLI BIBREF14 and MultiNLI BIBREF10 , include hidden biases. As these previous datasets are motivated by approximated entailments, workers are asked to freely write hypotheses given a premise, which does not strictly restrict them to creating logically complex inferences.
+
+Taking these concerns into consideration, we designed two-step tasks to be performed via crowdsourcing for creating a monotonicity test set; (i) a hypothesis creation task and (ii) a validation task. The task (i) is to create a hypothesis by making some polarized part of an original sentence more specific. Instead of writing a complete sentence from scratch, workers are asked to rewrite only a relatively short sentence. By restricting workers to rewrite only a polarized part, we can effectively collect monotonicity inference examples. The task (ii) is to annotate an entailment label for the premise-hypothesis pair generated in (i). Figure 1 summarizes the overview of our human-oriented dataset creation. We used the crowdsourcing platform Figure Eight for both tasks.
+
+As a resource, we use declarative sentences with more than five tokens from the Parallel Meaning Bank (PMB) BIBREF15 . The PMB contains syntactically correct sentences annotated with its syntactic category in Combinatory Categorial Grammar (CCG; BIBREF16 , BIBREF16 ) format, which is suitable for our purpose. To get a whole CCG derivation tree, we parse each sentence by the state-of-the-art CCG parser, depccg BIBREF17 . Then, we add a polarity to every constituent of the CCG tree by the polarity computation system ccg2mono BIBREF18 and make the polarized part a blank field.
+
+We ran a trial rephrasing task on 500 examples and detected 17 expressions that were too general and thus difficult to rephrase them in a natural way (e.g., every one, no time). We removed examples involving such expressions. To collect more downward inference examples, we select examples involving determiners in Table 1 and downward operators in Table 2 . As a result, we selected 1,485 examples involving expressions having arguments with upward monotonicity and 1,982 examples involving expressions having arguments with downward monotonicity.
+
+We present crowdworkers with a sentence whose polarized part is underlined, and ask them to replace the underlined part with more specific phrases in three different ways. In the instructions, we showed examples rephrased in various ways: by adding modifiers, by adding conjunction phrases, and by replacing a word with its hyponyms.
+
+Workers were paid US$0.05 for each set of substitutions, and each set was assigned to three workers. To remove low-quality examples, we set the minimum time it should take to complete each set to 200 seconds. The entry in our task was restricted to workers from native speaking English countries. 128 workers contributed to the task, and we created 15,339 hypotheses (7,179 upward examples and 8,160 downward examples).
+
+The gold label of each premise-hypothesis pair created in the previous task is automatically determined by monotonicity calculus. That is, a downward inference pair is labeled as entailment, while an upward inference pair is labeled as non-entailment.
+
+However, workers sometimes provided some ungrammatical or unnatural sentences such as the case where a rephrased phrase does not satisfy the selectional restrictions (e.g., original: Tom doesn't live in Boston, rephrased: Tom doesn't live in yes), making it difficult to judge their entailment relations. Thus, we performed an annotation task to ensure accurate labeling of gold labels. We asked workers about the entailment relation of each premise-hypothesis pair as well as how natural it is.
+
+Worker comprehension of an entailment relation directly affects the quality of inference problems. To avoid worker misunderstandings, we showed workers the following definitions of labels and five examples for each label:
+
+entailment: the case where the hypothesis is true under any situation that the premise describes.
+
+non-entailment: the case where the hypothesis is not always true under a situation that the premise describes.
+
+unnatural: the case where either the premise and/or the hypothesis is ungrammatical or does not make sense.
+
+Workers were paid US$0.04 for each question, and each question was assigned to three workers. To collect high-quality annotation results, we imposed ten test questions on each worker, and removed workers who gave more than three wrong answers. We also set the minimum time it should take to complete each question to 200 seconds. 1,237 workers contributed to this task, and we annotated gold labels of 15,339 premise-hypothesis pairs.
+
+Table 3 shows the numbers of cases where answers matched gold labels automatically determined by monotonicity calculus. This table shows that there exist inference pairs whose labels are difficult even for humans to determine; there are 3,354 premise-hypothesis pairs whose gold labels as annotated by polarity computations match with those answered by all workers. We selected these naturalistic monotonicity inference pairs for the candidates of the final test set.
+
+To make the distribution of gold labels symmetric, we checked these pairs to determine if we can swap the premise and the hypothesis, reverse their gold labels, and create another monotonicity inference pair. In some cases, shown below, the gold label cannot be reversed if we swap the premise and the hypothesis.
+
+In ( UID15 ), child and kid are not hyponyms but synonyms, and the premise $P$ and the hypothesis $H$ are paraphrases.
+
+ $P$ : Tom is no longer a child $H$ : Tom is no longer a kid 
+
+These cases are not strict downward inference problems, in the sense that a phrase is not replaced by its hyponym/hypernym.
+
+Consider the example ( UID16 ).
+
+ $P$ : The moon has no atmosphere $H$ : The moon has no atmosphere, and the gravity force is too low 
+
+The hypothesis $H$ was created by asking workers to make atmosphere in the premise $P$ more specific. However, the additional phrase and the gravity force is too low does not form constituents with atmosphere. Thus, such examples are not strict downward monotone inferences.
+
+In such cases as (a) and (b), we do not swap the premise and the hypothesis. In the end, we collected 4,068 examples from crowdsourced datasets.
+
+## Linguistics-oriented dataset
+
+We also collect monotonicity inference problems from previous manually curated datasets and linguistics publications. The motivation is that previous linguistics publications related to monotonicity reasoning are expected to contain well-designed inference problems, which might be challenging problems for NLI models.
+
+We collected 1,184 examples from 11 linguistics publications BIBREF19 , BIBREF20 , BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 , BIBREF25 , BIBREF26 , BIBREF27 , BIBREF28 , BIBREF29 . Regarding previous manually-curated datasets, we collected 93 examples for monotonicity reasoning from the GLUE diagnostic dataset, and 37 single-premise problems from FraCaS.
+
+Both the GLUE diagnostic dataset and FraCaS categorize problems by their types of monotonicity reasoning, but we found that each dataset has different classification criteria. Thus, following GLUE, we reclassified problems into three types of monotone reasoning (upward, downward, and non-monotone) by checking if they include (i) the target monotonicity operator in both the premise and the hypothesis and (ii) the phrase replacement in its argument position. In the GLUE diagnostic dataset, there are several problems whose gold labels are contradiction. We regard them as non-entailment in that the premise does not semantically entail the hypothesis.
+
+## Statistics
+
+We merged the human-oriented dataset created via crowdsourcing and the linguistics-oriented dataset created from linguistics publications to create the current version of the monotonicity entailment dataset (MED). Table 4 shows some examples from the MED dataset. We can see that our dataset contains various phrase replacements (e.g., conjunction, relative clauses, and comparatives). Table 5 reports the statistics of the MED dataset, including 5,382 premise-hypothesis pairs (1,820 upward examples, 3,270 downward examples, and 292 non-monotone examples). Regarding non-monotone problems, gold labels are always non-entailment, whether a hypothesis is more specific or general than its premise, and thus almost all non-monotone problems are labeled as non-entailment. The size of the word vocabulary in the MED dataset is 4,023, and overlap ratios of vocabulary with previous standard NLI datasets is 95% with MultiNLI and 90% with SNLI.
+
+We assigned a set of annotation tags for linguistic phenomena to each example in the test set. These tags allow us to analyze how well models perform on each linguistic phenomenon related to monotonicity reasoning. We defined 6 tags (see Table 4 for examples):
+
+lexical knowledge (2,073 examples): inference problems that require lexical relations (i.e., hypernyms, hyponyms, or synonyms)
+
+reverse (240 examples): inference problems where a propositional object is embedded in a downward environment more than once
+
+conjunction (283 examples): inference problems that include the phrase replacement by adding conjunction (and) to the hypothesis
+
+disjunction (254 examples): inference problems that include the phrase replacement by adding disjunction (or) to the hypothesis
+
+conditionals (149 examples): inference problems that include conditionals (e.g., if, when, unless) in the hypothesis 
+
+negative polarity items (NPIs) (338 examples): inference problems that include NPIs (e.g., any, ever, at all, anything, anyone, anymore, anyhow, anywhere) in the hypothesis
+
+## Baselines
+
+To test the difficulty of our dataset, we checked the majority class label and the accuracies of five state-of-the-art NLI models adopting different approaches: BiMPM (Bilateral Multi-Perspective Matching Model; BIBREF31 , BIBREF31 ), ESIM (Enhanced Sequential Inference Model; BIBREF32 , BIBREF32 ), Decomposable Attention Model BIBREF33 , KIM (Knowledge-based Inference Model; BIBREF34 , BIBREF34 ), and BERT (Bidirectional Encoder Representations from Transformers model; BIBREF35 , BIBREF35 ). Regarding BERT, we checked the performance of a model pretrained on Wikipedia and BookCorpus for language modeling and trained with SNLI and MultiNLI. For other models, we checked the performance trained with SNLI. In agreement with our dataset, we regarded the prediction label contradiction as non-entailment.
+
+Table 6 shows that the accuracies of all models were better on upward inferences, in accordance with the reported results of the GLUE leaderboard. The overall accuracy of each model was low. In particular, all models underperformed the majority baseline on downward inferences, despite some models having rich lexical knowledge from a knowledge base (KIM) or pretraining (BERT). This indicates that downward inferences are difficult to perform even with the expansion of lexical knowledge. In addition, it is interesting to see that if a model performed better on upward inferences, it performed worse on downward inferences. We will investigate these results in detail below.
+
+## Data augmentation for analysis
+
+To explore whether the performance of models on monotonicity reasoning depends on the training set or the model themselves, we conducted further analysis performed by data augmentation with the automatically generated monotonicity dataset HELP BIBREF11 . HELP contains 36K monotonicity inference examples (7,784 upward examples, 21,192 downward examples, and 1,105 non-monotone examples). The size of the HELP word vocabulary is 15K, and the overlap ratio of vocabulary between HELP and MED is 15.2%.
+
+We trained BERT on MultiNLI only and on MultiNLI augmented with HELP, and compared their performance. Following BIBREF3 , we also checked the performance of a hypothesis-only model trained with each training set to test whether our test set contains undesired biases.
+
+Table 7 shows that the performance of BERT with the hypothesis-only training set dropped around 10-40% as compared with the one with the premise-hypothesis training set, even if we use the data augmentation technique. This indicates that the MED test set does not allow models to predict from hypotheses alone. Data augmentation by HELP improved the overall accuracy to 71.6%, but there is still room for improvement. In addition, while adding HELP increased the accuracy on downward inferences, it slightly decreased accuracy on upward inferences. The size of downward examples in HELP is much larger than that of upward examples. This might improve accuracy on downward inferences, but might decrease accuracy on upward inferences.
+
+To investigate the relationship between accuracy on upward inferences and downward inferences, we checked the performance throughout training BERT with only upward and downward inference examples in HELP (Figure 2 (i), (ii)). These two figures show that, as the size of the upward training set increased, BERT performed better on upward inferences but worse on downward inferences, and vice versa.
+
+Figure 2 (iii) shows performance on a different ratio of upward and downward inference training sets. When downward inference examples constitute more than half of the training set, accuracies on upward and downward inferences were reversed. As the ratio of downward inferences increased, BERT performed much worse on upward inferences. This indicates that a training set in one direction (upward or downward entailing) of monotonicity might be harmful to models when learning the opposite direction of monotonicity.
+
+Previous work using HELP BIBREF11 reported that the BERT trained with MultiNLI and HELP containing both upward and downward inferences improved accuracy on both directions of monotonicity. MultiNLI rarely comes from downward inferences (see Section "Discussion" ), and its size is large enough to be immune to the side-effects of downward inference examples in HELP. This indicates that MultiNLI might act as a buffer against side-effects of the monotonicity-driven data augmentation technique.
+
+Table 8 shows the evaluation results by genre. This result shows that inference problems collected from linguistics publications are more challenging than crowdsourced inference problems, even if we add HELP to training sets. As shown in Figure 2 , the change in performance on problems from linguistics publications is milder than that on problems from crowdsourcing. This result also indicates the difficulty of problems from linguistics publications. Regarding non-monotone problems collected via crowdsourcing, there are very few non-monotone problems, so accuracy is 100%. Adding non-monotone problems to our test set is left for future work.
+
+Table 9 shows the evaluation results by type of linguistic phenomenon. While accuracy on problems involving NPIs and conditionals was improved on both upward and downward inferences, accuracy on problems involving conjunction and disjunction was improved on only one direction. In addition, it is interesting to see that the change in accuracy on conjunction was opposite to that on disjunction. Downward inference examples involving disjunction are similar to upward inference ones; that is, inferences from a sentence to a shorter sentence are valid (e.g., Not many campers have had a sunburn or caught a cold $\Rightarrow $ Not many campers have caught a cold). Thus, these results were also caused by addition of downward inference examples. Also, accuracy on problems annotated with reverse tags was apparently better without HELP because all examples are upward inferences embedded in a downward environment twice.
+
+Table 9 also shows that accuracy on conditionals was better on upward inferences than that on downward inferences. This indicates that BERT might fail to capture the monotonicity property that conditionals create a downward entailing context in their scope while they create an upward entailing context out of their scope.
+
+Regarding lexical knowledge, the data augmentation technique improved the performance much better on downward inferences which do not require lexical knowledge. However, among the 394 problems for which all models provided wrong answers, 244 problems are non-lexical inference problems. This indicates that some non-lexical inference problems are more difficult than lexical inference problems, though accuracy on non-lexical inference problems was better than that on lexical inference problems.
+
+## Discussion
+
+One of our findings is that there is a type of downward inferences to which every model fails to provide correct answers. One such example is concerned with the contrast between few and a few. Among 394 problems for which all models provided wrong answers, 148 downward inference problems were problems involving the downward monotonicity operator few such as in the following example:
+
+ $P$ : Few of the books had typical or marginal readers $H$ : Few of the books had some typical readers We transformed these downward inference problems to upward inference problems in two ways: (i) by replacing the downward operator few with the upward operator a few, and (ii) by removing the downward operator few. We tested BERT using these transformed test sets. The results showed that BERT predicted the same answers for the transformed test sets. This suggests that BERT does not understand the difference between the downward operator few and the upward operator a few.
+
+The results of crowdsourcing tasks in Section 3.1.3 showed that some downward inferences can naturally be performed in human reasoning. However, we also found that the MultiNLI training set BIBREF10 , which is one of the dataset created from naturally-occurring texts, contains only 77 downward inference problems, including the following one.
+
+ $P$ : No racin' on the Range $H$ : No horse racing is allowed on the Range 
+
+One possible reason why there are few downward inferences is that certain pragmatic factors can block people to draw a downward inference. For instance, in the case of the inference problem in ( "Discussion" ), unless the added disjunct in $H$ , i.e., a small cat with green eyes, is salient in the context, it would be difficult to draw the conclusion $H$ from the premise $P$ .
+
+ $P$ : I saw a dog $H$ : I saw a dog or a small cat with green eyes 
+
+Such pragmatic factors would be one of the reasons why it is difficult to obtain downward inferences in naturally occurring texts.
+
+## Conclusion
+
+We introduced a large monotonicity entailment dataset, called MED. To illustrate the usefulness of MED, we tested state-of-the-art NLI models, and found that performance on the new test set was substantially worse for all state-of-the-art NLI models. In addition, the accuracy on downward inferences was inversely proportional to the one on upward inferences.
+
+An experiment with the data augmentation technique showed that accuracy on upward and downward inferences depends on the proportion of upward and downward inferences in the training set. This indicates that current neural models might have limitations on their generalization ability in monotonicity reasoning. We hope that the MED will be valuable for future research on more advanced models that are capable of monotonicity reasoning in a proper way.
+
+## Acknowledgement
+
+This work was partially supported by JST AIP- PRISM Grant Number JPMJCR18Y1, Japan, and JSPS KAKENHI Grant Number JP18H03284, Japan. We thank our three anonymous reviewers for helpful suggestions. We are also grateful to Koki Washio, Masashi Yoshikawa, and Thomas McLachlan for helpful discussion.

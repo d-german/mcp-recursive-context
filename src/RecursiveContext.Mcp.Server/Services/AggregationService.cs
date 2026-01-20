@@ -112,6 +112,133 @@ internal sealed class AggregationService : IAggregationService
             sortedMatches));
     }
 
+    public async Task<Result<MultiPatternResult>> AggregateMultiPatternMatchesAsync(
+        string directory, string filePattern, IReadOnlyList<string> searchPatterns,
+        string combineMode, int maxFiles, CancellationToken ct)
+    {
+        var callCheck = _guardrails.CheckAndIncrementCallCount();
+        if (callCheck.IsFailure)
+            return Result.Failure<MultiPatternResult>(callCheck.Error);
+
+        // Validate combine mode
+        var normalizedMode = combineMode.ToLowerInvariant();
+        if (normalizedMode != "union" && normalizedMode != "intersection")
+            return Result.Failure<MultiPatternResult>($"Invalid combineMode: '{combineMode}'. Must be 'union' or 'intersection'.");
+
+        // Compile all regex patterns upfront (fail fast)
+        var regexes = new List<Regex>(searchPatterns.Count);
+        for (var i = 0; i < searchPatterns.Count; i++)
+        {
+            try
+            {
+                regexes.Add(new Regex(searchPatterns[i], RegexOptions.Compiled, TimeSpan.FromSeconds(5)));
+            }
+            catch (ArgumentException ex)
+            {
+                return Result.Failure<MultiPatternResult>($"Invalid regex pattern at index {i}: {ex.Message}");
+            }
+        }
+
+        // Convert directory to relative path from workspace root
+        var relativeDir = _pathResolver.ToRelativePath(directory);
+        if (relativeDir.IsFailure)
+            return Result.Failure<MultiPatternResult>(relativeDir.Error);
+
+        // Build glob pattern with relative directory
+        var globPattern = string.IsNullOrEmpty(relativeDir.Value) || relativeDir.Value == "."
+            ? $"**/{filePattern}"
+            : $"{relativeDir.Value}/**/{filePattern}";
+
+        // Find matching files
+        var filesResult = await _patternService.FindFilesAsync(globPattern, maxFiles, ct)
+            .ConfigureAwait(false);
+        if (filesResult.IsFailure)
+            return Result.Failure<MultiPatternResult>(filesResult.Error);
+
+        var filePaths = filesResult.Value.MatchingPaths;
+        var effectiveMax = Math.Min(maxFiles, _guardrails.MaxFilesPerAggregation);
+
+        var filesCheck = _guardrails.CheckFilesLimit(filePaths.Length);
+        if (filesCheck.IsFailure)
+        {
+            filePaths = filePaths.Take(effectiveMax).ToImmutableArray();
+        }
+
+        // Thread-safe collections for parallel processing
+        var patternCounts = new int[searchPatterns.Count];
+        var patternFileCounts = new int[searchPatterns.Count];
+        var fileBreakdowns = new System.Collections.Concurrent.ConcurrentBag<FilePatternMatches>();
+
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Environment.ProcessorCount,
+            CancellationToken = ct
+        };
+
+        await Parallel.ForEachAsync(filePaths, parallelOptions, async (relativePath, token) =>
+        {
+            var pathResult = _pathResolver.ResolveAndValidateExists(relativePath);
+            if (pathResult.IsFailure)
+                return;
+
+            try
+            {
+                var content = await File.ReadAllTextAsync(pathResult.Value, token).ConfigureAwait(false);
+                var matchedIndices = new List<int>();
+                var totalFileMatches = 0;
+
+                for (var i = 0; i < regexes.Count; i++)
+                {
+                    var matches = regexes[i].Matches(content);
+                    var count = matches.Count;
+                    if (count > 0)
+                    {
+                        matchedIndices.Add(i);
+                        Interlocked.Add(ref patternCounts[i], count);
+                        Interlocked.Increment(ref patternFileCounts[i]);
+                        totalFileMatches += count;
+                    }
+                }
+
+                if (matchedIndices.Count > 0)
+                {
+                    fileBreakdowns.Add(new FilePatternMatches(
+                        relativePath,
+                        matchedIndices.ToImmutableArray(),
+                        totalFileMatches));
+                }
+            }
+            catch (IOException)
+            {
+                // Skip files that can't be read
+            }
+        }).ConfigureAwait(false);
+
+        // Build per-pattern results
+        var patternResults = searchPatterns.Select((p, i) => new PatternMatchInfo(
+            p, patternCounts[i], patternFileCounts[i])).ToImmutableArray();
+
+        // Sort file breakdowns for deterministic output
+        var sortedBreakdowns = fileBreakdowns.OrderBy(f => f.Path).ToImmutableArray();
+
+        // Compute matching files based on combine mode
+        var matchingFiles = normalizedMode == "intersection"
+            ? sortedBreakdowns
+                .Where(f => f.MatchedPatternIndices.Length == searchPatterns.Count)
+                .Select(f => f.Path)
+                .ToImmutableArray()
+            : sortedBreakdowns
+                .Select(f => f.Path)
+                .ToImmutableArray();
+
+        return Result.Success(new MultiPatternResult(
+            filePaths.Length,
+            normalizedMode,
+            patternResults,
+            matchingFiles,
+            sortedBreakdowns));
+    }
+
     public Task<Result<int>> CountFilesAsync(
         string directory, string pattern, bool recursive, CancellationToken ct)
     {

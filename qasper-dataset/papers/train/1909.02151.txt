@@ -1,0 +1,196 @@
+# KagNet: Knowledge-Aware Graph Networks for Commonsense Reasoning
+
+**Paper ID:** 1909.02151
+
+## Abstract
+
+Commonsense reasoning aims to empower machines with the human ability to make presumptions about ordinary situations in our daily life. In this paper, we propose a textual inference framework for answering commonsense questions, which effectively utilizes external, structured commonsense knowledge graphs to perform explainable inferences. The framework first grounds a question-answer pair from the semantic space to the knowledge-based symbolic space as a schema graph, a related sub-graph of external knowledge graphs. It represents schema graphs with a novel knowledge-aware graph network module named KagNet, and finally scores answers with graph representations. Our model is based on graph convolutional networks and LSTMs, with a hierarchical path-based attention mechanism. The intermediate attention scores make it transparent and interpretable, which thus produce trustworthy inferences. Using ConceptNet as the only external resource for Bert-based models, we achieved state-of-the-art performance on the CommonsenseQA, a large-scale dataset for commonsense reasoning.
+
+## Introduction
+
+Human beings are rational and a major component of rationality is the ability to reason. Reasoning is the process of combining facts and beliefs to make new decisions BIBREF0 , as well as the ability to manipulate knowledge to draw inferences BIBREF1 . Commonsense reasoning utilizes the basic knowledge that reflects our natural understanding of the world and human behaviors, which is common to all humans.
+
+Empowering machines with the ability to perform commonsense reasoning has been seen as the bottleneck of artificial general intelligence BIBREF2 . Recently, there have been a few emerging large-scale datasets for testing machine commonsense with various focuses BIBREF3 , BIBREF4 , BIBREF5 . In a typical dataset, CommonsenseQA BIBREF6 , given a question like “Where do adults use glue sticks?”, with the answer choices being {classroom(✗), office (✓), desk drawer (✗)}, a commonsense reasoner is expected to differentiate the correct choice from other “distractive” candidates. False choices are usually highly related to the question context, but just less possible in real-world scenarios, making the task even more challenging. This paper aims to tackle the research question of how we can teach machines to make such commonsense inferences, particularly in the question-answering setting.
+
+It has been shown that simply fine-tuning large, pre-trained language models such as Gpt BIBREF7 and Bert BIBREF8 can be a very strong baseline method. However, there still exists a large gap between performance of said baselines and human performance. Reasoning with neural models is also lacking in transparency and interpretability. There is no clear way as to how they manage to answer commonsense questions, thus making their inferences dubious.
+
+Merely relying on pre-training large language models on corpora cannot provide well-defined or reusable structures for explainable commonsense reasoning. We argue that it would be more beneficial to propose reasoners that can exploit commonsense knowledge bases BIBREF9 , BIBREF10 , BIBREF11 . Knowledge-aware models can explicitly incorporate external knowledge as relational inductive biases BIBREF12 to enhance their reasoning capacity, as well as to increase the transparency of model behaviors for more interpretable results. Furthermore, a knowledge-centric approach is extensible through commonsense knowledge acquisition techniques BIBREF13 , BIBREF14 .
+
+We propose a knowledge-aware reasoning framework for learning to answer commonsense questions, which has two major steps: schema graph grounding (§ "Schema Graph Grounding" ) and graph modeling for inference (§ "Knowledge-Aware Graph Network" ). As shown in Fig. 1 , for each pair of question and answer candidate, we retrieve a graph from external knowledge graphs (e.g. ConceptNet) in order to capture the relevant knowledge for determining the plausibility of a given answer choice. The graphs are named “schema graphs” inspired by the schema theory proposed by Gestalt psychologists BIBREF15 . The grounded schema graphs are usually much more complicated and noisier, unlike the ideal case shown in the figure.
+
+Therefore, we propose a knowledge-aware graph network module to further effectively model schema graphs. Our model is a combination of graph convolutional networks BIBREF16 and LSTMs, with a hierarchical path-based attention mechanism, which forms a GCN-LSTM-HPA architecture for path-based relational graph representation. Experiments show that our framework achieved a new state-of-the-art performance on the CommonsenseQA dataset. Our model also works better then other methods with limited supervision, and provides human-readable results via intermediate attention scores.
+
+## Overview
+
+In this section, we first formalize the commonsense question answering problem in a knowledge-aware setting, and then introduce the overall workflow of our framework.
+
+## Problem statement
+
+Given a commonsense-required natural language question $q$ and a set of $N$ candidate answers $\lbrace a_i\rbrace $ , the task is to choose one answer from the set. From a knowledge-aware perspective, we additionally assume that the question $q$ and choices $\lbrace a_i\rbrace $ can be grounded as a schema graph (denoted as $g$ ) extracted from a large external knowledge graph $G$ , which is helpful for measuring the plausibility of answer candidates. The knowledge graph $G=(V,E)$ can be defined as a fixed set of concepts $V$ , and typed edges $E$ describing semantic relations between concepts. Therefore, our goal is to effectively ground and model schema graphs to improve the reasoning process.
+
+## Reasoning Workflow
+
+As shown in Fig. 2 , our framework accepts a pair of question and answer (QA-pair) denoted as $q$ and $a$ . It first recognizes the mentioned concepts within them respectively from the concept set $V$ of the knowledge graph. We then algorithmically construct the schema graph $g$ by finding paths between pairs of mentioned concepts (§ "Schema Graph Grounding" ).
+
+The grounded schema graph is further encoded with our proposed knowledge-aware graph network module (§ "Knowledge-Aware Graph Network" ). We first use a model-agnostic language encoder, which can either be trainable or a fixed feature extractor, to represent the QA-pair as a statement vector. The statement vector serves as an additional input to a GCN-LSTM-HPA architecture for path-based attentive graph modeling to obtain a graph vector. The graph vector is finally fed into a simple multi-layer perceptron to score this QA-pair into a scalar ranging from 0 to 1, representing the plausibility of the inference. The answer candidate with the maximum plausibility score to the same question becomes the final choice of our framework.
+
+## Schema Graph Grounding
+
+The grounding stage is three-fold: recognizing concepts mentioned in text (§ "Conclusion" ), constructing schema graphs by retrieving paths in the knowledge graph (§ "Schema Graph Construction" ), and pruning noisy paths (§ "Path Pruning via KG Embedding" ).
+
+## Concept Recognition
+
+We match tokens in questions and answers to sets of mentioned concepts ( $\mathcal {C}_q$ and $\mathcal {C}_a$ respectively) from the knowledge graph $G$ (for this paper we chose to use ConceptNet due to its generality).
+
+A naive approach to mentioned concept recognition is to exactly match n-grams in sentences with the surface tokens of concepts in $V$ . For example, in the question “Sitting too close to watch tv can cause what sort of pain?”, the exact matching result $\mathcal {C}_q$ would be {sitting, close, watch_tv, watch, tv, sort, pain, etc.}. We are aware of the fact that such retrieved mentioned concepts are not always perfect (e.g. “sort” is not a semantically related concept, “close” is a polysemous concept). How to efficiently retrieve contextually-related knowledge from noisy knowledge resources is still an open research question by itself BIBREF17 , BIBREF18 , and thus most prior works choose to stop here BIBREF19 , BIBREF20 . We enhance this straightforward approach with some rules, such as soft matching with lemmatization and filtering of stop words, and further deal with noise by pruning paths (§ "Path Pruning via KG Embedding" ) and reducing their importance with attention mechanisms (§ "Hierarchical Attention Mechanism" ).
+
+## Schema Graph Construction
+
+ConceptNet. Before diving into the construction of schema graphs, we would like to briefly introduce our target knowledge graph ConceptNet. ConceptNet can be seen as a large set of triples of the form $(h, r, t)$ , like (ice, HasProperty, cold), where $h$ and $t$ represent head and tail concepts in the concept set $V$ and $r$ is a certain relation type from the pre-defined set $R$ . We delete and merge the original 42 relation types into 17 types, in order to increase the density of the knowledge graph for grounding and modeling.
+
+Sub-graph Matching via Path Finding. We define a schema graph as a sub-graph $g$ of the whole knowledge graph $G$ , which represents the related knowledge for reasoning a given question-answer pair with minimal additional concepts and edges. One may want to find a minimal spanning sub-graph covering all the question and answer concepts, which is actually the NP-complete “Steiner tree problem” in graphs BIBREF21 . Due to the incompleteness and tremendous size of ConceptNet, we find that it is impractical to retrieve a comprehensive but helpful set of knowledge facts this way. Therefore, we propose a straightforward yet effective graph construction algorithm via path finding among mentioned concepts ( $\mathcal {C}_q \cup \mathcal {C}_a$ ).
+
+Specifically, for each question concept $c_i \in \mathcal {C}_q$ and answer concept $c_j \in \mathcal {C}_a$ , we can efficiently find paths between them that are shorter than $k$ concepts. Then, we add edges, if any, between the concept pairs within $\mathcal {C}_q$ or $\mathcal {C}_a$ .
+
+## Path Pruning via KG Embedding
+
+To prune irrelevant paths from potentially noisy schema graphs, we first utilize knowledge graph embedding (KGE) techniques, like TransE BIBREF22 , to pre-train concept embeddings $\mathbf {V}$ and relation type embeddings $\mathbf {R}$ , which are also used as initialization for (§ "Knowledge-Aware Graph Network" ). In order to measure the quality of a path, we decompose it into a set of triples, the confidence of which can be directly measured by the scoring function of the KGE method (i.e. the confidence of triple classification). Thus, we score a path with the multiplication product of the scores of each triple in the path, and then we empirically set a threshold for pruning (§ "Implementation Details of KagNet" ).
+
+## Knowledge-Aware Graph Network
+
+The core component of our reasoning framework is the knowledge-aware graph network module . The first encodes plain structures of schema graphs with graph convolutional networks (§ "Graph Convolutional Networks" ) to accommodate pre-trained concept embeddings in their particular context within schema graphs. It then utilizes LSTMs to encode the paths between $\mathcal {C}_q$ and $\mathcal {C}_a$ , capturing multi-hop relational information (§ "Relational Path Encoding" ). Finally, we apply a hierarchical path-based attention mechanism (§ "Hierarchical Attention Mechanism" ) to complete the GCN-LSTM-HPA architecture, which models relational schema graphs with respect to the paths between question and answer concepts.
+
+## Graph Convolutional Networks
+
+Graph convolutional networks (GCNs) encode graph-structured data by updating node vectors via pooling features of their adjacent nodes BIBREF16 . Our intuition for applying GCNs to schema graphs is to 1) contextually refine the concept vectors and 2) capture structural patterns of schema graphs for generalization.
+
+Although we have obtained concept vectors by pre-training (§ "Path Pruning via KG Embedding" ), the representations of concepts still need to be further accommodated to their specific schema graphs context. Think of polysemous concepts such as “close” (§ "Conclusion" ), which can either be a verb concept like in “close the door” or an adjective concept meaning “a short distance apart”. Using GCNs to update the concept vector with their neighbors is thus helpful for disambiguation and contextualized concept embedding. Also, the pattern of schema graph structures provides potentially valuable information for reasoning. For instance, shorter and denser connections between question and answer concepts could mean higher plausibility under specific contexts.
+
+As many works show BIBREF23 , BIBREF24 , relational GCNs BIBREF25 usually over-parameterize the model and cannot effectively utilize multi-hop relational information. We thus apply GCNs on the plain version (unlabeled, non-directional) of schema graphs, ignoring relation types on the edges. Specifically, the vector for concept $c_i\in \mathcal {V}_g$ in the schema graph $g$ is initialized by their pre-trained embeddings at first ( $h_i^{(0)} = \mathbf {V}_i$ ). Then, we update them at the $(l+1)$ -th layer by pooling features of their neighboring nodes ( $N_i$ ) and their own at the $l$ -th layer with an non-linear activation function $\sigma $ : $
+h_i^{(l+1)} = \sigma (W_{self}^{(l)}h_i^{(l)}+\sum _{j\in N_i}\frac{1}{|N_i|}W^{(l)}h_j^{(l)})
+$ 
+
+## Relational Path Encoding
+
+In order to capture the relational information in schema graphs, we propose an LSTM-based path encoder on top of the outputs of GCNs. Recall that our graph representation has a special purpose: “to measure the plausibility of a candidate answer to a given question”. Thus, we propose to represent graphs with respect to the paths between question concepts $\mathcal {C}_q$ and answer concepts $\mathcal {C}_a$ .
+
+We denote the $k$ -th path between $i$ -th question concept $c_i^{(q)}\in \mathcal {C}_q$ and $j$ -th answer concept $c_j^{(a)}\in \mathcal {C}_a$ as $P_{i,j}[k]$ , which is a sequence of triples: $
+P_{i,j}[k] = [(c_i^{(q)}, r_0, t_0),...,(t_{n-1}, r_n,c_j^{(a)} )]
+$ 
+
+Note that the relations are represented with trainable relation vectors (initialized with pre-trained relation embeddings), and concept vectors are the GCNs' outputs ( $h^{(l)}$ ). Thus, each triple can be represented by the concatenation of the three corresponding vectors. We employ LSTM networks to encode these paths as sequences of triple vectors, taking the concatenation of the first and the last hidden states: $\vspace{-10.0pt} \mathbf {R}_{i,j}= \frac{1}{|P_{i,j}|}\sum _k \texttt {LSTM}(P_{i,j}[k]) $ 
+
+The above $\mathbf {R}_{i,j}$ can be viewed as the latent relation between the question concept $c_i^{(q)}$ and the answer concept $c_j^{(a)}$ , for which we aggregate the representations of all the paths between them in the schema graph. Now we can finalize the vector representation of a schema graph $\mathbf {g}$ by aggregating all vectors in the matrix $\mathbf {R}$ using mean pooling: $
+\mathbf {T}_{i,j} &= \texttt {MLP}([\mathbf {s}~;~ \mathbf {c_q^{(i)}}~;~ \mathbf {c_a^{(j)}}]) \\
+\mathbf {g}&= \frac{\sum _{i,j} [\mathbf {R}_{i,j}~;~ \mathbf {T}_{i,j}] }{|\mathcal {C}_q|\times |\mathcal {C}_a|}
+$ 
+
+ , where $[\cdot ~;~\cdot ]$ means concatenation of two vectors.
+
+The statement vector $\mathbf {s}$ in the above equation is obtained from a certain language encoder, which can either be a trainable sequence encoder like LSTM or features extracted from pre-trained universal language encoders like Gpt/Bert). To encode a question-answer pair with universal language encoders, we simply create a sentence combining the question and the answer with a special token (“question+ [sep] + answer”), and then use the vector of `[cls]' as suggested by prior works BIBREF6 ..
+
+We concatenate $\mathbf {R}_{i,j}$ $\mathbf {R}_{i,j}$ with an additional vector $\mathbf {T}_{i,j}$ $\mathbf {T}_{i,j}$ before doing average pooling. The $\mathbf {T}_{i,j}$ is inspired from the Relation Network BIBREF26 , which also encodes the latent relational information yet from the context in the statement ${s}$ instead of the schema graph $g$ . Simply put, we want to combine the relational representations of a pair of question/answer concepts from both the schema graph side ( symbolic space symbolic space ) and the language side ( semantic space semantic space ).
+
+Finally, the plausibility score of the answer candidate $a$ to the question $q$ can be computed as $\texttt {score}(q,a) = \texttt {sigmoid}(\texttt {MLP}(\mathbf {g}))$ .
+
+## Hierarchical Attention Mechanism
+
+A natural argument against the above GCN-LSTM-mean architecture is that mean pooling over the path vectors does not always make sense, since some paths are more important than others for reasoning. Also, it is usually not the case that all pairs of question and answer concepts equally contribute to the reasoning. Therefore, we propose a hierarchical path-based attention mechanism to selectively aggregate important path vectors and then more important question-answer concept pairs. This core idea is similar to the work of BIBREF27 (2016), which proposes a document encoder that has two levels of attention mechanisms applied at the word- and sentence-level. In our case, we have path-level and concept-pair-level attention for learning to contextually model graph representations. We learn a parameter matrix $\mathbf {W}_1$ for path-level attention scores, and the importance of the path $P_{i,j}[k]$ is denoted as $\hat{\alpha }_{(i,j,\cdot )}$ . $
+\alpha _{(i,j,k)} &= \mathbf {T}_{i,j} ~\mathbf {W}_{1} ~\texttt {LSTM}(P_{i,j}[k]) ,\\
+\hat{\alpha }_{(i,j,\cdot )} &= \texttt {SoftMax}(\alpha _{(i,j,\cdot )}),\\
+\hat{\mathbf {R}}_{i,j} &= \sum _k \hat{\alpha }_{(i,j,k)} \cdot \texttt {LSTM}(P_{i,j}[k]).
+$ 
+
+ Afterwards, we similarly obtain the attention over concept-pairs. $
+\beta _{(i,j)} &= \mathbf {s_{}}~\mathbf {W}_{2} ~ {\mathbf {T}}_{i,j} \\
+\hat{\beta }_{(\cdot ,\cdot )} &= \texttt {SoftMax}(\beta _{(\cdot ,\cdot )})\\
+\hat{\mathbf {g}} &= \sum _{i,j} \hat{\beta }_{(i,j)} [\hat{\mathbf {R}}_{i,j}~;~ \mathbf {T}_{i,j}]
+$ 
+
+The whole GCN-LSTM-HPA architecture is illustrated in Figure 3 . To sum up, we claim that the is a graph neural network module with the GCN-LSTM-HPA architecture that models relational graphs for relational reasoning under the context of both knowledge symbolic space knowledge symbolic space and language semantic space language semantic space .
+
+## Experiments
+
+We introduce our setups of the CommonsenseQA dataset BIBREF6 , present the baseline methods, and finally analyze experimental results.
+
+## Dataset and Experiment Setup
+
+The CommonsenseQA dataset consists of 12,102 (v1.11) natural language questions in total that require human commonsense reasoning ability to answer, where each question has five candidate answers (hard mode). The authors also release an easy version of the dataset by picking two random terms/phrases for sanity check. CommonsenseQA is directly gathered from real human annotators and covers a broad range of types of commonsense, including spatial, social, causal, physical, temporal, etc. To the best of our knowledge, CommonsenseQA may be the most suitable choice for us to evaluate supervised learning models for question answering.
+
+For the comparisons with the reported results in the CommonsenseQA's paper and leaderboard, we use the official split (9,741/1,221/1,140) named (OFtrain/OFdev/OFtest). Note that the performance on OFtest can only be tested by submitting predictions to the organizers. To efficiently test other baseline methods and ablation studies, we choose to use randomly selected 1,241 examples from the training data as our in-house data, forming an (8,500/1,221/1,241) split denoted as (IHtrain/IHdev/IHtest). All experiments are using the random-split setting as the authors suggested, and three or more random states are tested on development sets to pick the best-performing one.
+
+## Compared Methods
+
+We consider two different kinds of baseline methods as follows:
+
+ $\bullet $ Knowledge-agnostic Methods. These methods either use no external resources or only use unstructured textual corpora as additional information, including gathering textual snippets from search engine or large pre-trained language models like Bert-Large. QABilinear, QACompare, ESIM are three supervised learning models for natural language inference that can be equipped with different word embeddings including GloVe and ELMo. BIDAF++ utilizes Google web snippets as context and is further augmented with a self-attention layer while using ELMo as input features. Gpt/Bert-Large are fine-tuning methods with an additional linear layer for classification as the authors suggested. They both add a special token `[sep]' to the input and use the hidden state of the `[cls]' as the input to the linear layer. More details about them can be found in the dataset paper BIBREF6 .
+
+ $\bullet $ Knowledge-aware Methods. We also adopt some recently proposed methods of incorporating knowledge graphs for question answering. KV-Mem BIBREF28 is a method that incorporates retrieved triples from ConceptNet at the word-level, which uses a key-valued memory module to improve the representation of each token individually by learning an attentive aggregation of related triple vectors. CBPT BIBREF19 is a plug-in method of assembling the predictions of any models with a straightforward method of utilizing pre-trained concept embeddings from ConceptNet. TextGraphCat BIBREF29 concatenates the graph-based and text-based representations of the statement and then feed it into a classifier. We create sentence template for generating sentences and then feed retrieved triples as additional text inputs as a baseline method TripleString. BIBREF30 (2019) propose to collect human explanations for commonsense reasoning from annotators as additional knowledge (CoS-E), and then train a language model based on such human annotations for improving the model performance.
+
+## Implementation Details of KagNet
+
+Our best (tested on OFdev) settings of have two GCN layers (100 dim, 50dim respectively), and one bidirectional LSTMs (128dim) . We pre-train KGE using TransE (100 dimension) initialized with GloVe embeddings. The statement encoder in use is Bert-Large, which works as a pre-trained sentence encoder to obtain fixed features for each pair of question and answer candidate. The paths are pruned with path-score threshold set to 0.15, keeping 67.21% of the original paths. We did not conduct pruning on concept pairs with less than three paths. For very few pairs with none path, $\hat{\mathbf {R}}_{(i,j)}$ will be a randomly sampled vector. We learn our models with Adam optimizers BIBREF31 . In our experiments, we found that the recall of ConceptNet on commonsense questions and answers is very high (over 98% of QA-pairs have more than one grounded concepts).
+
+## Performance Comparisons and Analysis
+
+Comparison with standard baselines.
+
+As shown in Table 2 , we first use the official split to compare our model with the baseline methods reported on the paper and leaderboard. Bert and Gpt-based pre-training methods are much higher than other baseline methods, demonstrating the ability of language models to store commonsense knowledge in an implicit way. This presumption is also investigated by BIBREF32 (2019) and BIBREF33 (2019). Our proposed framework achieves an absolute increment of 2.2% in accuracy on the test data, a state-of-the-art performance.
+
+We conduct the experiments with our in-house splits to investigate whether our can also work well on other universal language encoders (GPT and Bert-Base), particularly with different fractions of the dataset (say 10%, 50%, 100% of the training data). Table 1 shows that our -based methods using fixed pre-trained language encoders outperform fine-tuning themselves in all settings. Furthermore, we find that the improvements in a small data situation (10%) is relatively limited, and we believe an important future research direction is thus few-shot learning for commonsense reasoning.
+
+Comparison with knowledge-aware baselines.
+
+To compare our model with other adopted baseline methods that also incorporate ConceptNet, we set up a bidirectional LSTM networks-based model for our in-house dataset. Then, we add baseline methods and onto the BLSTMs to compare their abilities to utilize external knowledge. Table 3 shows the comparisons under both easy mode and hard mode, and our methods outperform all knowledge-aware baseline methods by a large margin in terms of accuracy. Note that we compare our model and the CoS-E in Table 2 . Although CoS-E also achieves better result than only fine-tuning BERT by training with human-generated explanations, we argue that our proposed KagNet does not utilize any additional human efforts to provide more supervision.
+
+Ablation study on model components.
+
+To better understand the effectiveness of each component of our method, we have done ablation study as shown in Table 4 . We find that replacing our GCN-LSTM-HPA architecture with traditional relational GCNs, which uses separate weight matrices for different relation types, results in worse performance, due to its over-parameterization. The attention mechanisms matters almost equally in two levels, and pruning also effectively filters noisy paths.
+
+Error analysis.
+
+In the failed cases, there are three kinds of hard problems that is still not good at.
+
+negative reasoning: the grounding stage is not sensitive to the negation words, and thus can choose exactly opposite answers.
+
+comparative reasoning strategy: For the questions with more than one highly plausible answers, the commonsense reasoner should benefit from explicitly investigating the difference between different answer candidates, while training method is not capable of doing so.
+
+subjective reasoning: Many answers actually depend on the “personality” of the reasoner. For instance, “Traveling from new place to new place is likely to be what?” The dataset gives the answer as “exhilarating” instead of “exhausting”, which we think is more like a personalized subjective inference instead of common sense.
+
+## Case Study on Interpretibility
+
+Our framework enjoys the merit of being more transparent, and thus provides more interpretable inference process. We can understand our model behaviors by analyzing the hierarchical attention scores on the question-answer concept pairs and path between them.
+
+Figure 4 shows an example how we can analyze our framework through both pair-level and path-level attention scores. We first select the concept-pairs with highest attention scores and then look at the (one or two) top-ranked paths for each selected pair. We find that paths located in this way are highly related to the inference process and also shows that noisy concepts like `fountain' will be diminished while modeling.
+
+## Model Transferability.
+
+We study the transferability of a model that is trained on CommonsenseQA (CSQA) by directly testing it with another task while fixing its parameters. Recall that we have obtained a Bert-Large model and a model trained on CSQA. Now we denoted them as Csqa-Bl and Csqa-Kn to suggest that they are not trainable anymore.
+
+In order to investigate their transferability, we separately test them on SWAG BIBREF3 and WSC BIBREF34 datasets. We first test them the 20k validation examples in SWAG. Csqa-Bl has an accuracy of $56.53\%$ , while our fixed Csqa-Kn model achieves $59.01\%$ . Similarly, we also test both models on the WSC-QA, which is converted from the WSC pronoun resolution to a multi-choice QA task.
+
+The Csqa-BL achieves an accuracy of $51.23\%$ , while our model Csqa-KN scores $53.51\%$ . These two comparisons further support our assumption that , as a knowledge-centric model, is more extensible in commonsense reasoning. As we expect for a good knowledge-aware frameworks to behave, our indeed enjoys better transferablity than only fine-tuning large language encoders like Bert.
+
+## Recent methods on the leaderboard.
+
+We argue that the utilizes the ConceptNet as the only external resource and other methods are improving their performance in orthogonal directions: 1) we find that most of the other recent submissions (as of Aug. 2019) with public information on the leaderboard utilize larger additional textual corpora (e.g. top 10 matched sentences in full Wikipedia via information retrieval tools), and fine-tuning on larger pre-trained encoders, such as XLNet BIBREF35 , RoBERTa BIBREF36 . 2) there are also models using multi-task learning to transfer knowledge from other reading comprehension datasets, such as RACE BIBREF37 and OpenBookQA BIBREF38 .
+
+An interesting fact is that the best performance on the OFtest set is still achieved the original fine-tuned RoBERTa model, which is pre-trained with copora much larger than Bert. All other RoBERTa-extended methods have negative improvements. We also use statement vectors from RoBERTa as the input vectors for , and find that the performance on OFdev marginally improves from $77.47\%$ to $77.56\%$ . Based on our above-mentioned failed cases in error analysis, we believe fine-tuning RoBERTa has achieved the limit due to the annotator biases of the dataset and the lack of comparative reasoning strategies.
+
+## Related Work
+
+Commonsense knowledge and reasoning. There is a recent surge of novel large-scale datasets for testing machine commonsense with various focuses, such as situation prediction (SWAG) BIBREF3 , social behavior understanding BIBREF11 , BIBREF4 , visual scene comprehension BIBREF5 , and general commonsense reasoning BIBREF6 , which encourages the study of supervised learning methods for commonsense reasoning. BIBREF39 (2018) find that large language models show promising results in WSC resolution task BIBREF34 , but this approach can hardly be applied in a more general question answering setting and also not provide explicit knowledge used in inference. A unique merit of our method is that it provides grounded explicit knowledge triples and paths with scores, such that users can better understand and put trust in the behaviors and inferences of the model.
+
+Injecting external knowledge for NLU. Our work also lies in the general context of using external knowledge to encode sentences or answer questions. BIBREF40 (2017) are the among first ones to propose to encode sentences by keeping retrieving related entities from knowledge bases and then merging their embeddings into LSTM networks computations, to achieve a better performance on entity/event extraction tasks. BIBREF17 (2017), BIBREF28 (2018), and BIBREF41 (2018) follow this line of works to incorporate the embeddings of related knowledge triples at the word-level and improve the performance of natural language understanding tasks. In contrast to our work, they do not explicitly impose graph-structured knowledge into models , but limit its potential within transforming word embeddings to concept embeddings.
+
+Some other recent attempts BIBREF19 , BIBREF29 to use ConceptNet graph embeddings are adopted and compared in our experiments (§ "Experiments" ). BIBREF30 (2019) propose to manually collect more human explanations for correct answers as additional supervision for auxiliary training. -based framework focuses on injecting external knowledge as an explicit graph structure, and enjoys the relational reasoning capacity over the graphs.
+
+Relational reasoning. can be seen as a knowledge-augmented Relation Network module (RN) BIBREF26 , which is proposed for the visual question answering task requiring relational reasoning (i.e. questions about the relations between multiple 3D-objects in an image). We view the concepts in the questions and answers as objects and effectively utilize external knowledge graphs to model their relations from both semantic and symbolic spaces (§ "Relational Path Encoding" ), while prior methods mainly work on the semantic one.
+
+## Conclusion
+
+We propose a knowledge-aware framework for learning to answer commonsense questions. The framework first constructs schema graphs to represent relevant commonsense knowledge, and then model the graphs with our module. The module is based on a GCN-LSTM-HPA architecture, which effectively represent graphs for relational reasoning purpose in a transparent, interpretable way, yielding a new state-of-the-art results on a large-scale general dataset for testing machine commonsense. Future directions include better question parsing methods to deal with negation and comparative question answering, as well as incorporating knowledge to visual reasoning.
+
+## Acknowledgments
+
+This work has been supported in part by National Science Foundation SMA 18-29268, DARPA MCS and GAILA, IARPA BETTER, Schmidt Family Foundation, Amazon Faculty Award, Google Research Award, Snapchat Gift and JP Morgan AI Research Award. We would like to thank all the collaborators in the INK research lab for their constructive feedback on the work. 

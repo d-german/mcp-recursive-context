@@ -1,0 +1,149 @@
+# Coarse-grain Fine-grain Coattention Network for Multi-evidence Question Answering
+
+**Paper ID:** 1901.00603
+
+## Abstract
+
+End-to-end neural models have made significant progress in question answering, however recent studies show that these models implicitly assume that the answer and evidence appear close together in a single document. In this work, we propose the Coarse-grain Fine-grain Coattention Network (CFC), a new question answering model that combines information from evidence across multiple documents. The CFC consists of a coarse-grain module that interprets documents with respect to the query then finds a relevant answer, and a fine-grain module which scores each candidate answer by comparing its occurrences across all of the documents with the query. We design these modules using hierarchies of coattention and self-attention, which learn to emphasize different parts of the input. On the Qangaroo WikiHop multi-evidence question answering task, the CFC obtains a new state-of-the-art result of 70.6% on the blind test set, outperforming the previous best by 3% accuracy despite not using pretrained contextual encoders.
+
+## Introduction
+
+A requirement of scalable and practical question answering (QA) systems is the ability to reason over multiple documents and combine their information to answer questions. Although existing datasets enabled the development of effective end-to-end neural question answering systems, they tend to focus on reasoning over localized sections of a single document BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 . For example, BIBREF4 find that 90% of the questions in the Stanford Question Answering Dataset are answerable given 1 sentence in a document. In this work, we instead focus on multi-evidence QA, in which answering the question requires aggregating evidence from multiple documents BIBREF5 , BIBREF6 .
+
+Most of this work was done while Victor Zhong was at Salesforce Research.
+
+Our multi-evidence QA model, the (), selects among a set of candidate answers given a set of support documents and a query. The is inspired by and . In , the model builds a coarse summary of support documents conditioned on the query without knowing what candidates are available, then scores each candidate. In , the model matches specific fine-grain contexts in which the candidate is mentioned with the query in order to gauge the relevance of the candidate. These two strategies of reasoning are respectively modeled by the coarse-grain and fine-grain modules of the . Each module employs a novel hierarchical attention — a hierarchy of coattention and self-attention — to combine information from the support documents conditioned on the query and candidates. Figure 1 illustrates the architecture of the .
+
+The achieves a new result on the blind Qangaroo WikiHop test set of accuracy, beating previous best by accuracy despite not using pretrained contextual encoders. In addition, on the TriviaQA multi-paragraph question answering task BIBREF6 , reranking outputs from a traditional span extraction model BIBREF7 using the improves exact match accuracy by 3.1% and F1 by 3.0%.
+
+Our analysis shows that components in the attention hierarchies of the coarse and fine-grain modules learn to focus on distinct parts of the input. This enables the to more effectively represent a large collection of long documents. Finally, we outline common types of errors produced by , caused by difficulty in aggregating large quantity of references, noise in distant supervision, and difficult relation types.
+
+## None
+
+The coarse-grain module and fine-grain module of the correspond to and strategies. The coarse-grain module summarizes support documents without knowing the candidates: it builds codependent representations of support documents and the query using coattention, then produces a coarse-grain summary using self-attention. In contrast, the fine-grain module retrieves specific contexts in which each candidate occurs: it identifies coreferent mentions of the candidate, then uses coattention to build codependent representations between these mentions and the query. While low-level encodings of the inputs are shared between modules, we show that this division of labour allows the attention hierarchies in each module to focus on different parts of the input. This enables the model to more effectively represent a large number of potentially long support documents.
+
+Suppose we are given a query, a set of $$ support documents, and a set of $$ candidates. Without loss of generality, let us consider the $i$ th document and the $j$ th candidate. Let $\in {\times }$ , $\in {\times }$ , and $\in {\times }$ respectively denote the word embeddings of the query, the $i$ th support document, and the $j$ th candidate answer. Here, $$ , $$0 , and $$1 are the number of words in the corresponding sequence. $$2 is the size of the word embedding. We begin by encoding each sequence using a bidirectional Gated Recurrent Units (GRUs) BIBREF8 . 
+
+$$&=& {\tanh (W_q + b_q) } \in {\times }
+\\
+&=& {} \in {\times }
+\\
+&=& {} \in {\times }$$   (Eq. 2) 
+
+Here, $$ , $$ , and $$ are the encodings of the query, support, and candidate. $W_q$ and $b_q$ are parameters of a query projection layer. $$ is the size of the bidirectional GRU.
+
+## Coarse-grain module
+
+The coarse-grain module of the , shown in Figure 2 , builds codependent representations of support documents $$ and the query $$ using coattention, and then summarizes the coattention context using self-attention to compare it to the candidate $$ . Coattention and similar techniques are crucial to single-document question answering models BIBREF9 , BIBREF10 , BIBREF11 . We start by computing the affinity matrix between the document and the query as 
+
+$$= {\left( \right)} ^\intercal \in {\times }$$   (Eq. 5) 
+
+The support summary vectors and query summary vectors are defined as 
+
+$$&=& \left( \right) \in {\times }
+\\
+&=& \left( ^\intercal \right) \in {\times }$$   (Eq. 6) 
+
+where $(X)$ normalizes $X$ column-wise. We obtain the document context as 
+
+$$&=& { ~\left( \right) } \in {\times }$$   (Eq. 7) 
+
+The coattention context is then the feature-wise concatenation of the document context $$ and the document summary vector $$ . 
+
+$$&=& [; ] \in {\times 2}$$   (Eq. 8) 
+
+For ease of exposition, we abbreviate coattention, which takes as input a document encoding $$ and a query encoding $$ and produces the coattention context $$ , as 
+
+$${}{} \rightarrow $$   (Eq. 9) 
+
+Next, we summarize the coattention context — a codependent encoding of the supporting document and the query — using hierarchical self-attention. First, we use self-attention to create a fixed-length summary vector of the coattention context. We compute a score for each position of the coattention context using a two-layer multi-layer perceptron (MLP). This score is normalized and used to compute a weighted sum over the coattention context. 
+
+$$a_{si} &=& \tanh \left( W_2 \tanh \left( W_1 U_{si} + b_1 \right) + b_2 \right) \in {}
+\\
+\hat{a}_{s} &=& (a_{s})
+\\
+&=& \sum ^{}_i \hat{a}_{si} U_{si} \in {2}$$   (Eq. 10) 
+
+Here, $a_{si}$ and $\hat{a}_{si}$ are respectively the unnormalized and normalized score for the $i$ th position of the coattention context. $W_2$ , $b_2$ , $W_1$ , and $b_1$ are parameters for the MLP scorer. $U_{si}$ is the $i$ th position of the coattention context. We abbreviate self-attention, which takes as input a sequence $$ and produces the summary conditioned on the query $\hat{a}_{si}$0 , as 
+
+$${} \rightarrow $$   (Eq. 11) 
+
+Recall that $$ provides the summary of the $i$ th of $$ support documents. We apply another self-attention layer to compute a fixed-length summary vector of all support documents. This summary is then multiplied with the summary of the candidate answer to produce the coarse-grain score. Let $\in {\times 2}$ represent the sequence of summaries for all support documents. We have 
+
+$$G_c &=& {} \in {}
+\\
+G^\prime &=& {} \in {2}
+
+\\
+&=& \tanh \left( G^\prime + \right) G_c \in {}$$   (Eq. 12) 
+
+where $$ and $G_c$ are respectively the encoding and the self-attention summary of the candidate. $G^\prime $ is the fixed-length summary vector of all support documents. $$ and $$ are parameters of a projection layer that reduces the support documents summary from 2 to ${}$ .
+
+## Candidate-dependent fine-grain module
+
+In contrast to the coarse-grain module, the fine-grain module, shown in Figure 3 , finds the specific context in which the candidate occurs in the supporting documents using coreference resolution . Each mention is then summarized using a self-attention layer to form a mention representation. We then compute the coattention between the mention representations and the query. This coattention context, which is a codependent encoding of the mentions and the query, is again summarized via self-attention to produce a fine-grain summary to score the candidate.
+
+Let us assume that there are $m$ mentions of the candidate in the $i$ th support document. Let the $k$ th mention corresponds to the $$ to $$ tokens in the support document. We represent this mention using self-attention over the span of the support document encoding that corresponds to the mention. 
+
+$$_k = {[:]} \in {}$$   (Eq. 16) 
+
+Suppose that there are $$ mentions of the candidate in total. We extract each mention representation using self-attention to produce a sequence of mention representations $\in {\times }$ . The coattention context and summary of these mentions $$ with respect to the query $$ are 
+
+$$U_m &=& {M}{} \in {\times 2}
+
+\\
+G_m &=& {U_m} \in {2}$$   (Eq. 17) 
+
+We use a linear layer to determine the fine-grain score of the candidate 
+
+$$= G_m + \in {}$$   (Eq. 18) 
+
+## Score aggregation
+
+We take the sum of the coarse-grain score and the fine-grain score, $= + $ , as the score for the candidate. Recall that our earlier presentation is with respect to the $j$ th out of $$ candidates. We combine each candidate score to form the final score vector $Y \in {}$ . The model is trained using cross-entropy loss.
+
+## Experiments
+
+We evaluate the on two tasks to evaluate its effectiveness. The first task is multi-evidence question answering on the unmasked and masked version of the WikiHop dataset BIBREF5 . The second task is the multi-paragraph extractive question answering task TriviaQA, which we frame as a span reranking task BIBREF6 . On the former, the achieves a new result. On the latter, reranking the outputs of a span-extraction model BIBREF7 using the results in significant performance improvement.
+
+## Multi-evidence question answering on WikiHop
+
+ BIBREF5 proposed the Qangaroo WikiHop task to facilitate the study of multi-evidence question answering. This dataset is constructed by linking entities in a document corpus (Wikipedia) with a knowledge base (Wikidata). This produces a bipartite graph of documents and entities, an edge in which marks the occurrence of an entity in a document. A knowledge base fact triplet consequently corresponds to a path from the subject to the object in the resulting graph. The documents along this path compose the support documents for the fact triplet. The Qangaroo WikiHop task, shown in Figure 4 , is as follows: given a query, that is, the subject and relation of a fact triplet, a set of plausible candidate objects, and the corresponding support documents for the candidates, select the correct candidate as the answer.
+
+The unmasked version of WikiHop represents candidate answers with original text while the masked version replaces them with randomly sampled placeholders in order to remove correlation between frequent answers and support documents. Official blind, held-out test evaluation is performed using the unmasked version. We tokenize the data using Stanford CoreNLP BIBREF12 . We use fixed GloVe embeddings BIBREF13 as well as character ngram embeddings BIBREF14 . We split symbolic query relations into words. All models are trained using ADAM BIBREF15 . We list detailed experiment setup and hyperparemeters of the best-performing model in of the Appendix.
+
+We compare the performance of the to other models on the WikiHop leaderboard in Table 1 . The achieves results on both the masked and unmasked versions of WikiHop. In particular, on the blind, held-out WikiHop test set, the achieves a new best accuracy of . The previous result by BIBREF16 uses pretrained contextual encoders, which has led to consistent improvements across NLP tasks BIBREF19 . We outperform this result by despite not using pretrained contextual encoders . In addition, we show that the division of labour between the coarse-grain module and the fine-grain module allows the attention hierarchies of each module to focus on different parts of the input. This enables the to more effectively model the large collection of potentially long documents found in WikiHop.
+
+## Reranking extractive question answering on TriviaQA
+
+To further study the effectiveness of our model, we also experiment on TriviaQA BIBREF6 , another large-scale question answering dataset that requires aggregating evidence from multiple sentences. Similar to BIBREF20 , BIBREF21 , we decompose the original TriviaQA task into two subtasks: proposing plausible candidate answers and reranking candidate answers.
+
+We address the first subtask using BiDAF++, a competitive span extraction question answering model by BIBREF7 and the second subtask using the . To compute the candidate list for reranking, we obtain the top 50 answer candidates from BiDAF++. During training, we use the answer candidate that gives the maximum F1 as the gold label for training the CFC.
+
+Our experimental results in Table 2 show that reranking using the CFC provides consistent performance gains over only using the span extraction question answering model. In particular, reranking using the improves performance regardless of whether the candidate answer set obtained from the span extraction model contains correct answers. On the whole TriviaQA dev set, reranking using the results in a gain of 3.1% EM and 3.0% F1, which suggests that the can be used to further refine the outputs produced by span extraction question answering models.
+
+## Ablation study
+
+Table 3 shows the performance contributions of the coarse-grain module, the fine-grain module, as well as model decisions such as self-attention and bidirectional GRUs. Both the coarse-grain module and the fine-grain module significantly contribute to model performance. Replacing self-attention layers with mean-pooling and the bidirectional GRUs with unidirectional GRUs result in less performance degradation. Replacing the encoder with a projection over word embeddings result in significant performance drop, which suggests that contextual encodings that capture positional information is crucial to this task.
+
+Figure 5 shows the distribution of model prediction errors across various lengths of the dataset for the coarse-grain-only model (-fine) and the fine-grain-only model (-coarse). The fine-grain-only model under-performs the coarse-grain-only model consistently across almost all length measures. This is likely due to the difficulty of coreference resolution of candidates in the support documents — the technique we use of exact lexical matching tends to produce high precision and low recall. However, the fine-grain-only model matches or outperforms the coarse-grain-only model on examples with a large number of support documents or with long support documents. This is likely because the entity-matching coreference resolution we employ captures intra-document and inter-document dependencies more precisely than hierarchical attention.
+
+## Qualitative analysis
+
+We examine the hierarchical attention maps produced by the on examples from the WikiHop development set. We find that coattention layers consistently focus on phrases that are similar between the document and the query, while lower level self-attention layers capture phrases that characterize the entity described by the document. Because these attention maps are very large, we do not include them in the main text and instead refer readers to of the Appendix.
+
+Coarse-grain summary self-attention, described in ( 12 ), tends to focus on support documents that present information relevant to the object in the query. Figure 6 illustrates an example of this in which the self-attention focuses on documents relevant to the literary work “The Troll”, namely those about The Troll, its author Julia Donaldson, and Old Norse.
+
+In contrast, fine-grain coattention over mention representations, described in (), tends to focus on the relation part of the query. Figure 7 illustrates an example of this in which the coattention focuses on the relationship between the mentions and the phrase “located in the administrative territorial entity”. Attention maps of more examples can be found in of the Appendix.
+
+## Error Analysis
+
+We examine errors the produced on the WikiHop development set and categorize them into four types. We list identifiers and examples of these errors in of the Appendix. The first type (% of errors) results from the model aggregating the wrong reference. For example, for the query country_of_citizenship jamie burnett, the model correctly attends to the documents about Jamie Burnett being born in South Larnarkshire and about Lanarkshire being in Scotland. However it wrongly focuses on the word “england” in the latter document instead of the answer “scotland”. We hypothesize that ways to reduce this type of error include using more robust pretrained contextual encoders BIBREF22 , BIBREF19 and coreference resolution. The second type (% of errors) results from questions that are not answerable. For example, the support documents do not provide the narrative location of the play “The Beloved Vagabond” for the query narrative_location the beloved vagabond. The third type (% of errors) results from queries that yield multiple correct answers. An example is the query instance_of qilakitsoq, for which the model predicts “archaeological site”, which is more specific than the answer “town”. The second and third types of errors underscore the difficulty of using distant supervision to create large-scale datasets such as WikiHop. The fourth type (% of errors) results from complex relation types such as parent_taxon which are difficult to interpret using pretrained word embeddings. One method to alleviate this type of errors is to embed relations using tunable symbolic embeddings as well as fixed word embeddings.
+
+## Conclusion
+
+We presented , a new model for multi-evidence question answering inspired by and . On the WikiHop question answering task, the achieves test accuracy, outperforming previous methods by accuracy. We showed in our analysis that the complementary coarse-grain and fine-grain modules of the focus on different aspects of the input, and are an effective means to represent large collections of long documents.
+
+## Acknowledgement
+
+The authors thank Luke Zettlemoyer for his feedback and advice and Sewon Min for her help in preprocessing the TriviaQA dataset.

@@ -1,0 +1,71 @@
+# Impact of Coreference Resolution on Slot Filling
+
+**Paper ID:** 1710.09753
+
+## Abstract
+
+In this paper, we demonstrate the importance of coreference resolution for natural language processing on the example of the TAC Slot Filling shared task. We illustrate the strengths and weaknesses of automatic coreference resolution systems and provide experimental results to show that they improve performance in the slot filling end-to-end setting. Finally, we publish KBPchains, a resource containing automatically extracted coreference chains from the TAC source corpus in order to support other researchers working on this topic.
+
+## Introduction
+
+Coreference resolution systems group noun phrases (mentions) that refer to the same entity into the same chain. Mentions can be full names (e.g., John Miller), pronouns (e.g., he), demonstratives (e.g., this), comparatives (e.g., the first) or descriptions of the entity (e.g. the 40-year-old) BIBREF0 . Although coreference resolution has been a research focus for several years, systems are still far away from being perfect. Nevertheless, there are many tasks in natural language processing (NLP) which would benefit from coreference information, such as information extraction, question answering or summarization BIBREF1 . In BIBREF2 , for example, we showed that coreference information can also be incorporated into word embedding training. In general, coreference resolution systems can be used as a pre-processing step or as a part of a pipeline of different modules.
+
+Slot Filling is an information extraction task which has become popular in the last years BIBREF3 . It is a shared task organized by the Text Analysis Conference (TAC). The task aims at extracting information about persons, organizations or geo-political entities from a large collection of news, web and discussion forum documents. An example is “Steve Jobs” for the slot “X founded Apple”. Thinking of a text passage like “Steve Jobs was an American businessman. In 1976, he co-founded Apple”, it is clear that coreference resolution can play an important role for finding the correct slot filler value.
+
+In this study, we investigate how coreference resolution could help to improve performance on slot filling and which challenges exist. Furthermore, we present how we pre-processed the TAC source corpus with a coreference resolution system in order to be able to run the slot filling system more efficiently. In addition to this paper, we also publish the results of this pre-processing since it required long computation time and much resources.
+
+## Related work
+
+The slot filling task has been organized since 2009. The top ranked systems of the last years achieved F1 scores of 37.28 (2013) BIBREF4 , 36.77 (2014) BIBREF5 and 31.48 (2015). In 2015, the task has been merged with the Cold Start track of the same conference. This led to several changes in the number of relations, the evaluation documents and the outputs expected from the systems BIBREF6 .
+
+Previous studies and error analyses have shown that coreference resolution is an important component to increase the recall of slot filling systems BIBREF7 , BIBREF8 , BIBREF9 . analysis2012 identified coreference failures as the second most frequent error source of slot filling systems (after inference failures). In most cases, nominal anaphors were not resolved correctly. analysisRecall investigated possible causes of recall loss in a slot filling system. They described that coreference resolution provided higher recall but might be inefficient since it requires a lot of time and resources. Moreover, they argued that the overall results of a slot filling system might be better without coreference resolution since it can have a negative impact on precision. In contrast, our experiments in this study show that the increased number of true positives when using coreference resolution has a much higher impact on the final results. For coping with the problem of time-consuming coreference resolution, we prepared and publish KBPchains, a coreference resource for slot filling.
+
+## Slot filling task
+
+The main idea of slot filling is to extend a knowledge base by extracting pre-defined relations between (named) entities from text data. Systems are provided with a large collection of text documents and a query file including entities and the relations to find in the text. As output, they have to provide the second argument for each relation. For entity “Apple” and relation “org:founded_by”, for example, the systems need to extract “Steve Jobs”, “Steve Wozniak” and “Ronald Wayne” along with text passages for justification.
+
+This task combines several NLP challenges like information retrieval, information extraction, relation classification and knowledge inference. Until 2014, the slot filling shared task included 41 relations (25 for persons and 16 for organizations) BIBREF3 . Since 2015, these relations have been extended to all possible inverse relations which introduced a new query entity type (geo-political entity) and augmented the set of relations to 64 (27 for persons, 20 for organizations and 17 for geo-political entities) BIBREF6 . Table 1 provides exemplary relations for the different entity types.
+
+The input for a slot filling system is an xml query containing the name and type of the entity, an exemplary occurence of the entity in the document collection and the slot to be filled. The expected output of the system contains, i.a., a provenance for the slot filler in the document collection, the slot filler itself, the type of the filler ( $\in {PER, ORG, GPE, STRING}$ ), its offsets in the document collection, as well as a confidence value of the system.
+
+The document collection from which the slot fillers should be extracted is quite large: until 2014, it consisted of about 2.1 million documents, in 2015 the number was reduced to about 50,000 documents. The documents comprise newswire, web and discussion forum texts. Therefore, the slot filling task is more than relation extraction for pre-defined relations: It also includes challenges like information retrieval and coping with different genres.
+
+Most slot filling systems are a pipeline of different components, such as query expansion, information retrieval, candidate extraction, candidate classification and postprocessing. Figure 1 depicts a typical system. We performed a detailed analysis of the errors of these components and found that one of the most important sources of error is failure of coreference resolution in the candidate extraction step.
+
+## Coreference resolution for slot filling
+
+In our study, we have identified two main reasons why coreference resolution can improve slot filling performance. The first reason is that both arguments of a relation can be pronouns referring to the entity or filler in question. Consider the relation “per:parents” and the sentence “Bill is the father of Jane.” Both entities “Bill” and “Jane” might have been mentioned in sentences before and could now be replaced by pronouns: “He is the father of Jane”, “Bill is her father” or “He is her father”. If a slot filling system only extracts sentences with appearances of the full name of a person, it might miss many relevant sentences which can reduce the recall of the whole system drastically. As analysisRecall pointed out, the recall losses cannot be recovered by subsequent pipeline modules.
+
+The second reason is that coreference resolution can provide slot fillers “for free”: If a phrase like “The Hawaii-born” is coreferent to the entity in question, it not only provides an additional sentence with information about the entity but also directly the location of birth (without the need of classification). Similar phrases can provide the age, a title or the religion of a person or the location of headquarters of an organization.
+
+## Coreference resource
+
+As motivated above, coreference information is a very important resource for participants of the slot filling task or related knowledge base population tasks on the same documents. Since we found that the coreference resolution component is one of the bottlenecks which considerably slows down our slot filling pipeline, we have pre-processed the TAC source corpus by tagging its documents using Stanford CoreNLP BIBREF10 . We call this resource of coreference chains KBPchains and share it (in the form of document-offset spans) on our website. Although CoreNLP is publicly available, KBPchains will save researchers much time and resources (cf., analysisRecall who mentioned the need for efficient coreference resolution when processing the large slot filling corpora). Table 2 lists statistics about the extracted coreference chains and their mentions. In addition to the minimum, maximum, average and median numbers of chains per document, mentions per chain and words per mention, we also report the number of mentions which are pronouns, the number of singletons (chains consisting of only one mention) and the number of chains with only identical mentions.
+
+## Analysis of coreference resolution errors
+
+Coreference resolution systems produce acceptable results but are still far away from being perfect. In an analysis of the results of Stanford CoreNLP on the TAC source corpus in the context of our slot filling system, we found the following flaws being most prominent: Wrongly linked pronoun chains, unlinked pronoun chains and no recognition of coreferent phrases like “the 42-year-old”, “the author” or “the California-based company”. In the following, we describe the effect of these failures on the slot filling system.
+
+Wronly linked pronoun chains. If a pronoun chain is wrongly linked to the entity in question, all sentences with pronouns of this chain will be extracted as sentences containing information about the entity. This increases the number of falsely extracted sentences and as a result also the number of possible filler candidates. All those false positive filler candidates will be passed to the candidate evaluation module and can easily lead to a lower precision in the final output. (Either because the candidate evaluation makes a wrong decision, too or because – in the worst case – the relation in question holds between the pronoun and the filler candidate but not between the entity in question and the filler candidate.)
+
+Unlinked pronoun chains. If a coreference chain consists of only pronouns without any entity mention, the slot filling system cannot decide to which entity it belongs to and will omit it. If the pronouns of the chain are coreferent to the entity in question, the chance that the slot filling system misses information which are relevant to the slot in question is quite high. As a result, the recall of the end-to-end system will be reduced. A solution to this problem could be a post-processing of these unlinked pronoun chains, a challenge we will investigate in the future.
+
+No recognition of nominal anaphors. Phrases like “the 42-year-old” or “the California-based company” may occur directly after a sentence with the entity in question but are often not recognized as being coreferent to it. However, if they refer to this entity, they first contain possibly relevant information (like the age of a person). Second, the sentence in which they appear could mention additional information about the entity. Omitting these sentences and these phrases can therefore reduce the recall of the slot filling system. In our system, we cope with these cases by explicitely looking for such phrases in the sentence following a mention of the entity in question.
+
+Additional findings. We perform a manual analysis of the extracted coreference chains in ten randomly chosen documents with the following results.
+
+## Experiments with end-to-end system
+
+In order to investigate the impact of coreference resolution on slot filling empirically, we perform end-to-end experiments on the TAC evaluation data from 2015. Our system with coreference resolution was one of the top-performing systems in the official evaluations 2015 BIBREF11 . It follows the pipeline shown in Figure 1 . For a more detailed descriptions of its component, see BIBREF11 . Table 3 shows its results with (+) and without (-) coreference resolution in the candidate extraction component.
+
+The number of true positives is reduced considerably (from 361 to 321) when the system does not use coreference information. The number of false positives is also lower, but the final results show that the impact of the number of true positives is larger since it affects both precision and recall: The F1 score drops by more than 6 points when omitting coreference resolution.
+
+To conclude, in order to provide the classification and postprocessing modules with a recall as high as possible, coreference resolution is a crucial part of the system. Despite of the errors identified in Section "Analysis of coreference resolution errors" , an automatic coreference system still performs well enough to improve the performance on slot filling.
+
+## Conclusion
+
+In this work, we analyzed the impact of coreference resolution on the NLP task slot filling. We showed that coreference information improves the slot filling system performance and outlined the most important challenges we have discovered in an analysis of coreference resolution errors. Since the TAC source corpus is very large, we will publish KBPchains, a resource containing the coreference chains which we have extracted automatically.
+
+## Acknowledgments
+
+Heike Adel is a recipient of the Google European Doctoral Fellowship in Natural Language Processing and this research is supported by this fellowship. This work was also supported by DFG (grant SCHU 2246/4-2).

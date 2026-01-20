@@ -1,0 +1,103 @@
+# A Better Variant of Self-Critical Sequence Training
+
+**Paper ID:** 2003.09971
+
+## Abstract
+
+In this work, we present a simple yet better variant of Self-Critical Sequence Training. We make a simple change in the choice of baseline function in REINFORCE algorithm. The new baseline can bring better performance with no extra cost, compared to the greedy decoding baseline.
+
+## Introduction
+
+Self-Critical Sequence Training(SCST), upon its release, has been a popular way to train sequence generation models. While originally proposed for image captioning task, SCST not only has become the new standard for training captioning models BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5, BIBREF6, BIBREF7, BIBREF8, BIBREF9, but also has been applied to many other tasks, like video captioningBIBREF10, BIBREF11, BIBREF12, reading comprehensionBIBREF13, summarizationBIBREF14, BIBREF15, BIBREF16, BIBREF17, image paragraph generationBIBREF18, speech recognitionBIBREF19.
+
+SCST is used to optimize generated sequences over a non-differentiable objective, usually the evaluation metrics, for example, CIDEr for captioning, ROUGE for summarization. To optimize such objective, SCST adopts REINFORCE with baseline BIBREF20, where a “Self-Critical” baseline is used; specifically, the score of the greedy decoding output is used as the baseline. This is proved to be better than learned baseline function which is more commonly used in Reinforcement Learning literature.
+
+In this work, we present a different baseline choice which was first proposed in BIBREF21, to the best of our knowledge. With more elaboration in Sec. SECREF3, this baseline can be described as a variant of “Self-Critical”. This method is simple, but also faster and more effective compared to the greedy decoding baseline used in SCST.
+
+## Recap for SCST
+
+MIXER BIBREF22 is the first to use REINFORCE algorithm for sequence generation training. They use a learned function approximator to get the baseline.
+
+SCST inherits the REINFORCE algorithm from MIXER, but discards the learned baseline function. Instead, SCST uses the reward of the greedy decoding result as the baseline, achieving better captioning performance and lower gradient variance.
+
+## Recap for SCST ::: Math formulation
+
+The goal of SCST, for example in captioning, is to maximize the expected CIDEr score of generated captions.
+
+where ${\hat{c}}$ is a sampled caption; $I$ is the image; $p_{\theta }(c|I)$ is the captioning model parameterized by $\theta $, and $R(\cdot )$ is the CIDEr score.
+
+Since this objective is not non-differentiable with respect to $\theta $, back propagation is not feasible. To optimize it, a policy gradient method, specifically REINFORCE with baseline BIBREF20 is used.
+
+The policy gradient method allows estimating the gradient from individual samples (the right-hand side) and applying gradient ascent. To reduce the variance of the estimation, a baseline $b$ is needed, and $b$ has to be independent of $\hat{c}$.
+
+In SCST, the baseline is set to be the CIDEr score of the greedy decoding caption, denoted as $c^*$. Thus, we have
+
+## The Better SCST
+
+The success of SCST comes from better gradient variance reduction introduced by the greedy decoding baseline. In our variant, we use the baseline proposed in BIBREF21 to achieve even better variance reduction.
+
+Following BIBREF21, we sample $K$ captions for each image when applying REINFORCE: ${\hat{c}}_1 \ldots {\hat{c}}_K$, ${\hat{c}}_k \sim p_{\theta }(c|I)$,
+
+The baseline for each sampled caption is defined as the average reward of the rest samples. That is, for caption $\hat{c}_k$, its baseline is
+
+Since each sample is independently drawn, $b_k$ is a valid baseline. The final gradient estimation is
+
+Note that, $b_k$ is an estimation of expected reward, which is similar to the learning objective of value functions in other Reinforcement Learning algorithms. The expected reward is usually a good baseline choice in that it can effectively reduce gradient variance. In Sec. SECREF4, we show that our gradient variance is lower than SCST empirically.
+
+It is still a “Self-Critical” baseline because the critic is still from itself: its other sampling results, instead of the greedy decoding result.
+
+## Experiments
+
+For all models, we first pretrain them using standard cross-entropy loss and then switch to Self-Critical training.
+
+For a fair comparison, during Self-Critical stage, we always sample 5 captions for each image, same for both SCST and our variant.
+
+All the experiments are done on COCO captioning dataset BIBREF23. The scores are obtained on Karparthy test split BIBREF24 with beam search of beam size 5 if not explicitly noted.
+
+## Experiments ::: Speed
+
+Since no extra greedy decoding is needed, our method is slightly faster than SCST.
+
+## Experiments ::: Performance on different model architectures
+
+We experiment with four different architectures. FC and Att2in are from SCSTBIBREF25. UpDown is from BIBREF26. Transformer is adapted from BIBREF27 for captioning task.
+
+Table TABREF6 shows that our variant is better than SCST on all architectures, especially on Transformer.
+
+## Experiments ::: Different training hyperparameters
+
+Here we adopt a different training setting (`Long') for UpDown model. The `Long' setting (from https://github.com/yangxuntu/SGAE) uses a larger batch size and a longer training time. Table TABREF8 shows that there is always a gap between our method and SCST which cannot be closed by longer training or a larger batch size.
+
+## Experiments ::: Multiple runs
+
+Table TABREF10 shows that our variant is consistently better than SCST with different random seeds. All the models use `Long' setting with UpDown model.
+
+Specifically, we pretrain 5 models using cross-entropy loss, and then apply SCST and our method respectively. The same $RS*$ means they share the same pretrained model.
+
+## Experiments ::: Training curves
+
+Figure FIGREF12 shows the model performance on the validation set during training, after entering Self-Critical stage. The scores are averaged over the 5 UpDown(Long) models above.
+
+## Experiments ::: Is greedy decoding necessary for SCST
+
+We also experiment with a variant of SCST, by replacing the greedy decoding output with a sampled output. (This is similar to our method with $K=2$.)
+
+Table TABREF14 shows that one sample baseline is worse than greedy decoding. This is as expected, because using one sample to estimate the expected reward is too noisy, resulting in larger gradient variance, while the reward of greedy decoding output may be biased but more stable. It also shows that it is important to use sufficiently large $K$ to have a better estimation of expected reward.
+
+## Experiments ::: Variance reduction
+
+As stated in Sec. SECREF3, the motivation of using the average reward baseline is for better variance reduction. Here we show it indeed is better in practice.
+
+The gradient variance is calculated as follows. At the end of each epoch, we take the saved model and run through the training set. We get the gradients from each training batch and calculate the variance for each parameter gradient across batches. To get a single value, we take the average of all the parameters. A mathematic expression of this process is:
+
+where $i$ is the index of each parameter; $b$ is the index of each batch; $\theta $ is the network parameters; $\text{grad}_{\theta _i}^b$ is the gradient of $\theta _i$ at batch $b$.
+
+As shown in Fig. FIGREF16, our method is always getting lower variance than SCST.
+
+## Code release
+
+Code has been released at https://github.com/ruotianluo/self-critical.pytorch. More instructions of using this method are at https://github.com/ruotianluo/self-critical.pytorch/tree/master/projects/NewSelfCritical
+
+## Conclusion
+
+We propose a variant of popular SCST, which can work as a drop-in replacement for SCST. This variant reduces the gradient variance when applying REINFORCE by modifying the baseline function. We show that this method is effective on Image Captioning task, and we believe it should benefit other tasks as well.

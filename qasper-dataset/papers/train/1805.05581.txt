@@ -1,0 +1,119 @@
+# Unsupervised Learning of Style-sensitive Word Vectors
+
+**Paper ID:** 1805.05581
+
+## Abstract
+
+This paper presents the first study aimed at capturing stylistic similarity between words in an unsupervised manner. We propose extending the continuous bag of words (CBOW) model (Mikolov et al., 2013) to learn style-sensitive word vectors using a wider context window under the assumption that the style of all the words in an utterance is consistent. In addition, we introduce a novel task to predict lexical stylistic similarity and to create a benchmark dataset for this task. Our experiment with this dataset supports our assumption and demonstrates that the proposed extensions contribute to the acquisition of style-sensitive word embeddings.
+
+## Introduction
+
+Analyzing and generating natural language texts requires the capturing of two important aspects of language: what is said and how it is said. In the literature, much more attention has been paid to studies on what is said. However, recently, capturing how it is said, such as stylistic variations, has also proven to be useful for natural language processing tasks such as classification, analysis, and generation BIBREF1 , BIBREF2 , BIBREF3 .
+
+This paper studies the stylistic variations of words in the context of the representation learning of words. The lack of subjective or objective definitions is a major difficulty in studying style BIBREF4 . Previous attempts have been made to define a selected aspect of the notion of style (e.g., politeness) BIBREF5 , BIBREF6 , BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 ; however, it is not straightforward to create strict guidelines for identifying the stylistic profile of a given text. The systematic evaluations of style-sensitive word representations and the learning of style-sensitive word representations in a supervised manner are hampered by this. In addition, there is another trend of research forward controlling style-sensitive utterance generation without defining the style dimensions BIBREF11 , BIBREF12 ; however, this line of research considers style to be something associated with a given specific character, i.e., a persona, and does not aim to capture the stylistic variation space.
+
+The contributions of this paper are three-fold. (1) We propose a novel architecture that acquires style-sensitive word vectors (Figure 1 ) in an unsupervised manner. (2) We construct a novel dataset for style, which consists of pairs of style-sensitive words with each pair scored according to its stylistic similarity. (3) We demonstrate that our word vectors capture the stylistic similarity between two words successfully. In addition, our training script and dataset are available on https://jqk09a.github.io/style-sensitive-word-vectors/.
+
+## Style-sensitive Word Vector
+
+The key idea is to extend the continuous bag of words (CBOW) BIBREF0 by distinguishing nearby contexts and wider contexts under the assumption that a style persists throughout every single utterance in a dialog. We elaborate on it in this section.
+
+## Notation
+
+Let $w_{t}$ denote the target word (token) in the corpora and $\mathcal {U}_t = \lbrace w_1, \dots , w_{t-1}, w_t, w_{t+1},\dots , w_{\vert \mathcal {U}_t \vert }\rbrace $ denote the utterance (word sequence) including $w_t$ . Here, $w_{t+d}$ or $w_{t-d} \in \mathcal {U}_t$ is a context word of $w_t$ (e.g., $w_{t+1}$ is the context word next to $w_{t}$ ), where $d\in \mathbb {N}_{>0}$ is the distance between the context words and the target word $w_t$ .
+
+For each word (token) $w$ , bold face $\mbox{$v$}_{w}$ and $\tilde{\mbox{$v$}}_{w}$ denote the vector of $w$ and the vector predicting the word $w$ . Let $\mathcal {V}$ denote the vocabulary.
+
+## Baseline Model (CBOW-near-ctx)
+
+First, we give an overview of CBOW, which is our baseline model. CBOW predicts the target word $w_t$ given nearby context words in a window with width $\delta $ : 
+
+$$ := \left\lbrace  w_{t\pm d} \in \mathcal {U}_t \mid 1\le d \le \delta \right\rbrace $$   (Eq. 4) 
+
+ The set $$ contains in total at most $2\delta $ words, including $\delta $ words to the left and $\delta $ words to the right of a target word. Specifically, we train the word vectors $\tilde{\mbox{$v$}}_{w_t}$ and $\mbox{$v$}_c$ ( $c\in $ ) by maximizing the following prediction probability: 
+
+$$P(w_t|) \propto \exp \biggl (\!\tilde{\mbox{$v$}}_{w_t} \cdot \frac{1}{\vert  \vert }\!\!\!\! [r]{\sum _{\;\;c\in }} \mbox{$v$}_c\!\biggr )
+\text{.}$$   (Eq. 5) 
+
+ The CBOW captures both semantic and syntactic word similarity through the training using nearby context words. We refer to this form of CBOW as CBOW-near-ctx. Note that, in the implementation of BIBREF13 , the window width $\delta $ is sampled from a uniform distribution; however, in this work, we fixed $\delta $ for simplicity. Hereafter, throughout our experiments, we turn off the random resizing of $\delta $ .
+
+## Learning Style with Utterance-size Context Window (CBOW-all-ctx)
+
+CBOW is designed to learn the semantic and syntactic aspects of words from their nearby context BIBREF13 . However, an interesting problem is determining the location where the stylistic aspects of words can be captured. To address this problem, we start with the assumption that a style persists throughout each single utterance in a dialog, that is, the stylistic profile of a word in an utterance must be consistent with other words in the same utterance. Based on this assumption, we propose extending CBOW to use all the words in an utterance as context, 
+
+$$ := \lbrace w_{t\pm d} \in \mathcal {U}_t \mid 1\le d\rbrace 
+\text{,}$$   (Eq. 7) 
+
+ instead of only the nearby words. Namely, we expand the context window from a fixed width to the entire utterance. This training strategy is expected to lead to learned word vectors that are more sensitive to style rather than to other aspects. We refer to this version as CBOW-all-ctx.
+
+## Learning the Style and Syntactic/Semantic Separately
+
+To learn the stylistic aspect more exclusively, we further extended the learning strategy.
+
+First, remember that using nearby context is effective for learning word vectors that capture semantic and syntactic similarities. However, this means that using the nearby context can lead the word vectors to capture some aspects other than style. Therefore, as the first extension, we propose excluding the nearby context $$ from all the context $$ . In other words, we use the distant context words only: 
+
+$$\! := \setminus 
+= \left\lbrace  w_{t\pm d} \in \mathcal {U}_t \mid \delta < d \right\rbrace \!\text{.}\!$$   (Eq. 9) 
+
+ We expect that training with this type of context will lead to word vectors containing the style-sensitive information only. We refer to this method as CBOW-dist-ctx.
+
+As the second extension to distill off aspects other than style, we use both nearby and all contexts ( $$ and $$ ). As Figure 2 shows, both the vector $\mbox{$v$}_{w}$ and $\tilde{\mbox{$v$}}_w$ of each word $w\in \mathcal {V}$ are divided into two vectors: 
+
+$$\mbox{$v$}_w = \mbox{$x$}_w \oplus \mbox{$y$}_w,\;\;
+\tilde{\mbox{$v$}}_w = \tilde{\mbox{$x$}}_w \oplus \tilde{\mbox{$y$}}_w
+\text{,}$$   (Eq. 10) 
+
+ where $\oplus $ denotes vector concatenation. Vectors $\mbox{$x$}_{w}$ and $\tilde{\mbox{$x$}}_w$ indicate the style-sensitive part of $\mbox{$v$}_w$ and $\tilde{\mbox{$v$}}_w$ respectively. Vectors $\mbox{$y$}_w$ and $\tilde{\mbox{$y$}}_w$ indicate the syntactic/semantic-sensitive part of $\mbox{$v$}_w$ and $\tilde{\mbox{$v$}}_w$ respectively. For training, when the context words are near the target word ( $$ ), we update both the style-sensitive vectors ( $\mbox{$x$}_{w}$0 , $\mbox{$x$}_{w}$1 ) and the syntactic/semantic-sensitive vectors ( $\mbox{$x$}_{w}$2 , $\mbox{$x$}_{w}$3 ), i.e., $\mbox{$x$}_{w}$4 , $\mbox{$x$}_{w}$5 . Conversely, when the context words are far from the target word ( $\mbox{$x$}_{w}$6 ), we only update the style-sensitive vectors ( $\mbox{$x$}_{w}$7 , $\mbox{$x$}_{w}$8 ). Formally, the prediction probability is calculated as follows: 
+
+$$P_1^{}(w_{t}|) &\propto \exp \biggl (\!\tilde{\mbox{$v$}}_{w_t} \cdot \frac{1}{\vert  \vert }\!\!\!\! [r]{\sum _{\;\;c\in }} \mbox{$v$}_c\!\biggr )
+\text{,}
+\\
+P_2^{}(w_{t}|) &\propto \exp \biggl (\!\tilde{\mbox{$x$}}_{w_t} \cdot \frac{1}{\vert  \vert }\!\!\!\! [r]{\sum _{\;\;c\in }} \mbox{$x$}_c\!\biggr )
+\text{.}$$   (Eq. 11) 
+
+ At the time of learning, two prediction probabilities (loss functions) are alternately computed, and the word vectors are updated. We refer to this method using the two-fold contexts separately as the CBOW-sep-ctx.
+
+## Experiments
+
+We investigated which word vectors capture the stylistic, syntactic, and semantic similarities.
+
+## Settings
+
+We collected Japanese fictional stories from the Web to construct the dataset. The dataset contains approximately 30M utterances of fictional characters. We separated the data into a 99%–1% split for training and testing. In Japanese, the function words at the end of the sentence often exhibit style (e.g., desu+wa, desu+ze;) therefore, we used an existing lexicon of multi-word functional expressions BIBREF14 . Overall, the vocabulary size $\vert \mathcal {V} \vert $ was 100K.
+
+We chose the dimensions of both the style-sensitive and the syntactic/semantic-sensitive vectors to be 300, and the dimensions of the baseline CBOWs were 300. The learning rate was adjusted individually for each part in $\lbrace \mbox{$x$}_w, \mbox{$y$}_w, \tilde{\mbox{$x$}}_w, \tilde{\mbox{$y$}}_w\rbrace $ such that “the product of the learning rate and the expectation of the number of updates” was a fixed constant. We ran the optimizer with its default settings from the implementation of BIBREF0 . The training stopped after 10 epochs. We fixed the nearby window width to $\delta =5$ .
+
+## Stylistic Similarity Evaluation
+
+To verify that our models capture the stylistic similarity, we evaluated our style-sensitive vector $\mbox{$x$}_{w_t}$ by comparing to other word vectors on a novel artificial task matching human stylistic similarity judgments. For this evaluation, we constructed a novel dataset with human judgments on the stylistic similarity between word pairs by performing the following two steps. First, we collected only style-sensitive words from the test corpus because some words are strongly associated with stylistic aspects BIBREF15 , BIBREF16 and, therefore, annotating random words for stylistic similarity is inefficient. We asked crowdsourced workers to select style-sensitive words in utterances. Specifically, for the crowdsourced task of picking “style-sensitive” words, we provided workers with a word-segmented utterance and asked them to pick words that they expected to be altered within different situational contexts (e.g., characters, moods, purposes, and the background cultures of the speaker and listener.). Then, we randomly sampled $1,000$ word pairs from the selected words and asked 15 workers to rate each of the pairs on five scales (from $-2$ : “The style of the pair is different” to $+2$ : “The style of the pair is similar”), inspired by the syntactic/semantic similarity dataset BIBREF17 , BIBREF18 . Finally, we picked only word pairs featuring clear worker agreement in which more than 10 annotators rated the pair with the same sign, which consisted of random pairs of highly agreeing style-sensitive words. Consequently, we obtained 399 word pairs with similarity scores. To our knowledge, this is the first study that created an evaluation dataset to measure the lexical stylistic similarity.
+
+In the task of selecting style-sensitive words, the pairwise inter-annotator agreement was moderate (Cohen's kappa $\kappa $ is $0.51$ ). In the rating task, the pairwise inter-annotator agreement for two classes ( $\lbrace -2, -1\rbrace $ or $\lbrace +1, +2\rbrace $ ) was fair (Cohen's kappa $\kappa $ is $0.23$ ). These statistics suggest that, at least in Japanese, native speakers share a sense of style-sensitivity of words and stylistic similarity between style-sensitive words.
+
+We used this evaluation dataset to compute the Spearman rank correlation ( $\rho _{style}$ ) between the cosine similarity scores between the learned word vectors $\cos (\mbox{$v$}_{w}, \mbox{$v$}_{w^{\prime }})$ and the human judgements. Table 1 shows the results on its left side. First, our proposed model, CBOW-all-ctx outperformed the baseline CBOW-near-ctx. Furthermore, the $\mbox{$x$}$ of CBOW-dist-ctx and CBOW-sep-ctx demonstrated better correlations for stylistic similarity judgments ( $\rho _{style}=56.1$ and $51.3$ , respectively). Even though the $\mbox{$x$}$ of CBOW-sep-ctx was trained with the same context window as CBOW-all-ctx, the style-sensitivity was boosted by introducing joint training with the near context. CBOW-dist-ctx, which uses only the distant context, slightly outperforms CBOW-sep-ctx. These results indicate the effectiveness of training using a wider context window.
+
+## Syntactic and Semantic Evaluation
+
+We further investigated the properties of each model using the following criterion: (1) the model's ability to capture the syntactic aspect was assessed through a task predicting part of speech (POS) and (2) the model's ability to capture the semantic aspect was assessed through a task calculating the correlation with human judgments for semantic similarity.
+
+First, we tested the ability to capture syntactic similarity of each model by checking whether the POS of each word was the same as the POS of a neighboring word in the vector space. Specifically, we calculated SyntaxAcc@ $N$ defined as follows: 
+
+$$\frac{1}{\vert \mathcal {V} \vert  N}\sum _{w\in \mathcal {V}}\sum _{\,w^{\prime }\in \mathcal {N}(w)} \hspace{-4.0pt}\mathbb {I}[\mathrm {POS}(w) \!=\! \mathrm {POS}(w^{\prime })]
+\text{,}\!$$   (Eq. 24) 
+
+ where $\mathbb {I}[\text{condition}] = 1$ if the condition is true and $\mathbb {I}[\text{conditon}] = 0$ otherwise, the function $\mathrm {POS}(w)$ returns the actual POS tag of the word $w$ , and $\mathcal {N}(w)$ denotes the set of the $N$ top similar words $\lbrace w^{\prime }\rbrace $ to $w$ w.r.t. $\cos (\mbox{$v$}_w,\mbox{$v$}_{w^{\prime }})$ in each vector space.
+
+Table 1 shows SyntaxAcc@ $N$ with $N = 5$ and 10. For both $N$ , the $\mbox{$y$}$ (the syntactic/semantic part) of CBOW-near-ctx, CBOW-all-ctx and CBOW-sep-ctx achieved similarly good. Interestingly, even though the $\mbox{$x$}$ of CBOW-sep-ctx used the same context as that of CBOW-all-ctx, the syntactic sensitivity of $\mbox{$x$}$ was suppressed. We speculate that the syntactic sensitivity was distilled off by the other part of the CBOW-sep-ctx vector, i.e., $\mbox{$y$}$ learned using only the near context, which captured more syntactic information. In the next section, we analyze CBOW-sep-ctx for the different characteristics of $\mbox{$x$}$ and $\mbox{$y$}$ .
+
+To test the model's ability to capture the semantic similarity, we also measured correlations with the Japanese Word Similarity Dataset (JWSD) BIBREF19 , which consists of $4,\!000$ Japanese word pairs annotated with semantic similarity scores by human workers. For each model, we calculate and show the Spearman rank correlation score ( $\rho _{sem}$ ) between the cosine similarity score $\cos (\mbox{$v$}_w, \mbox{$v$}_{w^{\prime }})$ and the human judgements on JWSD in Table 1 . CBOW-dist-ctx has the lowest score ( $\rho _{sem}\!=\!15.9$ ); however, surprisingly, the stylistic vector $\mbox{$x$}_{w_t}$ has the highest score ( $\rho _{sem}\!=\!28.9$ ), while both vectors have a high $\rho _{style}$ . This result indicates that the proposed stylistic vector $\mbox{$x$}_{w_t}$ captures not only the stylistic similarity but also the captures semantic similarity, contrary to our expectations (ideally, we want the stylistic vector to capture only the stylistic similarity). We speculate that this is because not only the style but also the topic is often consistent in single utterances. For example, “UTF8ipxmサンタ (Santa Clause)” and “UTF8ipxmトナカイ (reindeer)” are topically relevant words and these words tend to appear in a single utterance. Therefore, stylistic vectors $\lbrace \mbox{$x$}_{w}\rbrace $ using all the context words in an utterance also capture the topic relatedness. In addition, JWSD contains topic-related word pairs and synonym pairs; therefore the word vectors that capture the topic similarity have higher $\rho _{sem}$0 . We will discuss this point in the next section.
+
+## Analysis of Trained Word Vectors
+
+Finally, to further understand what types of features our CBOW-sep-ctx model acquired, we show some words with the four most similar words in Table 2 . Here, for English readers, we also report a result for English. The English result also shows an example of the performance of our model on another language. The left side of Table 2 (for stylistic vector $\mbox{$x$}$ ) shows the results. We found that the Japanese word “UTF8ipxm拙者 (I; classical)” is similar to “UTF8ipxmござる (be; classical)” or words containing it (the second row of Table 2 ). The result looks reasonable, because words such as “UTF8ipxm拙者 (I; classical)” and “UTF8ipxmござる (be; classical)” are typically used by Japanese Samurai or Ninja. We can see that the vectors captured the similarity of these words, which are stylistically consistent across syntactic and semantic varieties. Conversely, the right side of the table (for the syntactic/semantic vector $\mbox{$y$}$ ) shows that the word “UTF8ipxm拙者 (I; classical)” is similar to the personal pronoun (e.g., “UTF8ipxm僕 (I; male, childish)”). We further confirmed that 15 the top similar words are also personal pronouns (even though they are not shown due to space limitations). These results indicate that the proposed CBOW-sep-ctx model jointly learns two different types of lexical similarities, i.e., the stylistic and syntactic/semantic similarities in the different parts of the vectors. However, our stylistic vector also captured the topic similarity, such as “UTF8ipxmサンタ (Santa Clause)” and “UTF8ipxmトナカイ (reindeer)” (the fourth row of Table 2 ). Therefore, there is still room for improvement in capturing the stylistic similarity.
+
+## Conclusions and Future Work
+
+This paper presented the unsupervised learning of style-sensitive word vectors, which extends CBOW by distinguishing nearby contexts and wider contexts. We created a novel dataset for style, where the stylistic similarity between word pairs was scored by human. Our experiment demonstrated that our method leads word vectors to distinguish the stylistic aspect and other semantic or syntactic aspects. In addition, we also found that our training cannot help confusing some styles and topics. A future direction will be to addressing the issue by further introducing another context such as a document or dialog-level context windows, where the topics are often consistent but the styles are not.
+
+## Acknowledgments
+
+This work was supported by JSPS KAKENHI Grant Number 15H01702. We thank our anonymous reviewers for their helpful comments and suggestions.

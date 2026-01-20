@@ -1,0 +1,233 @@
+# BLEURT: Learning Robust Metrics for Text Generation
+
+**Paper ID:** 2004.04696
+
+## Abstract
+
+Text generation has made significant advances in the last few years. Yet, evaluation metrics have lagged behind, as the most popular choices (e.g., BLEU and ROUGE) may correlate poorly with human judgments. We propose BLEURT, a learned evaluation metric based on BERT that can model human judgments with a few thousand possibly biased training examples. A key aspect of our approach is a novel pre-training scheme that uses millions of synthetic examples to help the model generalize. BLEURT provides state-of-the-art results on the last three years of the WMT Metrics shared task and the WebNLG Competition dataset. In contrast to a vanilla BERT-based approach, it yields superior results even when the training data is scarce and out-of-distribution.
+
+## Introduction
+
+In the last few years, research in natural text generation (NLG) has made significant progress, driven largely by the neural encoder-decoder paradigm BIBREF0, BIBREF1 which can tackle a wide array of tasks including translation BIBREF2, summarization BIBREF3, BIBREF4, structured-data-to-text generation BIBREF5, BIBREF6, BIBREF7 dialog BIBREF8, BIBREF9 and image captioning BIBREF10. However, progress is increasingly impeded by the shortcomings of existing metrics BIBREF7, BIBREF11, BIBREF12.
+
+Human evaluation is often the best indicator of the quality of a system. However, designing crowd sourcing experiments is an expensive and high-latency process, which does not easily fit in a daily model development pipeline. Therefore, NLG researchers commonly use automatic evaluation metrics, which provide an acceptable proxy for quality and are very cheap to compute. This paper investigates sentence-level, reference-based metrics, which describe the extent to which a candidate sentence is similar to a reference one. The exact definition of similarity may range from string overlap to logical entailment.
+
+The first generation of metrics relied on handcrafted rules that measure the surface similarity between the sentences. To illustrate, BLEU BIBREF13 and ROUGE BIBREF14, two popular metrics, rely on N-gram overlap. Because those metrics are only sensitive to lexical variation, they cannot appropriately reward semantic or syntactic variations of a given reference. Thus, they have been repeatedly shown to correlate poorly with human judgment, in particular when all the systems to compare have a similar level of accuracy BIBREF15, BIBREF16, BIBREF17.
+
+Increasingly, NLG researchers have addressed those problems by injecting learned components in their metrics. To illustrate, consider the WMT Metrics Shared Task, an annual benchmark in which translation metrics are compared on their ability to imitate human assessments. The last two years of the competition were largely dominated by neural net-based approaches, RUSE, YiSi and ESIM BIBREF18, BIBREF11. Current approaches largely fall into two categories. Fully learned metrics, such as BEER, RUSE, and ESIM are trained end-to-end, and they typically rely on handcrafted features and/or learned embeddings. Conversely, hybrid metrics, such as YiSi and BERTscore combine trained elements, e.g., contextual embeddings, with handwritten logic, e.g., as token alignment rules. The first category typically offers great expressivity: if a training set of human ratings data is available, the metrics may take full advantage of it and fit the ratings distribution tightly. Furthermore, learned metrics can be tuned to measure task-specific properties, such as fluency, faithfulness, grammatically, or style. On the other hand, hybrid metrics offer robustness. They may provide better results when there is little to no training data, and they do not rely on the assumption that training and test data are identically distributed.
+
+And indeed, the iid assumption is particularly problematic in NLG evaluation because of domain drifts, that have been the main target of the metrics literature, but also because of quality drifts: NLG systems tend to get better over time, and therefore a model trained on ratings data from 2015 may fail to distinguish top performing systems in 2019, especially for newer research tasks. An ideal learned metric would be able to both take full advantage of available ratings data for training, and be robust to distribution drifts, i.e., it should be able to extrapolate.
+
+Our insight is that it is possible to combine expressivity and robustness by pre-training a fully learned metric on large amounts of synthetic data, before fine-tuning it on human ratings. To this end, we introduce Bleurt, a text generation metric based on BERT BIBREF19. A key ingredient of Bleurt is a novel pre-training scheme, which uses random perturbations of Wikipedia sentences augmented with a diverse set of lexical and semantic-level supervision signals.
+
+To demonstrate our approach, we train Bleurt for English and evaluate it under different generalization regimes. We first verify that it provides state-of-the-art results on all recent years of the WMT Metrics Shared task (2017 to 2019, to-English language pairs). We then stress-test its ability to cope with quality drifts with a synthetic benchmark based on WMT 2017. Finally, we show that it can easily adapt to a different domain with three tasks from a data-to-text dataset, WebNLG 2017 BIBREF20. Ablations show that our synthetic pretraining scheme increases performance in the iid setting, and is critical to ensure robustness when the training data is scarce, skewed, or out-of-domain.
+
+## Preliminaries
+
+Define $= (x_1,..,x_{r})$ to be the reference sentence of length $r$ where each $x_i$ is a token and let $\tilde{} = (\tilde{x}_1,..,\tilde{x}_{p})$ be a prediction sentence of length $p$. Let $\lbrace (_i, \tilde{}_i, y_i)\rbrace _{n=1}^{N}$ be a training dataset of size $N$ where $y_i \in [0, 1]$ is the human rating that indicates how good $\tilde{}_i$ is with respect to $_i$. Given the training data, our goal is to learn a function $: (, \tilde{}) \rightarrow y$ that predicts the human rating.
+
+## Fine-Tuning BERT for Quality Evaluation
+
+Given the small amounts of rating data available, it is natural to leverage unsupervised representations for this task. In our model, we use BERT (Bidirectional Encoder Representations from Transformers) BIBREF19, which is an unsupervised technique that learns contextualized representations of sequences of text. Given $$ and $\tilde{}$, BERT is a Transformer BIBREF21 that returns a sequence of contextualized vectors:
+
+where $_{\mathrm {[CLS]}}$ is the representation for the special $\mathrm {[CLS]}$ token. As described by devlin2018bert, we add a linear layer on top of the $\mathrm {[CLS]}$ vector to predict the rating:
+
+where $$ and $$ are the weight matrix and bias vector respectively. Both the above linear layer as well as the BERT parameters are trained (i.e. fine-tuned) on the supervised data which typically numbers in a few thousand examples. We use the regression loss $\ell _{\textrm {supervised}} = \frac{1}{N} \sum _{n=1}^{N} \Vert y_i - \hat{y} \Vert ^2 $.
+
+Although this approach is quite straightforward, we will show in Section SECREF5 that it gives state-of-the-art results on WMT Metrics Shared Task 17-19, which makes it a high-performing evaluation metric. However, fine-tuning BERT requires a sizable amount of iid data, which is less than ideal for a metric that should generalize to a variety of tasks and model drift.
+
+## Pre-Training on Synthetic Data
+
+The key aspect of our approach is a pre-training technique that we use to “warm up” BERT before fine-tuning on rating data. We generate a large number of of synthetic reference-candidate pairs $(, \tilde{})$, and we train BERT on several lexical- and semantic-level supervision signals with a multitask loss. As our experiments will show, Bleurt generalizes much better after this phase, especially with incomplete training data.
+
+Any pre-training approach requires a dataset and a set of pre-training tasks. Ideally, the setup should resemble the final NLG evaluation task, i.e., the sentence pairs should be distributed similarly and the pre-training signals should correlate with human ratings. Unfortunately, we cannot have access to the NLG models that we will evaluate in the future. Therefore, we optimized our scheme for generality, with three requirements. (1) The set of reference sentences should be large and diverse, so that Bleurt can cope with a wide range of NLG domains and tasks. (2) The sentence pairs should contain a wide variety of lexical, syntactic, and semantic dissimilarities. The aim here is to anticipate all variations that an NLG system may produce, e.g., phrase substitution, paraphrases, noise, or omissions. (3) The pre-training objectives should effectively capture those phenomena, so that Bleurt can learn to identify them. The following sections present our approach.
+
+## Pre-Training on Synthetic Data ::: Generating Sentence Pairs
+
+One way to expose Bleurt to a wide variety of sentence differences is to use existing sentence pairs datasets BIBREF22, BIBREF23, BIBREF24. These sets are a rich source of related sentences, but they may fail to capture the errors and alterations that NLG systems produce (e.g., omissions, repetitions, nonsensical substitutions). We opted for an automatic approach instead, that can be scaled arbitrarily and at little cost: we generate synthetic sentence pairs $(, \tilde{})$ by randomly perturbing 1.8 million segments $$ from Wikipedia. We use three techniques: mask-filling with BERT, backtranslation, and randomly dropping out words. We obtain about 6.5 million perturbations $\tilde{}$. Let us describe those techniques.
+
+## Pre-Training on Synthetic Data ::: Generating Sentence Pairs ::: Mask-filling with BERT:
+
+BERT's initial training task is to fill gaps (i.e., masked tokens) in tokenized sentences. We leverage this functionality by inserting masks at random positions in the Wikipedia sentences, and fill them with the language model. Thus, we introduce lexical alterations while maintaining the fluency of the sentence. We use two masking strategies—we either introduce the masks at random positions in the sentences, or we create contiguous sequences of masked tokens. More details are provided in the Appendix.
+
+## Pre-Training on Synthetic Data ::: Generating Sentence Pairs ::: Backtranslation:
+
+We generate paraphrases and perturbations with backtranslation, that is, round trips from English to another language and then back to English with a translation model BIBREF25, BIBREF26, BIBREF27. Our primary aim is to create variants of the reference sentence that preserves semantics. Additionally, we use the mispredictions of the backtranslation models as a source of realistic alterations.
+
+## Pre-Training on Synthetic Data ::: Generating Sentence Pairs ::: Dropping words:
+
+We found it useful in our experiments to randomly drop words from the synthetic examples above to create other examples. This method prepares Bleurt for “pathological” behaviors or NLG systems, e.g., void predictions, or sentence truncation.
+
+## Pre-Training on Synthetic Data ::: Pre-Training Signals
+
+The next step is to augment each sentence pair $(, \tilde{})$ with a set of pre-training signals $\lbrace {\tau }_k\rbrace $, where ${\tau }_k$ is the target vector of pre-training task $k$. Good pre-training signals should capture a wide variety of lexical and semantic differences. They should also be cheap to obtain, so that the approach can scale to large amounts of synthetic data. The following section presents our 9 pre-training tasks, summarized in Table TABREF3. Additional implementation details are in the Appendix.
+
+## Pre-Training on Synthetic Data ::: Pre-Training Signals ::: Automatic Metrics:
+
+We create three signals ${\tau _{\text{BLEU}}}$, ${\tau _{\text{ROUGE}}}$, and ${\tau _{\text{BERTscore}}}$ with sentence BLEU BIBREF13, ROUGE BIBREF14, and BERTscore BIBREF28 respectively (we use precision, recall and F-score for the latter two).
+
+## Pre-Training on Synthetic Data ::: Pre-Training Signals ::: Backtranslation Likelihood:
+
+The idea behind this signal is to leverage existing translation models to measure semantic equivalence. Given a pair $(, \tilde{})$, this training signal measures the probability that $\tilde{}$ is a backtranslation of $$, $P(\tilde{} | )$, normalized by the length of $\tilde{}$. Let $P_{\texttt {en}\rightarrow \texttt {fr}}(_{\texttt {fr}} | )$ be a translation model that assigns probabilities to French sentences $_{\texttt {fr}}$ conditioned on English sentences $$ and let $P_{\texttt {fr}\rightarrow \texttt {en}}(| _{\texttt {fr}})$ be a translation model that assigns probabilities to English sentences given french sentences. If $|\tilde{}|$ is the number of tokens in $\tilde{}$, we define our score as $ {\tau }_{\text{en-fr}, \tilde{} \mid } = \frac{\log P(\tilde{} | )}{|\tilde{}|}$, with:
+
+Because computing the summation over all possible French sentences is intractable, we approximate the sum using $_{\texttt {fr}}^\ast = P_{\texttt {en}\rightarrow \texttt {fr}} (_{\texttt {fr}} | )$ and we assume that $P_{\texttt {en}\rightarrow \texttt {fr}}(_{\texttt {fr}}^\ast | ) \approx 1$:
+
+We can trivially reverse the procedure to compute $P(| \tilde{})$, thus we create 4 pre-training signals ${\tau }_{\text{en-fr}, \mid \tilde{}}$, ${\tau }_{\text{en-fr}, \tilde{} \mid }$, ${\tau }_{\text{en-de}, \mid \tilde{}}$, ${\tau }_{\text{en-de}, \tilde{} \mid }$ with two pairs of languages ($\texttt {en}\leftrightarrow \texttt {de}$ and $\texttt {en}\leftrightarrow \texttt {fr}$) in both directions.
+
+## Pre-Training on Synthetic Data ::: Pre-Training Signals ::: Textual Entailment:
+
+The signal ${\tau }_\text{entail}$ expresses whether $$ entails or contradicts $\tilde{}$ using a classifier. We report the probability of three labels: Entail, Contradict, and Neutral, using BERT fine-tuned on an entailment dataset, MNLI BIBREF19, BIBREF23.
+
+## Pre-Training on Synthetic Data ::: Pre-Training Signals ::: Backtranslation flag:
+
+The signal ${\tau }_\text{backtran\_flag}$ is a Boolean that indicates whether the perturbation was generated with backtranslation or with mask-filling.
+
+## Pre-Training on Synthetic Data ::: Modeling
+
+For each pre-training task, our model uses either a regression or a classification loss. We then aggregate the task-level losses with a weighted sum.
+
+Let ${\tau }_k$ describe the target vector for each task, e.g., the probabilities for the classes Entail, Contradict, Neutral, or the precision, recall, and F-score for ROUGE. If ${\tau }_k$ is a regression task, then the loss used is the $\ell _2$ loss i.e. $\ell _k = \Vert {\tau }_k - \hat{{\tau }}_k \Vert _2^2 / |{\tau }_k|$ where $|{\tau }_k|$ is the dimension of ${\tau }_k$ and $\hat{{\tau }}_k$ is computed by using a task-specific linear layer on top of the $\textrm {[CLS]}$ embedding: $\hat{{\tau }}_k = _{\tau _k} \tilde{}_{\textrm {[CLS]}} + _{\tau _k}$. If ${\tau }_k$ is a classification task, we use a separate linear layer to predict a logit for each class $c$: $\hat{{\tau }}_{kc} = _{\tau _{kc}} \tilde{}_{\textrm {[CLS]}} + _{\tau _{kc}}$, and we use the multiclass cross-entropy loss. We define our aggregate pre-training loss function as follows: pre-training = 1M m=1M k=1K k k(km, km) where ${\tau }_k^m$ is the target vector for example $m$, $M$ is number of synthetic examples, and $\gamma _k$ are hyperparameter weights obtained with grid search (more details in the Appendix).
+
+## Experiments
+
+In this section, we report our experimental results for two tasks, translation and data-to-text. First, we benchmark Bleurt against existing text generation metrics on the last 3 years of the WMT Metrics Shared Task BIBREF29. We then evaluate its robustness to quality drifts with a series of synthetic datasets based on WMT17. We test Bleurt's ability to adapt to different tasks with the WebNLG 2017 Challenge Dataset BIBREF20. Finally, we measure the contribution of each pre-training task with ablation experiments.
+
+## Experiments ::: Our Models:
+
+Unless specified otherwise, all Bleurt models are trained in three steps: regular BERT pre-training BIBREF19, pre-training on synthetic data (as explained in Section SECREF4), and fine-tuning on task-specific ratings (translation and/or data-to-text). We experiment with two versions of Bleurt, BLEURT and BLEURTbase, respectively based on BERT-Large (24 layers, 1024 hidden units, 16 heads) and BERT-Base (12 layers, 768 hidden units, 12 heads) BIBREF19, both uncased. We use batch size 32, learning rate 1e-5, and 800,000 steps for pre-training and 40,000 steps for fine-tuning. We provide the full detail of our training setup in the Appendix.
+
+## Experiments ::: WMT Metrics Shared Task ::: Datasets and Metrics:
+
+We use years 2017 to 2019 of the WMT Metrics Shared Task, to-English language pairs. For each year, we used the official WMT test set, which include several thousand pairs of sentences with human ratings from the news domain. The training sets contain 5,360, 9,492, and 147,691 records for each year. The test sets for years 2018 and 2019 are noisier, as reported by the organizers and shown by the overall lower correlations.
+
+We evaluate the agreement between the automatic metrics and the human ratings. For each year, we report two metrics: Kendall's Tau $\tau $ (for consistency across experiments), and the official WMT metric for that year (for completeness). The official WMT metric is either Pearson's correlation or a robust variant of Kendall's Tau called DARR, described in the Appendix. All the numbers come from our own implementation of the benchmark. Our results are globally consistent with the official results but we report small differences in 2018 and 2019, marked in the tables.
+
+## Experiments ::: WMT Metrics Shared Task ::: Models:
+
+We experiment with four versions of Bleurt: BLEURT, BLEURTbase, BLEURT -pre and BLEURTbase -pre. The first two models are based on BERT-large and BERT-base. In the latter two versions, we skip the pre-training phase and fine-tune directly on the WMT ratings. For each year of the WMT shared task, we use the test set from the previous years for training and validation. We describe our setup in further detail in the Appendix. We compare Bleurt to participant data from the shared task and automatic metrics that we ran ourselves. In the former case, we use the the best-performing contestants for each year, that is, chrF++, BEER, Meteor++, RUSE, Yisi1, ESIM and Yisi1-SRL BIBREF30. All the contestants use the same WMT training data, in addition to existing sentence or token embeddings. In the latter case, we use Moses sentenceBLEU, BERTscore BIBREF28, and MoverScore BIBREF31. For BERTscore, we use BERT-large uncased for fairness, and roBERTa (the recommended version) for completeness BIBREF32. We run MoverScore on WMT 2017 using the scripts published by the authors.
+
+## Experiments ::: WMT Metrics Shared Task ::: Results:
+
+Tables TABREF14, TABREF15, TABREF16 show the results. For years 2017 and 2018, a Bleurt-based metric dominates the benchmark for each language pair (Tables TABREF14 and TABREF15). BLEURT and BLEURTbase are also competitive for year 2019: they yield the best results for every language pair on Kendall's Tau, and they come first for 4 out of 7 pairs on DARR. As expected, BLEURT dominates BLEURTbase in the majority of cases. Pre-training consistently improves the results of BLEURT and BLEURTbase. We observe the largest effect on year 2017, where it adds up to 7.4 Kendall Tau points for BLEURTbase (zh-en). The effect is milder on years 2018 and 2019, up to 2.1 points (tr-en, 2018). We explain the difference by the fact that the training data used for 2017 is smaller than the datasets used for the following years, so pre-training is likelier to help. In general pre-training yields higher returns for BERT-base than for BERT-large—in fact, BLEURTbase with pre-training is often better than BLEURT without.
+
+Takeaways: Pre-training delivers consistent improvements, especially for BERT-base. Bleurt yields state-of-the art performance for all years of the WMT Metrics Shared task.
+
+## Experiments ::: Robustness to Quality Drift
+
+We assess our claim that pre-training makes Bleurt robust to quality drifts, by constructing a series of tasks for which it is increasingly pressured to extrapolate. All the experiments that follow are based on the WMT Metrics Shared Task 2017, because the ratings for this edition are particularly reliable.
+
+## Experiments ::: Robustness to Quality Drift ::: Methodology:
+
+We create increasingly challenging datasets by sub-sampling the records from the WMT Metrics shared task, keeping low-rated translations for training and high-rated translations for test. The key parameter is the skew factor $\alpha $, that measures how much the training data is left-skewed and the test data is right-skewed. Figure FIGREF24 demonstrates the ratings distribution that we used in our experiments. The training data shrinks as $\alpha $ increases: in the most extreme case ($\alpha =3.0$), we use only 11.9% of the original 5,344 training records. We give the full detail of our sampling methodology in the Appendix.
+
+We use BLEURT with and without pre-training and we compare to Moses sentBLEU and BERTscore. We use BERT-large uncased for both BLEURT and BERTscore.
+
+## Experiments ::: Robustness to Quality Drift ::: Results:
+
+Figure FIGREF25 presents Bleurt's performance as we vary the train and test skew independently. Our first observation is that the agreements fall for all metrics as we increase the test skew. This effect was already described is the 2019 WMT Metrics report BIBREF11. A common explanation is that the task gets more difficult as the ratings get closer—it is easier to discriminate between “good” and “bad” systems than to rank “good” systems.
+
+Training skew has a disastrous effect on Bleurt without pre-training: it is below BERTscore for $\alpha =1.0$, and it falls under sentBLEU for $\alpha \ge 1.5$. Pre-trained Bleurt is much more robust: the only case in which it falls under the baselines is $\alpha =3.0$, the most extreme drift, for which incorrect translations are used for train while excellent ones for test.
+
+## Experiments ::: Robustness to Quality Drift ::: Takeaways:
+
+Pre-training makes BLEURT significantly more robust to quality drifts.
+
+## Experiments ::: WebNLG Experiments
+
+In this section, we evaluate Bleurt's performance on three tasks from a data-to-text dataset, the WebNLG Challenge 2017 BIBREF33. The aim is to assess Bleurt's capacity to adapt to new tasks with limited training data.
+
+## Experiments ::: WebNLG Experiments ::: Dataset and Evaluation Tasks:
+
+The WebNLG challenge benchmarks systems that produce natural language description of entities (e.g., buildings, cities, artists) from sets of 1 to 5 RDF triples. The organizers released the human assessments for 9 systems over 223 inputs, that is, 4,677 sentence pairs in total (we removed null values). Each input comes with 1 to 3 reference descriptions. The submissions are evaluated on 3 aspects: semantics, grammar, and fluency. We treat each type of rating as a separate modeling task. The data has no natural split between train and test, therefore we experiment with several schemes. We allocate 0% to about 50% of the data to training, and we split on both the evaluated systems or the RDF inputs in order to test different generalization regimes.
+
+## Experiments ::: WebNLG Experiments ::: Systems and Baselines:
+
+BLEURT -pre -wmt, is a public BERT-large uncased checkpoint directly trained on the WebNLG ratings. BLEURT -wmtwas first pre-trained on synthetic data, then fine-tuned on WebNLG data. BLEURT was trained in three steps: first on synthetic data, then on WMT data (16-18), and finally on WebNLG data. When a record comes with several references, we run BLEURT on each reference and report the highest value BIBREF28.
+
+We report four baselines: BLEU, TER, Meteor, and BERTscore. The first three were computed by the WebNLG competition organizers. We ran the latter one ourselves, using BERT-large uncased for a fair comparison.
+
+## Experiments ::: WebNLG Experiments ::: Results:
+
+Figure FIGREF26 presents the correlation of the metrics with human assessments as we vary the share of data allocated to training. The more pre-trained Bleurt is, the quicker it adapts. The vanilla BERT approach BLEURT -pre -wmt requires about a third of the WebNLG data to dominate the baselines on the majority of tasks, and it still lags behind on semantics (split by system). In contrast, BLEURT -wmt is competitive with as little as 836 records, and Bleurt is comparable with BERTscore with zero fine-tuning.
+
+## Experiments ::: WebNLG Experiments ::: Takeaways:
+
+Thanks to pre-training, Bleurt can quickly adapt to the new tasks. Bleurt fine-tuned twice (first on synthetic data, then on WMT data) provides acceptable results on all tasks without training data.
+
+## Experiments ::: Ablation Experiments
+
+Figure FIGREF36 presents our ablation experiments on WMT 2017, which highlight the relative importance of each pre-training task. On the left side, we compare Bleurt pre-trained on a single task to Bleurt without pre-training. On the right side, we compare full Bleurt to Bleurt pre-trained on all tasks except one. Pre-training on BERTscore, entailment, and the backtranslation scores yield improvements (symmetrically, ablating them degrades Bleurt). Oppositely, BLEU and ROUGE have a negative impact. We conclude that pre-training on high quality signals helps BLEURT, but that metrics that correlate less well with human judgment may in fact harm the model.
+
+## Related Work
+
+The WMT shared metrics competition BIBREF34, BIBREF18, BIBREF11 has inspired the creation of many learned metrics, some of which use regression or deep learning BIBREF35, BIBREF36, BIBREF37, BIBREF38, BIBREF30. Other metrics have been introduced, such as the recent MoverScore BIBREF31 which combines contextual embeddings and Earth Mover's Distance. We provide a head-to-head comparison with the best performing of those in our experiments. Other approaches do not attempt to estimate quality directly, but use information extraction or question answering as a proxy BIBREF7, BIBREF39, BIBREF40. Those are complementary to our work.
+
+There has been recent work that uses BERT for evaluation. BERTScore BIBREF28 proposes replacing the hard n-gram overlap of BLEU with a soft-overlap using BERT embeddings. We use it in all our experiments. Bertr BIBREF30 and YiSi BIBREF30 also make use of BERT embeddings to compute a similarity score. Sum-QE BIBREF41 fine-tunes BERT for quality estimation as we describe in Section SECREF3. Our focus is different—we train metrics that are not only state-of-the-art in conventional iid experimental setups, but also robust in the presence of scarce and out-of-distribution training data. To our knowledge no existing work has explored pre-training and extrapolation in the context of NLG.
+
+Noisy pre-training has been proposed before for other tasks such as paraphrasing BIBREF42, BIBREF43 but generally not with synthetic data. Generating synthetic data via paraphrases and perturbations has been commonly used for generating adversarial examples BIBREF44, BIBREF45, BIBREF46, BIBREF47, an orthogonal line of research.
+
+## Conclusion
+
+We presented Bleurt, a reference-based text generation metric for English. Because the metric is trained end-to-end, Bleurt can model human assessment with superior accuracy. Furthermore, pre-training makes the metrics robust particularly robust to both domain and quality drifts. Future research directions include multilingual NLG evaluation, and hybrid methods involving both humans and classifiers.
+
+## Acknowledgments
+
+Thanks to Eunsol Choi, Nicholas FitzGerald, Jacob Devlin, and to the members of the Google AI Language team for the proof-reading, feedback, and suggestions. We also thank Madhavan Kidambi and Ming-Wei Chang, who implemented blank-filling with BERT.
+
+## Implementation Details of the Pre-Training Phase
+
+This section provides implementation details for some of the pre-training techniques described in the main paper.
+
+## Implementation Details of the Pre-Training Phase ::: Data Generation ::: Random Masking:
+
+We use two masking strategies. The first strategy samples random words in the sentence and it replaces them with masks (one for each token). Thus, the masks are scattered across the sentence. The second strategy creates contiguous sequences: it samples a start position $s$, a length $l$ (uniformly distributed), and it masks all the tokens spanned by words between positions $s$ and $s+l$. In both cases, we use up to 15 masks per sentence. Instead of running the language model once and picking the most likely token at each position, we use beam search (the beam size 8 by default). This enforces consistency and avoids repeated sequences, e.g., “,,,”.
+
+## Implementation Details of the Pre-Training Phase ::: Data Generation ::: Backtranslation:
+
+Consider English and French. Given a forward translation model $P_{\texttt {en}\rightarrow \texttt {fr}}(z_{\texttt {fr}} | z_{\texttt {en}})$ and backward translation model $P_{\texttt {fr}\rightarrow \texttt {en}}(z_{\texttt {en}} | z_{\texttt {fr}})$, we generate $\tilde{}$ as follows: = zen (Pfren(zen | zfr) ) where $z_{\texttt {fr}}^\ast = _{z_{\texttt {fr}}} \left( P_{\texttt {fr}\rightarrow \texttt {en}}(z_{\texttt {fr}} | z ) \right)$. For the translations, we use a Transformer model BIBREF21, trained on English-German with the tensor2tensor framework.
+
+## Implementation Details of the Pre-Training Phase ::: Data Generation ::: Word dropping:
+
+Given a synthetic example $(, \tilde{})$ we generate a pair $(, \tilde{}^{\prime })$, by randomly dropping words from $\tilde{}$. We draw the number of words to drop uniformly, up to the length of the sentence. We apply this transformation on about 30% of the data generated with the previous method.
+
+## Implementation Details of the Pre-Training Phase ::: Modeling ::: Setting the weights of the pre-training tasks:
+
+We set the weights $\gamma _k$ with grid search, optimizing Bleurt's performance on WMT 17's validation set. To reduce the size of the grid, we make groups of pre-training tasks that share the same weights: $({\tau }_{\text{BLEU}}, {\tau }_{\text{ROUGE}}, {\tau }_{\text{BERTscore}})$, $({\tau }_{\text{en-fr}, z \mid \tilde{z}}, {\tau }_{\text{en-fr}, \tilde{z} \mid z}, {\tau }_{\text{en-de}, z \mid \tilde{z}}, {\tau }_{\text{en-de}, \tilde{z} \mid z})$, and $({\tau }_{\text{entail}}, {\tau }_{\text{backtran\_flag}})$.
+
+## Implementation Details of the Pre-Training Phase ::: Pre-Training Tasks
+
+We now provide additional details on the signals we uses for pre-training.
+
+## Implementation Details of the Pre-Training Phase ::: Pre-Training Tasks ::: Automatic Metrics:
+
+As shown in the table, we use three types of signals: BLEU, ROUGE, and BERTscore. For BLEU, we used the original Moses sentenceBLEU implementation, using the Moses tokenizer and the default parameters. For ROUGE, we used the seq2seq implementation of ROUGE-N. We used a custom implementation of BERTscore, based on BERT-large uncased. ROUGE and BERTscore return three scores: precision, recall, and F-score. We use all three quantities.
+
+## Implementation Details of the Pre-Training Phase ::: Pre-Training Tasks ::: Backtranslation Likelihood:
+
+We compute all the losses using custom Transformer model BIBREF21, trained on two language pairs (English-French and English-German) with the tensor2tensor framework.
+
+## Experiments–Supplementary Material ::: Training Setup for All Experiments
+
+We user BERT's public checkpoints with Adam (the default optimizer), learning rate 1e-5, and batch size 32. Unless specified otherwise, we use 800,00 training steps for pre-training and 40,000 steps for fine-tuning. We run training and evaluation in parallel: we run the evaluation every 1,500 steps and store the checkpoint that performs best on a held-out validation set (more details on the data splits and our choice of metrics in the following sections). We use Google Cloud TPUs v2 for learning, and Nvidia Tesla V100 accelerators for evaluation and test. Our code uses Tensorflow 1.15 and Python 2.7.
+
+## Experiments–Supplementary Material ::: WMT Metric Shared Task ::: Metrics.
+
+The metrics used to compare the evaluation systems vary across the years. The organizers use Pearson's correlation on standardized human judgments across all segments in 2017, and a custom variant of Kendall's Tau named “DARR” on raw human judgments in 2018 and 2019. The latter metrics operates as follows. The organizers gather all the translations for the same reference segment, they enumerate all the possible pairs $(\text{translation}_1, \text{translation}_2)$, and they discard all the pairs which have a “similar” score (less than 25 points away on a 100 points scale). For each remaining pair, they then determine which translation is the best according both human judgment and the candidate metric. Let $|\text{Concordant}|$ be the number of pairs on which the NLG metrics agree and $|\text{Discordant}|$ be those on which they disagree, then the score is computed as follows:
+
+The idea behind the 25 points filter is to make the evaluation more robust, since the judgments collected for WMT 2018 and 2019 are noisy. Kendall's Tau is identical, but it does not use the filter.
+
+## Experiments–Supplementary Material ::: WMT Metric Shared Task ::: Training setup.
+
+To separate training and validation data, we set aside a fixed ratio of records in such a way that there is no “leak” between the datasets (i.e., train and validation records that share the same source). We use 10% of the data for validation for years 2017 and 2018, and 5% for year 2019. We report results for the models that yield the highest Kendall Tau across all records on validation data. The weights associated to each pretraining task (see our Modeling section) are set with grid search, using the train/validation setup of WMT 2017.
+
+## Experiments–Supplementary Material ::: WMT Metric Shared Task ::: Baselines.
+
+we use three metrics: the Moses implementation of sentenceBLEU, BERTscore, and MoverScore, which are all available online. We run the Moses tokenizer on the reference and candidate segments before computing sentenceBLEU.
+
+## Experiments–Supplementary Material ::: Robustness to Quality Drift ::: Data Re-sampling Methodology:
+
+We sample the training and test separately, as follows. We split the data in 10 bins of equal size. We then sample each record in the dataset with probabilities $\frac{1}{B^\alpha }$ and $\frac{1}{(11-B)^\alpha }$ for train and test respectively, where $B$ is the bin index of the record between 1 and 10, and $\alpha $ is a predefined skew factor. The skew factor $\alpha $ controls the drift: a value of 0 has no effect (the ratings are centered around 0), and value of 3.0 yields extreme differences. Note that the sizes of the datasets decrease as $\alpha $ increases: we use 50.7%, 30.3%, 20.4%, and 11.9% of the original 5,344 training records for $\alpha =0.5$, $1.0$, $1.5$, and $3.0$ respectively.
+
+## Experiments–Supplementary Material ::: Ablation Experiment–How Much Pre-Training Time is Necessary?
+
+To understand the relationship between pre-training time and downstream accuracy, we pre-train several versions of BLEURT and we fine-tune them on WMT17 data, varying the number of pre-training steps. Figure FIGREF60 presents the results. Most gains are obtained during the first 400,000 steps, that is, after about 2 epochs over our synthetic dataset.

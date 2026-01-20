@@ -1,0 +1,83 @@
+# Feature-Dependent Confusion Matrices for Low-Resource NER Labeling with Noisy Labels
+
+**Paper ID:** 1910.06061
+
+## Abstract
+
+In low-resource settings, the performance of supervised labeling models can be improved with automatically annotated or distantly supervised data, which is cheap to create but often noisy. Previous works have shown that significant improvements can be reached by injecting information about the confusion between clean and noisy labels in this additional training data into the classifier training. However, for noise estimation, these approaches either do not take the input features (in our case word embeddings) into account, or they need to learn the noise modeling from scratch which can be difficult in a low-resource setting. We propose to cluster the training data using the input features and then compute different confusion matrices for each cluster. To the best of our knowledge, our approach is the first to leverage feature-dependent noise modeling with pre-initialized confusion matrices. We evaluate on low-resource named entity recognition settings in several languages, showing that our methods improve upon other confusion-matrix based methods by up to 9%.
+
+## Introduction
+
+Most languages, even with millions of speakers, have not been the center for natural language processing and are counted as low-resource for tasks like named entity recognition (NER). Similarly, even for high-resource languages, there exists only few labeled data for most entity types beyond person, location and organization. Distantly- or weakly-supervised approaches have been proposed to solve this issue, e.g., by using lists of entities for labeling raw text BIBREF0, BIBREF1. This allows obtaining large amounts of training data quickly and cheaply. Unfortunately, these labels often contain errors and learning with this noisily-labeled data is difficult and can even reduce overall performance (see, e.g. BIBREF2).
+
+A variety of ideas have been proposed to overcome the issues of noisy training data. One popular approach is to estimate the relation between noisy and clean, gold-standard labels and use this noise model to improve the training procedure. However, most of these approaches only assume a dependency between the labels and do not take the features into account when modeling the label noise. This may disregard important information. The global confusion matrix BIBREF3 is a simple model which assumes that the errors in the noisy labels just depend on the clean labels.
+
+Our contributions are as follows: We propose to cluster the input words with the help of additional, unlabeled data. Based on this partition of the feature space, we obtain different confusion matrices that describe the relationship between clean and noisy labels. We evaluate our newly proposed models and related baselines in several low-resource settings across different languages with real, distantly supervised data with non-synthetic noise. The advanced modeling of the noisy labels substantially improves the performance up to 36% over methods without noise-handling and up to 9% over all other noise-handling baselines.
+
+## Related Work
+
+A popular approach is modeling the relationship between noisy and clean labels, i.e., estimating $p(\hat{y}|y)$ where $y$ is the clean and $\hat{y}$ the noisy label. For example, this can be represented as a noise or confusion matrix between the clean and the noisy labels, as explained in Section SECREF3. Having its roots in statistics BIBREF4, this or similar ideas have been recently studied in NLP BIBREF2, BIBREF3, BIBREF5, image classification BIBREF6, BIBREF7, BIBREF8 and general machine learning settings BIBREF9, BIBREF10, BIBREF11. All of these methods, however, do not take the features into account that are used to represent the instances during classification. In BIBREF12 only the noise type depends on $x$ but not the actual noise model. BIBREF13 and BIBREF14 use the learned feature representation $h$ to model $p(\hat{y}|y,h(x))$ for image classification and relation extraction respectively. In the work of BIBREF15, $p(y|\hat{y},h(x))$ is estimated to clean the labels for an image classification task. The survey by BIBREF16 gives a detailed overview about other techniques for learning in the presence of noisy labels.
+
+Specific to learning noisy sequence labels in NLP, BIBREF2 used a combination of clean and noisy data for low-resource POS tagging. BIBREF17 suggested partial annotation learning to lessen the effects of incomplete annotations and reinforcement learning for filtering incorrect labels for Chinese NER. BIBREF3 used a confusion matrix and proposed to leverage pairs of clean and noisy labels for its initialization, evaluating on English NER. For English NER and Chunking, BIBREF5 also used a confusion matrix but learned it with an EM approach and combined it with multi-task learning. Recently, BIBREF18 studied input from different, unreliable sources and how to combine them for NER prediction.
+
+## Global Noise Model
+
+We assume a low-resource setting with a small set of gold standard annotated data $C$ consisting of instances with features $x$ and corresponding, clean labels $y$. Additionally, a large set of noisy instances $(x,\hat{y}) \in N$ is available. This can be obtained e.g. from weak or distant supervision. In a multi-class classification setting, we can learn the probability of a label $y$ having a specific class given the feature $x$ as
+
+where $k$ is the number of classes, $h$ is a learned, non-linear function (in our case a neural network) and $u$ is the softmax weights. This is our base model trained on $C$. Due to the errors in the labels, the clean and noisy labels have different distributions. Therefore, learning on $C$ and $N$ jointly can be detrimental for the performance of predicting unseen, clean instances. Nevertheless, the noisy-labeled data is still related to $C$ and can contain useful information that we want to successfully leverage. We transform the predicted (clean) distribution of the base model to the noisy label distribution
+
+The relationship is modeled using a confusion matrix (also called noise or transformation matrix or noise layer) with learned weights $b_{ij}$:
+
+The overall architecture is visualized in Figure FIGREF4. An important question is how to initialize this noise layer. As proposed by BIBREF3, we apply the same distant supervision technique used to obtain $N$ from unlabeled data on the already labeled instances in $C$. We thus obtain pairs of clean $y$ and corresponding noisy labels $\hat{y}$ for the same instances and the weights of the noise layer can be initialized as
+
+Following the naming by BIBREF14, we call this the global noise model.
+
+## Feature Dependent Noise Model
+
+The global confusion matrix is a simple model which assumes that the errors in the noisy labels depend on the clean labels. An approach that also takes the corresponding features $x$ into account can model more complex relations. BIBREF15 and BIBREF14 use multiple layers of a neural network to model these relationships. However, in low resource settings with only small amounts of clean, supervised data, these more complex models can be difficult to learn. In contrast to that, larger amounts of unlabeled text are usually available even in low-resource settings. Therefore, we propose to use unsupervised clustering techniques to partition the feature space of the input words (and the corresponding instances) before estimating the noise matrices. To create the clusters, we use either Brown clustering BIBREF19 on the input words or $k$-means clustering BIBREF20 on the pretrained word embeddings after applying PCA BIBREF21.
+
+In sequence labeling tasks, the features $x$ of an instance usually consist of the input word $\iota (x)$ and its context. Given a clustering $\Pi $ over the input words $\lbrace \iota (x) \mid (x,y) \in C \cup N \rbrace $ consisting of clusters $\Pi _1, ..., \Pi _p$, we can group all clean and noisy instances into groups
+
+For each group, we construct an independent confusion matrix using Formulas DISPLAY_FORM3 and DISPLAY_FORM5. The prediction of the noisy label $\hat{y}$ (Formula DISPLAY_FORM2) then becomes
+
+Since the clustering is performed on unsupervised data, in low-resource settings, the size of an actual group of instances $G_q$ can be very small. If the number of members in a group is insufficient, the estimation of reliable noise matrices is difficult. This issue can be avoided by only using the largest groups and creating a separate group for all other instances. To make use of all the clusters, we alternatively propose to interpolate between the global and the group confusion matrix:
+
+The interpolation hyperparameter $\lambda $ (with $0 \le \lambda \le 1$) regulates the influence from the global matrix on the interpolated matrix. The selection of the largest groups and the interpolation can also be combined.
+
+## Experiments
+
+We evaluate all models in five low-resource NER settings across different languages. Although the evaluation is performed for NER labeling, the proposed models are not restricted to the task of NER and can potentially be used for other tasks.
+
+## Experiments ::: Models
+
+We follow the BiLSTM architecture from BIBREF3. Only the optimizer was changed for all models to NADAM BIBREF22 as this helped with convergence problems for increasing cluster numbers. The Base is trained only on clean data while Base+Noise is trained on both the clean and the noisy data without noise handling. Global-CM uses a global confusion matrix for all noisy instances to model the noise as proposed by BIBREF3 and presented in Section SECREF3. The same architecture is used for Global-ID-CM, but the confusion matrix is initialized with the identity matrix (instead of Formula DISPLAY_FORM5) and only adapted during training.
+
+The cluster-based models we propose in Section SECREF4 are Brown-CM and K-Means-CM. We experimented with numbers of clusters of 5, 10, 25 and 50. The models that select only the largest groups $G$ are marked as *-Freq and select either 30% or 50% of the clusters. The interpolation models have the postfix *-IP with $\lambda \in \lbrace 0.3, 0.5, 0.7\rbrace $ . The combination of both is named *-Freq-IP. As for all other hyperparameters, the choice was taken on the development set.
+
+We implemented the Cleaning BIBREF15 and Dynamic-CM BIBREF14 models. Both were not developed for sequence labeling tasks and therefore needed to be adapted. For the Cleaning model, we followed the instructions by BIBREF3. The embedding and prediction components of the Dynamic-CM model were replaced according to our base model. The output of the dense layer was used as input to the dynamic matrix generation. We experimented with and without their proposed trace loss.
+
+The training for all models was performed with labels in the IO format. The predicted labels for the test data were converted and evaluated in IOB2 with the official CoNLL evaluation script. The IOB2 format would increase matrix size making the confusion matrix estimation more difficult without adding much information in practice. In preliminary experiments, this decreased performance in particular for low-resource settings.
+
+## Experiments ::: Data
+
+The models were tested on the four CoNLL datasets for English, German, Spanish and Dutch BIBREF23, BIBREF24 using the standard split, and the Estonian data from BIBREF25 using a 10/10/80 split for dev/test/train sets. For each language, the labels of 1% of the training data (ca. 2100 instances) were used to obtain a low-resource setting. We treat this as the clean data $C$. The rest of the (now unlabeled) training data was used for the automatic annotation which we treat as noisily labeled data $N$. We applied the distant supervision method by BIBREF1, which uses lists and gazetteer information for NER labeling. As seen in Table TABREF19, this method reaches rather high precision but has a poor recall. The development set of the original dataset is used for model-epoch and hyperparameter selection, and the results are reported on the complete, clean test set. The words were embedded with the pretrained fastText vectors BIBREF26. The clusters were calculated on the unlabeled version of the full training data. Additionally, the Brown clusters used the language-specific documents from the Europarl corpus BIBREF27.
+
+## Experimental Results
+
+The results of all models are shown in Table TABREF9. The newly proposed cluster-based models achieve the best performance across all languages and outperform all other models in particular for Dutch and English. The combination of interpolation with the global matrix and the selection of large clusters is almost always beneficial compared to the cluster-based models using only one of the methods. In general, both clustering methods achieve similar performance in combination with interpolation and selection, except for English, where Brown clustering performs worse than $k$-Means clustering. While the Brown clustering was trained on the relatively small Europarl corpus, $k$-Means clustering seems to benefit from the word embeddings trained on documents from the much larger common crawl.
+
+## Analysis
+
+In the majority of cases, a cluster size of 10 or 25 was selected on the development set during the hyperparameter search. Increasing the number of clusters introduces smaller clusters for which it is difficult to estimate the noise matrix, due to the limited training resources. On the other hand, decreasing the number of clusters can generalize too much, resulting in loss of information on the noise distribution. For the $\lambda $ parameter, a value of either 0.3 or 0.5 was chosen on the development set giving the group clusters more or equal weight compared to the global confusion matrix. This shows that the feature dependent noise matrices are important and have a positive impact on performance.
+
+Five confusion matrices for groups and the global matrix in the English data are shown as examples in Figure FIGREF10. One can see that the noise matrix can visibly differ depending on the cluster of the input word. Some of these differences can also be directly explained by flaws in the distant supervision method. The automatic annotation did not label any locations written in all upper-case letters as locations. Therefore, the noise distribution for all upper-cased locations differs from the distribution of other location names (cf. FIGREF10 and FIGREF10). The words April and June are used both as names for a month and as first names in English. This results in a very specific noise distribution with many temporal expressions being annotated as person entities (cf. FIGREF10). Similar to this, first-person names and also Asian words are likely to be labeled as persons by the automatic annotation method (cf. FIGREF10 and FIGREF10).
+
+All of these groups show traits that are not displayed in the global matrix, allowing the cluster-based models to outperform the other systems.
+
+## Conclusions
+
+We have shown that the noise models with feature-dependent confusion matrices can be used effectively in practice. These models improve low-resource named entity recognition with noisy labels beyond all other tested baselines. Further, the feature-dependent confusion matrices are task-independent and could be used for other NLP tasks, which is one possible direction of future research.
+
+## Acknowledgments
+
+The authors would like to thank Heike Adel, Annemarie Friedrich and the anonymous reviewers for their helpful comments. This work has been partially funded by Deutsche Forschungsgemeinschaft (DFG) under grant SFB 1102: Information Density and Linguistic Encoding.

@@ -1,0 +1,135 @@
+# Learning to Ask Unanswerable Questions for Machine Reading Comprehension
+
+**Paper ID:** 1906.06045
+
+## Abstract
+
+Machine reading comprehension with unanswerable questions is a challenging task. In this work, we propose a data augmentation technique by automatically generating relevant unanswerable questions according to an answerable question paired with its corresponding paragraph that contains the answer. We introduce a pair-to-sequence model for unanswerable question generation, which effectively captures the interactions between the question and the paragraph. We also present a way to construct training data for our question generation models by leveraging the existing reading comprehension dataset. Experimental results show that the pair-to-sequence model performs consistently better compared with the sequence-to-sequence baseline. We further use the automatically generated unanswerable questions as a means of data augmentation on the SQuAD 2.0 dataset, yielding 1.9 absolute F1 improvement with BERT-base model and 1.7 absolute F1 improvement with BERT-large model.
+
+## Introduction
+
+Extractive reading comprehension BIBREF0 , BIBREF1 obtains great attentions from both research and industry in recent years. End-to-end neural models BIBREF2 , BIBREF3 , BIBREF4 have achieved remarkable performance on the task if answers are assumed to be in the given paragraph. Nonetheless, the current systems are still not good at deciding whether no answer is presented in the context BIBREF5 . For unanswerable questions, the systems are supposed to abstain from answering rather than making unreliable guesses, which is an embodiment of language understanding ability.
+
+We attack the problem by automatically generating unanswerable questions for data augmentation to improve question answering models. The generated unanswerable questions should not be too easy for the question answering model so that data augmentation can better help the model. For example, a simple baseline method is randomly choosing a question asked for another paragraph, and using it as an unanswerable question. However, it would be trivial to determine whether the retrieved question is answerable by using word-overlap heuristics, because the question is irrelevant to the context BIBREF6 . In this work, we propose to generate unanswerable questions by editing an answerable question and conditioning on the corresponding paragraph that contains the answer. So the generated unanswerable questions are more lexically similar and relevant to the context. Moreover, by using the answerable question as a prototype and its answer span as a plausible answer, the generated examples can provide more discriminative training signal to the question answering model.
+
+To create training data for unanswerable question generation, we use (plausible) answer spans in paragraphs as pivots to align pairs of answerable questions and unanswerable questions. As shown in Figure 1 , the answerable and unanswerable questions of a paragraph are aligned through the text span “Victoria Department of Education” for being both the answer and plausible answer. These two questions are lexically similar and both asked with the same answer type in mind. In this way, we obtain the data with which the models can learn to ask unanswerable questions by editing answerable ones with word exchanges, negations, etc. Consequently, we can generate a mass of unanswerable questions with existing large-scale machine reading comprehension datasets.
+
+Inspired by the neural reading comprehension models BIBREF7 , BIBREF8 , we introduce a pair-to-sequence model to better capture the interactions between questions and paragraphs. The proposed model first encodes input question and paragraph separately, and then conducts attention-based matching to make them aware of each other. Finally, the context-aware representations are used to generate outputs. To facilitate the use of context words during the generation process, we also incorporate the copy mechanism BIBREF9 , BIBREF10 .
+
+Experimental results on the unanswerable question generation task shows that the pair-to-sequence model generates consistently better results over the sequence-to-sequence baseline and performs better with long paragraphs than with short answer sentences. Further experimental results show that the generated unanswerable questions can improve multiple machine reading comprehension models. Even using BERT fine-tuning as a strong reading comprehension model, we can still obtain a $1.9$ % absolute improvement of F1 score with BERT-base model and $1.7$ % absolute F1 improvement with BERT-large model.
+
+## Related Work
+
+Machine Reading Comprehension (MRC) Various large-scale datasets BIBREF0 , BIBREF1 , BIBREF11 , BIBREF12 , BIBREF5 , BIBREF13 have spurred rapid progress on machine reading comprehension in recent years. SQuAD BIBREF1 is an extractive benchmark whose questions and answers spans are annotated by humans. Neural reading comprehension systems BIBREF14 , BIBREF2 , BIBREF3 , BIBREF15 , BIBREF8 , BIBREF16 , BIBREF4 , BIBREF17 have outperformed humans on this task in terms of automatic metrics. The SQuAD 2.0 dataset BIBREF5 extends SQuAD with more than $50,000$ crowdsourced unanswerable questions. So far, neural reading comprehension models still fall behind humans on SQuAD 2.0. Abstaining from answering when no answer can be inferred from the given document does require more understanding than barely extracting an answer.
+
+Question Generation for MRC In recent years, there has been an increasing interest in generating questions for reading comprehension. BIBREF18 show that neural models based on the encoder-decoder framework can generate significantly better questions than rule-based systems BIBREF19 . To generate answer-focused questions, one can simply indicate the answer positions in the context with extra features BIBREF20 , BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 . BIBREF25 and BIBREF26 separate answer representations for further matching. BIBREF27 introduce a latent variable for capturing variability and an observed variable for controlling question types. In summary, the above mentioned systems aim to generate answerable questions with certain context. On the contrary, our goal is to generate unanswerable questions.
+
+Adversarial Examples for MRC To evaluate the language understanding ability of pre-trained systems, BIBREF28 construct adversarial examples by adding distractor sentences that do not contradict question answering for humans to the paragraph. BIBREF29 and BIBREF30 use questions to retrieve paragraphs that do not contain the answer as adversarial examples. BIBREF5 create unanswerable questions through rigid rules, which swap entities, numbers and antonyms of answerable questions. It has been shown that adversarial examples generated by rule-based systems are much easier to detect than ones in the SQuAD 2.0 dataset.
+
+Data Augmentation for MRC Several attempts have been made to augment training data for machine reading comprehension. We categorize these work according to the type of the augmentation data: external data source, paragraphs or questions. BIBREF31 fine-tune BERT on the SQuAD dataset jointly with another dataset TriviaQA BIBREF12 . BIBREF4 paraphrase paragraphs with backtranslation. Another line of work adheres to generate answerable questions. BIBREF32 propose to generate questions based on the unlabeled text for semi-supervised question answering. BIBREF33 propose a rule-based system to generate multiple-choice questions with candidate options upon the paragraphs. We aim at generating unanswerable questions as a means of data augmentation.
+
+## Problem Formulation
+
+Given an answerable question $q$ and its corresponding paragraph $p$ that contains the answer $a$ , we aim to generate unanswerable questions $\tilde{q}$ that fulfills certain requirements. First, it cannot be answered by paragraph $p$ . Second, it must be relevant to both answerable question $q$ and paragraph $p$ , which refrains from producing irrelevant questions. Third, it should ask for something of the same type as answer $a$ .
+
+As shown in Figure 2 , we investigate two simple neural models built upon encoder-decoder architecture BIBREF34 , BIBREF35 to generate unanswerable questions. A sequence-to-sequence model takes the concatenated paragraph and question as input, and encodes the input in a sequential manner. A pair-to-sequence model is further introduced to capture the interactions between inputs. The decoder of two models generates unanswerable questions sequentially. We factorize the probability of generating the unanswerable question $P(\tilde{q}|q,p,a)$ as: P(q|q,p,a)=t=1|q|P(qt|q<t,q,p,a) where $\tilde{q}_{<t}=\tilde{q}_1 \dots \tilde{q}_{t-1}$ .
+
+## Sequence-to-Sequence Model
+
+In the sequence-to-sequence model, paragraph and question pairs are packed into an ordered sequence $x$ with a special separator in between. To indicate answers in paragraphs, we introduce token type embeddings which can also be used to distinguish questions from paragraphs in sequence-to-sequence model. As we can see in Figure 2 , the token type can be answer (A), paragraph (P), or question (Q). For a given token, we construct the input representation $\mathbf {e}_i$ by summing the corresponding word embeddings, character embeddings and token type embeddings. Here characters are embedded by an embedding matrix followed by a max pooling layer.
+
+We apply a single-layer bi-directional recurrent neural networks with long short-term memory units (LSTM; BIBREF36 ) to produce encoder hidden states $\mathbf {h}_i=(\mathbf {h}_{i-1}, \mathbf {e}_i)$ . On each decoding step $t$ , the hidden states of decoder (a single-layer unidirectional LSTM network) are computed by $\mathbf {s}_t=(\mathbf {s}_{t-1}, [\mathbf {y}_{t-1}; \mathbf {c}_{t-1}])$ , where $\mathbf {y}_{t-1}$ is the word embedding of previously predicted token and $\mathbf {c}_{t-1}$ is the encoder context vector of previous step. Besides, we use an attention mechanism to summarize the encoder-side information into $\mathbf {c}_{t}$ for current step. The attention distribution $\gamma _t$ over source words is computed as in BIBREF37 : score(hi , st)=hiTWst
+
+i,t=(score(hi,st)) / Zt
+
+ct=i|x|i,t hi where $Z_t = {\sum _{k}^{|x|}\exp (score(\mathbf {h}_k,\mathbf {s}_t))}$ , $\mathbf {W}_\gamma $ in score function is a learnable parameter.
+
+Next, $\mathbf {s}_t$ is concatenated with $\mathbf {c}_t$ to produce the vocabulary distribution $P_{v}$ : 
+
+$$P_{v}=(\mathbf {W}_v[\mathbf {s}_t;\mathbf {c}_t] + \mathbf {b}_{v})$$   (Eq. 4) 
+
+where $\mathbf {W}_v$ and $\mathbf {b}_{v}$ are learnable parameters. Copy mechanism BIBREF10 is incorporated to directly copy words from inputs, because words in paragraphs or source questions are of great value for unanswerable question generation. Specifically, we use $\mathbf {s}_t$ and $\mathbf {c}_t$ to produce a gating probability $g_t$ : 
+
+$$g_t=(\mathbf {W}_g[\mathbf {s}_t;\mathbf {c}_t] + \mathbf {b}_{g})$$   (Eq. 5) 
+
+where $\mathbf {W}_g$ and $\mathbf {b}_{g}$ are learnable parameters. The gate $g_t$ determines whether generating a word from the vocabulary or copying a word from inputs. Finally, we obtain the probability of generating $\tilde{q}_t$ by: 
+
+$$P(\tilde{q}_t|\tilde{q}_{<t},q,p,a)=g_t P_{v}(\tilde{q}_t) + (1-g_t)\sum _{i \in \zeta _{\tilde{q}_t}}\hat{\gamma }_{i,t} \nonumber $$   (Eq. 6) 
+
+where $\zeta _{\tilde{q}_t}$ denotes all the occurrence of $\tilde{q}_t$ in inputs, and the copying score $\hat{\gamma }_t$ is computed in the same way as attention scores $\gamma _t$ (see Equation ( "Sequence-to-Sequence Model" )) while using different parameters.
+
+## Pair-to-Sequence Model
+
+Paragraph and question interactions play a vitally important role in machine reading comprehension. The interactions make the paragraph and question aware of each other and help to predict the answer more precisely. Therefore we propose a pair-to-sequence model, conducting attention based interactions in encoder and subsequently decoding with two series of representations.
+
+In pair-to-sequence model, the paragraph and question are embedded as in sequence-to-sequence model, but encoded separately by weight-shared bi-directional LSTM networks, yielding $\mathbf {h}_i^p=(\mathbf {h}_{i-1}^p, \mathbf {e}_{i-1}^p)$ as paragraph encodings and $\mathbf {h}_i^q=(\mathbf {h}_{i-1}^q, \mathbf {e}_{i-1}^q)$ as question encodings. The same attention mechanism as in sequence-to-sequence model is used in the following interaction layer to produce question-aware paragraph representations ${\mathbf {h}}_i^p$ : i,j=(score(hip,hjq))/Zi
+
+hip=j=1|q|i,jhjq
+
+hip=(Wp[hip;hip] + bp) where $Z_i=\sum _{k=1}^{|q|}\exp (score(\mathbf {h}_i^p,\mathbf {h}_k^q))$ , $\mathbf {W}_p$ and $\mathbf {b}_p$ are learnable parameters. Similarly, the paragraph-aware question representations ${\mathbf {h}}_i^q$ are produced by: i,j=(score(hip,hjq))/Zj
+
+hiq=i=1|p|i,jhip
+
+hjq=(Wq[hjq;hjq] + bq) where $Z_j=\sum _{k=1}^{|p|}\exp (score(\mathbf {h}_k^p,\mathbf {h}_j^q))$ , $\mathbf {W}_q$ and $\mathbf {b}_q$ are learnable parameters.
+
+Accordingly, the decoder now takes paragraph context $\mathbf {c}^p_{t-1}$ and question context $\mathbf {c}^q_{t-1}$ as encoder context, computed as $\mathbf {c}_t$ (see Equation ( "Sequence-to-Sequence Model" )) in sequence-to-sequence model, to update decoder hidden states $\mathbf {s}_t=(\mathbf {s}_{t-1},[\mathbf {y}_{t-1};\mathbf {c}^p_{t-1};\mathbf {c}^q_{t-1}])$ and predict tokens. Copy mechanism is also adopted as described before, and copying words from both the paragraph and question is viable.
+
+## Training and Inference
+
+The training objective is to minimize the negative likelihood of the aligned unanswerable question $\tilde{q}$ given the answerable question $q$ and its corresponding paragraph $p$ that contains the answer $a$ : L=-(q,q,p,a)DP(q|q,p,a;) where $\mathcal {D}$ is the training corpus and $\theta $ denotes all the parameters. Sequence-to-sequence and pair-to-sequence models are trained with the same objective.
+
+During inference, the unanswerable question for question answering pair $(q,p,a)$ is obtained via $\textrm {argmax}_{q^{\prime }}P(q^{\prime }|q,p,a)$ , where $q^{\prime }$ represents candidate outputs. Beam search is used to avoid iterating over all possible outputs.
+
+## Experiments
+
+We conduct experiments on the SQuAD 2.0 dataset BIBREF5 . The extractive machine reading benchmark contains about $100,000$ answerable questions and over $50,000$ crowdsourced unanswerable questions towards Wikipedia paragraphs. Crowdworkers are requested to craft unanswerable questions that are relevant to the given paragraph. Moreover, for each unanswerable question, a plausible answer span is annotated, which indicates the incorrect answer obtained by only relying on type-matching heuristics. Both answers and plausible answers are text spans in the paragraphs.
+
+## Unanswerable Question Generation
+
+We use (plausible) answer spans in paragraphs as pivots to align pairs of answerable questions and unanswerable questions. An aligned pair is shown in Figure 1 . As to the spans that correspond to multiple answerable and unanswerable questions, we sort the pairs by Levenshtein distance BIBREF38 and keep the pair with the minimum distance, and make sure that each question is only paired once.
+
+We obtain $20,240$ aligned pairs from the SQuAD 2.0 dataset in total. The Levenshtein distance between the answerable and unanswerable questions in pairs is $3.5$ on average. Specifically, the $17,475$ pairs extracted from the SQuAD 2.0 training set are used to train generation models. Since the SQuAD 2.0 test set is hidden, we randomly sample 46 articles from the SQuAD 2.0 training set with $1,805$ ( $\sim $ 10%) pairs as holdout set and evaluate generation models with $2,765$ pairs extracted the SQuAD 2.0 development set.
+
+We implement generation models upon OpenNMT BIBREF39 . We preprocess the corpus with the spaCy toolkit for tokenization and sentence segmentation. We lowercase tokens and build the vocabulary on SQuAD 2.0 training set with word frequency threshold of 9 to remove most noisy tokens introduced in data collection and tokenization. We set word, character and token type embeddings dimension to 300. We use the glove.840B.300d pre-trained embeddings BIBREF40 to initialize word embeddings, and do further updates during training. Both encoder and decoder share the same vocabulary and word embeddings. The hidden state size of LSTM network is 150. Dropout probability is set to $0.2$ . The data are shuffled and split into mini-batches of size 32 for training. The model is optimized with Adagrad BIBREF41 with an initial learning rate of $0.15$ . During inference, the beam size is 5. We prohibit producing unknown words by setting the score of <unk> token to -inf. We filter the beam outputs that make no differences to the input question.
+
+The generation quality is evaluated using three automatic evaluation metrics: BLEU BIBREF42 , ROUGE BIBREF43 and GLEU BIBREF44 . BLEU is a commonly used metric in machine translation that computes n-gram precisions over references. Recall-oriented ROUGE metric is widely adopted in summarization, and ROUGE-L measures longest common subsequence between system outputs and references. GLEU is a variant of BLEU with the modification that penalizes system output n-grams that present in input but absent from the reference. This makes GLEU a preferable metric for tasks with subtle but critical differences in a monolingual setting as in our unanswerable question generation task.
+
+We also conduct human evaluation on 100 samples in three criteria: (1) unanswerability, which indicates whether the question is unanswerable or not; (2) relatedness, which measures semantic relatedness between the generated question and input question answering pair; (3) readability, which indicates the grammaticality and fluency. We ask three raters to score the generated questions in terms of relatedness and readability on a 1-3 scale (3 for the best) and determine the answerability in binary (1 for unanswerable). The raters are not aware of the question generation methods in advance.
+
+Results of the automatic evaluation are shown in Table 1 . We find that the proposed pair-to-sequence model that captures interactions between paragraph and question performs consistently better than sequence-to-sequence model. Moreover, replacing the input paragraph with the answer sentence hurts model performance, which indicates that using the whole paragraph as context provides more helpful information to unanswerable question generation. We also try to generate unanswerable questions by only relying on answerable questions (see “-Paragraph”), or the paragraph (see “-Question”). Unsurprisingly, both ablation models obtain worse performance compared with the full model. These two ablation results also demonstrate that the input answerable question helps more to improve performance compared with the input paragraph. We argue that the original answerable question provides more direct information due to the fact that the average edit distance between the example pairs is $3.5$ . At last, we remove the copy mechanism that restrains prediction tokens to the vocabulary. The results indicate the necessity of copying tokens from answerable questions and paragraphs to outputs, which relieves the out-of-vocabulary problem.
+
+Table 3 shows the human evaluation results of generated unanswerable questions. We compare with the baseline method TfIdf, which uses the input answerable question to retrieve similar questions towards other articles as outputs. The retrieved questions are mostly unanswerable and readable, but they are not quite relevant to the question answering pair. Notice that being relevant is demonstrated to be important for data augmentation in further experiments on machine reading comprehension. Here pair-to-sequence model still outperforms sequence-to-sequence model in terms of all three metrics. But the differences in human evaluation are not as notable as in the automatic metrics.
+
+As shown in Table 4 , we further randomly sample 100 system outputs to analyze the types of generated unanswerable questions. We borrow the types defined in BIBREF5 for SQuAD 2.0. We categorize the outputs with grammatical errors that make them hard to understand into Other. Samples that fall into Impossible Condition are mainly produced by non-entity substitution. We can see that models tend to generate unanswerable questions by inserting negation and swapping entities. These two types are also most commonly used when crowdworkers pose unanswerable questions according to answerable ones. We also find that the current models still have difficulties in utilizing antonyms and exclusion conditions, which could be improved by incorporating external resources.
+
+In Figure 3 , we present a sample paragraph and its corresponding answerable questions and generated unanswerable questions. In the first example, two models generate unanswerable questions by swapping the location entity “Victoria” with “texas” and inserting negation word “never”, respectively. In the second example, sequence-to-sequence model omits the condition “in Victoria” and yields an answerable question. Pair-to-sequence model inserts the negation “no longer” properly, which is not mentioned in the paragraph. In the third example, grammatical errors are found in the output of . The last example shows that inserting negation words in different positions (“n't public” versus “not in victoria”) can express different meanings. Such cases are critical for generated questions' answerability, which is hard to handle in a rule-based system.
+
+## Data Augmentation for Machine Reading Comprehension
+
+We apply our automatically generated unanswerable questions as augmentation data to the following reading comprehension models:
+
+BiDAF BIBREF2 is a benchmark model on extractive machine reading comprehension. Based on BiDAF, BIBREF45 propose the BiDAF-No-Answer model to predict the distribution of answer candidates and the probability of a question being unanswerable at the same time.
+
+ BIBREF29 propose the DocQA model to address document-level reading comprehension. The no-answer probability is also predicted jointly.
+
+It is the state-of-the-art model on unanswerable machine reading comprehension. We adopt the uncased version of BERT BIBREF31 for fine-tuning. The batch sizes of BERT-base and BERT-large are set to 12 and 24 respectively. The rest hyperparameters are kept untouched as in the official instructions of fine-tuning BERT-Large on SQuAD 2.0.
+
+We first generate unanswerable questions using the trained generation model. Specifically, we use the answerable questions in the SQuAD 2.0 training set, besides ones aligned before, to generate unanswerable questions. Then we use the paragraph and answers of answerable questions along with the generated questions to construct training examples. At last, we have an augmentation data containing $69,090$ unanswerable examples.
+
+We train question answering models with augmentation data in two separate phases. In the first phase, we train the models by combining the augmentation data and all $86,821$ SQuAD 2.0 answerable examples. Subsequently, we use the original SQuAD 2.0 training data alone to further fine-tune model parameters.
+
+Exact Match (EM) and F1 are two metrics used to evaluate model performance. EM measures the percentage of predictions that match ground truth answers exactly. F1 measures the word overlap between the prediction and ground truth answers. We use pair-to-sequence model with answerable questions and paragraphs for data augmentation by default.
+
+Table 2 shows the exact match and F1 scores of multiple reading comprehension models with and without data augmentation. We can see that the generated unanswerable questions can improve both specifically designed reading comprehension models and strong BERT fine-tuning models, yielding $1.9$ absolute F1 improvement with BERT-base model and $1.7$ absolute F1 improvement with BERT-large model. Our submitted model obtains an EM score of $80.75$ and an F1 score of $83.85$ on the hidden test set.
+
+As shown in Table 5 , pair-to-sequence model proves to be a better option for generating augmentation data than other three methods. Besides the sequence-to-sequence model, we use answerable questions to retrieve questions from other articles with TfIdf. The retrieved questions are of little help to improve the model, because they are less relevant to the paragraph as shown in Table 3 . We refer to the rule-based method BIBREF28 that swaps entities and replaces words with antonyms as Rule. In comparison to the above methods, pair-to-sequence model can yield the largest improvement.
+
+Results in Table 6 show that enlarging the size of augmentation data can further improve model performance, especially with the BERT-base model. We conduct experiments using two and three times the size of the base augmentation data (i.e., $69,090$ unanswerable questions). We generate multiple unanswerable questions for each answerable question by using beam search. Because we only generate unanswerable questions, the data imbalance problem could mitigate the improvement of incorporating more augmentation data.
+
+## Conclusions
+
+In this paper, we propose to generate unanswerable questions as a means of data augmentation for machine reading comprehension. We produce relevant unanswerable questions by editing answerable questions and conditioning on the corresponding paragraph. A pair-to-sequence model is introduced in order to capture the interactions between question and paragraph. We also present a way to construct training data for unanswerable question generation models. Both automatic and human evaluations show that the proposed model consistently outperforms the sequence-to-sequence baseline. The results on the SQuAD 2.0 dataset show that our generated unanswerable questions can help to improve multiple reading comprehension models. As for future work, we would like to enhance the ability to utilize antonyms for unanswerable question generation by leveraging external resources.
+
+## Acknowledgments
+
+We thank anonymous reviewers for their helpful comments. Qin and Liu were supported by National Natural Science Foundation of China (NSFC) via grants 61632011 and 61772156.

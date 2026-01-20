@@ -1,0 +1,113 @@
+# Semi-supervised sequence tagging with bidirectional language models
+
+**Paper ID:** 1705.00108
+
+## Abstract
+
+Pre-trained word embeddings learned from unlabeled text have become a standard component of neural network architectures for NLP tasks. However, in most cases, the recurrent network that operates on word-level representations to produce context sensitive representations is trained on relatively little labeled data. In this paper, we demonstrate a general semi-supervised approach for adding pre- trained context embeddings from bidirectional language models to NLP systems and apply it to sequence labeling tasks. We evaluate our model on two standard datasets for named entity recognition (NER) and chunking, and in both cases achieve state of the art results, surpassing previous systems that use other forms of transfer or joint learning with additional labeled data and task specific gazetteers.
+
+## Introduction
+
+Due to their simplicity and efficacy, pre-trained word embedding have become ubiquitous in NLP systems. Many prior studies have shown that they capture useful semantic and syntactic information BIBREF0 , BIBREF1 and including them in NLP systems has been shown to be enormously helpful for a variety of downstream tasks BIBREF2 .
+
+However, in many NLP tasks it is essential to represent not just the meaning of a word, but also the word in context. For example, in the two phrases “A Central Bank spokesman” and “The Central African Republic”, the word `Central' is used as part of both an Organization and Location. Accordingly, current state of the art sequence tagging models typically include a bidirectional recurrent neural network (RNN) that encodes token sequences into a context sensitive representation before making token specific predictions BIBREF3 , BIBREF4 , BIBREF5 , BIBREF6 .
+
+Although the token representation is initialized with pre-trained embeddings, the parameters of the bidirectional RNN are typically learned only on labeled data. Previous work has explored methods for jointly learning the bidirectional RNN with supplemental labeled data from other tasks BIBREF7 , BIBREF3 .
+
+In this paper, we explore an alternate semi-supervised approach which does not require additional labeled data. We use a neural language model (LM), pre-trained on a large, unlabeled corpus to compute an encoding of the context at each position in the sequence (hereafter an LM embedding) and use it in the supervised sequence tagging model. Since the LM embeddings are used to compute the probability of future words in a neural LM, they are likely to encode both the semantic and syntactic roles of words in context.
+
+Our main contribution is to show that the context sensitive representation captured in the LM embeddings is useful in the supervised sequence tagging setting. When we include the LM embeddings in our system overall performance increases from 90.87% to 91.93% INLINEFORM0 for the CoNLL 2003 NER task, a more then 1% absolute F1 increase, and a substantial improvement over the previous state of the art. We also establish a new state of the art result (96.37% INLINEFORM1 ) for the CoNLL 2000 Chunking task.
+
+As a secondary contribution, we show that using both forward and backward LM embeddings boosts performance over a forward only LM. We also demonstrate that domain specific pre-training is not necessary by applying a LM trained in the news domain to scientific papers.
+
+## Overview
+
+The main components in our language-model-augmented sequence tagger (TagLM) are illustrated in Fig. FIGREF4 . After pre-training word embeddings and a neural LM on large, unlabeled corpora (Step 1), we extract the word and LM embeddings for every token in a given input sequence (Step 2) and use them in the supervised sequence tagging model (Step 3).
+
+## Baseline sequence tagging model
+
+Our baseline sequence tagging model is a hierarchical neural tagging model, closely following a number of recent studies BIBREF4 , BIBREF5 , BIBREF3 , BIBREF8 (left side of Figure FIGREF5 ).
+
+Given a sentence of tokens INLINEFORM0 it first forms a representation, INLINEFORM1 , for each token by concatenating a character based representation INLINEFORM2 with a token embedding INLINEFORM3 : DISPLAYFORM0 
+
+ The character representation INLINEFORM0 captures morphological information and is either a convolutional neural network (CNN) BIBREF4 , BIBREF8 or RNN BIBREF3 , BIBREF5 . It is parameterized by INLINEFORM1 with parameters INLINEFORM2 . The token embeddings, INLINEFORM3 , are obtained as a lookup INLINEFORM4 , initialized using pre-trained word embeddings, and fine tuned during training BIBREF2 .
+
+To learn a context sensitive representation, we employ multiple layers of bidirectional RNNs. For each token position, INLINEFORM0 , the hidden state INLINEFORM1 of RNN layer INLINEFORM2 is formed by concatenating the hidden states from the forward ( INLINEFORM3 ) and backward ( INLINEFORM4 ) RNNs. As a result, the bidirectional RNN is able to use both past and future information to make a prediction at token INLINEFORM5 . More formally, for the first RNN layer that operates on INLINEFORM6 to output INLINEFORM7 : DISPLAYFORM0 
+
+ The second RNN layer is similar and uses INLINEFORM0 to output INLINEFORM1 . In this paper, we use INLINEFORM2 layers of RNNs in all experiments and parameterize INLINEFORM3 as either Gated Recurrent Units (GRU) BIBREF9 or Long Short-Term Memory units (LSTM) BIBREF10 depending on the task.
+
+Finally, the output of the final RNN layer INLINEFORM0 is used to predict a score for each possible tag using a single dense layer. Due to the dependencies between successive tags in our sequence labeling tasks (e.g. using the BIOES labeling scheme, it is not possible for I-PER to follow B-LOC), it is beneficial to model and decode each sentence jointly instead of independently predicting the label for each token. Accordingly, we add another layer with parameters for each label bigram, computing the sentence conditional random field (CRF) loss BIBREF11 using the forward-backward algorithm at training time, and using the Viterbi algorithm to find the most likely tag sequence at test time, similar to BIBREF2 .
+
+## Bidirectional LM
+
+A language model computes the probability of a token sequence INLINEFORM0 INLINEFORM1 
+
+Recent state of the art neural language models BIBREF12 use a similar architecture to our baseline sequence tagger where they pass a token representation (either from a CNN over characters or as token embeddings) through multiple layers of LSTMs to embed the history INLINEFORM0 into a fixed dimensional vector INLINEFORM1 . This is the forward LM embedding of the token at position INLINEFORM2 and is the output of the top LSTM layer in the language model. Finally, the language model predicts the probability of token INLINEFORM3 using a softmax layer over words in the vocabulary.
+
+The need to capture future context in the LM embeddings suggests it is beneficial to also consider a backward LM in additional to the traditional forward LM. A backward LM predicts the previous token given the future context. Given a sentence with INLINEFORM0 tokens, it computes INLINEFORM1 
+
+A backward LM can be implemented in an analogous way to a forward LM and produces the backward LM embedding INLINEFORM0 , for the sequence INLINEFORM1 , the output embeddings of the top layer LSTM.
+
+In our final system, after pre-training the forward and backward LMs separately, we remove the top layer softmax and concatenate the forward and backward LM embeddings to form bidirectional LM embeddings, i.e., INLINEFORM0 . Note that in our formulation, the forward and backward LMs are independent, without any shared parameters.
+
+## Combining LM with sequence model
+
+Our combined system, TagLM, uses the LM embeddings as additional inputs to the sequence tagging model. In particular, we concatenate the LM embeddings INLINEFORM0 with the output from one of the bidirectional RNN layers in the sequence model. In our experiments, we found that introducing the LM embeddings at the output of the first layer performed the best. More formally, we simply replace ( EQREF6 ) with DISPLAYFORM0 
+
+There are alternate possibilities for adding the LM embeddings to the sequence model. One possibility adds a non-linear mapping after the concatenation and before the second RNN (e.g. replacing ( EQREF9 ) with INLINEFORM0 where INLINEFORM1 is a non-linear function). Another possibility introduces an attention-like mechanism that weights the all LM embeddings in a sentence before including them in the sequence model. Our initial results with the simple concatenation were encouraging so we did not explore these alternatives in this study, preferring to leave them for future work.
+
+## Experiments
+
+We evaluate our approach on two well benchmarked sequence tagging tasks, the CoNLL 2003 NER task BIBREF13 and the CoNLL 2000 Chunking task BIBREF14 . We report the official evaluation metric (micro-averaged INLINEFORM0 ). In both cases, we use the BIOES labeling scheme for the output tags, following previous work which showed it outperforms other options BIBREF15 . Following BIBREF8 , we use the Senna word embeddings BIBREF2 and pre-processed the text by lowercasing all tokens and replacing all digits with 0.
+
+## Overall system results
+
+Tables TABREF15 and TABREF16 compare results from TagLM with previously published state of the art results without additional labeled data or task specific gazetteers. Tables TABREF17 and TABREF18 compare results of TagLM to other systems that include additional labeled data or gazetteers. In both tasks, TagLM establishes a new state of the art using bidirectional LMs (the forward CNN-BIG-LSTM and the backward LSTM-2048-512).
+
+In the CoNLL 2003 NER task, our model scores 91.93 mean INLINEFORM0 , which is a statistically significant increase over the previous best result of 91.62 INLINEFORM1 from BIBREF8 that used gazetteers (at 95%, two-sided Welch t-test, INLINEFORM2 ).
+
+In the CoNLL 2000 Chunking task, TagLM achieves 96.37 mean INLINEFORM0 , exceeding all previously published results without additional labeled data by more then 1% absolute INLINEFORM1 . The improvement over the previous best result of 95.77 in BIBREF6 that jointly trains with Penn Treebank (PTB) POS tags is statistically significant at 95% ( INLINEFORM2 assuming standard deviation of INLINEFORM3 ).
+
+Importantly, the LM embeddings amounts to an average absolute improvement of 1.06 and 1.37 INLINEFORM0 in the NER and Chunking tasks, respectively.
+
+Although we do not use external labeled data or gazetteers, we found that TagLM outperforms previous state of the art results in both tasks when external resources (labeled data or task specific gazetteers) are available. Furthermore, Tables TABREF17 and TABREF18 show that, in most cases, the improvements we obtain by adding LM embeddings are larger then the improvements previously obtained by adding other forms of transfer or joint learning. For example, BIBREF3 noted an improvement of only 0.06 INLINEFORM0 in the NER task when transfer learning from both CoNLL 2000 chunks and PTB POS tags and BIBREF8 reported an increase of 0.71 INLINEFORM1 when adding gazetteers to their baseline. In the Chunking task, previous work has reported from 0.28 to 0.75 improvement in INLINEFORM2 when including supervised labels from the PTB POS tags or CoNLL 2003 entities BIBREF3 , BIBREF7 , BIBREF6 .
+
+## Analysis
+
+To elucidate the characteristics of our LM augmented sequence tagger, we ran a number of additional experiments on the CoNLL 2003 NER task.
+
+In this experiment, we concatenate the LM embeddings at different locations in the baseline sequence tagger. In particular, we used the LM embeddings INLINEFORM0 to:
+
+augment the input of the first RNN layer; i.e.,
+
+ INLINEFORM0 ,
+
+augment the output of the first RNN layer; i.e., INLINEFORM0 , and
+
+augment the output of the second RNN layer; i.e., INLINEFORM0 .
+
+Table TABREF20 shows that the second alternative performs best. We speculate that the second RNN layer in the sequence tagging model is able to capture interactions between task specific context as expressed in the first RNN layer and general context as expressed in the LM embeddings in a way that improves overall system performance. These results are consistent with BIBREF7 who found that chunking performance was sensitive to the level at which additional POS supervision was added.
+
+In this experiment, we compare six different configurations of the forward and backward language models (including the baseline model which does not use any language models). The results are reported in Table TABREF21 .
+
+We find that adding backward LM embeddings consistently outperforms forward-only LM embeddings, with INLINEFORM0 improvements between 0.22 and 0.27%, even with the relatively small backward LSTM-2048-512 LM.
+
+LM size is important, and replacing the forward LSTM-2048-512 with CNN-BIG-LSTM (test perplexities of 47.7 to 30.0 on 1B Word Benchmark) improves INLINEFORM0 by 0.26 - 0.31%, about as much as adding backward LM. Accordingly, we hypothesize (but have not tested) that replacing the backward LSTM-2048-512 with a backward LM analogous to the CNN-BIG-LSTM would further improve performance.
+
+To highlight the importance of including language models trained on a large scale data, we also experimented with training a language model on just the CoNLL 2003 training and development data. Due to the much smaller size of this data set, we decreased the model size to 512 hidden units with a 256 dimension projection and normalized tokens in the same manner as input to the sequence tagging model (lower-cased, with all digits replaced with 0). The test set perplexities for the forward and backward models (measured on the CoNLL 2003 test data) were 106.9 and 104.2, respectively. Including embeddings from these language models decreased performance slightly compared to the baseline system without any LM. This result supports the hypothesis that adding language models help because they learn composition functions (i.e., the RNN parameters in the language model) from much larger data compared to the composition functions in the baseline tagger, which are only learned from labeled data.
+
+To understand the importance of including a task specific sequence RNN we ran an experiment that removed the task specific sequence RNN and used only the LM embeddings with a dense layer and CRF to predict output tags. In this setup, performance was very low, 88.17 INLINEFORM0 , well below our baseline. This result confirms that the RNNs in the baseline tagger encode essential information which is not encoded in the LM embeddings. This is unsurprising since the RNNs in the baseline tagger are trained on labeled examples, unlike the RNN in the language model which is only trained on unlabeled examples. Note that the LM weights are fixed in this experiment.
+
+A priori, we expect the addition of LM embeddings to be most beneficial in cases where the task specific annotated datasets are small. To test this hypothesis, we replicated the setup from BIBREF3 that samples 1% of the CoNLL 2003 training set and compared the performance of TagLM to our baseline without LM. In this scenario, test INLINEFORM0 increased 3.35% (from 67.66 to 71.01%) compared to an increase of 1.06% INLINEFORM1 for a similar comparison with the full training dataset. The analogous increases in BIBREF3 are 3.97% for cross-lingual transfer from CoNLL 2002 Spanish NER and 6.28% INLINEFORM2 for transfer from PTB POS tags. However, they found only a 0.06% INLINEFORM3 increase when using the full training data and transferring from both CoNLL 2000 chunks and PTB POS tags. Taken together, this suggests that for very small labeled training sets, transferring from other tasks yields a large improvement, but this improvement almost disappears when the training data is large. On the other hand, our approach is less dependent on the training set size and significantly improves performance even with larger training sets.
+
+Our TagLM formulation increases the number of parameters in the second RNN layer INLINEFORM0 due to the increase in the input dimension INLINEFORM1 if all other hyperparameters are held constant. To confirm that this did not have a material impact on the results, we ran two additional experiments. In the first, we trained a system without a LM but increased the second RNN layer hidden dimension so that number of parameters was the same as in TagLM. In this case, performance decreased slightly (by 0.15% INLINEFORM2 ) compared to the baseline model, indicating that solely increasing parameters does not improve performance. In the second experiment, we decreased the hidden dimension of the second RNN layer in TagLM to give it the same number of parameters as the baseline no LM model. In this case, test INLINEFORM3 increased slightly to INLINEFORM4 indicating that the additional parameters in TagLM are slightly hurting performance.
+
+One artifact of our evaluation framework is that both the labeled data in the chunking and NER tasks and the unlabeled text in the 1 Billion Word Benchmark used to train the bidirectional LMs are derived from news articles. To test the sensitivity to the LM training domain, we also applied TagLM with a LM trained on news articles to the SemEval 2017 Shared Task 10, ScienceIE. ScienceIE requires end-to-end joint entity and relationship extraction from scientific publications across three diverse fields (computer science, material sciences, and physics) and defines three broad entity types (Task, Material and Process). For this task, TagLM increased INLINEFORM0 on the development set by 4.12% (from 49.93 to to 54.05%) for entity extraction over our baseline without LM embeddings and it was a major component in our winning submission to ScienceIE, Scenario 1 BIBREF20 . We conclude that LM embeddings can improve the performance of a sequence tagger even when the data comes from a different domain.
+
+## Conclusion
+
+In this paper, we proposed a simple and general semi-supervised method using pre-trained neural language models to augment token representations in sequence tagging models. Our method significantly outperforms current state of the art models in two popular datasets for NER and Chunking. Our analysis shows that adding a backward LM in addition to traditional forward LMs consistently improves performance. The proposed method is robust even when the LM is trained on unlabeled data from a different domain, or when the baseline model is trained on a large number of labeled examples.
+
+## Acknowledgments
+
+We thank Chris Dyer, Julia Hockenmaier, Jayant Krishnamurthy, Matt Gardner and Oren Etzioni for comments on earlier drafts that led to substantial improvements in the final version.

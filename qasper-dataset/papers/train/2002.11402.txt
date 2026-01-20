@@ -1,0 +1,115 @@
+# Detecting Potential Topics In News Using BERT, CRF and Wikipedia
+
+**Paper ID:** 2002.11402
+
+## Abstract
+
+For a news content distribution platform like Dailyhunt, Named Entity Recognition is a pivotal task for building better user recommendation and notification algorithms. Apart from identifying names, locations, organisations from the news for 13+ Indian languages and use them in algorithms, we also need to identify n-grams which do not necessarily fit in the definition of Named-Entity, yet they are important. For example, "me too movement", "beef ban", "alwar mob lynching". In this exercise, given an English language text, we are trying to detect case-less n-grams which convey important information and can be used as topics and/or hashtags for a news. Model is built using Wikipedia titles data, private English news corpus and BERT-Multilingual pre-trained model, Bi-GRU and CRF architecture. It shows promising results when compared with industry best Flair, Spacy and Stanford-caseless-NER in terms of F1 and especially Recall.
+
+## Introduction & Related Work
+
+Named-Entity-Recognition(NER) approaches can be categorised broadly in three types. Detecting NER with predefined dictionaries and rulesBIBREF2, with some statistical approachesBIBREF3 and with deep learning approachesBIBREF4.
+
+Stanford CoreNLP NER is a widely used baseline for many applications BIBREF5. Authors have used approaches of Gibbs sampling and conditional random field (CRF) for non-local information gathering and then Viterbi algorithm to infer the most likely state in the CRF sequence outputBIBREF6.
+
+Deep learning approaches in NLP use document, word or token representations instead of one-hot encoded vectors. With the rise of transfer learning, pretrained Word2VecBIBREF7, GloVeBIBREF8, fasttextBIBREF9 which provides word embeddings were being used with recurrent neural networks (RNN) to detect NERs. Using LSTM layers followed by CRF layes with pretrained word-embeddings as input has been explored hereBIBREF10. Also, CNNs with character embeddings as inputs followed by bi-directional LSTM and CRF layers, were explored hereBIBREF11.
+
+With the introduction of attentions and transformersBIBREF12 many deep architectures emerged in last few years. Approach of using these pretrained models like ElmoBIBREF13, FlairBIBREF14 and BERTBIBREF0 for word representations followed by variety of LSMT and CRF combinations were tested by authors in BIBREF15 and these approaches show state-of-the-art performance.
+
+There are very few approaches where caseless NER task is explored. In this recent paperBIBREF16 authors have explored effects of "Cased" entities and how variety of networks perform and they show that the most effective strategy is a concatenation of cased and lowercased training data, producing a single model with high performance on both cased and uncased text.
+
+In another paperBIBREF17, authors have proposed True-Case pre-training before using BiLSTM+CRF approach to detect NERs effectively. Though it shows good results over previous approaches, it is not useful in Indian Languages context as there is no concept of cases.
+
+In our approach, we are focusing more on data preparation for our definition of topics using some of the state-of-art architectures based on BERT, LSTM/GRU and CRF layers as they have been explored in previous approaches mentioned above. Detecting caseless topics with higher recall and reasonable precision has been given a priority over f1 score. And comparisons have been made with available and ready-to-use open-source libraries from the productionization perspective.
+
+## Data Preparation
+
+We need good amount of data to try deep learning state-of-the-art algorithms. There are lot of open datasets available for names, locations, organisations, but not for topics as defined in Abstract above. Also defining and inferring topics is an individual preference and there are no fix set of rules for its definition. But according to our definition, we can use wikipedia titles as our target topics. English wikipedia dataset has more than 18 million titles if we consider all versions of them till now. We had to clean up the titles to remove junk titles as wikipedia title almost contains all the words we use daily. To remove such titles, we deployed simple rules as follows -
+
+Remove titles with common words : "are", "the", "which"
+
+Remove titles with numeric values : 29, 101
+
+Remove titles with technical components, driver names, transistor names : X00, lga-775
+
+Remove 1-gram titles except locations (almost 80% of these also appear in remaining n-gram titles)
+
+After doing some more cleaning we were left with 10 million titles. We have a dump of 15 million English news articles published in past 4 years. Further, we reduced number of articles by removing duplicate and near similar articles. We used our pre-trained doc2vec models and cosine similarity to detect almost similar news articles. Then selected minimum articles required to cover all possible 2-grams to 5-grams. This step is done to save some training time without loosing accuracy. Do note that, in future we are planning to use whole dataset and hope to see gains in F1 and Recall further. But as per manual inspection, our dataset contains enough variations of sentences with rich vocabulary which contains names of celebrities, politicians, local authorities, national/local organisations and almost all locations, India and International, mentioned in the news text, in last 4 years.
+
+We then created a parallel corpus format as shown in Table 1. Using pre-trained Bert-Tokenizer from hugging-face, converted words in sentences to tokenes. Caseless-BERT pre-trained tokenizer is used. Notice that some of the topic words are broken into tokens and NER tag has been repeated accordingly. For example, in Table 1 second row, word "harassment" is broken into "har ##ass ##ment". Similarly, one "NER" tag is repeated three times to keep the length of sequence-pair same. Finally, for around 3 million news articles, parallel corpus is created, which is of around 150 million sentences, with around 3 billion words (all lower cased) and with around 5 billion tokens approximately.
+
+## Experiments ::: Model Architecture
+
+We tried multiple variations of LSTM and GRU layes, with/without CRF layer. There is a marginal gain in using GRU layers over LSTM. Also, we saw gain in using just one layers of GRU instead of more. Finally, we settled on the architecture, shown in Figure 1 for the final training, based on validation set scores with sample training set.
+
+Text had to be tokenized using pytorch-pretrained-bert as explained above before passing to the network. Architecture is built using tensorflow/keras. Coding inspiration taken from BERT-keras and for CRF layer keras-contrib. If one is more comfortable in pytorch there are many examples available on github, but pytorch-bert-crf-ner is better for an easy start.
+
+We used BERT-Multilingual model so that we can train and fine-tune the same model for other Indian languages. You can take BERT-base or BERT-large for better performance with only English dataset. Or you can use DistilBERT for English and DistilmBERT for 104 languages for faster pre-training and inferences. Also, we did not choose AutoML approach for hyper-parameter tuning which could have resulted in much more accurate results but at the same time could have taken very long time as well. So instead, chose and tweaked the parameters based on initial results.
+
+We trained two models, one with sequence length 512 to capture document level important n-grams and second with sequence length 64 to capture sentence/paragraph level important n-grams. Through experiments it was evident that, sequence length plays a vital role in deciding context and locally/globally important n-grams. Final output is a concatenation of both the model outputs.
+
+## Experiments ::: Training
+
+Trained the topic model on single 32gb NVidia-V100 and it took around 50 hours to train the model with sequence length 512. We had to take 256gb ram machine to accommodate all data in memory for faster read/write. Also, trained model with 64 sequence length in around 17 hours.
+
+It is very important to note that sequence length decides how many bert-tokens you can pass for inference and also decides training time and accuracy. Ideally more is better because inference would be faster as well. For 64 sequence length, we are moving 64-token window over whole token-text and recognising topics in each window. So, one should choose sequence length according to their use case. Also, we have explained before our motivation of choosing 2 separate sequence lengths models.
+
+We stopped the training for both the models when it crossed 70% precision, 90% recall on training and testing sets, as we were just looking to get maximum recall and not bothered about precision in our case. Both the models reach this point at around 16 epochs.
+
+## Experiments ::: Results
+
+Comparison with existing open-source NER libraries is not exactly fair as they are NOT trained for detecting topics and important n-grams, also NOT trained for case-less text. But they are useful in testing and benchmarking if our model is detecting traditional NERs or not, which it should capture, as Wikipedia titles contains almost all Names, Places and Organisation names. You can check the sample output here
+
+Comparisons have been made among Flair-NER, Stanford-caseless-NER (used english.conll.4class.caseless as it performed better than 3class and 7class), Spacy-NER and our models. Of which only Stanford-NER provides case-less models. In Table 2, scores are calculated by taking traditional NER list as reference. In Table 4, same is done with Wikipedia Titles reference set.
+
+As you can see in Table 2 & 3, recall is great for our model but precision is not good as Model is also trying to detect new potential topics which are not there even in reference Wikipedia-Titles and NER sets. In capturing Wikipedia topics our model clearly surpasses other models in all scores.
+
+Spacy results are good despite not being trained for case-less data. In terms of F1 and overall stability Spacy did better than Stanford NER, on our News Validation set. Similarly, Stanford did well in Precision but could not catch up with Spacy and our model in terms of Recall. Flair overall performed poorly, but as said before these open-source models are not trained for our particular use-case.
+
+## Experiments ::: Discussions
+
+Lets check some examples for detailed analysis of the models and their results. Following is the economy related news.
+
+Example 1 : around $1–1.5 trillion or around two percent of global gdp, are lost to corruption every year, president of the natural resource governance institute nrgi has said. speaking at a panel on integrity in public governance during the world bank group and international monetary fund annual meeting on sunday, daniel kaufmann, president of nrgi, presented the statistic, result of a study by the nrgi, an independent, non-profit organisation based in new york. however, according to kaufmann, the figure is only the direct costs of corruption as it does not factor in the opportunities lost on innovation and productivity, xinhua news agency reported. a country that addresses corruption and significantly improves rule of law can expect a huge increase in per capita income in the long run, the study showed. it will also see similar gains in reducing infant mortality and improving education, said kaufmann.
+
+Detected NERs can be seen per model in Table 4. Our model do not capture numbers as we have removed all numbers from my wiki-titles as topics. Reason behind the same is that we can easily write regex to detect currency, prices, time, date and deep learning is not required for the same. Following are few important n-grams only our models was able to capture -
+
+capita income
+
+infant mortality
+
+international monetary fund annual meeting
+
+natural resource governance institute
+
+public governance
+
+At the same time, we can see that Spacy did much better than Stanford-caseless NER and Flair could not capture any of the NERs. Another example of a news in political domain and detected NERs can be seen per model in Table 5.
+
+Example 2 : wearing the aam aadmi party's trademark cap and with copies of the party's five-year report card in hand, sunita kejriwal appears completely at ease. it's a cold winter afternoon in delhi, as the former indian revenue service (irs) officer hits the campaign trail to support her husband and batchmate, chief minister arvind kejriwal. emerging from the background for the first time, she is lending her shoulder to the aap bandwagon in the new delhi assembly constituency from where the cm, then a political novice, had emerged as the giant killer by defeating congress incumbent sheila dikshit in 2013.
+
+Correct n-grams captured only by our model are -
+
+aam aadmi party
+
+aap bandwagon
+
+delhi assembly constituency
+
+giant killer
+
+indian revenue service
+
+political novice
+
+In this example, Stanford model did better and captured names properly, for example "sheila dikshit" which Spacy could not detect but Spacy captureed almost all numeric values along with numbers expressed in words.
+
+It is important to note that, our model captures NERs with some additional words around them. For example, "president of nrgi" is detected by the model but not "ngri". But model output does convey more information than the later. To capture the same for all models (and to make comparison fair), partial match has been enabled and if correct NER is part of predictied NER then later one is marked as matched. This could be the reason for good score for Spacy. Note that, partial match is disabled for Wikipedia Titles match task as shown in Table 3. Here, our model outperformed all the models.
+
+## Conclusion and Future Work
+
+Through this exercise, we were able to test out the best suitable model architecture and data preparation steps so that similar models could be trained for Indian languages. Building cased or caseless NERs for English was not the final goal and this has already been benchmarked and explored before in previous approaches explained in "Related Work" section. We didn't use traditional datasets for model performance comparisons & benchmarks. As mentioned before, all the comparisons are being done with open-source models and libraries from the productionization point of view. We used a english-news validation dataset which is important and relevant to our specific task and all validation datasets and raw output results can be found at our github link .
+
+Wikipedia titles for Indian languages are very very less and resulting tagged data is even less to run deep architectures. We are trying out translations/transliterations of the English-Wiki-Titles to improve Indic-languages entity/topics data.
+
+This approach is also useful in building news-summarizing models as it detects almost all important n-grams present in the news. Output of this model can be introduced in a summarization network to add more bias towards important words and bias for their inclusion.

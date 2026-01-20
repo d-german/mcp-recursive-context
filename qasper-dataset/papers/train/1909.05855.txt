@@ -1,0 +1,157 @@
+# Towards Scalable Multi-domain Conversational Agents: The Schema-Guided Dialogue Dataset
+
+**Paper ID:** 1909.05855
+
+## Abstract
+
+Virtual assistants such as Google Assistant, Alexa and Siri provide a conversational interface to a large number of services and APIs spanning multiple domains. Such systems need to support an ever-increasing number of services with possibly overlapping functionality. Furthermore, some of these services have little to no training data available. Existing public datasets for task-oriented dialogue do not sufficiently capture these challenges since they cover few domains and assume a single static ontology per domain. In this work, we introduce the the Schema-Guided Dialogue (SGD) dataset, containing over 16k multi-domain conversations spanning 16 domains. Our dataset exceeds the existing task-oriented dialogue corpora in scale, while also highlighting the challenges associated with building large-scale virtual assistants. It provides a challenging testbed for a number of tasks including language understanding, slot filling, dialogue state tracking and response generation. Along the same lines, we present a schema-guided paradigm for task-oriented dialogue, in which predictions are made over a dynamic set of intents and slots, provided as input, using their natural language descriptions. This allows a single dialogue system to easily support a large number of services and facilitates simple integration of new services without requiring additional training data. Building upon the proposed paradigm, we release a model for dialogue state tracking capable of zero-shot generalization to new APIs, while remaining competitive in the regular setting.
+
+## Introduction
+
+Virtual assistants help users accomplish tasks including but not limited to finding flights, booking restaurants and, more recently, navigating user interfaces, by providing a natural language interface to services and APIs on the web. The recent popularity of conversational interfaces and the advent of frameworks like Actions on Google and Alexa Skills, which allow developers to easily add support for new services, has resulted in a major increase in the number of application domains and individual services that assistants need to support, following the pattern of smartphone applications.
+
+Consequently, recent work has focused on scalable dialogue systems that can handle tasks across multiple application domains. Data-driven deep learning based approaches for multi-domain modeling have shown promise, both for end-to-end and modular systems involving dialogue state tracking and policy learning. This line of work has been facilitated by the release of multi-domain dialogue corpora such as MultiWOZ BIBREF0, M2M BIBREF1 and FRAMES BIBREF2.
+
+However, existing datasets for multi-domain task-oriented dialogue do not sufficiently capture a number of challenges that arise with scaling virtual assistants in production. These assistants need to support a large BIBREF3, constantly increasing number of services over a large number of domains. In comparison, existing public datasets cover few domains. Furthermore, they define a single static API per domain, whereas multiple services with overlapping functionality, but heterogeneous interfaces, exist in the real world.
+
+To highlight these challenges, we introduce the Schema-Guided Dialogue (SGD) dataset, which is, to the best of our knowledge, the largest public task-oriented dialogue corpus. It exceeds existing corpora in scale, with over 16000 dialogues in the training set spanning 26 services belonging to 16 domains (more details in Table TABREF2). Further, to adequately test the models' ability to generalize in zero-shot settings, the evaluation sets contain unseen services and domains. The dataset is designed to serve as an effective testbed for intent prediction, slot filling, state tracking and language generation, among other tasks in large-scale virtual assistants.
+
+We also propose the schema-guided paradigm for task-oriented dialogue, advocating building a single unified dialogue model for all services and APIs. Using a service's schema as input, the model would make predictions over this dynamic set of intents and slots present in the schema. This setting enables effective sharing of knowledge among all services, by relating the semantic information in the schemas, and allows the model to handle unseen services and APIs. Under the proposed paradigm, we present a novel architecture for multi-domain dialogue state tracking. By using large pretrained models like BERT BIBREF4, our model can generalize to unseen services and is robust to API changes, while achieving state-of-the-art results on the original and updated BIBREF5 MultiWOZ datasets.
+
+## Related Work
+
+Task-oriented dialogue systems have constituted an active area of research for decades. The growth of this field has been consistently fueled by the development of new datasets. Initial datasets were limited to one domain, such as ATIS BIBREF6 for spoken language understanding for flights. The Dialogue State Tracking Challenges BIBREF7, BIBREF8, BIBREF9, BIBREF10 contributed to the creation of dialogue datasets with increasing complexity. Other notable related datasets include WOZ2.0 BIBREF11, FRAMES BIBREF2, M2M BIBREF1 and MultiWOZ BIBREF0. These datasets have utilized a variety of data collection techniques, falling within two broad categories:
+
+Wizard-of-Oz This setup BIBREF12 connects two crowd workers playing the roles of the user and the system. The user is provided a goal to satisfy, and the system accesses a database of entities, which it queries as per the user's preferences. WOZ2.0, FRAMES and MultiWOZ, among others, have utilized such methods.
+
+Machine-machine Interaction A related line of work explores simulation-based dialogue generation, where the user and system roles are simulated to generate a complete conversation flow, which can then be converted to natural language using crowd workers BIBREF1. Such a framework may be cost-effective and error-resistant since the underlying crowd worker task is simpler, and semantic annotations are obtained automatically.
+
+As virtual assistants incorporate diverse domains, recent work has focused on zero-shot modeling BIBREF13, BIBREF14, BIBREF15, domain adaptation and transfer learning techniques BIBREF16. Deep-learning based approaches have achieved state of the art performance on dialogue state tracking tasks. Popular approaches on small-scale datasets estimate the dialogue state as a distribution over all possible slot-values BIBREF17, BIBREF11 or individually score all slot-value combinations BIBREF18, BIBREF19. Such approaches are not practical for deployment in virtual assistants operating over real-world services having a very large and dynamic set of possible values. Addressing these concerns, approaches utilizing a dynamic vocabulary of slot values have been proposed BIBREF20, BIBREF21, BIBREF22.
+
+## The Schema-Guided Dialogue Dataset
+
+An important goal of this work is to create a benchmark dataset highlighting the challenges associated with building large-scale virtual assistants. Table TABREF2 compares our dataset with other public datasets. Our Schema-Guided Dialogue (SGD) dataset exceeds other datasets in most of the metrics at scale. The especially larger number of domains, slots, and slot values, and the presence of multiple services per domain, are representative of these scale-related challenges. Furthermore, our evaluation sets contain many services, and consequently slots, which are not present in the training set, to help evaluate model performance on unseen services.
+
+The 17 domains (`Alarm' domain not included in training) present in our dataset are listed in Table TABREF5. We create synthetic implementations of a total of 34 services or APIs over these domains. Our simulator framework interacts with these services to generate dialogue outlines, which are a structured representation of dialogue semantics. We then used a crowd-sourcing procedure to paraphrase these outlines to natural language utterances. Our novel crowd-sourcing procedure preserves all annotations obtained from the simulator and does not require any extra annotations after dialogue collection. In this section, we describe these steps in detail and then present analyses of the collected dataset.
+
+## The Schema-Guided Dialogue Dataset ::: Services and APIs
+
+We define the schema for a service as a combination of intents and slots with additional constraints, with an example in Figure FIGREF7. We implement all services using a SQL engine. For constructing the underlying tables, we sample a set of entities from Freebase and obtain the values for slots defined in the schema from the appropriate attribute in Freebase. We decided to use Freebase to sample real-world entities instead of synthetic ones since entity attributes are often correlated (e.g, a restaurant's name is indicative of the cuisine served). Some slots like event dates/times and available ticket counts, which are not present in Freebase, are synthetically sampled.
+
+To reflect the constraints present in real-world services and APIs, we impose a few other restrictions. First, our dataset does not expose the set of all possible slot values for some slots. Having such a list is impractical for slots like date or time because they have infinitely many possible values or for slots like movie or song names, for which new values are periodically added. Our dataset specifically identifies such slots as non-categorical and does not provide a set of all possible values for these. We also ensure that the evaluation sets have a considerable fraction of slot values not present in the training set to evaluate the models in the presence of new values. Some slots like gender, number of people, day of the week etc. are defined as categorical and we specify the set of all possible values taken by them. However, these values are not assumed to be consistent across services. E.g., different services may use (`male', `female'), (`M', `F') or (`he', `she') as possible values for gender slot.
+
+Second, real-world services can only be invoked with a limited number of slot combinations: e.g. restaurant reservation APIs do not let the user search for restaurants by date without specifying a location. However, existing datasets simplistically allow service calls with any given combination of slot values, thus giving rise to flows unsupported by actual services or APIs. As in Figure FIGREF7, the different service calls supported by a service are listed as intents. Each intent specifies a set of required slots and the system is not allowed to call this intent without specifying values for these required slots. Each intent also lists a set of optional slots with default values, which the user can override.
+
+## The Schema-Guided Dialogue Dataset ::: Dialogue Simulator Framework
+
+The dialogue simulator interacts with the services to generate dialogue outlines. Figure FIGREF9 shows the overall architecture of our dialogue simulator framework. It consists of two agents playing the roles of the user and the system. Both agents interact with each other using a finite set of actions specified through dialogue acts over a probabilistic automaton designed to capture varied dialogue trajectories. These dialogue acts can take a slot or a slot-value pair as argument. Figure FIGREF13 shows all dialogue acts supported by the agents.
+
+At the start of a conversation, the user agent is seeded with a scenario, which is a sequence of intents to be fulfilled. We identified over 200 distinct scenarios for the training set, each comprising up to 5 intents. For multi-domain dialogues, we also identify combinations of slots whose values may be transferred when switching intents e.g. the 'address' slot value in a restaurant service could be transferred to the 'destination' slot for a taxi service invoked right after.
+
+The user agent then generates the dialogue acts to be output in the next turn. It may retrieve arguments i.e. slot values for some of the generated acts by accessing either the service schema or the raw SQL backend. The acts, combined with the respective parameters yield the corresponding user actions. Next, the system agent generates the next set of actions using a similar procedure. Unlike the user agent, however, the system agent has restricted access to the services (denoted by dashed line), e.g. it can only query the services by supplying values for all required slots for some service call. This helps us ensure that all generated flows are valid.
+
+After an intent is fulfilled through a series of user and system actions, the user agent queries the scenario to proceed to the next intent. Alternatively, the system may suggest related intents e.g. reserving a table after searching for a restaurant. The simulator also allows for multiple intents to be active during a given turn. While we skip many implementation details for brevity, it is worth noting that we do not include any domain-specific constraints in the simulation automaton. All domain-specific constraints are encoded in the schema and scenario, allowing us to conveniently use the simulator across a wide variety of domains and services.
+
+## The Schema-Guided Dialogue Dataset ::: Dialogue Paraphrasing
+
+The dialogue paraphrasing framework converts the outlines generated by the simulator into a natural conversation. Figure FIGREF11a shows a snippet of the dialogue outline generated by the simulator, containing a sequence of user and system actions. The slot values present in these actions are in a canonical form because they obtained directly from the service. However, users may refer to these values in various different ways during the conversation, e.g., “los angeles" may be referred to as “LA" or “LAX". To introduce these natural variations in the slot values, we replace different slot values with a randomly selected variation (kept consistent across user turns in a dialogue) as shown in Figure FIGREF11b.
+
+Next we define a set of action templates for converting each action into a utterance. A few examples of such templates are shown below. These templates are used to convert each action into a natural language utterance, and the resulting utterances for the different actions in a turn are concatenated together as shown in Figure FIGREF11c. The dialogue transformed by these steps is then sent to the crowd workers. One crowd worker is tasked with paraphrasing all utterances of a dialogue to ensure naturalness and coherence.
+
+In our paraphrasing task, the crowd workers are instructed to exactly repeat the slot values in their paraphrases. This not only helps us verify the correctness of the paraphrases, but also lets us automatically obtain slot spans in the generated utterances by string search. This automatic slot span generation greatly reduced the annotation effort required, with little impact on dialogue naturalness, thus allowing us to collect more data with the same resources. Furthermore, it is important to note that this entire procedure preserves all other annotations obtained from the simulator including the dialogue state. Hence, no further annotation is needed.
+
+## The Schema-Guided Dialogue Dataset ::: Dataset Analysis
+
+With over 16000 dialogues in the training set, the Schema-Guided Dialogue dataset is the largest publicly available annotated task-oriented dialogue dataset. The annotations include the active intents and dialogue states for each user utterance and the system actions for every system utterance. We have a few other annotations like the user actions but we withhold them from the public release. These annotations enable our dataset to be used as benchmark for tasks like intent detection, dialogue state tracking, imitation learning of dialogue policy, dialogue act to text generation etc. The schemas contain semantic information about the schema and the constituent intents and slots, in the form of natural language descriptions and other details (example in Figure FIGREF7).
+
+The single-domain dialogues in our dataset contain an average of 15.3 turns, whereas the multi-domain ones contain 23 turns on an average. These numbers are also reflected in Figure FIGREF13 showing the histogram of dialogue lengths on the training set. Table TABREF5 shows the distribution of dialogues across the different domains. We note that the dataset is largely balanced in terms of the domains and services covered, with the exception of Alarm domain, which is only present in the development set. Figure FIGREF13 shows the frequency of dialogue acts contained in the dataset. Note that all dialogue acts except INFORM, REQUEST and GOODBYE are specific to either the user or the system.
+
+## The Schema-Guided Approach
+
+Virtual assistants aim to support a large number of services available on the web. One possible approach is to define a large unified schema for the assistant, to which different service providers can integrate with. However, it is difficult to come up with a common schema covering all use cases. Having a common schema also complicates integration of tail services with limited developer support. We propose the schema-guided approach as an alternative to allow easy integration of new services and APIs.
+
+Under our proposed approach, each service provides a schema listing the supported slots and intents along with their natural language descriptions (Figure FIGREF7 shows an example). These descriptions are used to obtain a semantic representation of these schema elements. The assistant employs a single unified model containing no domain or service specific parameters to make predictions conditioned on these schema elements. For example, Figure FIGREF14 shows how dialogue state representation for the same dialogue can vary for two different services. Here, the departure and arrival cities are captured by analogously functioning but differently named slots in both schemas. Furthermore, values for the number_stops and direct_only slots highlight idiosyncrasies between services interpreting the same concept.
+
+There are many advantages to this approach. First, using a single model facilitates representation and transfer of common knowledge across related services. Second, since the model utilizes semantic representation of schema elements as input, it can interface with unseen services or APIs on which it has not been trained. Third, it is robust to changes like addition of new intents or slots to the service.
+
+## Zero-Shot Dialogue State Tracking
+
+Models in the schema-guided setting can condition on the pertinent services' schemas using descriptions of intents and slots. These models, however, also need access to representations for potentially unseen inputs from new services. Recent pretrained models like ELMo BIBREF23 and BERT BIBREF4 can help, since they are trained on very large corpora. Building upon these, we present our zero-shot schema-guided dialogue state tracking model.
+
+## Zero-Shot Dialogue State Tracking ::: Model
+
+We use a single model, shared among all services and domains, to make these predictions. We first encode all the intents, slots and slot values for categorical slots present in the schema into an embedded representation. Since different schemas can have differing numbers of intents or slots, predictions are made over dynamic sets of schema elements by conditioning them on the corresponding schema embeddings. This is in contrast to existing models which make predictions over a static schema and are hence unable to share knowledge across domains and services. They are also not robust to changes in schema and require the model to be retrained with new annotated data upon addition of a new intent, slot, or in some cases, a slot value to a service.
+
+## Zero-Shot Dialogue State Tracking ::: Model ::: Schema Embedding
+
+This component obtains the embedded representations of intents, slots and categorical slot values in each service schema. Table TABREF18 shows the sequence pairs used for embedding each schema element. These sequence pairs are fed to a pretrained BERT encoder shown in Figure FIGREF20 and the output $\mathbf {u}_{\texttt {CLS}}$ is used as the schema embedding.
+
+For a given service with $I$ intents and $S$ slots, let $\lbrace \mathbf {i}_j\rbrace $, ${1 \le j \le I}$ and $\lbrace \mathbf {s}_j\rbrace $, ${1 \le j \le S}$ be the embeddings of all intents and slots respectively. As a special case, we let $\lbrace \mathbf {s}^n_j\rbrace $, ${1 \le j \le N \le S}$ denote the embeddings for the $N$ non-categorical slots in the service. Also, let $\lbrace \textbf {v}_j^k\rbrace $, $1 \le j \le V^k$ denote the embeddings for all possible values taken by the $k^{\text{th}}$ categorical slot, $1 \le k \le C$, with $C$ being the number of categorical slots and $N + C = S$. All these embeddings are collectively called schema embeddings.
+
+## Zero-Shot Dialogue State Tracking ::: Model ::: Utterance Encoding
+
+Like BIBREF24, we use BERT to encode the user utterance and the preceding system utterance to obtain utterance pair embedding $\mathbf {u} = \mathbf {u}_{\texttt {CLS}}$ and token level representations $\mathbf {t}_1, \mathbf {t}_2 \cdots \mathbf {t}_M$, $M$ being the total number of tokens in the two utterances. The utterance and schema embeddings are used together to obtain model predictions using a set of projections (defined below).
+
+## Zero-Shot Dialogue State Tracking ::: Model ::: Projection
+
+Let $\mathbf {x}, \mathbf {y} \in \mathbb {R}^d$. For a task $K$, we define $\mathbf {l} = \mathcal {F}_K(\mathbf {x}, \mathbf {y}, p)$ as a projection transforming $\mathbf {x}$ and $\mathbf {y}$ into the vector $\mathbf {l} \in \mathbb {R}^p$ using Equations DISPLAY_FORM22-. Here, $\mathbf {h_1},\mathbf {h_2} \in \mathbb {R}^d$, $W^K_i$ and $b^K_i$ for $1 \le i \le 3$ are trainable parameters of suitable dimensions and $A$ is the activation function. We use $\texttt {gelu}$ BIBREF25 activation as in BERT.
+
+## Zero-Shot Dialogue State Tracking ::: Model ::: Active Intent
+
+For a given service, the active intent denotes the intent requested by the user and currently being fulfilled by the system. It takes the value “NONE" if no intent for the service is currently being processed. Let $\mathbf {i}_0$ be a trainable parameter in $\mathbb {R}^d$ for the “NONE" intent. We define the intent network as below.
+
+The logits $l^{j}_{\text{int}}$ are normalized using softmax to yield a distribution over all $I$ intents and the “NONE" intent. During inference, we predict the highest probability intent as active.
+
+## Zero-Shot Dialogue State Tracking ::: Model ::: Requested Slots
+
+These are the slots whose values are requested by the user in the current utterance. Projection $\mathcal {F}_{\text{req}}$ predicts logit $l^j_{\text{req}}$ for the $j^{\text{th}}$ slot. Obtained logits are normalized using sigmoid to get a score in $[0,1]$. During inference, all slots with $\text{score} > 0.5$ are predicted as requested.
+
+## Zero-Shot Dialogue State Tracking ::: Model ::: User Goal
+
+We define the user goal as the user constraints specified over the dialogue context till the current user utterance. Instead of predicting the entire user goal after each user utterance, we predict the difference between the user goal for the current turn and preceding user turn. During inference, the predicted user goal updates are accumulated to yield the predicted user goal. We predict the user goal updates in two stages. First, for each slot, a distribution of size 3 denoting the slot status and taking values none, dontcare and active is obtained by normalizing the logits obtained in equation DISPLAY_FORM28 using softmax. If the status of a slot is predicted to be none, its assigned value is assumed to be unchanged. If the prediction is dontcare, then the special dontcare value is assigned to it. Otherwise, a slot value is predicted and assigned to it in the second stage.
+
+In the second stage, equation is used to obtain a logit for each value taken by each categorical slot. Logits for a given categorical slot are normalized using softmax to get a distribution over all possible values. The value with the maximum mass is assigned to the slot. For each non-categorical slot, logits obtained using equations and are normalized using softmax to yield two distributions over all tokens. These two distributions respectively correspond to the start and end index of the span corresponding to the slot. The indices $p \le q$ maximizing $start[p] + end[q]$ are predicted to be the span boundary and the corresponding value is assigned to the slot.
+
+## Zero-Shot Dialogue State Tracking ::: Evaluation
+
+We consider the following metrics for evaluation of the dialogue state tracking task:
+
+Active Intent Accuracy: The fraction of user turns for which the active intent has been correctly predicted.
+
+Requested Slot F1: The macro-averaged F1 score for requested slots over all eligible turns. Turns with no requested slots in ground truth and predictions are skipped.
+
+Average Goal Accuracy: For each turn, we predict a single value for each slot present in the dialogue state. The slots which have a non-empty assignment in the ground truth dialogue state are considered for accuracy. This is the average accuracy of predicting the value of a slot correctly. A fuzzy matching score is used for non-categorical slots to reward partial matches with the ground truth.
+
+Joint Goal Accuracy: This is the average accuracy of predicting all slot assignments for a turn correctly. For non-categorical slots a fuzzy matching score is used.
+
+## Zero-Shot Dialogue State Tracking ::: Evaluation ::: Performance on other datasets
+
+We evaluate our model on public datasets WOZ2.0, MultiWOZ 2.0 and the updated MultiWOZ 2.1 BIBREF5. As results in Table TABREF37 show, our model performs competitively on all these datasets. Furthermore, we obtain state-of-the-art joint goal accuracies of 0.516 on MultiWOZ 2.0 and 0.489 on MultiWOZ 2.1 test sets respectively, exceeding the best-known results of 0.486 and 0.456 on these datasets as reported in BIBREF5.
+
+## Zero-Shot Dialogue State Tracking ::: Evaluation ::: Performance on SGD
+
+The model performs well for Active Intent Accuracy and Requested Slots F1 across both seen and unseen services, shown in Table TABREF37. For joint goal and average goal accuracy, the model performs better on seen services compared to unseen ones (Figure FIGREF38). The main reason for this performance difference is a significantly higher OOV rate for slot values of unseen services.
+
+## Zero-Shot Dialogue State Tracking ::: Evaluation ::: Performance on different domains (SGD)
+
+The model performance also varies across various domains. The performance for the different domains is shown in (Table TABREF39) below. We observe that one of the factors affecting the performance across domains is still the presence of the service in the training data (seen services). Among the seen services, those in the `Events' domain have a very low OOV rate for slot values and the largest number of training examples which might be contributing to the high joint goal accuracy. For unseen services, we notice that the `Services' domain has a lower joint goal accuracy because of higher OOV rate and higher average turns per dialogue. For `Services' and `Flights' domains, the difference between joint goal accuracy and average accuracy indicates a possible skew in performance across slots where the performance on a few of the slots is much worse compared to all the other slots, thus considerably degrading the joint goal accuracy. The `RideSharing' domain also exhibits poor performance, since it possesses the largest number of the possible slot values across the dataset. We also notice that for categorical slots, with similar slot values (e.g. “Psychologist" and “Psychiatrist"), there is a very weak signal for the model to distinguish between the different classes, resulting in inferior performance.
+
+## Discussion
+
+It is often argued that simulation-based data collection does not yield natural dialogues or sufficient coverage, when compared to other approaches such as Wizard-of-Oz. We argue that simulation-based collection is a better alternative for collecting datasets like this owing to the factors below.
+
+Fewer Annotation Errors: All annotations are automatically generated, so these errors are rare. In contrast, BIBREF5 reported annotation errors in 40% of turns in MultiWOZ 2.0 which utilized a Wizard-of-Oz setup.
+
+Simpler Task: The crowd worker task of paraphrasing a readable utterance for each turn is simple. The error-prone annotation task requiring skilled workers is not needed.
+
+Low Cost: The simplicity of the crowd worker task and lack of an annotation task greatly cut data collection costs.
+
+Better Coverage: A wide variety of dialogue flows can be collected and specific usecases can be targeted.
+
+## Conclusions
+
+We presented the Schema-Guided Dialogue dataset to encourage scalable modeling approaches for virtual assistants. We also introduced the schema-guided paradigm for task-oriented dialogue that simplifies the integration of new services and APIs with large scale virtual assistants. Building upon this paradigm, we present a scalable zero-shot dialogue state tracking model achieving state-of-the-art results.
+
+## Conclusions ::: Acknowledgements
+
+The authors thank Guan-Lin Chao for help with model design and implementation, and Amir Fayazi and Maria Wang for help with data collection.

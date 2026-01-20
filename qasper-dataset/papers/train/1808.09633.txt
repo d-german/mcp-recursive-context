@@ -1,0 +1,149 @@
+# Improved Semantic-Aware Network Embedding with Fine-Grained Word Alignment
+
+**Paper ID:** 1808.09633
+
+## Abstract
+
+Network embeddings, which learn low-dimensional representations for each vertex in a large-scale network, have received considerable attention in recent years. For a wide range of applications, vertices in a network are typically accompanied by rich textual information such as user profiles, paper abstracts, etc. We propose to incorporate semantic features into network embeddings by matching important words between text sequences for all pairs of vertices. We introduce a word-by-word alignment framework that measures the compatibility of embeddings between word pairs, and then adaptively accumulates these alignment features with a simple yet effective aggregation function. In experiments, we evaluate the proposed framework on three real-world benchmarks for downstream tasks, including link prediction and multi-label vertex classification. Results demonstrate that our model outperforms state-of-the-art network embedding methods by a large margin.
+
+## Introduction
+
+Networks are ubiquitous, with prominent examples including social networks (e.g., Facebook, Twitter) or citation networks of research papers (e.g., arXiv). When analyzing data from these real-world networks, traditional methods often represent vertices (nodes) as one-hot representations (containing the connectivity information of each vertex with respect to all other vertices), usually suffering from issues related to the inherent sparsity of large-scale networks. This results in models that are not able to fully capture the relationships between vertices of the network BIBREF0 , BIBREF1 . Alternatively, network embedding (i.e., network representation learning) has been considered, representing each vertex of a network with a low-dimensional vector that preserves information on its similarity relative to other vertices. This approach has attracted considerable attention in recent years BIBREF2 , BIBREF0 , BIBREF3 , BIBREF4 , BIBREF5 , BIBREF6 , BIBREF7 , BIBREF8 .
+
+Traditional network embedding approaches focus primarily on learning representations of vertices that preserve local structure, as well as internal structural properties of the network. For instance, Isomap BIBREF9 , LINE BIBREF3 , and Grarep BIBREF10 were proposed to preserve first-, second-, and higher-order proximity between nodes, respectively. DeepWalk BIBREF0 , which learns vertex representations from random-walk sequences, similarly, only takes into account structural information of the network. However, in real-world networks, vertices usually contain rich textual information (e.g., user profiles in Facebook, paper abstracts in arXiv, user-generated content on Twitter, etc.), which may be leveraged effectively for learning more informative embeddings.
+
+To address this opportunity, BIBREF11 proposed text-associated DeepWalk, to incorporate textual information into the vectorial representations of vertices (embeddings). BIBREF12 employed deep recurrent neural networks to integrate the information from vertex-associated text into network representations. Further, BIBREF13 proposed to more effectively model the semantic relationships between vertices using a mutual attention mechanism.
+
+Although these methods have demonstrated performance gains over structure-only network embeddings, the relationship between text sequences for a pair of vertices is accounted for solely by comparing their sentence embeddings. However, as shown in Figure 1 , to assess the similarity between two research papers, a more effective strategy would compare and align (via local-weighting) individual important words (keywords) within a pair of abstracts, while information from other words (e.g., stop words) that tend to be less relevant can be effectively ignored (down-weighted). This alignment mechanism is difficult to accomplish in models where text sequences are first embedded into a common space and then compared in pairs BIBREF14 , BIBREF15 , BIBREF16 , BIBREF17 , BIBREF18 .
+
+We propose to learn a semantic-aware Network Embedding (NE) that incorporates word-level alignment features abstracted from text sequences associated with vertex pairs. Given a pair of sentences, our model first aligns each word within one sentence with keywords from the other sentence (adaptively up-weighted via an attention mechanism), producing a set of fine-grained matching vectors. These features are then accumulated via a simple but efficient aggregation function, obtaining the final representation for the sentence. As a result, the word-by-word alignment features (as illustrated in Figure 1 ) are explicitly and effectively captured by our model. Further, the learned network embeddings under our framework are adaptive to the specific (local) vertices that are considered, and thus are context-aware and especially suitable for downstream tasks, such as link prediction. Moreover, since the word-by-word matching procedure introduced here is highly parallelizable and does not require any complex encoding networks, such as Long Short-Term Memory (LSTM) or Convolutional Neural Networks (CNNs), our framework requires significantly less time for training, which is attractive for large-scale network applications.
+
+We evaluate our approach on three real-world datasets spanning distinct network-embedding-based applications: link prediction, vertex classification and visualization. We show that the proposed word-by-word alignment mechanism efficiently incorporates textual information into the network embedding, and consistently exhibits superior performance relative to several competitive baselines. Analyses considering the extracted word-by-word pairs further validate the effectiveness of the proposed framework.
+
+## Problem Definition
+
+A network (graph) is defined as $G = \lbrace V,E\rbrace $ , where $V$ and $E$ denote the set of $N$ vertices (nodes) and edges, respectively, where elements of $E$ are two-element subsets of $V$ . Here we only consider undirected networks, however, our approach (introduced below) can be readily extended to the directed case. We also define $W$ , the symmetric $\mathbb {R}^{N \times N}$ matrix whose elements, $w_{ij}$ , denote the weights associated with edges in $V$ , and $V$0 , the set of text sequences assigned to each vertex. Edges and weights contain the structural information of the network, while the text can be used to characterize the semantic properties of each vertex. Given network $V$1 , with the network embedding we seek to encode each vertex into a low-dimensional vector $V$2 (with dimension much smaller than $V$3 ), while preserving structural and semantic features of $V$4 .
+
+## Framework Overview
+
+To incorporate both structural and semantic information into the network embeddings, we specify two types of (latent) embeddings: ( $i$ ) $_s$ , the structural embedding; and ( $ii$ ) $_t$ , the textual embedding. Specifically, each vertex in $G$ is encoded into a low-dimensional embedding $= [_s; _t]$ . To learn these embeddings, we specify an objective that leverages the information from both $W$ and $T$ , denoted as 
+
+$$= \sum _{e \in E} _{\textrm {struct}}(e) + _{\textrm {text}}(e) + _{\textrm {joint}}(e) \,,$$   (Eq. 4) 
+
+ where $_{\textrm {struct}}$ , $_{\textrm {text}}$ and $_{\textrm {joint}}$ denote structure, text, and joint structure-text training losses, respectively. For a vertex pair $\lbrace v_i,v_j\rbrace $ weighted by $w_{ij}$ , $_{\textrm {struct}}(v_i, v_j)$ in ( 4 ) is defined as BIBREF3 
+
+$$_{\textrm {struct}}(v_i, v_j) = w_{ij} \log p(^i_s|^j_{s}) \,,$$   (Eq. 5) 
+
+ where $p(^i_s|^j_{s})$ denotes the conditional probability between structural embeddings for vertices $\lbrace v_i,v_j\rbrace $ . To leverage the textual information in $T$ , similar text-specific and joint structure-text training objectives are also defined 
+
+$$_{\textrm {text}}(v_i, v_j) & = w_{ij} \alpha _1 \log p(^i_t|^j_{t}) \,, \\
+_{\textrm {joint}}(v_i, v_j) & = w_{ij} \alpha _2 \log p(^i_t|^j_{s}) \\
+& + w_{ij}\alpha _3 \log p(^i_s|^j_{t}) \,,$$   (Eq. 6) 
+
+ where $p(^i_t|^j_t)$ and $p(^i_t|^j_s)$ (or $p(^i_s|^j_t)$ ) denote the conditional probability for a pair of text embeddings and text embedding given structure embedding (or vice versa), respectively, for vertices $\lbrace v_i,v_j\rbrace $ . Further, $\alpha _1$ , $\alpha _2$ and $\alpha _3$ are hyperparameters that balance the impact of the different training-loss components. Note that structural embeddings, $_s$ , are treated directly as parameters, while the text embeddings $_t$ are learned based on the text sequences associated with vertices.
+
+For all conditional probability terms, we follow BIBREF3 and consider the second-order proximity between vertex pairs. Thus, for vertices $\lbrace v_i,v_j\rbrace $ , the probability of generating $_i$ conditioned on $_j$ may be written as 
+
+$$p(^i|^j) = \frac{\exp \left({^j}^T ^i\right)}{\textstyle {\sum }_{k=1}^{N}\exp \left({^j}^T ^k\right)} \,.$$   (Eq. 7) 
+
+ Note that ( 7 ) can be applied to both structural and text embeddings in ( 5 ) and ( 6 ).
+
+Inspired by BIBREF13 , we further assume that vertices in the network play different roles depending on the vertex with which they interact. Thus, for a given vertex, the text embedding, $_t$ , is adaptive (specific) to the vertex it is being conditioned on. This type of context-aware textual embedding has demonstrated superior performance relative to context-free embeddings BIBREF13 . In the following two sections, we describe our strategy for encoding the text sequence associated with an edge into its adaptive textual embedding, via word-by-context and word-by-word alignments.
+
+## Word-by-Context Alignment
+
+We first introduce our base model, which re-weights the importance of individual words within a text sequence in the context of the edge being considered. Consider text sequences associated with two vertices connected by an edge, denoted $t_a$ and $t_b$ and contained in $T$ . Text sequences $t_a$ and $t_b$ are of lengths $M_a$ and $M_b$ , respectively, and are represented by $_a\in \mathbb {R}^{d\times M_a}$ and $_b\in \mathbb {R}^{d\times M_b}$ , respectively, where $d$ is the dimension of the word embedding. Further, $t_b$0 denotes the embedding of the $t_b$1 -th word in sequence $t_b$2 .
+
+Our goal is to encode text sequences $t_a$ and $t_b$ into counterpart-aware vectorial representations $_a$ and $_b$ . Thus, while inferring the adaptive textual embedding for sentence $t_a$ , we propose re-weighting the importance of each word in $t_a$ to explicitly account for its alignment with sentence $t_b$ . The weight $\alpha _i$ , corresponding to the $i$ -th word in $t_a$ , is generated as: 
+
+$$\alpha _i = \frac{\exp (\tanh (_1 _b + _2 ^{(i)}_a))}{\sum _{j = 1}^{M_a} \exp (\tanh (_1 _b + _2 ^{(j)}_a))} \,,$$   (Eq. 9) 
+
+ where $_1$ and $_2$ are model parameters and $_b = \sum _{i = 1}^{M_b} x^b_i$ is the context vector of sequence $t_b$ , obtained by simply averaging over all the word embeddings in the sequence, similar to fastText BIBREF19 . Further, the word-by-context embedding for sequence $t_a$ is obtained by taking the weighted average over all word embeddings 
+
+$$h_a = \textstyle {\sum }_{i = 1}^{M_a} \alpha _i ^{(i)}_a \,.$$   (Eq. 10) 
+
+ Intuitively, $\alpha _i$ may be understood as the relevance score between the $i$ th word in $t_a$ and sequence $t_b$ . Specifically, keywords within $t_a$ , in the context of $t_b$ , should be assigned larger weights, while less important words will be correspondingly down-weighted. Similarly, $h_b$ is encoded as a weighted embedding using ( 9 ) and ( 10 ).
+
+## Fine-Grained Word-by-Word Alignment
+
+With the alignment in the previous section, word-by-context matching features $\alpha _i$ are modeled; however, the word-by-word alignment information (fine-grained), which is key to characterize the relationship between two vertices (as discussed in the above), is not explicitly captured. So motivated, we further propose an architecture to explicitly abstract word-by-word alignment information from $t_a$ and $t_b$ , to learn the relationship between the two vertices. This is inspired by the recent success of Relation Networks (RNs) for relational reasoning BIBREF20 .
+
+As illustrated in Figure 2 , given two input embedding matrices $_a$ and $_b$ , we first compute the affinity matrix $\in \mathbb {R}^{M_b\times M_a}$ , whose elements represent the affinity scores corresponding to all word pairs between sequences $t_a$ and $t_b$ 
+
+$$= ^T_b_a \,.$$   (Eq. 13) 
+
+ Subsequently, we compute the context-aware matrix for sequence $t_b$ as 
+
+$$_b = \textrm {softmax}() \,, \qquad \widetilde{}_b = _b_b \,,$$   (Eq. 14) 
+
+ where the $\textrm {softmax}(\cdot )$ function is applied column-wise to $$ , and thus $_b$ contains the attention weights (importance scores) across sequence $t_b$ (columns), which account for each word in sequence $t_a$ (rows). Thus, matrix $\widetilde{}_b \in \mathbb {R}^{d\times M_a}$ in ( 14 ) constitutes an attention-weighted embedding for $_b$ . Specifically, the $i$ -th column of $\widetilde{}_b$ , denoted as $\widetilde{}^{(i)}_b$ , can be understood as a weighted average over all the words in $$0 , where higher attention weights indicate better alignment (match) with the $$1 -th word in $$2 .
+
+To abstract the word-by-word alignments, we compare $^{(i)}_a$ with $\widetilde{}^{(i)}_b$ , for $i=1,2,...,M_a$ , to obtain the corresponding matching vector 
+
+$$^{(i)}_a=f_{\textrm {align}}\left(^{(i)}_a,\widetilde{}^{(i)}_b\right) \,,$$   (Eq. 15) 
+
+ where $f_{\textrm {align}}(\cdot )$ represents the alignment function. Inspired by the observation in BIBREF16 that simple comparison/alignment functions based on element-wise operations exhibit excellent performance in matching text sequences, here we use a combination of element-wise subtraction and multiplication as $
+f_{\textrm {align}}(^{(i)}_a,\widetilde{}^{(i)}_a) = [^{(i)}_a - \widetilde{}^{(i)}_a; ^{(i)}_a \odot \widetilde{}^{(i)}_a] \,,
+$ 
+
+ where $\odot $ denotes the element-wise Hadamard product, then these two operations are concatenated to produce the matching vector $^{(i)}_a$ . Note these operators may be used individually or combined as we will investigate in our experiments.
+
+Subsequently, matching vectors from ( 15 ) are aggregated to produce the final textual embedding $_t^a$ for sequence $t_a$ as 
+
+$$_t^a=f_{\textrm {aggregate}}\left(^{(1)}_a,^{(2)}_a,...,^{(M_a)}_a\right) \,,$$   (Eq. 16) 
+
+ where $f_{\textrm {aggregate}}$ denotes the aggregation function, which we specify as the max-pooling pooling operation. Notably, other commutative operators, such as summation or average pooling, can be otherwise employed. Although these aggregation functions are simple and invariant to the order of words in input sentences, they have been demonstrated to be highly effective in relational reasoning BIBREF15 , BIBREF20 . To further explore this, in Section "Ablation Study" , we conduct an ablation study comparing different choices of alignment and aggregation functions.
+
+The representation $_b$ can be obtained in a similar manner through ( 13 ), ( 14 ), ( 15 ) and ( 16 ), but replacing ( 13 ) with $= ^T_a_b$ (its transpose). Note that this word-by-word alignment is more computationally involved than word-by-context; however, the former has substantially fewer parameters to learn, provided we no longer have to estimate the parameters in ( 9 ).
+
+## Training and Inference
+
+For large-scale networks, computing and optimizing the conditional probabilities in ( 4 ) using ( 7 ) is computationally prohibitive, since it requires the summation over all vertices $V$ in $G$ . To address this limitation, we leverage the negative sampling strategy introduced by BIBREF21 , i.e., we perform computations by sampling a subset of negative edges. As a result, the conditional in ( 7 ) can be rewritten as: $ \begin{aligned}
+p(^i|^j) & = \log \sigma \left({^j}^T ^i\right) \\
+& + \sum _{i=1}^{K} \mathbb {E}_{^i\sim P(v)}\left[\log \sigma (-{^j}^T ^i)\right] \,,
+\end{aligned}
+$ 
+
+ where $\sigma (x) = 1/(1+\exp (-x))$ is the sigmoid function. Following BIBREF21 , we set the noise distribution $P(v) \propto d_v^{3/4}$ , where $d_v$ is the out-degree of vertex $v\in V$ . The number of negative samples $K$ is treated as a hyperparameter. We use Adam BIBREF22 to update the model parameters while minimizing the objective in ( 4 ).
+
+## Related Work
+
+Network embedding methods can be divided into two categories: (i) methods that solely rely on the structure, e.g., vertex information; and (ii) methods that leverage both the structure the network and the information associated with its vertices.
+
+For the first type of models, DeepWalk BIBREF0 has been proposed to learn node representations by generating node contexts via truncated random walks; it is similar to the concept of Skip-Gram BIBREF21 , originally introduced for learning word embeddings. LINE BIBREF3 proposed a principled objective to explicitly capture first-order and second-order proximity information from the vertices of a network. Further, BIBREF4 introduced a biased random walk procedure to generate the neighborhood for a vertex, which infers the node representations by maximizing the likelihood of preserving the local context information of vertices. However, these algorithms generally ignore rich heterogeneous information associated with vertices. Here, we focus on incorporating textual information into network embeddings.
+
+To learn semantic-aware network embeddings, Text-Associated DeepWalk (TADW) BIBREF11 proposed to integrate textual features into network representations with matrix factorization, by leveraging the equivalence between DeepWalk and matrix factorization. CENE (Content-Enhanced Network Embedding) BIBREF12 used bidirectional recurrent neural networks to abstract the semantic information associated with vertices, which further demonstrated the advantages of employing textual information. To capture the interaction between sentences of vertex pairs, BIBREF13 further proposed Context-Aware Network Embedding (CANE), that employs a mutual attention mechanism to adaptively account for the textual information from neighboring vertices. Despite showing improvement over structure-only models, these semantic-aware methods cannot capture word-level alignment information, which is important for inferring the relationship between node pairs, as previously discussed. In this work, we introduce a Word-Alignment-based Network Embedding (WANE) framework, which aligns and aggregates word-by-word matching features in an explicit manner, to obtain more informative network representations.
+
+## Experimental Results
+
+We experiment with three variants for our WANE model: (i) WANE: where the word embeddings of each text sequence are simply average to obtain the sentence representations, similar to BIBREF19 , BIBREF25 . (ii) WANE-wc: where the textual embeddings are inferred with word-by-context alignment. (iii) WANE-ww: where the word-by-word alignment mechanism is leveraged to capture word-by-word matching features between available sequence pairs.
+
+## Link Prediction
+
+Table 1 presents link prediction results for all models on Cora dataset, where different ratios of edges are used for training. It can be observed that when only a small number of edges are available, e.g., $15\%$ , the performances of structure-only methods is much worse than semantic-aware models that have taken textual information into consideration The perfromance gap tends to be smaller when a larger proportion of edges are employed for training. This highlights the importance of incorporating associated text sequences into network embeddings, especially in the case of representing a relatively sparse network. More importantly, the proposed WANE-ww model consistently outperforms other semantic-aware NE models by a substantial margin, indicating that our model better abstracts word-by-word alignment features from the text sequences available, thus yields more informative network representations.
+
+Further, WANE-ww also outperforms WANE or WANE-wc on a wide range of edge training proportions. This suggests that: (i) adaptively assigning different weights to each word within a text sequence (according to its paired sequence) tends to be a better strategy than treating each word equally (as in WANE). (ii) Solely considering the context-by-word alignment features (as in WANE-wc) is not as efficient as abstracting word-by-word matching information from text sequences. We observe the same trend and the superiority of our WANE-ww models on the other two datasets, HepTh and Zhihu datasets, as shown in Table 2 and 3 , respectively.
+
+## Multi-label Vertex Classification
+
+We further evaluate the effectiveness of proposed framework on vertex classification tasks with the Cora dataset. Similar to BIBREF13 , we generate the global embedding for each vertex by taking the average over its context-aware embeddings with all other connected vertices. As shown in Figure 3 (c), semantic-aware NE methods (including naive combination, TADW, CENE, CANE) exhibit higher test accuracies than semantic-agnostic models, demonstrating the advantages of incorporating textual information. Moreover, WANE-ww consistently outperforms other competitive semantic-aware models on a wide range of labeled proportions, suggesting that explicitly capturing word-by-word alignment features is not only useful for vertex-pair-based tasks, such as link prediction, but also results in better global embeddings which are required for vertex classification tasks. These observations further demonstrate that WANE-ww is an effective and robust framework to extract informative network representations.
+
+We further consider the case where the training ratio is less than $10\%$ , and evaluate the learned network embedding with a semi-supervised classifier. Following BIBREF11 , we employ a Transductive SVM (TSVM) classifier with a linear kernel BIBREF26 for fairness. As illustrated in Table 4 , the proposed WANE-ww model exhibits superior performances in most cases. This may be due to the fact that WANE-ww extracts information from the vertices and text sequences jointly, thus the obtained vertex embeddings are less noisy and perform more consistently with relatively small training ratios BIBREF11 .
+
+## Ablation Study
+
+Motivated by the observation in BIBREF16 that the advantages of different functions to match two vectors vary from task to task, we further explore the choice of alignment and aggregation functions in our WANE-ww model. To match the word pairs between two sequences, we experimented with three types of operations: subtraction, multiplication, and Sub & Multi (the concatenation of both approaches). As shown in Figure 3 (a) and 3 (b), element-wise subtraction tends to be the most effective operation performance-wise on both Cora and Zhihu datasets, and performs comparably to Sub & Multi on the HepTh dataset. This finding is consistent with the results in BIBREF16 , where they found that simple comparison functions based on element-wise operations work very well on matching text sequences.
+
+In terms of the aggregation functions, we compare (one-layer) CNN, mean-pooling, and max-pooling operations to accumulate the matching vectors. As shown in Figure 3 (b), max-pooling has the best empirical results on all three datasets. This may be attributed to the fact that the max-pooling operation is better at selecting important word-by-word alignment features, among all matching vectors available, to infer the relationship between vertices.
+
+## Qualitative Analysis
+
+To visualize the learned network representations, we further employ $t$ -SNE to map the low-dimensional vectors of the vertices to a 2-D embedding space. We use the Cora dataset because there are labels associated with each vertex and WANE-ww to obtain the network embeddings.
+
+As shown in Figure 4 where each point indicates one paper (vertex), and the color of each point indicates the category it belongs to, the embeddings of the same label are indeed very close in the 2-D plot, while those with different labels are relatively farther from each other. Note that the model is not trained with any label information, indicating that WANE-ww has extracted meaningful patterns from the text and vertex information available.
+
+The proposed word-by-word alignment mechanism can be used to highlight the most informative words (and the corresponding matching features) wrt the relationship between vertices. We visualize the norm of matching vector obtained in ( 15 ) in Figure 5 for the Cora dataset. It can be observed that matched key words, e.g., `MCMC', `convergence', between the text sequences are indeed assigned higher values in the matching vectors. These words would be selected preferentially by the final max-pooling aggregation operation. This indicates that WANE-ww is able to abstract important word-by-word alignment features from paired text sequences.
+
+## Conclusions
+
+We have presented a novel framework to incorporate the semantic information from vertex-associated text sequences into network embeddings. An align-aggregate framework is introduced, which first aligns a sentence pair by capturing the word-by-word matching features, and then adaptively aggregating these word-level alignment information with an efficient max-pooling function. The semantic features abstracted are further encoded, along with the structural information, into a shared space to obtain the final network embedding. Compelling experimental results on several tasks demonstrated the advantages of our approach. In future work, we aim to leverage abundant unlabeled text data to abstract more informative sentence representations BIBREF27 , BIBREF28 , BIBREF29 , BIBREF30 . Another interesting direction is to learn binary and compact network embedding, which could be more efficient in terms of both computation and memory, relative to its continuous counterpart BIBREF31 .

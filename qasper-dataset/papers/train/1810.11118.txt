@@ -1,0 +1,165 @@
+# A Large-Scale Corpus for Conversation Disentanglement
+
+**Paper ID:** 1810.11118
+
+## Abstract
+
+Disentangling conversations mixed together in a single stream of messages is a difficult task, made harder by the lack of large manually annotated datasets. We created a new dataset of 77,563 messages manually annotated with reply-structure graphs that both disentangle conversations and define internal conversation structure. Our dataset is 16 times larger than all previously released datasets combined, the first to include adjudication of annotation disagreements, and the first to include context. We use our data to re-examine prior work, in particular, finding that 80% of conversations in a widely used dialogue corpus are either missing messages or contain extra messages. Our manually-annotated data presents an opportunity to develop robust data-driven methods for conversation disentanglement, which will help advance dialogue research.
+
+## Introduction
+
+When a group of people communicate in a common channel there are often multiple conversations occurring concurrently. Often there is no explicit structure identifying conversations or their structure, such as in Internet Relay Chat (IRC), Google Hangout, and comment sections on websites. Even when structure is provided it often has limited depth, such as threads in Slack, which provide one layer of branching. In all of these cases, conversations are entangled: all messages appear together, with no indication of separate conversations. Automatic disentanglement could be used to provide more interpretable results when searching over chat logs, and to help users understand what is happening when they join a channel. Over a decade of research has considered conversation disentanglement BIBREF0 , but using datasets that are either small BIBREF1 or not released BIBREF2 .
+
+We introduce a conversation disentanglement dataset of 77,563 messages of IRC manually annotated with reply-to relations between messages. Our data is sampled from a technical support channel at 173 points in time between 2004 and 2018, providing a diverse set of speakers and topics, while remaining in a single domain. Our data is the first to include context, which differentiates messages that start a conversation from messages that are responding to an earlier point in time. We are also the first to adjudicate disagreements in disentanglement annotations, producing higher quality development and test sets. We also developed a simple model that is more effective than prior work, and showed that having diverse data makes it perform better and more consistently.
+
+We also analyze prior disentanglement work. In particular, a recent approach from BIBREF3 , BIBREF4 . By applying disentanglement to an enormous log of IRC messages, they developed a resource that has been widely used (over 315 citations), indicating the value of disentanglement in dialogue research. However, they lacked annotated data to evaluate the conversations produced by their method. We find that 20% of the conversations are completely right or a prefix of a true conversation; 58% are missing messages, 3% contain messages from other conversations, and 19% have both issues. As a result, systems trained on the data will not be learning from accurate human-human dialogues.
+
+## Task Definition
+
+We consider a shared channel in which a group of people are communicating by sending messages that are visible to everyone. We label this data with a graph in which messages are nodes and edges indicate that one message is a response to another. Each connected component is a conversation.
+
+Figure shows an example of two entangled conversations and their graph structure. It includes a message that receives multiple responses, when multiple people independently help BurgerMann, and the inverse, when the last message responds to multiple messages. We also see two of the users, delire and Seveas, simultaneously participating in two conversations. This multi-conversation participation is common.
+
+The example also shows two aspects of IRC we will refer to later. Directed messages, an informal practice in which a participant is named in the message. These cues are useful for understanding the discussion, but only around 48% of messages have them. System messages, which indicate actions like users entering the channel. These all start with ===, but not all messages starting with === are system messages, as shown by the second message in Figure .
+
+## Related Work
+
+IRC Disentanglement Data: The most significant work on conversation disentanglement is a line of papers developing data and models for the #Linux IRC channel BIBREF1 , BIBREF5 , BIBREF6 , BIBREF7 . Until now, their dataset was the only publicly available set of messages with annotated conversations (partially re-annotated by BIBREF8 with reply-structure graphs), and has been used for training and evaluation in subsequent work BIBREF9 , BIBREF8 , BIBREF10 .
+
+We are aware of three other IRC disentanglement datasets. First, BIBREF2 studied disentanglement and topic identification, but did not release their data. Second, BIBREF11 annotated conversations and discourse relations in the #Ubuntu-fr channel (French Ubuntu support). Third, BIBREF3 , BIBREF4 heuristically extracted conversations from the #Ubuntu channel. Their work opened up a new research opportunity by providing 930,000 disentangled conversations, and has already been the basis of many papers (315 citations), particularly on developing dialogue agents. This is far beyond the size of resources previously collected, even with crowdsourcing BIBREF15 . Using our data we provide the first empirical evaluation of their method.
+
+Other Disentanglement Data: IRC is not the only form of synchronous group conversation online. Other platforms with similar communication formats have been studied in settings such as classes BIBREF16 , BIBREF17 , support communities BIBREF18 , and customer service BIBREF19 . Unfortunately, only one of these resources BIBREF17 is available, possibly due to privacy concerns.
+
+Another stream of research has used user-provided structure to get conversation labels BIBREF0 , BIBREF20 and reply-to relations BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 , BIBREF25 , BIBREF26 . By removing these labels and mixing conversations they create a disentanglement problem. While convenient, this risks introducing a bias, as people write differently when explicit structure is defined, and only a few papers have released data BIBREF27 , BIBREF28 , BIBREF29 .
+
+Models: BIBREF1 explored various message-pair feature sets and linear classifiers, combined with local and global inference methods. Their system is the only publicly released statistical model for disentanglement of chat conversation, but most of the other work cited above applied similar models. We evaluate their model on both our data and our re-annotated version of their data. Recent work has applied neural networks BIBREF8 , BIBREF10 , with slight gains in performance.
+
+Graph Structure: Within a conversation, we define a graph of reply-to relations. Almost all prior work with annotated graph structures has been for threaded web forums BIBREF30 , BIBREF31 , BIBREF32 , which do not exhibit the disentanglement problem we explore. Studies that do consider graphs for disentanglement have used small datasets BIBREF17 , BIBREF8 that are not always released BIBREF16 , BIBREF33 .
+
+## Data
+
+We introduce a manually annotated dataset of 77,563 messages: 74,963 from the #Ubuntu IRC channel, and 2,600 messages from the #Linux IRC channel. Annotating the #Linux data enables comparison with BIBREF1 , while the #Ubuntu channel has over 34 million messages, making it an interesting large-scale resource for dialogue research. It also allows us to evaluate BIBREF3 , BIBREF4 's widely used heuristically disentangled conversations.
+
+When choosing samples we had to strike a balance between the number of samples and the size of each one. We sampled the training set in three ways: (1) 95 uniform length samples, (2) 10 smaller samples to check annotator agreement, and (3) 48 time spans of one hour that are diverse in terms of the number of messages, the number of participants, and what percentage of messages are directed. For additional details of the data selection process, see the supplementary material.
+
+## Dataset Comparison
+
+Table presents properties of our data and prior work on disentanglement in real-time chat.
+
+Availability: Only one other dataset, annotated twice, has been publicly released, and two others were shared when we contacted the authors.
+
+Scale: Our dataset is 31 times larger than almost any other dataset, the exception being one that was not released. As well as being larger, our data is also based on many different points in time. This is crucial because a single sample presents a biased view of the task. Having multiple samples also means our training and evaluation sets are from different points in time, preventing overfitting to specific users or topics of conversation.
+
+Context: We are the first to consider the fact that IRC data is sampled from a continuous stream and the context prior to the sample is important. In prior work, a message with no antecedent could either be the start of a conversation or a response to a message that occurs prior to the sample.
+
+Adjudication: Our labeling method is similar to prior work, but we are the first to perform adjudication of annotations. While some cases were ambiguous, often one option was clearly incorrect. By performing adjudication we can reduce these errors, creating high quality sets.
+
+## Methodology
+
+Guidelines: We developed annotation guidelines through three rounds of pilot annotations in which annotators labeled a set of messages and discussed all disagreements. We instructed annotators to link each message to the one or more messages it is a response to. If a message started a new conversation it was linked to itself. We also described a series of subtle cases, using one to three examples to tease out differences. These included when a question is repeated, when a user responds multiple times, interjections, etc. For our full guidelines, see the supplementary material. All annotations were performed using SLATE BIBREF34 , a custom-built tool with features designed specifically for this task.
+
+Adjudication: Table shows the number of annotators for each subset of our data. For the development, test, out-of-domain data, and a small set of the training data, we labeled each sample multiple times and then resolved all disagreements in an adjudication step. During adjudication, there was no indication of who had given which annotation, and there was the option to choose a different annotation entirely. In order to maximize the volume annotated, we did not perform adjudication for most of the training data. Also, the 18,924 training message set initially only had 100 messages of context per sample, and we later added another 900 lines and checked every message that was not a reply to see if it was a response to something in the additional context.
+
+Annotators: The annotators were all fluent English speakers with a background in computer science (necessary to understand the technical content): a postdoc, a master's student, and three CS undergraduates. All adjudication was performed by the postdoc, who is a native English speaker.
+
+Time: Annotations took between 7 and 11 seconds per message depending on the complexity of the discussion, and adjudication took 5 seconds per message. Overall, we spent approximately 240 hours on annotation and 15 hours on adjudication.
+
+## Annotation Quality
+
+Our annotations define two levels of structure: (1) links between pairs of messages, and (2) sets of messages, where each set is one conversation. Annotators label (1), from which (2) can be inferred. Table TABREF10 presents inter-annotator agreement measures for both cases. These are measured in the standard manner, by comparing the labels from different annotators on the same data. We also include measurements for annotations in prior work.
+
+Figure shows ambiguous examples from our data to provide some intuition for the source of disagreements. In both examples the disagreement involves one link, but the conversation structure in the second case is substantially changed. Some disagreements in our data are mistakes, where one annotation is clearly incorrect, and some are ambiguous cases, such as these. In Channel Two, we also see mistakes and ambiguous cases, including a particularly long discussion about a user's financial difficulties that could be divided in multiple ways (also noted by BIBREF1 ).
+
+Graphs: We measure agreement on the graph structure annotation using BIBREF35 's INLINEFORM0 . This measure of inter-rater reliability corrects for chance agreement, accounting for the class imbalance between linked and not-linked pairs.
+
+Values are in the good agreement range proposed by BIBREF36 , and slightly higher than for BIBREF8 's annotations. Results are not shown for BIBREF1 because they did not annotate graphs.
+
+Conversations: We consider three metrics:
+
+(1) Variation of Information BIBREF37 . A measure of information gained or lost when going from one clustering to another. It is the sum of conditional entropies INLINEFORM0 , where INLINEFORM1 and INLINEFORM2 are clusterings of the same set of items. We consider a scaled version, using the bound for INLINEFORM3 items that VI INLINEFORM4 , and present INLINEFORM5 VI so that larger values are better.
+
+(2) One-to-One Overlap BIBREF1 . Percentage overlap when conversations from two annotations are optimally paired up using the max-flow algorithm. We follow BIBREF8 and keep system messages.
+
+(3) Exact Match F INLINEFORM0 . Calculated using the number of perfectly matching conversations, excluding conversations with only one message (mostly system messages). This is an extremely challenging metric. We include it because it is easy to understand and it directly measures a desired value (perfectly extracted conversations).
+
+Our scores are higher in 4 cases and lower in 5. Interestingly, while INLINEFORM0 was higher for us than BIBREF8 , our scores for conversations are lower. This is possible because a single link can merge two conversations, meaning a single disagreement in links can cause a major difference in conversations. This may reflect the fact that our annotation guide was developed for the Ubuntu channel, which differs in conversation style from the Channel Two data. Manually comparing the annotations, there was no clear differences in the types of disagreements.
+
+Agreement is lower on the Channel Two data, particularly on its test set. From this we conclude that there is substantial variation in the difficulty of conversation disentanglement across datasets.
+
+## Evaluating Disentanglement Quality
+
+In this section, we propose new simple disentanglement models that perform better than prior methods, and re-examine prior work. The models we consider are:
+
+Previous: Each message is linked to the most recent non-system message before it.
+
+ BIBREF4 : A heuristic based on time differences and identifying directed messages.
+
+ BIBREF1 : A linear pairwise scoring model in which each message is linked to the highest scoring previous message, or none if all scores are below zero.
+
+Linear: Our linear ranking model that scores potential antecedents using a feature-based model based on properties such as time, directedness, word overlap, and context.
+
+Feedforward (FF): Our feedforward model with the same features as the linear model, plus a sentence embedding calculated using an average of vectors from GloVe BIBREF38 .
+
+Union: Run 10 FF models trained with different random seeds and combine their output by keeping all edges predicted.
+
+Vote: Run 10 FF models and combine output by keeping the edges they all agree on. Link messages with no agreed antecedent to themselves.
+
+Intersect: Conversations that 10 FF models agree on, and other messages as singleton conversations.
+
+For Channel Two we also compare to BIBREF9 and BIBREF8 , but their code was unavailable, preventing evaluation on our data. We exclude BIBREF10 as they substantially modified the dataset. For details of models, including hyperparameters tuned on the development set, see the supplementary material.
+
+## Results
+
+Graphs: Table TABREF13 presents precision, recall, and F-score over links. Our models perform much better than the baseline. As we would expect, vote has higher precision, while union has higher recall. Vote has higher recall than a single feedforward model because it identifies more of the self-link cases (its default when there is no agreement).
+
+Conversations: Table TABREF14 presents results on the metrics defined in Section SECREF8 . There are three regions of performance. First, the baseline has consistently low scores since it forms a single conversation containing all messages. Second, BIBREF1 and BIBREF4 perform similarly, with one doing better on VI and the other on 1-1, though BIBREF1 do consistently better across the exact conversation extraction metrics. Third, our methods do best, with x10 vote best in all cases except precision, where the intersect approach is much better.
+
+Dataset Variations: Table TABREF15 shows results for the feedforward model with several modifications to the training set, designed to test corpus design decisions. Removing context does not substantially impact results. Decreasing the data size to match BIBREF1 's training set leads to worse results, both if the sentences are from diverse contexts (3rd row), and if they are from just two contexts (bottom row). We also see a substantial increase in the standard deviation when only two samples are used, indicating that performance is not robust when the data is not widely sampled.
+
+## Channel Two Results
+
+For channel Two, we consider two annotations of the same underlying text: ours and BIBREF1 's. To compare with prior work, we use the metrics defined by BIBREF0 and BIBREF1 . We do not use these for our data as they have been superseded by more rigorously studied metrics (VI for Shen) or make strong assumptions about the data (Loc). We do not evaluate on graphs because BIBREF1 's annotations do not include them. This also prevents us from training our method on their data.
+
+Model Comparison: For Elsner's annotations (top section of Table TABREF18 ), their approach remains the most effective with just Channel Two data. However, training on our Ubuntu data, treating Channel Two as an out-of-domain sample, yields substantially higher performance on two metrics and comparable performance on the third. On our annotations (bottom section), we see the same trend. In both cases, the heuristic from BIBREF3 , BIBREF4 performs poorly. We suspect our model trained only on Channel Two data is overfitting, as the graph F-score on the training data is 94, whereas on the Ubuntu data it is 80.
+
+Data Comparison: Comparing the same models in the top and bottom section, scores are consistently higher for our annotations, except for the BIBREF3 , BIBREF4 heuristic. Comparing the annotations, we find that their annotators identified between 250 and 328 conversations (mean 281), while we identify 257. Beyond this difference it is hard to identify consistent variations in the annotations. Another difference is the nature of the evaluation. On Elsner's data, evaluation is performed by measuring relative to each annotators labels and averaging the scores. On our data, we adjudicated the annotations, providing a single gold standard. Evaluating our Channel-Two-trained Feedforward model on our two pre-adjudication annotations and averaging scores, the results are lower by 3.1, 1.8, and 4.3 on 1-1, Loc and Shen respectively. This suggests that our adjudication process removes annotator mistakes that introduce noise into the evaluation.
+
+## Evaluating , 
+
+The previous section showed that only 10.8% of the conversations extracted by the heuristic in BIBREF3 , BIBREF4 are correct (P in Table TABREF14 ). We focus on precision because the primary use of their method has been to extract conversations to train and test dialogue systems, which will be impacted by errors in the conversations. Recall errors (measuring missed conversations) are not as serious a problem because the Ubuntu chat logs are so large that even with low recall a large number of conversations will still be extracted.
+
+Additional Metrics: First, we must check this is not an artifact of our test set. On our development set, P, R, and F are slightly higher (11.6, 8.1 and 9.5), but VI and 1-1 are slightly lower (80.0 and 51.7). We can also measure performance as the distribution of scores over all of the samples we annotated. The average precision was 10, and varied from 0 to 50, with 19% of cases at 0 and 95% below 23. To avoid the possibility that we made a mistake running their code, we also considered evaluating their released conversations. On the data that overlapped with our annotations, the precision was 9%. These results indicate that the test set performance is not an aberration: the heuristic's results are consistently low, with only about 10% of output conversations completely right.
+
+Error Types: Figure shows an example heuristic output with several types of errors. The initial question was missed, as was the final resolution, and in the middle there is a message from a separate conversation. 67% of conversations were a subset of a true conversation (ie., only missed messages), and 3% were a superset of a true conversation (ie., only had extra messages). The subset cases were missing 1-187 messages (missing 56% of the conversation on average) and the superset cases had 1-3 extra messages (an extra 31% of the conversation on average). The first message is particularly important because it is usually the question being resolved. In 47% of cases the first message is not the true start of a conversation.
+
+It is important to note that the dialogue task the conversations were intended for only uses a prefix of each conversation. For this purpose, missing the end of a conversation is not a problem. In 9% of cases, the conversation is a true prefix of a gold conversation. Combined with the exact match cases, that means 20% of the conversations are accurate as used in the next utterance selection task. A further 9% of cases are a continuous chunk of a conversation, but missing one or more messages at the start.
+
+Long Distance Links: One issue we observed is that conversations often spanned days. We manually inspected a random sample: 20 conversations 12 to 24 hours long, and 20 longer than 24 hours. All of the longer conversations and 17 of the shorter ones were clearly incorrect. This issue is not measured in the analysis above because our samples do not span days (they are 5.5 hours long on average when including context). The original work notes this issue, but claims that it is rare. We measured the time between consecutive messages in conversations and plot the frequency of each value in Figure FIGREF20 . The figure indicates that the conversations often extend over days, or even more than a month apart (note the point in the top-right corner). In contrast, our annotations rarely contain links beyond an hour, and the output of our model rarely contains links longer than 2 hours.
+
+Causes: To investigate possible reasons for these issues, we measured several properties of our data to test assumptions in the heuristic. First, the heuristic assumes if all directed messages from a user are in one conversation, all undirected messages from the user are in the same conversation. We find this is true 52.2% of the time. Second, it assumes that it is rare for two people to respond to an initial question. In our data, of the messages that start a conversation and receive a response, 37.7% receive multiple responses. Third, that a directed message can start a conversation, which we find in 6.8% of cases. Fourth, that the first response to a question is within 3 minutes, which we find is true in 94.8% of conversations. Overall, these assumptions have mixed support from our data, which may be why the heuristic produces so few accurate conversations.
+
+Dialogue Modeling: Most of the work building on BIBREF4 uses the conversations to train and evaluate dialogue systems. To see the impact on downstream work, we constructed a next utterance selection task as described in their work, disentangling the entire #Ubuntu logs with our feedforward model. We tried two dialogue models: a dual-encoder BIBREF4 , and Enhanced Long Short-Term Memory BIBREF39 . For full details of the task and model hyperparameters, see the supplementary material.
+
+Table TABREF23 show results when varying the training and test datasets. Training and testing on the same dataset leads to higher performance than training on one and testing on the other. This is true even though the heuristic data contains nine times as many training conversations. This is evidence that our conversations are fundamentally different despite being derived from the same resource and filtered in the same way. This indicates that our changes lead to quantitatively different downstream models. Fortunately, the relative performance of the two models remains consistent across the two datasets.
+
+## Re-Examining Disentanglement Research
+
+Using our data we also investigate other assumptions made in prior work. The scale of our data provides a more robust test of these ideas.
+
+Number of samples: Table shows that all prior work with available data has considered a small number of samples. In Table TABREF15 , we saw that training on less diverse data samples led to models that performed worse and with higher variance. We can also investigate this by looking at performance on the different samples in our test set. The difficulty of samples varies considerably, with the F-score of our model varying from 11 to 40 and annotator agreement scores before adjudication varying from 0.65 to 0.78. The model performance and agreement levels are also strongly correlated, with a Spearman's rank correlation of 0.77. This demonstrates the importance of evaluating on data from more than one point in time to get a robust estimate of performance.
+
+How far apart consecutive messages in a conversation are: BIBREF1 and BIBREF8 use a limit of 129 seconds, BIBREF10 limit to within 1 hour, BIBREF33 limit to within 8 messages, and we limit to within 100 messages. Figure FIGREF20 shows the distribution of time differences in our conversations. 94.9% are within 2 minutes, and almost all are within an hour. 88.3% are 8 messages or less apart, and 99.4% are 100 or less apart. This suggests that the lower limits in prior work are too low. However, in Channel Two, 98% of messages are within 2 minutes, suggesting this property is channel and sample dependent.
+
+Concurrent conversations: BIBREF2 forced annotators to label at most 3 conversations, while BIBREF10 remove conversations to ensure there are no more than 10 at once. We find there are 3 or fewer 46.4% of the time and 10 or fewer 97.3% of the time (where time is in terms of messages, not minutes, and we ignore system messages), Presumably the annotators in BIBREF2 would have proposed changes if the 3 conversation limit was problematic, suggesting that their data is less entangled than ours.
+
+Conversation and message length: BIBREF2 annotate blocks of 200 messages. If such a limit applied to our data, 13.7% of conversations would not finish before the cutoff point. This suggests that their conversations are typically shorter, which is consistent with the previous conclusion that their conversations are less entangled. BIBREF10 remove conversations with fewer than 10 messages, describing them as outliers, and remove messages shorter than 5 words, arguing that they were not part of real conversations. Not counting conversations with only system messages, 83.4% of our conversations have fewer than 10 messages, 40.8% of which have multiple authors. 88.5% of messages with less than 5 words are in conversations with more than one author. These values suggest that these messages and conversations are real and not outliers.
+
+Overall: This analysis indicates that working from a small number of samples can lead to major bias in system design for disentanglement. There is substantial variation across channels, and across time within a single channel.
+
+## Conclusion
+
+Conversation disentanglement has been under-studied because of a lack of public, annotated datasets. We introduce a new corpus that is larger and more diverse than any prior corpus, and the first to include context and adjudicated annotations. Using our data, we perform the first empirical analysis of BIBREF3 , BIBREF4 's widely used data, finding that only 20% of the conversations their method produces are true prefixes of conversations. The models we develop have already enabled new directions in dialogue research, providing disentangled conversations for DSTC 7 track 1 BIBREF40 , BIBREF41 and will be used in DSTC 8. We also show that diversity is particularly important for the development of robust models. This work fills a key gap that has limited research, providing a new opportunity for understanding synchronous multi-party conversation online.
+
+## Acknowledgements
+
+We would like to thank Jacob Andreas, Greg Durrett, Will Radford, Ryan Lowe, and Glen Pink for helpful feedback on earlier drafts of this paper and the anonymous reviewers for their helpful suggestions. This material is based in part on work supported by IBM as part of the Sapphire Project at the University of Michigan. Any opinions, findings, conclusions or recommendations expressed above do not necessarily reflect the views of IBM.

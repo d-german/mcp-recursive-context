@@ -1,0 +1,143 @@
+# Neural Factor Graph Models for Cross-lingual Morphological Tagging
+
+**Paper ID:** 1805.04570
+
+## Abstract
+
+Morphological analysis involves predicting the syntactic traits of a word (e.g. {POS: Noun, Case: Acc, Gender: Fem}). Previous work in morphological tagging improves performance for low-resource languages (LRLs) through cross-lingual training with a high-resource language (HRL) from the same family, but is limited by the strict, often false, assumption that tag sets exactly overlap between the HRL and LRL. In this paper we propose a method for cross-lingual morphological tagging that aims to improve information sharing between languages by relaxing this assumption. The proposed model uses factorial conditional random fields with neural network potentials, making it possible to (1) utilize the expressive power of neural network representations to smooth over superficial differences in the surface forms, (2) model pairwise and transitive relationships between tags, and (3) accurately generate tag sets that are unseen or rare in the training data. Experiments on four languages from the Universal Dependencies Treebank demonstrate superior tagging accuracies over existing cross-lingual approaches.
+
+## Introduction
+
+Morphological analysis (hajivc1998tagging, oflazer1994tagging, inter alia) is the task of predicting fine-grained annotations about the syntactic properties of tokens in a language such as part-of-speech, case, or tense. For instance, in Figure FIGREF2 , the given Portuguese sentence is labeled with the respective morphological tags such as Gender and its label value Masculine.
+
+The accuracy of morphological analyzers is paramount, because their results are often a first step in the NLP pipeline for tasks such as translation BIBREF1 , BIBREF2 and parsing BIBREF3 , and errors in the upstream analysis may cascade to the downstream tasks. One difficulty, however, in creating these taggers is that only a limited amount of annotated data is available for a majority of the world's languages to learn these morphological taggers. Fortunately, recent efforts in morphological annotation follow a standard annotation schema for these morphological tags across languages, and now the Universal Dependencies Treebank BIBREF0 has tags according to this schema in 60 languages.
+
+cotterell2017crossling have recently shown that combining this shared schema with cross-lingual training on a related high-resource language (HRL) gives improved performance on tagging accuracy for low-resource languages (LRLs). The output space of this model consists of tag sets such as {POS: Adj, Gender: Masc, Number: Sing}, which are predicted for a token at each time step. However, this model relies heavily on the fact that the entire space of tag sets for the LRL must match those of the HRL, which is often not the case, either due to linguistic divergence or small differences in the annotation schemes between the two languages. For instance, in Figure FIGREF2 “refrescante” is assigned a gender in the Portuguese UD treebank, but not in the Spanish UD treebank.
+
+In this paper, we propose a method that instead of predicting full tag sets, makes predictions over single tags separately but ties together each decision by modeling variable dependencies between tags over time steps (e.g. capturing the fact that nouns frequently occur after determiners) and pairwise dependencies between all tags at a single time step (e.g. capturing the fact that infinitive verb forms don't have tense). The specific model is shown in Figure FIGREF4 , consisting of a factorial conditional random field (FCRF; sutton2007dynamic) with neural network potentials calculated by long short-term memory (LSTM; BIBREF4 ) at every variable node (§ SECREF3 ). Learning and inference in the model is made tractable through belief propagation over the possible tag combinations, allowing the model to consider an exponential label space in polynomial time (§ SECREF24 ).
+
+This model has several advantages:
+
+In the following sections, we describe the model and these results in more detail.
+
+## Problem Formulation
+
+Formally, we define the problem of morphological analysis as the task of mapping a length- INLINEFORM0 string of tokens INLINEFORM1 into the target morphological tag sets for each token INLINEFORM2 . For the INLINEFORM3 th token, the target label INLINEFORM4 defines a set of tags (e.g. {Gender: Masc, Number: Sing, POS: Verb}). An annotation schema defines a set INLINEFORM5 of INLINEFORM6 possible tag types and with the INLINEFORM7 th type (e.g. Gender) defining its set of possible labels INLINEFORM8 (e.g. {Masc, Fem, Neu}) such that INLINEFORM9 . We must note that not all tags or attributes need to be specified for a token; usually, a subset of INLINEFORM10 is specified for a token and the remaining tags can be treated as mapping to a INLINEFORM11 value. Let INLINEFORM12 denote the set of all possible tag sets.
+
+## Baseline: Tag Set Prediction
+
+Data-driven models for morphological analysis are constructed using training data INLINEFORM0 consisting of INLINEFORM1 training examples. The baseline model BIBREF5 we compare with regards the output space of the model as a subset INLINEFORM2 where INLINEFORM3 is the set of all tag sets seen in this training data. Specifically, they solve the task as a multi-class classification problem where the classes are individual tag sets. In low-resource scenarios, this indicates that INLINEFORM4 and even for those tag sets existing in INLINEFORM5 we may have seen very few training examples. The conditional probability of a sequence of tag sets given the sentence is formulated as a 0th order CRF. DISPLAYFORM0 
+
+Instead, we would like to be able to generate any combination of tags from the set INLINEFORM0 , and share statistical strength among similar tag sets.
+
+## A Relaxation: Tag-wise Prediction
+
+As an alternative, we could consider a model that performs prediction for each tag's label INLINEFORM0 independently. DISPLAYFORM0 
+
+This formulation has an advantage: the tag-predictions within a single time step are now independent, it is now easy to generate any combination of tags from INLINEFORM0 . On the other hand, now it is difficult to model the interdependencies between tags in the same tag set INLINEFORM1 , a major disadvantage over the previous model. In the next section, we describe our proposed neural factor graph model, which can model not only dependencies within tags for a single token, but also dependencies across time steps while still maintaining the flexibility to generate any combination of tags from INLINEFORM2 .
+
+## Neural Factor Graph Model
+
+Due to the correlations between the syntactic properties that are represented by morphological tags, we can imagine that capturing the relationships between these tags through pairwise dependencies can inform the predictions of our model. These dependencies exist both among tags for the same token (intra-token pairwise dependencies), and across tokens in the sentence (inter-token transition dependencies). For instance, knowing that a token's POS tag is a Noun, would strongly suggest that this token would have a INLINEFORM0 label for the tag Tense, with very few exceptions BIBREF6 . In a language where nouns follow adjectives, a tag set prediction {POS: Adj, Gender: Fem} might inform the model that the next token is likely to be a noun and have the same gender. The baseline model can not explicitly model such interactions given their factorization in equation EQREF10 .
+
+To incorporate the dependencies discussed above, we define a factorial CRF BIBREF7 , with pairwise links between cotemporal variables and transition links between the same types of tags. This model defines a distribution over the tag-set sequence INLINEFORM0 given the input sentence INLINEFORM1 as, DISPLAYFORM0 
+
+where INLINEFORM0 is the set of factors in the factor graph (as shown in Figure FIGREF4 ), INLINEFORM1 is one such factor, and INLINEFORM2 is the assignment to the subset of variables neighboring factor INLINEFORM3 . We define three types of potential functions: neural INLINEFORM4 , pairwise INLINEFORM5 , and transition INLINEFORM6 , described in detail below.
+
+## Neural Factors
+
+The flexibility of our formulation allows us to include any form of custom-designed potentials in our model. Those for the neural factors have a fairly standard log-linear form, DISPLAYFORM0 
+
+except that the features INLINEFORM0 are themselves given by a neural network. There is one such factor per variable. We obtain our neural factors using a biLSTM over the input sequence INLINEFORM1 , where the input word embedding for each token is obtained from a character-level biLSTM embedder. This component of our model is similar to the model proposed by BIBREF5 . Given an input token INLINEFORM2 , we compute an input embedding INLINEFORM3 as, DISPLAYFORM0 
+
+Here, INLINEFORM0 is a character-level LSTM function that returns the last hidden state. This input embedding INLINEFORM1 is then used in the biLSTM tagger to compute an output representation INLINEFORM2 . Finally, the scores INLINEFORM3 are obtained as, DISPLAYFORM0 
+
+We use a language-specific linear layer with weights INLINEFORM0 and bias INLINEFORM1 .
+
+## Pairwise Factors
+
+As discussed previously, the pairwise factors are crucial for modeling correlations between tags. The pairwise factor potential for a tag INLINEFORM0 and tag INLINEFORM1 at timestep INLINEFORM2 is given in equation EQREF20 . Here, the dimension of INLINEFORM3 is INLINEFORM4 . These scores are used to define the neural factors as, DISPLAYFORM0 
+
+## Transition Factors
+
+Previous work has experimented with the use of a linear chain CRF with factors from a neural network BIBREF8 for sequence tagging tasks. We hypothesize that modeling transition factors in a similar manner can allow the model to utilize information about neighboring tags and capture word order features of the language. The transition factor for tag INLINEFORM0 and timestep INLINEFORM1 is given below for variables INLINEFORM2 and INLINEFORM3 . The dimension of INLINEFORM4 is INLINEFORM5 . DISPLAYFORM0 
+
+In our experiments, INLINEFORM0 and INLINEFORM1 are simple indicator features for the values of tag variables with no dependence on INLINEFORM2 .
+
+## Language-Specific Weights
+
+As an enhancement to the information encoded in the transition and pairwise factors, we experiment with training general and language-specific parameters for the transition and the pairwise weights. We define the weight matrix INLINEFORM0 to learn the general trends that hold across both languages, and the weights INLINEFORM1 to learn the exceptions to these trends. In our model, we sum both these parameter matrices before calculating the transition and pairwise factors. For instance, the transition weights INLINEFORM2 are calculated as INLINEFORM3 .
+
+## Loopy Belief Propagation
+
+Since the graph from Figure FIGREF4 is a loopy graph, performing exact inference can be expensive. Hence, we use loopy belief propagation BIBREF9 , BIBREF10 for computation of approximate variable and factor marginals. Loopy BP is an iterative message passing algorithm that sends messages between variables and factors in a factor graph. The message updates from variable INLINEFORM0 , with neighboring factors INLINEFORM1 , to factor INLINEFORM2 is DISPLAYFORM0 
+
+The message from factor INLINEFORM0 to variable INLINEFORM1 is DISPLAYFORM0 
+
+where INLINEFORM0 denote an assignment to the subset of variables adjacent to factor INLINEFORM1 , and INLINEFORM2 is the assignment for variable INLINEFORM3 . Message updates are performed asynchronously in our model. Our message passing schedule was similar to that of foward-backward: the forward pass sends all messages from the first time step in the direction of the last. Messages to/from pairwise factors are included in this forward pass. The backward pass sends messages in the direction from the last time step back to the first. This process is repeated until convergence. We say that BP has converged when the maximum residual error BIBREF11 over all messages is below some threshold. Upon convergence, we obtain the belief values of variables and factors as, DISPLAYFORM0 
+
+ where INLINEFORM0 and INLINEFORM1 are normalization constants ensuring that the beliefs for a variable INLINEFORM2 and factor INLINEFORM3 sum-to-one. In this way, we can use the beliefs as approximate marginal probabilities.
+
+## Learning and Decoding
+
+We perform end-to-end training of the neural factor graph by following the (approximate) gradient of the log-likelihood INLINEFORM0 . The true gradient requires access to the marginal probabilities for each factor, e.g. INLINEFORM1 where INLINEFORM2 denotes the subset of variables in factor INLINEFORM3 . For example, if INLINEFORM4 is a transition factor for tag INLINEFORM5 at timestep INLINEFORM6 , then INLINEFORM7 would be INLINEFORM8 and INLINEFORM9 . Following BIBREF7 , we replace these marginals with the beliefs INLINEFORM10 from loopy belief propagation. Consider the log-likelihood of a single example INLINEFORM11 . The partial derivative with respect to parameter INLINEFORM12 for each type of factor INLINEFORM13 is the difference of the observed features with the expected features under the model's (approximate) distribution as represented by the beliefs: INLINEFORM14 
+
+ where INLINEFORM0 denotes all the factors of type INLINEFORM1 , and we have omitted any dependence on INLINEFORM2 and INLINEFORM3 for brevity— INLINEFORM4 is accessible through the factor index INLINEFORM5 . For the neural network factors, the features are given by a biLSTM. We backpropagate through to the biLSTM parameters using the partial derivative below, INLINEFORM6 
+
+ where INLINEFORM0 is the variable belief corresponding to variable INLINEFORM1 .
+
+To predict a sequence of tag sets INLINEFORM0 at test time, we use minimum Bayes risk (MBR) decoding BIBREF13 , BIBREF14 for Hamming loss over tags. For a variable INLINEFORM1 representing tag INLINEFORM2 at timestep INLINEFORM3 , we take DISPLAYFORM0 
+
+where INLINEFORM0 ranges over the possible labels for tag INLINEFORM1 .
+
+## Dataset
+
+We used the Universal Dependencies Treebank UD v2.1 BIBREF0 for our experiments. We picked four low-resource/high-resource language pairs, each from a different family: Danish/Swedish (da/sv), Russian/Bulgarian (ru/bg), Finnish/Hungarian (fi/hu), Spanish/Portuguese (es/pt). Picking languages from different families would ensure that we obtain results that are on average consistent across languages.
+
+The sizes of the training and evaluation sets are specified in Table TABREF31 . In order to simulate low-resource settings, we follow the experimental procedure from BIBREF5 . We restrict the number of sentences of the target language ( INLINEFORM0 ) in the training set to 100 or 1000 sentences. We also augment the tag sets in our training data by adding a INLINEFORM1 label for all tags that are not seen for a token. It is expected that our model will learn which tags are unlikely to occur given the variable dependencies in the factor graph. The dev set and test set are only in the target language. From Table TABREF32 , we can see there is also considerable variance in the number of unique tags and tag sets found in each of these language pairs.
+
+## Baseline Tagger
+
+As the baseline tagger model, we re-implement the specific model from BIBREF5 that uses a language-specific softmax layer. Their model architecture uses a character biLSTM embedder to obtain a vector representation for each token, which is used as input in a word-level biLSTM. The output space of their model is all the tag sets seen in the training data. This work achieves strong performance on several languages from UD on the task of morphological tagging and is a strong baseline.
+
+## Training Regimen
+
+We followed the parameter settings from BIBREF5 for the baseline tagger and the neural component of the FCRF-LSTM model. For both models, we set the input embedding and linear layer dimension to 128. We used 2 hidden layers for the LSTM where the hidden layer dimension was set to 256 and a dropout BIBREF15 of 0.2 was enforced during training. All our models were implemented in the PyTorch toolkit BIBREF16 . The parameters of the character biLSTM and the word biLSTM were initialized randomly. We trained the baseline models and the neural factor graph model with SGD and Adam respectively for 10 epochs each, in batches of 64 sentences. These optimizers gave the best performances for the respective models.
+
+For the FCRF, we initialized transition and pairwise parameters with zero weights, which was important to ensure stable training. We considered BP to have reached convergence when the maximum residual error was below 0.05 or if the maximum number of iterations was reached (set to 40 in our experiments). We found that in cross-lingual experiments, when INLINEFORM0 , the relatively large amount of data in the HRL was causing our model to overfit on the HRL and not generalize well to the LRL. As a solution to this, we upsampled the LRL data by a factor of 10 when INLINEFORM1 for both the baseline and the proposed model.
+
+Previous work on morphological analysis BIBREF5 , BIBREF17 has reported scores on average token-level accuracy and F1 measure. The average token level accuracy counts a tag set prediction as correct only it is an exact match with the gold tag set. On the other hand, F1 measure is measured on a tag-by-tag basis, which allows it to give partial credit to partially correct tag sets. Based on the characteristics of each evaluation measure, Accuracy will favor tag-set prediction models (like the baseline), and F1 measure will favor tag-wise prediction models (like our proposed method). Given the nature of the task, it seems reasonable to prefer getting some of the tags correct (e.g. Noun+Masc+Sing becomes Noun+Fem+Sing), instead of missing all of them (e.g. Noun+Masc+Sing becomes Adj+Fem+Plur). F-score gives partial credit for getting some of the tags correct, while tagset-level accuracy will treat these two mistakes equally. Based on this, we believe that F-score is intuitively a better metric. However, we report both scores for completeness.
+
+## Main Results
+
+First, we report the results in the case of monolingual training in Table TABREF33 . The first row for each language pair reports the results for our reimplementation of cotterell2017crossling, and the second for our full model. From these results, we can see that we obtain improvements on the F-measure over the baseline method in most experimental settings except BG with INLINEFORM0 . In a few more cases, the baseline model sometimes obtains higher accuracy scores for the reason described in UID38 .
+
+In our cross-lingual experiments shown in Table TABREF37 , we also note F-measure improvements over the baseline model with the exception of DA/SV when INLINEFORM0 . We observe that the improvements are on average stronger when INLINEFORM1 . This suggests that our model performs well with very little data due to its flexibility to generate any tag set, including those not observed in the training data. The strongest improvements are observed for FI/HU. This is likely because the number of unique tags is the highest in this language pair and our method scales well with the number of tags due to its ability to make use of correlations between the tags in different tag sets.
+
+To examine the utility of our transition and pairwise factors, we also report results on ablation experiments by removing transition and pairwise factors completely from the model in Table TABREF40 . Ablation experiments for each factor showed decreases in scores relative to the model where both factors are present, but the decrease attributed to the pairwise factors is larger, in both the monolingual and cross-lingual cases. Removing both factors from our proposed model results in a further decrease in the scores. These differences were found to be more significant in the case when INLINEFORM0 .
+
+Upon looking at the tag set predictions made by our model, we found instances where our model utilizes variable dependencies to predict correct labels. For instance, for a specific phrase in Portuguese (um estado), the baseline model predicted {POS: Det, Gender: Masc, Number: Sing} INLINEFORM0 , {POS: Noun, Gender: Fem (X), Number: Sing} INLINEFORM1 , whereas our model was able to get the gender correct because of the transition factors in our model.
+
+## What is the Model Learning?
+
+One of the major advantages of our model is the ability to interpret what the model has learned by looking at the trained parameter weights. We investigated both language-generic and language-specific patterns learned by our parameters:
+
+Language-Generic: We found evidence for several syntactic properties learned by the model parameters. For instance, in Figure FIGREF42 , we visualize the generic ( INLINEFORM0 ) transition weights of the POS tags in Ru/Bg. Several universal trends such as determiners and adjectives followed by nouns can be seen. In Figure FIGREF43 , we also observed that infinitive has a strong correlation for NULL tense, which follows the universal phenomena that infinitives don't have tense.
+
+Language Specific Trends: We visualized the learnt language-specific weights and looked for evidence of patterns corresponding to linguistic phenomenas observed in a language of interest. For instance, in Russian, verbs are gender-specific in past tense but not in other tenses. To analyze this, we plotted pairwise weights for Gender/Tense in Figure FIGREF45 and verified strong correlations between the past tense and all gender labels.
+
+## Related Work
+
+There exist several variations of the task of prediction of morphological information from annotated data: paradigm completion BIBREF18 , BIBREF19 , morphological reinflection BIBREF20 , segmentation BIBREF21 , BIBREF22 and tagging. Work on morphological tagging has broadly focused on structured prediction models such as CRFs, and neural network models. Amongst structured prediction approaches, BIBREF23 proposed a factor-graph based model that performed joint morphological tagging and parsing. BIBREF24 , BIBREF25 proposed the use of a higher-order CRF that is approximated using coarse-to-fine decoding. BIBREF26 proposed joint lemmatization and tagging using this framework. BIBREF27 was the first work that performed experiments on multilingual morphological tagging. They proposed an exponential model and the use of a morphological dictionary. BIBREF17 , BIBREF28 proposed a model that used tag projection of type and token constraints from a resource-rich language to a low-resource language for tagging.
+
+Most recent work has focused on character-based neural models BIBREF29 , that can handle rare words and are hence more useful to model morphology than word-based models. These models first obtain a character-level representation of a token from a biLSTM or CNN, which is provided to a word-level biLSTM tagger. BIBREF29 , BIBREF30 compared several neural architectures to obtain these character-based representations and found the effect of the neural network architecture to be minimal given the networks are carefully tuned. Cross-lingual transfer learning has previously boosted performance on tasks such as translation BIBREF31 and POS tagging BIBREF32 , BIBREF33 . BIBREF5 proposed a cross-lingual character-level neural morphological tagger. They experimented with different strategies to facilitate cross-lingual training: a language ID for each token, a language-specific softmax and a joint language identification and tagging model. We have used this work as a baseline model for comparing with our proposed method.
+
+In contrast to earlier work on morphological tagging, we use a hybrid of neural and graphical model approaches. This combination has several advantages: we can make use of expressive feature representations from neural models while ensuring that our model is interpretable. Our work is similar in spirit to BIBREF8 and BIBREF34 , who proposed models that use a CRF with features from neural models. For our graphical model component, we used a factorial CRF BIBREF7 , which is a generalization of a linear chain CRF with additional pairwise factors between cotemporal variables.
+
+## Conclusion and Future Work
+
+In this work, we proposed a novel framework for sequence tagging that combines neural networks and graphical models, and showed its effectiveness on the task of morphological tagging. We believe this framework can be extended to other sequence labeling tasks in NLP such as semantic role labeling. Due to the robustness of the model across languages, we believe it can also be scaled to perform morphological tagging for multiple languages together.
+
+## Acknowledgments
+
+The authors would like to thank David Mortensen, Soumya Wadhwa and Maria Ryskina for useful comments about this work. We would also like to thank the reviewers who gave valuable feedback to improve the paper. This project was supported in part by an Amazon Academic Research Award and Google Faculty Award. 

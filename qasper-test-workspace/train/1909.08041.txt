@@ -1,0 +1,163 @@
+# Revealing the Importance of Semantic Retrieval for Machine Reading at Scale
+
+**Paper ID:** 1909.08041
+
+## Abstract
+
+Machine Reading at Scale (MRS) is a challenging task in which a system is given an input query and is asked to produce a precise output by "reading" information from a large knowledge base. The task has gained popularity with its natural combination of information retrieval (IR) and machine comprehension (MC). Advancements in representation learning have led to separated progress in both IR and MC; however, very few studies have examined the relationship and combined design of retrieval and comprehension at different levels of granularity, for development of MRS systems. In this work, we give general guidelines on system design for MRS by proposing a simple yet effective pipeline system with special consideration on hierarchical semantic retrieval at both paragraph and sentence level, and their potential effects on the downstream task. The system is evaluated on both fact verification and open-domain multihop QA, achieving state-of-the-art results on the leaderboard test sets of both FEVER and HOTPOTQA. To further demonstrate the importance of semantic retrieval, we present ablation and analysis studies to quantify the contribution of neural retrieval modules at both paragraph-level and sentence-level, and illustrate that intermediate semantic retrieval modules are vital for not only effectively filtering upstream information and thus saving downstream computation, but also for shaping upstream data distribution and providing better data for downstream modeling. Code/data made publicly available at: this https URL
+
+## Introduction
+
+Extracting external textual knowledge for machine comprehensive systems has long been an important yet challenging problem. Success requires not only precise retrieval of the relevant information sparsely restored in a large knowledge source but also a deep understanding of both the selected knowledge and the input query to give the corresponding output. Initiated by chen2017drqa, the task was termed as Machine Reading at Scale (MRS), seeking to provide a challenging situation where machines are required to do both semantic retrieval and comprehension at different levels of granularity for the final downstream task.
+
+Progress on MRS has been made by improving individual IR or comprehension sub-modules with recent advancements on representative learning BIBREF0, BIBREF1, BIBREF2. However, partially due to the lack of annotated data for intermediate retrieval in an MRS setting, the evaluations were done mainly on the final downstream task and with much less consideration on the intermediate retrieval performance. This led to the convention that upstream retrieval modules mostly focus on getting better coverage of the downstream information such that the upper-bound of the downstream score can be improved, rather than finding more exact information. This convention is misaligned with the nature of MRS where equal effort should be put in emphasizing the models' joint performance and optimizing the relationship between the semantic retrieval and the downstream comprehension sub-tasks.
+
+Hence, to shed light on the importance of semantic retrieval for downstream comprehension tasks, we start by establishing a simple yet effective hierarchical pipeline system for MRS using Wikipedia as the external knowledge source. The system is composed of a term-based retrieval module, two neural modules for both paragraph-level retrieval and sentence-level retrieval, and a neural downstream task module. We evaluated the system on two recent large-scale open domain benchmarks for fact verification and multi-hop QA, namely FEVER BIBREF3 and HotpotQA BIBREF4, in which retrieval performance can also be evaluated accurately since intermediate annotations on evidences are provided. Our system achieves the start-of-the-art results with 45.32% for answer EM and 25.14% joint EM on HotpotQA (8% absolute improvement on answer EM and doubling the joint EM over the previous best results) and with 67.26% on FEVER score (3% absolute improvement over previously published systems).
+
+We then provide empirical studies to validate design decisions. Specifically, we prove the necessity of both paragraph-level retrieval and sentence-level retrieval for maintaining good performance, and further illustrate that a better semantic retrieval module not only is beneficial to achieving high recall and keeping high upper bound for downstream task, but also plays an important role in shaping the downstream data distribution and providing more relevant and high-quality data for downstream sub-module training and inference. These mechanisms are vital for a good MRS system on both QA and fact verification.
+
+## Related Work
+
+Machine Reading at Scale First proposed and formalized in chen2017drqa, MRS has gained popularity with increasing amount of work on both dataset collection BIBREF5, BIBREF6 and MRS model developments BIBREF7, BIBREF8, BIBREF9. In some previous work BIBREF10, paragraph-level retrieval modules were mainly for improving the recall of required information, while in some other works BIBREF4, sentence-level retrieval modules were merely for solving the auxiliary sentence selection task. In our work, we focus on revealing the relationship between semantic retrieval at different granularity levels and the downstream comprehension task. To the best of our knowledge, we are the first to apply and optimize neural semantic retrieval at both paragraph and sentence levels for MRS.
+
+Automatic Fact Checking: Recent work BIBREF11 formalized the task of automatic fact checking from the viewpoint of machine learning and NLP. The release of FEVER BIBREF3 stimulates many recent developments BIBREF12, BIBREF13, BIBREF14 on data-driven neural networks for automatic fact checking. We consider the task also as MRS because they share almost the same setup except that the downstream task is verification or natural language inference (NLI) rather than QA.
+
+Information Retrieval Success in deep neural networks inspires their application to information retrieval (IR) tasks BIBREF15, BIBREF16, BIBREF17, BIBREF18. In typical IR settings, systems are required to retrieve and rank BIBREF19 elements from a collection of documents based on their relevance to the query. This setting might be very different from the retrieval in MRS where systems are asked to select facts needed to answer a question or verify a statement. We refer the retrieval in MRS as Semantic Retrieval since it emphasizes on semantic understanding.
+
+## Method
+
+In previous works, an MRS system can be complicated with different sub-components processing different retrieval and comprehension sub-tasks at different levels of granularity, and with some sub-components intertwined. For interpretability considerations, we used a unified pipeline setup. The overview of the system is in Fig. FIGREF2.
+
+To be specific, we formulate the MRS system as a function that maps an input tuple $(q, \mathbf {K})$ to an output tuple $(\hat{y}, \mathbf {S})$ where $q$ indicates the input query, $\mathbf {K}$ is the textual KB, $\hat{y}$ is the output prediction, and $\mathbf {S}$ is selected supporting sentences from Wikipedia. Let $\mathbf {E}$ denotes a set of necessary evidences or facts selected from $\mathbf {K}$ for the prediction. For a QA task, $q$ is the input question and $\hat{y}$ is the predicted answer. For a verification task, $q$ is the input claim and $\hat{y}$ is the predicted truthfulness of the input claim. For all tasks, $\mathbf {K}$ is Wikipedia.
+
+The system procedure is listed below:
+
+(1) Term-Based Retrieval: To begin with, we used a combination of the TF-IDF method and a rule-based keyword matching method to narrow the scope from whole Wikipedia down to a set of related paragraphs; this is a standard procedure in MRS BIBREF20, BIBREF10, BIBREF12. The focus of this step is to efficiently select a candidate set $\mathbf {P_I}$ that can cover the information as much as possible ($\mathbf {P_I} \subset \mathbf {K}$) while keeping the size of the set acceptable enough for downstream processing.
+
+(2) Paragraph-Level Neural Retrieval: After obtaining the initial set, we compare each paragraph in $\mathbf {P_I}$ with the input query $q$ using a neural model (which will be explained later in Sec SECREF4). The outputs of the neural model are treated as the relatedness score between the input query and the paragraphs. The scores will be used to sort all the upstream paragraphs. Then, $\mathbf {P_I}$ will be narrowed to a new set $\mathbf {P_N}$ ($\mathbf {P_N} \subset \mathbf {P_I}$) by selecting top $k_p$ paragraphs having relatedness score higher than some threshold value $h_p$ (going out from the P-Level grey box in Fig. FIGREF2). $k_p$ and $h_p$ would be chosen by keeping a good balance between the recall and precision of the paragraph retrieval.
+
+(3) Sentence-Level Neural Retrieval: Next, we select the evidence at the sentence-level by decomposing all the paragraphs in $\mathbf {P_N}$ into sentences. Similarly, each sentence is compared with the query using a neural model (see details in Sec SECREF4) and obtain a set of sentences $\mathbf {S} \subset \mathbf {P_N}$ for the downstream task by choosing top $k_s$ sentences with output scores higher than some threshold $h_s$ (S-Level grey box in Fig. FIGREF2). During evaluation, $\mathbf {S}$ is often evaluated against some ground truth sentence set denoted as $\mathbf {E}$.
+
+(4) Downstream Modeling: At the final step, we simply applied task-specific neural models (e.g., QA and NLI) on the concatenation of all the sentences in $\mathbf {S}$ and the query, obtaining the final output $\hat{y}$.
+
+In some experiments, we modified the setup for certain analysis or ablation purposes which will be explained individually in Sec SECREF6.
+
+## Method ::: Modeling and Training
+
+Throughout all our experiments, we used BERT-Base BIBREF2 to provide the state-of-the-art contextualized modeling of the input text.
+
+Semantic Retrieval: We treated the neural semantic retrieval at both the paragraph and sentence level as binary classification problems with models' parameters updated by minimizing binary cross entropy loss. To be specific, we fed the query and context into BERT as:
+
+We applied an affine layer and sigmoid activation on the last layer output of the [$\mathit {CLS}$] token which is a scalar value. The parameters were updated with the objective function:
+
+where $\hat{p}_i$ is the output of the model, $\mathbf {T}^{p/s}_{pos}$ is the positive set and $\mathbf {T}^{p/s}_{neg}$ is the negative set. As shown in Fig. FIGREF2, at sentence level, ground-truth sentences were served as positive examples while other sentences from upstream retrieved set were served as negative examples. Similarly at the paragraph-level, paragraphs having any ground-truth sentence were used as positive examples and other paragraphs from the upstream term-based retrieval processes were used as negative examples.
+
+QA: We followed devlin2018bert for QA span prediction modeling. To correctly handle yes-or-no questions in HotpotQA, we fed the two additional “$\mathit {yes}$" and “$\mathit {no}$" tokens between [$\mathit {CLS}$] and the $Query$ as:
+
+where the supervision was given to the second or the third token when the answer is “yes" or “no", such that they can compete with all other predicted spans. The parameters of the neural QA model were trained to maximize the log probabilities of the true start and end indexes as:
+
+where $\hat{y}^s_i$ and $\hat{y}^e_i$ are the predicted probability on the ground-truth start and end position for the $i$th example, respectively. It is worth noting that we used ground truth supporting sentences plus some other sentences sampled from upstream retrieved set as the context for training the QA module such that it will adapt to the upstream data distribution during inference.
+
+Fact Verification: Following Thorne18Fever, we formulate downstream fact verification as the 3-way natural language inference (NLI) classification problem BIBREF21, BIBREF22 and train the model with 3-way cross entropy loss. The input format is the same as that of semantic retrieval and the objective is $\mathcal {J}_{ver} = -\sum _{i} \mathbf {y}_i \cdot \log (\hat{\mathbf {y}}_i)$, where $\hat{\mathbf {y}}_i \in \mathbf {R^3}$ denotes the model's output for the three verification labels, and $\mathbf {y}_i$ is a one-hot embedding for the ground-truth label. For verifiable queries, we used ground truth evidential sentences plus some other sentences sampled from upstream retrieved set as new evidential context for NLI. For non-verifiable queries, we only used sentences sampled from upstream retrieved set as context because those queries are not associated with ground truth evidential sentences. This detail is important for the model to identify non-verifiable queries and will be explained more in Sec SECREF6. Additional training details and hyper-parameter selections are in the Appendix (Sec. SECREF8; Table TABREF27).
+
+It is worth noting that each sub-module in the system relies on its preceding sub-module to provide data both for training and inference. This means that there will be upstream data distribution misalignment if we trained the sub-module in isolation without considering the properties of its precedent upstream module. The problem is similar to the concept of internal covariate shift BIBREF23, where the distribution of each layer's inputs changes inside a neural network. Therefore, it makes sense to study this issue in a joint MRS setting rather than a typical supervised learning setting where training and test data tend to be fixed and modules being isolated. We release our code and the organized data both for reproducibility and providing an off-the-shelf testbed to facilitate future research on MRS.
+
+## Experimental Setup
+
+MRS requires a system not only to retrieve relevant content from textual KBs but also to poccess enough understanding ability to solve the downstream task. To understand the impact or importance of semantic retrieval on the downstream comprehension, we established a unified experimental setup that involves two different downstream tasks, i.e., multi-hop QA and fact verification.
+
+## Experimental Setup ::: Tasks and Datasets
+
+HotpotQA: This dataset is a recent large-scale QA dataset that brings in new features: (1) the questions require finding and reasoning over multiple documents; (2) the questions are diverse and not limited to pre-existing KBs; (3) it offers a new comparison question type BIBREF4. We experimented our system on HotpotQA in the fullwiki setting, where a system must find the answer to a question in the scope of the entire Wikipedia, an ideal MRS setup. The sizes of the train, dev and test split are 90,564, 7,405, and 7,405. More importantly, HotpotQA also provides human-annotated sentence-level supporting facts that are needed to answer each question. Those intermediate annotations enable evaluation on models' joint ability on both fact retrieval and answer span prediction, facilitating our direct analysis on the explainable predictions and its relations with the upstream retrieval.
+
+FEVER: The Fact Extraction and VERification dataset BIBREF3 is a recent dataset collected to facilitate the automatic fact checking. The work also proposes a benchmark task in which given an arbitrary input claim, candidate systems are asked to select evidential sentences from Wikipedia and label the claim as either Support, Refute, or Not Enough Info, if the claim can be verified to be true, false, or non-verifiable, respectively, based on the evidence. The sizes of the train, dev and test split are 145,449, 19,998, and 9,998. Similar to HotpotQA, the dataset provides annotated sentence-level facts needed for the verification. These intermediate annotations could provide an accurate evaluation on the results of semantic retrieval and thus suits well for the analysis on the effects of retrieval module on downstream verification.
+
+As in chen2017drqa, we use Wikipedia as our unique knowledge base because it is a comprehensive and self-evolving information source often used to facilitate intelligent systems. Moreover, as Wikipedia is the source for both HotpotQA and FEVER, it helps standardize any further analysis of the effects of semantic retrieval on the two different downstream tasks.
+
+## Experimental Setup ::: Metrics
+
+Following Thorne18Fever, yang2018hotpotqa, we used annotated sentence-level facts to calculate the F1, Precision and Recall scores for evaluating sentence-level retrieval. Similarly, we labeled all the paragraphs that contain any ground truth fact as ground truth paragraphs and used the same three metrics for paragraph-level retrieval evaluation. For HotpotQA, following yang2018hotpotqa, we used exact match (EM) and F1 metrics for QA span prediction evaluation, and used the joint EM and F1 to evaluate models' joint performance on both retrieval and QA. The joint EM and F1 are calculated as: $P_j = P_a \cdot P_s; R_j = R_a \cdot R_s; F_j = \frac{2P_j \cdot R_j}{P_j + R_j}; \text{EM}_j = \text{EM}_a \cdot \text{EM}_s$, where $P$, $R$, and $\text{EM}$ denote precision, recall and EM; the subscript $a$ and $s$ indicate that the scores are for answer span and supporting facts.
+
+For the FEVER task, following Thorne18Fever, we used the Label Accuracy for evaluating downstream verification and the Fever Score for joint performance. Fever score will award one point for each example with the correct predicted label only if all ground truth facts were contained in the predicted facts set with at most 5 elements. We also used Oracle Score for the two retrieval modules. The scores were proposed in nie2019combining and indicate the upperbound of final FEVER Score at one intermediate layer assuming all downstream modules are perfect. All scores are averaged over examples in the whole evaluation set.
+
+## Results on Benchmarks
+
+We chose the best system based on the dev set, and used that for submitting private test predictions on both FEVER and HotpotQA .
+
+As can be seen in Table TABREF8, with the proposed hierarchical system design, the whole pipeline system achieves new start-of-the-art on HotpotQA with large-margin improvements on all the metrics. More specifically, the biggest improvement comes from the EM for the supporting fact which in turn leads to doubling of the joint EM on previous best results. The scores for answer predictions are also higher than all previous best results with $\sim $8 absolute points increase on EM and $\sim $9 absolute points on F1. All the improvements are consistent between test and dev set evaluation.
+
+Similarly for FEVER, we showed F1 for evidence, the Label Accuracy, and the FEVER Score (same as benchmark evaluation) for models in Table TABREF9. Our system obtained substantially higher scores than all previously published results with a $\sim $4 and $\sim $3 points absolute improvement on Label Accuracy and FEVER Score. In particular, the system gains 74.62 on the evidence F1, 22 points greater that of the second system, demonstrating its ability on semantic retrieval.
+
+Previous systems BIBREF24, BIBREF4 on HotpotQA treat supporting fact retrieval (sentence-level retrieval) just as an auxiliary task for providing extra model explainability. In nie2019combining, although they used a similar three-stage system for FEVER, they only applied one neural retrieval module at sentence-level which potentially weaken its retrieval ability. Both of these previous best systems are different from our fully hierarchical pipeline approach. These observations lead to the assumption that the performance gain comes mainly from the hierarchical retrieval and its positive effects on downstream. Therefore, to validate the system design decisions in Sec SECREF3 and reveal the importance of semantic retrieval towards downstream, we conducted a series of ablation and analysis experiments on all the modules. We started by examining the necessity of both paragraph and sentence retrieval and give insights on why both of them matters.
+
+## Analysis and Ablations
+
+Intuitively, both the paragraph-level and sentence-level retrieval sub-module help speeding up the downstream processing. More importantly, since downstream modules were trained by sampled data from upstream modules, both of neural retrieval sub-modules also play an implicit but important role in controlling the immediate retrieval distribution i.e. the distribution of set $\mathbf {P_N}$ and set $\mathbf {S}$ (as shown in Fig. FIGREF2), and providing better inference data and training data for downstream modules.
+
+## Analysis and Ablations ::: Ablation Studies ::: Setups:
+
+To reveal the importance of neural retrieval modules at both paragraph and sentence level for maintaining the performance of the overall system, we removed either of them and examine the consequences. Because the removal of a module in the pipeline might change the distribution of the input of the downstream modules, we re-trained all the downstream modules accordingly. To be specific, in the system without the paragraph-level neural retrieval module, we re-trained the sentence-level retrieval module with negative sentences directly sampled from the term-based retrieval set and then also re-trained the downstream QA or verification module. In the system without the sentence-level neural retrieval module, we re-train the downstream QA or verification module by sampling data from both ground truth set and retrieved set directly from the paragraph-level module. We tested the simplified systems on both FEVER and HotpotQA.
+
+## Analysis and Ablations ::: Ablation Studies ::: Results:
+
+Table TABREF13 and TABREF14 shows the ablation results for the two neural retrieval modules at both paragraph and sentence level on HotpotQA and FEVER. To begin with, we can see that removing paragraph-level retrieval module significantly reduces the precision for sentence-level retrieval and the corresponding F1 on both tasks. More importantly, this loss of retrieval precision also led to substantial decreases for all the downstream scores on both QA and verification task in spite of their higher upper-bound and recall scores. This indicates that the negative effects on downstream module induced by the omission of paragraph-level retrieval can not be amended by the sentence-level retrieval module, and focusing semantic retrieval merely on improving the recall or the upper-bound of final score will risk jeopardizing the performance of the overall system.
+
+Next, the removal of sentence-level retrieval module induces a $\sim $2 point drop on EM and F1 score in the QA task, and a $\sim $15 point drop on FEVER Score in the verification task. This suggests that rather than just enhance explainability for QA, the sentence-level retrieval module can also help pinpoint relevant information and reduce the noise in the evidence that might otherwise distract the downstream comprehension module. Another interesting finding is that without sentence-level retrieval module, the QA module suffered much less than the verification module; conversely, the removal of paragraph-level retrieval neural induces a 11 point drop on answer EM comparing to a $\sim $9 point drop on Label Accuracy in the verification task. This seems to indicate that the downstream QA module relies more on the upstream paragraph-level retrieval whereas the verification module relies more on the upstream sentence-level retrieval. Finally, we also evaluate the F1 score on FEVER for each classification label and we observe a significant drop of F1 on Not Enough Info category without retrieval module, meaning that semantic retrieval is vital for the downstream verification module's discriminative ability on Not Enough Info label.
+
+## Analysis and Ablations ::: Sub-Module Change Analysis
+
+To further study the effects of upstream semantic retrieval towards downstream tasks, we change training or inference data between intermediate layers and then examine how this modification will affect the downstream performance.
+
+## Analysis and Ablations ::: Sub-Module Change Analysis ::: Effects of Paragraph-level Retrieval
+
+We fixed $h_p=0$ (the value achieving the best performance) and re-trained all the downstream parameters and track their performance as $k_p$ (the number of selected paragraph) being changed from 1 to 12. The increasing of $k_p$ means a potential higher coverage of the answer but more noise in the retrieved facts. Fig. FIGREF17 shows the results. As can be seen that the EM scores for supporting fact retrieval, answer prediction, and joint performance increase sharply when $k_p$ is changed from 1 to 2. This is consistent with the fact that at least two paragraphs are required to ask each question in HotpotQA. Then, after the peak, every score decrease as $k_p$ becomes larger except the recall of supporting fact which peaks when $k_p=4$. This indicates that even though the neural sentence-level retrieval module poccesses a certain level of ability to select correct facts from noisier upstream information, the final QA module is more sensitive to upstream data and fails to maintain the overall system performance. Moreover, the reduction on answer EM and joint EM suggests that it might be risky to give too much information for downstream modules with a unit of a paragraph.
+
+## Analysis and Ablations ::: Sub-Module Change Analysis ::: Effects of Sentence-level Retrieval
+
+Similarly, to study the effects of neural sentence-level retrieval module towards downstream QA and verification modules, we fixed $k_s$ to be 5 and set $h_s$ ranging from 0.1 to 0.9 with a 0.1 interval. Then, we re-trained the downstream QA and verification modules with different $h_s$ value and experimented on both HotpotQA and FEVER.
+
+Question Answering: Fig. FIGREF18 shows the trend of performance. Intuitively, the precision increase while the recall decrease as the system becomes more strict about the retrieved sentences. The EM score for supporting fact retrieval and joint performance reaches their highest value when $h_s=0.5$, a natural balancing point between precision and recall. More interestingly, the EM score for answer prediction peaks when $h_s=0.2$ and where the recall is higher than the precision. This misalignment between answer prediction performance and retrieval performance indicates that unlike the observation at paragraph-level, the downstream QA module is able to stand a certain amount of noise at sentence-level and benefit from a higher recall.
+
+Fact Verification: Fig. FIGREF19 shows the trends for Label Accuracy, FEVER Score, and Evidence F1 by modifying upstream sentence-level threshold $h_s$. We observed that the general trend is similar to that of QA task where both the label accuracy and FEVER score peak at $h_s=0.2$ whereas the retrieval F1 peaks at $h_s=0.5$. Note that, although the downstream verification could take advantage of a higher recall, the module is more sensitive to sentence-level retrieval comparing to the QA module in HotpotQA. More detailed results are in the Appendix.
+
+## Analysis and Ablations ::: Answer Breakdown
+
+We further sample 200 examples from HotpotQA and manually tag them according to several common answer types BIBREF4. The proportion of different answer types is shown in Figure FIGREF24. The performance of the system on each answer type is shown in Table TABREF23. The most frequent answer type is 'Person' (24%) and the least frequent answer type is 'Event' (2%). It is also interesting to note that the model performs the best in Yes/No questions as shown in Table TABREF23, reaching an accuracy of 70.6%.
+
+## Analysis and Ablations ::: Examples
+
+Fig. FIGREF26 shows an example that is correctly handled by the full pipeline system but not by the system without paragraph-level retrieval module. We can see that it is very difficult to filter the distracting sentence after sentence-level either by the sentence retrieval module or the QA module.
+
+Above findings in both FEVER and HotpotQA bring us some important guidelines for MRS: (1) A paragraph-level retrieval module is imperative; (2) Downstream task module is able to undertake a certain amount of noise from sentence-level retrieval; (3) Cascade effects on downstream task might be caused by modification at paragraph-level retrieval.
+
+## Conclusion
+
+We proposed a simple yet effective hierarchical pipeline system that achieves state-of-the-art results on two MRS tasks. Ablation studies demonstrate the importance of semantic retrieval at both paragraph and sentence levels in the MRS system. The work can give general guidelines on MRS modeling and inspire future research on the relationship between semantic retrieval and downstream comprehension in a joint setting.
+
+## Acknowledgments
+
+We thank the reviewers for their helpful comments and Yicheng Wang for useful comments. This work was supported by awards from Verisk, Google, Facebook, Salesforce, and Adobe (plus Amazon and Google GPU cloud credits). The views, opinions, and/or findings contained in this article are those of the authors and should not be interpreted as representing the official views or policies, either expressed or implied, of the funding agency.
+
+## Training Details
+
+The hyper-parameters were chosen based on the performance of the system on the dev set. The hyper-parameters search space is shown in Table TABREF27 and the learning rate was set to $10^{-5}$ in all experiments.
+
+## Term-Based Retrieval Details ::: FEVER
+
+We used the same key-word matching method in nie2019combining to get a candidate set for each query. We also used TF-IDF BIBREF20 method to get top-5 related documents for each query. Then, the two sets were combined to get final term-based retrieval set for FEVER. The mean and standard deviation of the number of the retrieved paragraph in the merged set were 8.06 and 4.88.
+
+## Term-Based Retrieval Details ::: HotpotQA
+
+We first used the same procedure on FEVER to get an initial candidate set for each query in HotpotQA. Because HotpotQA requires at least 2-hop reasoning for each query, we then extract all the hyperlinked documents from the retrieved documents in the initial candidate set, rank them with TF-IDF BIBREF20 score and then select top-5 most related documents and add them to the candidate set. This gives the final term-based retrieval set for HotpotQA. The mean and standard deviation of the number of the retrieved paragraph for each query in HotpotQA were 39.43 and 16.05.
+
+## Detailed Results
+
+The results of sentence-level retrieval and downstream QA with different values of $h_s$ on HotpotQA are in Table TABREF28.
+
+The results of sentence-level retrieval and downstream verification with different values of $h_s$ on FEVER are in Table TABREF34.
+
+The results of sentence-level retrieval and downstream QA with different values of $k_p$ on HotpotQA are in Table TABREF35.
+
+## Examples and Case Study
+
+We further provide examples, case study and error analysis for the full pipeline system. The examples are shown from Tables TABREF37, TABREF38, TABREF39, TABREF40, TABREF41. The examples show high diversity on the semantic level and the error occurs often due to the system's failure of extracting precise (either wrong, surplus or insufficient) information from KB.

@@ -1,0 +1,77 @@
+# Contextualized Word Embeddings Enhanced Event Temporal Relation Extraction for Story Understanding
+
+**Paper ID:** 1904.11942
+
+## Abstract
+
+Learning causal and temporal relationships between events is an important step towards deeper story and commonsense understanding. Though there are abundant datasets annotated with event relations for story comprehension, many have no empirical results associated with them. In this work, we establish strong baselines for event temporal relation extraction on two under-explored story narrative datasets: Richer Event Description (RED) and Causal and Temporal Relation Scheme (CaTeRS). To the best of our knowledge, these are the first results reported on these two datasets. We demonstrate that neural network-based models can outperform some strong traditional linguistic feature-based models. We also conduct comparative studies to show the contribution of adopting contextualized word embeddings (BERT) for event temporal relation extraction from stories. Detailed analyses are offered to better understand the results.
+
+## Introduction
+
+Event temporal relation understanding is a major component of story/narrative comprehension. It is an important natural language understanding (NLU) task with broad applications to downstream tasks such as story understanding BIBREF0 , BIBREF1 , BIBREF2 , question answering BIBREF3 , BIBREF4 , and text summarization BIBREF5 , BIBREF6 .
+
+The goal of event temporal relation extraction is to build a directed graph where nodes correspond to events, and edges reflect temporal relations between the events. Figure FIGREF1 illustrates an example of such a graph for the text shown above. Different types of edges specify different temporal relations: the event assassination is before slaughtered, slaughtered is included in rampage, and the relation between rampage and war is vague.
+
+Modeling event temporal relations is crucial for story/narrative understanding and storytelling, because a story is typically composed of a sequence of events BIBREF7 . Several story corpora are thus annotated with various event-event relations to understand commonsense event knowledge. CaTeRS BIBREF8 is created by annotating 320 five-sentence stories sampled from ROCStories BIBREF7 dataset. RED BIBREF9 contains annotations of rich relations between event pairs for storyline understanding, including co-reference and partial co-reference relations, temporal; causal, and sub-event relations.
+
+Despite multiple productive research threads on temporal and causal relation modeling among events BIBREF10 , BIBREF11 , BIBREF12 and event relation annotation for story understanding BIBREF8 , the intersection of these two threads seems flimsy. To the best of our knowledge, no event relation extraction results have been reported on CaTeRS and RED.
+
+We apply neural network models that leverage recent advances in contextualized embeddings (BERT BIBREF13 ) to event-event relation extraction tasks for CaTeRS and RED. Our goal in this paper is to increase understanding of how well the state-of-the-art event relation models work for story/narrative comprehension.
+
+In this paper, we report the first results of event temporal relation extraction on two under-explored story comprehension datasets: CaTeRS and RED. We establish strong baselines with neural network models enhanced by recent breakthrough of contextualized embeddings, BERT BIBREF13 . We summarize the contributions of the paper as follows:
+
+## Models
+
+We investigate both neural network-based models and traditional feature-based models. We briefly introduce them in this section.
+
+## Data
+
+is created by annotating 1600 sentences of 320 five-sentence stories sampled from ROCStories BIBREF7 dataset. CaTeRS contains both temporal and causal relations in an effort to understand and predict commonsense relations between events.
+
+As demonstrated in Table TABREF16 , we split all stories into 220 training and 80 test. We do not construct the development set because the dataset is small. Note that some relations have compounded labels such as “CAUSE_BEFORE”, “ENABLE_BEFORE”, etc. We only take the temporal portion of the annotations.
+
+annotates a wide range of relations of event pairs including their coreference and partial coreference relations, and temporal, causal and subevent relationships. We split data according to the standard train, development, test sets, and only focus on the temporal relations.
+
+The common issue of these two datasets is that they are not densely annotated – not every pair of events is annotated with a relation. We provide one way to handle negative (unannotated) pairs in this paper. When constructing negative examples, we take all event pairs that occur within the same or neighboring sentences with no annotations, labeling them as “NONE”. The negative to positive samples ratio is 1.00 and 11.5 for CaTeRS and RED respectively. Note that RED data has much higher negative ratio (as shown in Table TABREF16 ) because it contains longer articles, more complicated sentence structures, and richer entity types than CaTeRS where all stories consist of 5 (mostly short) sentences.
+
+In both the development and test sets, we add all negative pairs as candidates for the relation prediction. During training, the number of negative pairs we add is based on a hyper-parameter that we tune to control the negative-to-positive sample ratio.
+
+To justify our decision of selecting negative pairs within the same or neighboring sentences, we show the distribution of distances across positive sentence pairs in Table TABREF18 . Although CaTeRS data has pair distance more evenly distributed than RED, we observe that the vast majority (85.87% and 93.99% respectively) of positive pairs have sentence distance less than or equal to one.
+
+To handle negative pairs that are more than two sentences away, we automatically predict all out-of-window pairs as “NONE”. This means that some positive pairs will be automatically labeled as negative pairs. Since the percentage of out-of-window positive pairs is small, we believe the impact on performance is small. We can investigate expanding the prediction window in future research, but the trade-off is that we will get more negative pairs that are hard to predict.
+
+## Implementation Details
+
+CAEVO consists of both linguistic-rule-based sieves and feature-based trainable sieves. We train CAEVO sieves with our train set and evaluate them on both dev and test sets. CAEVO is an end-to-end system that automatically annotates both events and relations. In order to resolve label annotation mismatch between CAEVO and our gold data, we create our own final input files to CAEVO system. Default parameter settings are used when running the CAEVO system.
+
+In an effort of building a general model and reducing the number of hand-crafted features, we leverage pre-trained (GloVe 300) embeddings in place of linguistic features. The only linguistic feature we use in our experiment is token distance. We notice in our experiments that hidden layer size, dropout ratio and negative sample ratio impact model performance significantly. We conduct grid search to find the best hyper-parameter combination according to the performance of the development set.
+
+Note that since the CaTeRS data is small and there is no standard train, development, and test splits, we conduct cross-validation on training data to choose the best hyper-parameters and predict on test. For RED data, the standard train, development, test splits are used.
+
+As we mentioned briefly in the introduction, using BERT output as word embeddings could provide an additional performance boost in our NN architecture. We pre-process our raw data by feeding original sentences into a pre-trained BERT model and output the last layer of BERT as token representations. In this experiment, we fix the negative sample ratio according to the result obtained from the previous step and only search for the best hidden layer size and dropout ratio.
+
+## Result and Analysis
+
+Table TABREF25 contains the best hyper-parameters and Table TABREF26 contains micro-average F1 scores for both datasets on dev and test sets. We only consider positive pairs, i.e. correct predictions on NONE pairs are excluded for evaluation. In general, the baseline model CAEVO is outperformed by both NN models, and NN model with BERT embedding achieves the greatest performance. We now provide more detailed analysis and discussion for each dataset.
+
+## Temporal Relation Data
+
+Collecting dense TempRel corpora with event pairs fully annotated has been reported challenging since annotators could easily overlook some pairs BIBREF18 , BIBREF19 , BIBREF10 . TimeBank BIBREF20 is an example with events and their relations annotated sparsely. TB-Dense dataset mitigates this issue by forcing annotators to examine all pairs of events within the same or neighboring sentences. However, densely annotated datasets are relatively small both in terms of number of documents and event pairs, which restricts the complexity of machine learning models used in previous research.
+
+## Feature-based Models
+
+The series of TempEval competitions BIBREF21 , BIBREF22 , BIBREF23 have attracted many research interests in predicting event temporal relations. Early attempts by BIBREF24 , BIBREF21 , BIBREF25 , BIBREF26 only use pair-wise classification models. State-of-the-art local methods, such as ClearTK BIBREF27 , UTTime BIBREF28 , and NavyTime BIBREF29 improve on earlier work by feature engineering with linguistic and syntactic rules. As we mention in the Section 2, CAEVO is the current state-of-the-art system for feature-based temporal event relation extraction BIBREF10 . It's widely used as the baseline for evaluating TB-Dense data. We adopt it as our baseline for evaluating CaTeRS and RED datasets. Additionally, several models BramsenDLB2006, ChambersJ2008, DoLuRo12, NingWuRo18, P18-1212 have successfully incorporated global inference to impose global prediction consistency such as temporal transitivity.
+
+## Neural Network Model
+
+Neural network-based methods have been employed for event temporal relation extraction BIBREF14 , BIBREF15 , BIBREF16 , BIBREF12 which achieved impressive results. However, the dataset they focus on is TB-Dense. We have explored neural network models on CaTeRS and RED, which are more related to story narrative understanding and generation.
+
+In our NN model, we also leverage Bidrectional Encoder Representations from Transformers (BERT) BIBREF30 which has shown significant improvement in many NLP tasks by allowing fine-tuning of pre-trained language representations. Unlike the Generative Pre-trained Transformer (OpenAI GPT) BIBREF31 , BERT uses a biderctional Transformer BIBREF32 instead of a unidirectional (left-to-right) Transformer to incorporate context from both directions. As mentioned earlier, we do not fine-tune BERT in our experiments and simply leverage the last layer as our contextualized word representations.
+
+## Conclusion
+
+We established strong baselines for two story narrative understanding datasets: CaTeRS and RED. We have shown that neural network-based models can outperform feature-based models with wide margins, and we conducted an ablation study to show that contextualized representation learning can boost performance of NN models. Further research can focus on more systematic study or build stronger NN models over the same datasets used in this work. Exploring possibilities to directly apply temporal relation extraction to enhance performance of story generation systems is another promising research direction.
+
+## Acknowledgement
+
+We thank the anonymous reviewers for their constructive comments, as well as the members of the USC PLUS lab for their early feedback. This work is supported by Contract W911NF-15-1-0543 with the US Defense Advanced Research Projects Agency (DARPA).

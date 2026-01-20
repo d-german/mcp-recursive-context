@@ -1,0 +1,154 @@
+# Aff2Vec: Affect--Enriched Distributional Word Representations
+
+**Paper ID:** 1805.07966
+
+## Abstract
+
+Human communication includes information, opinions, and reactions. Reactions are often captured by the affective-messages in written as well as verbal communications. While there has been work in affect modeling and to some extent affective content generation, the area of affective word distributions in not well studied. Synsets and lexica capture semantic relationships across words. These models however lack in encoding affective or emotional word interpretations. Our proposed model, Aff2Vec provides a method for enriched word embeddings that are representative of affective interpretations of words. Aff2Vec outperforms the state--of--the--art in intrinsic word-similarity tasks. Further, the use of Aff2Vec representations outperforms baseline embeddings in downstream natural language understanding tasks including sentiment analysis, personality detection, and frustration prediction.
+
+## Introduction
+
+ This work is licensed under a Creative Commons Attribution 4.0 International License. License details: http://creativecommons.org/licenses/by/4.0/ Affect refers to the experience of a feeling or emotion BIBREF0 , BIBREF1 . This definition includes emotions, sentiments, personality, and moods. The importance of affect analysis in human communication and interactions has been discussed by Picard Picard1997. Historically, affective computing has focused on studying human communication and reactions through multi-modal data gathered through various sensors. The study of human affect from text and other published content is an important topic in language understanding. Word correlation with social and psychological processes is discussed by Pennebaker Pennebaker2011. Preotiuc-Pietro et al. perspara17nlpcss studied personality and psycho-demographic preferences through Facebook and Twitter content. Sentiment analysis in Twitter with a detailed discussion on human affect BIBREF2 and affect analysis in poetry BIBREF3 have also been explored. Human communication not only contains semantic and syntactic information but also reflects the psychological and emotional states. Examples include the use of opinion and emotion words BIBREF4 . The analysis of affect in interpersonal communication such as emails, chats, and longer written articles is necessary for various applications including the study of consumer behavior and psychology, understanding audiences and opinions in computational social science, and more recently for dialogue systems and conversational agents. This is a open research space today.
+
+Traditional natural language understanding systems rely on statistical language modeling and semantic word distributions such as WORDNET BIBREF5 to understand relationships across different words. There has been a resurgence of research efforts towards creating word distributions that capture multi-dimensional word semantics BIBREF6 , BIBREF7 . Sedoc et al. affnorms17eacl introduce the notion of affect features in word distributions but their approach is limited to creating enriched representations, and no comments on the utility of the new word distribution is presented. Beyond word-semantics, deep learning research in natural language understanding, is focused towards sentence representations using encoder-decoder models BIBREF8 , integrating symbolic knowledge to language models BIBREF9 , and some recent works in augmenting neural language modeling with affective information to emotive text generation BIBREF4 . These works however do not introduce distributional affective word representations that not only reflect affective content but are also superior for related downstream natural language tasks such as sentiment analysis and personality detection.
+
+We introduce Aff2Vec, affect-enriched word distributions trained on lexical resources coupled with semantic word distributions. Aff2Vec captures opinions and affect information in the representation using post-processing approaches. Figure 1 illustrates how Aff2Vec captures affective relationships using a t-SNE visualization of the word space. Aff2Vec can be trained using any affect space, we focus on the Valence–Arousal–Dominance dimensions but the approach is generalizable to other space. Our experiments show that Aff2Vec out performs vanilla embedding spaces for both intrinsic word–similarity tasks as well as extrinsic natural language applications. Main contributions of this paper include:
+
+Aff2Vec: Affect-enriched word representations using post-processing techniques. We show that Aff2Vec outperforms the state-of-the-art in both intrinsic word similarity metrics as well as downstream natural language tasks including Sentiment analysis, Personality detection, and Frustration detection in interpersonal communication.
+
+ENRON-FFP Dataset: We introduce the ENRON-FFP Email dataset with Frustration, Formality, and Politeness tags gathered using a crowd-sourced human perception study.
+
+The remainder of the paper is organized as follows. The prior art for enriched word distributions is discussed in Section "Related Work" . Aff2Vec is introduced in section "Aff2Vec: Affect–enriched Word Distributions" . We present the crowd-sourcing study for the ENRON-FFP Dataset in section "Dataset: ENRON-FFP" and section "Experiments" discusses the experimental setup. Section "Results" presents the evaluation of Aff2Vec for various intrinsic and extrinsic tasks. A discussion on the distributional word representations is presented in section "Discussion" before concluding in section "Conclusion" .
+
+## Related Work
+
+The use of lexical semantic information (lexical resources) to improve distributional representations is recent. Methods like BIBREF10 , BIBREF11 , BIBREF12 , BIBREF13 achieve this by using word similarity and relational knowledge to modify the prior or add a regularization term. We call such methods `pre-training methods', as they alter the training procedure for word representations. Such methods require a change in the loss function while training the embeddings, hence are computationally expensive.
+
+The other set of word distribution enhancements are done post-training. These methods aim to include external information using normalizations and modifications to the vanilla word distributions. Methods such as Retrofitting BIBREF14 which tries to drag similar words closer together, where notion of similarity is taken from word relation knowledge found in semantic lexica (e.g. WordNet) fall in this category. Counterfitting BIBREF15 on the other hand initiates from SimLex-999 tuned embeddings, injects antonyms and synonym constraints to improve word representations. This paper introduces post-training techniques on vanilla, retrofitted, and counterfitted embeddings to include affective information in the distributions. Our work falls in the post-training category, hence no direct comparison with the pre-trained approaches is presented in this paper.
+
+Recent work has explored approaches to adapt general-purpose lexica for specific contexts and affects. Studies have recognized the limited applicability of general purpose lexica such as ANEW BIBREF16 to identify affect in verbs and adverbs, as they focus heavily on adjectives. Recognizing that general-purpose lexica often detect sentiment which is incongruous with context, Ribeiro et al. ribeiro2016sentibench proposed a sentiment damping method which utilizes the average sentiment strength over a document to damp any abnormality in the derived sentiment strength. Similarly, Blitzer et al. blitzer2007biographies argued that words like `predictable' induced a negative connotation in book reviews, while `must-read' implied a highly positive sentiment. This paper doesn't focus on building yet another affect lexicon but studies the consequences of including affect information in distributional word representations that aim at defining relational relationships across all words in large contexts and vocabularies.
+
+Automatic expansion of affect ratings has been approached with the intuition that words closer in the distributional space would have similar ratings BIBREF17 , BIBREF18 , BIBREF19 , BIBREF20 . Recent work by Sedoc et al.affnorms17eacl uses Signed Spectral Clustering to differentiate between words which are contextually similar but display opposite affect. Whereas BIBREF21 uses a graph–based method inspired by label propagation. While our approach follows the nature of the task defined in Sedoc et al., we propose a generalized method to enrich content with affective information. They focus on distinguishing the polarities. Our method incorporates both semantic and affect information hence creating embeddings that can also be used for semantic similarity tasks. Note that Sedoc et al. do not include any semantic information in their modeling.
+
+## Aff2Vec: Affect–enriched Word Distributions
+
+Aff2Vec aims at incorporating affective information in word representations. We leverage the Warriner's lexicon BIBREF22 in the Valence–Arousal–Dominance space for this work. The proposed work is generalizable to other affect spaces. This section presents two approaches for affect–enrichment of word distributions.
+
+Warriner's lexicon: This is a affect lexicon with 13915 english words. It contains real-valued scored for Valence, Arousal, and Dominance (VAD) on a scale of $1-9$ each. 1, 5, 9 correspond to the low, moderate (i.e. neutral), and high values for each dimension respectively. The lexicon does not contain common English words such as stop words and proper nouns. For such out–of–dictionary words we assume a neutral affect vector $\vec{a}=[5,5,5]$ .
+
+## Affect-APPEND
+
+Consider word embeddings $W$ , the aim is to introduce affective information to this space using the affect embedding space, $A$ . The word vectors $W$ , with dimension $D$ are concatenated with affect vectors $A$ with dimension $F$ , thus resulting in a $D+F$ dimensional enriched representation. The process for this concatenation is described here:
+
+1. Normalize word vector $W$ and affect vector $A$ using their L2-Norms (Equation 7 , ). This reduces the individual vectors to unit-length. 
+
+$$x_i = \dfrac{x_i}{\sqrt{\sum _{k = 1}^{D} x_{ik}^2}} ~~\forall x_i \in W, ~~~~a_i = \dfrac{a_i}{\sqrt{\sum _{k = 1}^{F} a_{ik}^2}} ~~\forall a_i \in A$$   (Eq. 7) 
+
+2. Concatenate the regularized word vectors $x_i$ with regularized affect vectors $a_i$ . 
+
+$$WA(w) = W(w) \oplus A(w)$$   (Eq. 8) 
+
+3. Standardize (1 variance, 0 mean) the $D+F$ dimensional embeddings to achieve uniform distribution. 
+
+$$y_i = \dfrac{y_i - \mu }{\sigma } ~~~~ \forall y_i \in WA$$   (Eq. 9) 
+
+where $\mu $ and $\sigma $ represent the mean and standard deviation respectively.
+
+4. The enriched space $WA$ is then reduced to original $D$ dimensional vector. We use Principal Component Analysis for the dimensionality reduction.
+
+## Affect-STRENGTH
+
+In this approach, the strength in the antonym/synonym relationships of the words is incorporated in the word distribution space. Hence, we leverage the Retrofitted Word Embeddings for this approach BIBREF14 .
+
+Retrofitting: Let $V = \lbrace w_1, w_2, w_3,..., w_n\rbrace $ be a vocabulary and $\Omega $ be an ontology which encodes semantic relations between words present in $V$ (e.g. WORDNET). This ontology $\Omega $ is represented as an undirected graph $(V,E)$ with words as vertices and $(w_i, w_j)$ as edges indicating the semantic relationship of interest. Each word $w_i \in V$ is represented as a vector representation $\hat{q}_i \in R^d$ learnt using a data–driven approach (e.g. Word2Vec or GloVe) where $d$ is the length of the word vectors.
+
+Let $\hat{Q}$ be the matrix collection of these vector representations. The objective is to learn the matrix $ Q = (q_1,..., q_n) $ such that the word vectors ( $q_i$ ) are both close to their counterparts in $\hat{Q}$ and to adjacent vertices in $\Omega $ . The distance between a pair of vectors is defined to be Euclidean, hence the objective function for minimization is 
+
+$$\leavevmode \xbox {resizebox}{\XMLaddatt {width}{213.5pt}
+\Psi (Q) = \sum _{i=1}^{n} {\Bigg [ \alpha _i {\Vert q_i - \hat{q}_i\Vert }^2 + \sum _{(i,j) \in E} {\beta _{ij}{\Vert q_i - q_j\Vert }^2} \Bigg ] }
+
+}$$   (Eq. 12) 
+
+where $\alpha $ and $\beta $ are hyper parameters and control the relative strengths of the two associations. $\Psi $ is a convex function in $Q$ and its global optimal solution can be found by using an iterative update method. By setting $\frac{\partial \Psi (Q)}{\partial q_i} = 0$ , the online updates are as follows: 
+
+$$q_i = \frac{\sum _{j:(i,j) \in E} {\beta _{ij}q_j + \alpha _i\hat{q}_i}}{\sum _{j:(i,j) \in E} {\beta _{ij} + \alpha _i}}$$   (Eq. 13) 
+
+We propose two ways to modify $\beta _{ij}$ in equation 12 in order to incorporate affective strength in the edge weights connecting two retrofitted vectors to each other.
+
+Affect-cStrength: In this approach, the affective strength is considered as a function of all $F$ affect dimensions. 
+
+$$S(w_i, w_j) = 1 - \dfrac{\Vert a_{i} - a_{j}\Vert }{\sqrt{\sum _{f=1}^{F}{max\_dist_f^{2}}}}$$   (Eq. 14) 
+
+where $a_i$ and $a_j$ are $F$ dimensional vectors in $A$ and $max\_dist_f$ is defined as the maximum possible distance between two vectors in $f^{th}$ dimension ( $= 9.0 - 1.0 = 8.0$ for VAD dimensions).
+
+Affect-iStrength: Here, each dimension is treated individually. For every dimension $f$ in $A$ , we add an edge between neighbors in the Ontology $\Omega $ where the strength of that edge is given by $S_{f}(w_i, w_j)$ : 
+
+$$S_{f}(w_i, w_j) =
+1 - \dfrac{|a_{if} - a_{jf}|}{max\_dist_{f}}, ~~~~ S(w_i, w_j) = \sum _{f=1}^{F}{S_{f}(w_i, w_j)}$$   (Eq. 15) 
+
+ $\beta _{ij}$ from equation 13 is normalized with this strength function as $\beta _{ij} = \beta _{ij} * S(w_i, w_j)$ , where $S(w_i,w_j)$ is defined by either Affect-cStrength or Affect-iStrength.
+
+## Dataset: ENRON-FFP
+
+We introduce an email dataset, a subset of the ENRON data BIBREF31 , with tags about interpersonal communication traits, namely, Formality, Politeness, and Frustration. The dataset provides the text, user information, as well as the network information for email exchanges between Enron employees.
+
+Human Perceptions and Definitions: Tone or affects such as frustration and politeness are highly subjective measures. In this work, we do not attempt to introduce or standardize an accurate definition for frustration (or formality and politeness). Instead, we assume that these are defined by human perception, and each individual may differ in their understanding of these metrics. This approach of using untrained human judgments has been used in prior studies of pragmatics in text data BIBREF32 , BIBREF33 and is a recommended way of gathering gold-standard annotations BIBREF34 . The tagged data is then used to predict the formality, frustration, and politeness tags using Aff2Vec embeddings.
+
+Dataset Annotation: We conducted a crowd sourced experiment using Amazon's Mechanical Turk. The analysis presented in this section is based on 1050 emails that were tagged across multiple experiments. Table 1 provides an overview of the data statistics of the annotated data. We follow the annotation protocol of the Likert Scale BIBREF35 for all three dimensions. Each email is considered as a single data point and only the text in the email body is provided for tagging. Frustration is tagged on a 3 point scale with neutral being equated to `not frustrated'; `frustrated' and `very frustrated' are marked with $-1$ and $-2$ respectively. Formality and politeness follow a 5 point scale from $-2$ to $+2$ where both extremes mark the higher degree of presence and absence of the respective dimension. Table 2 shows some example emails from the dataset.
+
+Inter-annotator Agreement: To measure whether the individual intuition of the affect dimensions is consistent with other annotators' judgment, we use interclass correlation to quantify the ordinal ratings. This measure accounts for the fact that we may have different group of annotators for each data point. Each data point has 10 distinct annotations. Agreements reported for 3 class and 5 class annotations $0.506 \pm 0.05$ , $0.73 \pm 0.02$ , and $0.64 \pm 0.03$ for frustration, formality, and politeness respectively. The agreement measures are similar to those reported for other such psycholinguistic tagging tasks.
+
+## Experiments
+
+ Two sets of experiments are presented to evaluate Aff2Vec embeddings - Intrinsic evaluation using word similarity tasks and extrinsic evaluation using multiple NLP applications. We focus on 3 vanilla word embeddings: GloVe BIBREF7 , Word2Vec-SkipGram BIBREF36 , and Paragram-SL999 BIBREF37 . The vocabulary and embeddings used in our experiments resonate with the experimental setup by Mrkšić et al.mrkvsic2016counter (76427 words).
+
+## Intrinsic Evaluation
+
+Word similarity is a standard task used to evaluate embeddings BIBREF15 , BIBREF14 , BIBREF38 . In this paper, we evaluate the embeddings on benchmark datasets given in Table 1 .
+
+We report the Spearman's rank correlation coefficient between rankings produced by our model (based on cosine similarity of the pair of words) against the benchmark human rankings for each dataset.
+
+## Extrinsic Evaluation
+
+ Although intrinsic tasks are popular, performance of word embeddings on these benchmarks does not reflect directly into the downstream tasks BIBREF41 . BIBREF42 , BIBREF43 suggest that intrinsic tasks should not be considered as gold standards but as a tool to improve the model. We test the utility of the Aff2Vec on 4 distinct natural language understanding tasks:
+
+Affect Prediction (FFP-Prediction): The experiment is to predict the formality, politeness, and frustration in email. We introduce the ENRON-FFP dataset for this task in section "Dataset: ENRON-FFP" . A basic CNN model is used for the prediction. The purpose of this experiment is to evaluate the quality of the embeddings and not necessarily the model architecture. The CNN is hence not optimized for this task. Embeddings trained on the ENRON dataset (ENRON-Trainable) are used as a baseline.
+
+Personality Detection: This task is to predict human personality from text. The big five personality dimensions BIBREF44 are used for this experiment. The 5 personality dimensions include Extroversion (EXT), Neurotic-ism (NEU), Agreeableness (AGR), Conscientiousness (CON), and Openness (OPEN). Stream-of-consciousness essay dataset by Pennebaker et al. pennebaker1999linguistic contains 2468 anonymous essays tagged with personality traits of the author. We use this dataset. Majumder et al majumder2017deep propose a CNN model for this prediction. We use their best results as baseline and report the performance of Aff2Vec on their default implementation.
+
+Sentiment Analysis: The Stanford Sentiment Treebank (SST) BIBREF45 contains sentiment labels on sentences from movie reviews. This dataset in its binary form is split into training, validation, and test sets with 6920, 872, and 1821 samples, respectively. We report the performance on a Deep Averaging Network (DAN) BIBREF46 with default parameters on the SST dataset and compare against refined embeddings specifically created for sentiment analysis. Implementation by Yu et al yu2017refining is used for the refined embeddings.
+
+Emotion Intensity Task (WASSA): WASSA shared task on emotion intensity BIBREF47 requires to determine the intensity of a particular emotion (anger, fear, joy, or sadness) in a tweet. This intensity score can be seen as an approximation of the emotion intensity of the author or as felt by the reader. We train a BiLSTM-CNN–based model for this regression task with embedding dimensions as features.. Vanilla embeddings are used as a baseline for this experiment.
+
+## Qualitative Evaluation: Noise@k
+
+Affect-enriched embeddings perform better as they move semantically similar but affectively dissimilar words away from each other in the vector space. We demonstrate this effect through two measures that capture noise in the neighborhood of a word.
+
+Polarity-Noise@k (PN@k) BIBREF40 calculates the number of top $k$ nearest neighbors of a word with opposite polarity for the affect dimension under consideration.
+
+Granular-Noise@k (GN@k) captures the average difference between a word and its top $k$ nearest neighbors for a particular affect dimension ( $f$ ). 
+
+$$GN_i@k =
+\dfrac{\sum _{j \in kNN_i}{|a_if - a_jf|}}{k}$$   (Eq. 33) 
+
+where $a_i$ , $a_j$ are $F$ –dimensional vectors in $A$ and $kNN_i$ denotes the top $k$ nearest neighbors of word $i$ . This is done for each word in the affect lexicon.
+
+## Results
+
+ All experiments are compared against the vanilla word embeddings, embeddings with counterfitting, and embeddings with retrofitting.
+
+Table 3 summarizes the results of the Intrinsic word–similarity tasks. For the pre–trained word embeddings, Paragram-SL999 outperformed GloVe and Word2Vec on most metrics. Both retrofitting and counterfitting procedures show better or at par performance on all datasets except for WordSim-353. Addition of affect information to different versions of GloVe consistently improves performance whereas the only significant improvement for Paragram-SL999 variants is observed on the SimLex-999 and SimVerb-3500 datasets. To the best of our knowledge, $\rho =0.74$ reported by BIBREF15 represents the current state–of–the–art for SimLex-999 and inclusion of affect information to these embeddings yields higher performance ( $\rho = 0.75$ ). Similarly, for the SimVerb-3500 dataset, Paragram+Counterfitting $\oplus $ Affect embeddings beat the state–of–the–art scores. Amongst Affect-APPEND and Affect-STRENGTH, Affect-APPEND out performs the rest in most cases for GloVe and Word2vec. However, Affect-STRENGTH variations perform slightly better for the retrofitted Paragram embeddings.
+
+The results for the Extrinsic tasks are reported in Table 4 . We report the performance for GloVe and Word2Vec with Affect-APPEND variants. For FFP-Prediction, Affect-APPEND reports the lowest Mean Squared Error for Frustration and Politeness. However, in the case of Formality, the counterfitting variant reports the lowest error. For the personality detection, Affect-APPEND variants report best performance for NEU, AGR, and OPEN classes. For CON, Glove beats the best results in BIBREF39 . Evaluation against the Sentiment Analysis(SA) task shows that Affect-APPEND variants report highest accuracies. The final experiment reported here is the WASSA-EmoInt task. Affect-APPEND and retrofit variants out perform the vanilla embeddings.
+
+To summarize, the extrinsic evaluation supports the hypothesis that affect–enriched embeddings improve performance for all NLP tasks. Further, the word similarity metrics show that Aff2Vec is not specific to sentiment or affect–related tasks but is at par with accepted embedding quality metrics.
+
+Qualitative Evaluation: Table 5 reports the average Polarity-Noise@10 and Granular-Noise@10 for GloVe and Word2Vec variants. Note that lower the noise better the performance. The Affect-APPEND report the lowest noise for both cases. This shows that the introduction of affect dimensions in the word distributions intuitively captures psycholinguistic and in particular polarity properties in the vocabulary space. The rate of change of noise with varying $k$ provides insights into (1) how similar are the embedding spaces and (2) how robust are the new representations to the noise - how well is the affect captured in the new embeddings. Figure 2 shows the granular noise@k for Valence, Arousal, and Dominance respectively. Noise@k for the Aff2Vec i.e. the Affect-APPEND variants, specifically, $\oplus $ Affect and Couterfitting $\oplus $ Affect has lower noise even for a higher $k$ . The growth rate for all variants is similar and reduces with an increase in the value of $k$ . A similar behavior is observed for Polarity-Noise@k.
+
+## Discussion
+
+ Experiments give an empirical evaluation of the proposed embeddings, none of these provide an insight about the change in the distributional representations of the associated words. Semantic relationship capture the synonym like information. We study how the neighborhood of a certain word changes based on the different word distribution techniques used to create the corresponding representations. Table 6 shows the top five nearest neighbors based on the representations used. While SENTI-Wordnet represents synonyms more than affectively similar words, the affect–enriched embeddings provide a combination of both affective similarity and semantic similarity. The variance in the ranking of words also captures how different schemes capture the intuition of word distributions. Such an analysis can be used to build automated natural language generation and text modification systems with varying objectives.
+
+## Conclusion
+
+We present a novel, simple yet effective method to create affect–enriched word embeddings using affect and semantic lexica. The proposed embeddings outperform the state–of–the–art in benchmark intrinsic evaluations as well as extrinsic applications including sentiment, personality, and affect prediction. We introduce a new human–annotated dataset with formality, politeness, and frustration tags on the publicly available ENRON email data. We are currently exploring the effect of dimension size on the performance of the enriched embeddings as well as the use of Aff2Vec for complex tasks such as text generation.

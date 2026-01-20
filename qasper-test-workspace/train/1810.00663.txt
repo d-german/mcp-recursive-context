@@ -1,0 +1,183 @@
+# Translating Navigation Instructions in Natural Language to a High-Level Plan for Behavioral Robot Navigation
+
+**Paper ID:** 1810.00663
+
+## Abstract
+
+We propose an end-to-end deep learning model for translating free-form natural language instructions to a high-level plan for behavioral robot navigation. We use attention models to connect information from both the user instructions and a topological representation of the environment. We evaluate our model's performance on a new dataset containing 10,050 pairs of navigation instructions. Our model significantly outperforms baseline approaches. Furthermore, our results suggest that it is possible to leverage the environment map as a relevant knowledge base to facilitate the translation of free-form navigational instruction.
+
+## Introduction
+
+Enabling robots to follow navigation instructions in natural language can facilitate human-robot interaction across a variety of applications. For instance, within the service robotics domain, robots can follow navigation instructions to help with mobile manipulation BIBREF0 and delivery tasks BIBREF1 .
+
+Interpreting navigation instructions in natural language is difficult due to the high variability in the way people describe routes BIBREF2 . For example, there are a variety of ways to describe the route in Fig. FIGREF4 (a):
+
+Each fragment of a sentence within these instructions can be mapped to one or more than one navigation behaviors. For instance, assume that a robot counts with a number of primitive, navigation behaviors, such as “enter the room on the left (or on right)” , “follow the corridor”, “cross the intersection”, etc. Then, the fragment “advance forward” in a navigation instruction could be interpreted as a “follow the corridor” behavior, or as a sequence of “follow the corridor” interspersed with “cross the intersection” behaviors depending on the topology of the environment. Resolving such ambiguities often requires reasoning about “common-sense” concepts, as well as interpreting spatial information and landmarks, e.g., in sentences such as “the room on the left right before the end of the corridor” and “the room which is in the middle of two vases”.
+
+In this work, we pose the problem of interpreting navigation instructions as finding a mapping (or grounding) of the commands into an executable navigation plan. While the plan is typically modeled as a formal specification of low-level motions BIBREF2 or a grammar BIBREF3 , BIBREF4 , we focus specifically on translating instructions to a high-level navigation plan based on a topological representation of the environment. This representation is a behavioral navigation graph, as recently proposed by BIBREF5 , designed to take advantage of the semantic structure typical of human environments. The nodes of the graph correspond to semantically meaningful locations for the navigation task, such as kitchens or entrances to rooms in corridors. The edges are parameterized, visuo-motor behaviors that allow a robot to navigate between neighboring nodes, as illustrated in Fig. FIGREF4 (b). Under this framework, complex navigation routes can be achieved by sequencing behaviors without an explicit metric representation of the world.
+
+We formulate the problem of following instructions under the framework of BIBREF5 as finding a path in the behavioral navigation graph that follows the desired route, given a known starting location. The edges (behaviors) along this path serve to reach the – sometimes implicit – destination requested by the user. As in BIBREF6 , our focus is on the problem of interpreting navigation directions. We assume that a robot can realize valid navigation plans according to the graph.
+
+We contribute a new end-to-end model for following directions in natural language under the behavioral navigation framework. Inspired by the information retrieval and question answering literature BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , we propose to leverage the behavioral graph as a knowledge base to facilitate the interpretation of navigation commands. More specifically, the proposed model takes as input user directions in text form, the behavioral graph of the environment encoded as INLINEFORM0 node; edge; node INLINEFORM1 triplets, and the initial location of the robot in the graph. The model then predicts a set of behaviors to reach the desired destination according to the instructions and the map (Fig. FIGREF4 (c)). Our main insight is that using attention mechanisms to correlate navigation instructions with the topological map of the environment can facilitate predicting correct navigation plans.
+
+This work also contributes a new dataset of INLINEFORM0 pairs of free-form natural language instructions and high-level navigation plans. This dataset was collected through Mechanical Turk using 100 simulated environments with a corresponding topological map and, to the best of our knowledge, it is the first of its kind for behavioral navigation. The dataset opens up opportunities to explore data-driven methods for grounding navigation commands into high-level motion plans.
+
+We conduct extensive experiments to study the generalization capabilities of the proposed model for following natural language instructions. We investigate both generalization to new instructions in known and in new environments. We conclude this paper by discussing the benefits of the proposed approach as well as opportunities for future research based on our findings.
+
+## Related work
+
+This section reviews relevant prior work on following navigation instructions. Readers interested in an in-depth review of methods to interpret spatial natural language for robotics are encouraged to refer to BIBREF11 .
+
+Typical approaches to follow navigation commands deal with the complexity of natural language by manually parsing commands, constraining language descriptions, or using statistical machine translation methods. While manually parsing commands is often impractical, the first type of approaches are foundational: they showed that it is possible to leverage the compositionality of semantic units to interpret spatial language BIBREF12 , BIBREF13 .
+
+Constraining language descriptions can reduce the size of the input space to facilitate the interpretation of user commands. For example, BIBREF14 explored using structured, symbolic language phrases for navigation. As in this earlier work, we are also interested in navigation with a topological map of the environment. However, we do not process symbolic phrases. Our aim is to translate free-form natural language instructions to a navigation plan using information from a high-level representation of the environment. This translation problem requires dealing with missing actions in navigation instructions and actions with preconditions, such as “at the end of the corridor, turn right” BIBREF15 .
+
+Statistical machine translation BIBREF16 is at the core of recent approaches to enable robots to follow navigation instructions. These methods aim to automatically discover translation rules from a corpus of data, and often leverage the fact that navigation directions are composed of sequential commands. For instance, BIBREF17 , BIBREF4 , BIBREF2 used statistical machine translation to map instructions to a formal language defined by a grammar. Likewise, BIBREF18 , BIBREF0 mapped commands to spatial description clauses based on the hierarchical structure of language in the navigation problem. Our approach to machine translation builds on insights from these prior efforts. In particular, we focus on end-to-end learning for statistical machine translation due to the recent success of Neural Networks in Natural Language Processing BIBREF19 .
+
+Our work is inspired by methods that reduce the task of interpreting user commands to a sequential prediction problem BIBREF20 , BIBREF21 , BIBREF22 . Similar to BIBREF21 and BIBREF22 , we use a sequence-to-sequence model to enable a mobile agent to follow routes. But instead leveraging visual information to output low-level navigation commands, we focus on using a topological map of the environment to output a high-level navigation plan. This plan is a sequence of behaviors that can be executed by a robot to reach a desired destination BIBREF5 , BIBREF6 .
+
+We explore machine translation from the perspective of automatic question answering. Following BIBREF8 , BIBREF9 , our approach uses attention mechanisms to learn alignments between different input modalities. In our case, the inputs to our model are navigation instructions, a topological environment map, and the start location of the robot (Fig. FIGREF4 (c)). Our results show that the map can serve as an effective source of contextual information for the translation task. Additionally, it is possible to leverage this kind of information in an end-to-end fashion.
+
+## Problem Formulation
+
+Our goal is to translate navigation instructions in text form into a sequence of behaviors that a robot can execute to reach a desired destination from a known start location. We frame this problem under a behavioral approach to indoor autonomous navigation BIBREF5 and assume that prior knowledge about the environment is available for the translation task. This prior knowledge is a topological map, in the form of a behavioral navigation graph (Fig. FIGREF4 (b)). The nodes of the graph correspond to semantically-meaningful locations for the navigation task, and its directed edges are visuo-motor behaviors that a robot can use to move between nodes. This formulation takes advantage of the rich semantic structure behind man-made environments, resulting in a compact route representation for robot navigation.
+
+Fig. FIGREF4 (c) provides a schematic view of the problem setting. The inputs are: (1) a navigation graph INLINEFORM0 , (2) the starting node INLINEFORM1 of the robot in INLINEFORM2 , and (3) a set of free-form navigation instructions INLINEFORM3 in natural language. The instructions describe a path in the graph to reach from INLINEFORM4 to a – potentially implicit – destination node INLINEFORM5 . Using this information, the objective is to predict a suitable sequence of robot behaviors INLINEFORM6 to navigate from INLINEFORM7 to INLINEFORM8 according to INLINEFORM9 . From a supervised learning perspective, the goal is then to estimate: DISPLAYFORM0 
+
+based on a dataset of input-target pairs INLINEFORM0 , where INLINEFORM1 and INLINEFORM2 , respectively. The sequential execution of the behaviors INLINEFORM3 should replicate the route intended by the instructions INLINEFORM4 . We assume no prior linguistic knowledge. Thus, translation approaches have to cope with the semantics and syntax of the language by discovering corresponding patterns in the data.
+
+## The Behavioral Graph: A Knowledge Base For Navigation
+
+We view the behavioral graph INLINEFORM0 as a knowledge base that encodes a set of navigational rules as triplets INLINEFORM1 , where INLINEFORM2 and INLINEFORM3 are adjacent nodes in the graph, and the edge INLINEFORM4 is an executable behavior to navigate from INLINEFORM5 to INLINEFORM6 . In general, each behaviors includes a list of relevant navigational attributes INLINEFORM7 that the robot might encounter when moving between nodes.
+
+We consider 7 types of semantic locations, 11 types of behaviors, and 20 different types of landmarks. A location in the navigation graph can be a room, a lab, an office, a kitchen, a hall, a corridor, or a bathroom. These places are labeled with unique tags, such as "room-1" or "lab-2", except for bathrooms and kitchens which people do not typically refer to by unique names when describing navigation routes.
+
+Table TABREF7 lists the navigation behaviors that we consider in this work. These behaviors can be described in reference to visual landmarks or objects, such as paintings, book shelfs, tables, etc. As in Fig. FIGREF4 , maps might contain multiple landmarks of the same type. Please see the supplementary material (Appendix A) for more details.
+
+## Approach
+
+We leverage recent advances in deep learning to translate natural language instructions to a sequence of navigation behaviors in an end-to-end fashion. Our proposed model builds on the sequence-to-sequence translation model of BIBREF23 , which computes a soft-alignment between a source sequence (natural language instructions in our case) and the corresponding target sequence (navigation behaviors).
+
+As one of our main contributions, we augment the neural machine translation approach of BIBREF23 to take as input not only natural language instructions, but also the corresponding behavioral navigation graph INLINEFORM0 of the environment where navigation should take place. Specifically, at each step, the graph INLINEFORM1 operates as a knowledge base that the model can access to obtain information about path connectivity, facilitating the grounding of navigation commands.
+
+Figure FIGREF8 shows the structure of the proposed model for interpreting navigation instructions. The model consists of six layers:
+
+Embed layer: The model first encodes each word and symbol in the input sequences INLINEFORM0 and INLINEFORM1 into fixed-length representations. The instructions INLINEFORM2 are embedded into a 100-dimensional pre-trained GloVe vector BIBREF24 . Each of the triplet components, INLINEFORM3 , INLINEFORM4 , and INLINEFORM5 of the graph INLINEFORM6 , are one-hot encoded into vectors of dimensionality INLINEFORM7 , where INLINEFORM8 and INLINEFORM9 are the number of nodes and edges in INLINEFORM10 , respectively.
+
+Encoder layer: The model then uses two bidirectional Gated Recurrent Units (GRUs) BIBREF25 to independently process the information from INLINEFORM0 and INLINEFORM1 , and incorporate contextual cues from the surrounding embeddings in each sequence. The outputs of the encoder layer are the matrix INLINEFORM2 for the navigational commands and the matrix INLINEFORM3 for the behavioral graph, where INLINEFORM4 is the hidden size of each GRU, INLINEFORM5 is the number of words in the instruction INLINEFORM6 , and INLINEFORM7 is the number of triplets in the graph INLINEFORM8 .
+
+Attention layer: Matrices INLINEFORM0 and INLINEFORM1 generated by the encoder layer are combined using an attention mechanism. We use one-way attention because the graph contains information about the whole environment, while the instruction has (potentially incomplete) local information about the route of interest. The use of attention provides our model with a two-step strategy to interpret commands. This resembles the way people find paths on a map: first, relevant parts on the map are selected according to their affinity to each of the words in the input instruction (attention layer); second, the selected parts are connected to assemble a valid path (decoder layer). More formally, let INLINEFORM2 ( INLINEFORM3 ) be the INLINEFORM4 -th row of INLINEFORM5 , and INLINEFORM6 ( INLINEFORM7 ) the INLINEFORM8 -th row of INLINEFORM9 . We use each encoded triplet INLINEFORM10 in INLINEFORM11 to calculate its associated attention distribution INLINEFORM12 over all the atomic instructions INLINEFORM13 : DISPLAYFORM0 
+
+where the matrix INLINEFORM0 serves to combine the different sources of information INLINEFORM1 and INLINEFORM2 . Each component INLINEFORM3 of the attention distributions INLINEFORM4 quantifies the affinity between the INLINEFORM5 -th triplet in INLINEFORM6 and the INLINEFORM7 -th word in the corresponding input INLINEFORM8 .
+
+The model then uses each attention distribution INLINEFORM0 to obtain a weighted sum of the encodings of the words in INLINEFORM1 , according to their relevance to the corresponding triplet INLINEFORM2 . This results in L attention vectors INLINEFORM3 , INLINEFORM4 .
+
+The final step in the attention layer concatenates each INLINEFORM0 with INLINEFORM1 to generate the outputs INLINEFORM2 , INLINEFORM3 . Following BIBREF8 , we include the encoded triplet INLINEFORM4 in the output tensor INLINEFORM5 of this layer to prevent early summaries of relevant map information.
+
+FC layer: The model reduces the dimensionality of each individual vector INLINEFORM0 from INLINEFORM1 to INLINEFORM2 with a fully-connected (FC) layer. The resulting L vectors are output to the next layer as columns of a context matrix INLINEFORM3 .
+
+Decoder layer: After the FC layer, the model predicts likelihoods over the sequence of behaviors that correspond to the input instructions with a GRU network. Without loss of generality, consider the INLINEFORM0 -th recurrent cell in the GRU network. This cell takes two inputs: a hidden state vector INLINEFORM1 from the prior cell, and a one-hot embedding of the previous behavior INLINEFORM2 that was predicted by the model. Based on these inputs, the GRU cell outputs a new hidden state INLINEFORM3 to compute likelihoods for the next behavior. These likelihoods are estimated by combining the output state INLINEFORM4 with relevant information from the context INLINEFORM5 : DISPLAYFORM0 
+
+ where INLINEFORM0 , INLINEFORM1 , and INLINEFORM2 are trainable parameters. The attention vector INLINEFORM3 in Eq. () quantifies the affinity of INLINEFORM4 with respect to each of the columns INLINEFORM5 of INLINEFORM6 , where INLINEFORM7 . The attention vector also helps to estimate a dynamic contextual vector INLINEFORM8 that the INLINEFORM9 -th GRU cell uses to compute logits for the next behavior: DISPLAYFORM0 
+
+with INLINEFORM0 trainable parameters. Note that INLINEFORM1 includes a value for each of the pre-defined behaviors in the graph INLINEFORM2 , as well as for a special “stop” symbol to identify the end of the output sequence.
+
+Output layer: The final layer of the model searches for a valid sequence of robot behaviors based on the robot's initial node, the connectivity of the graph INLINEFORM0 , and the output logits from the previous decoder layer. Again, without loss of generality, consider the INLINEFORM1 -th behavior INLINEFORM2 that is finally predicted by the model. The search for this behavior is implemented as: DISPLAYFORM0 
+
+with INLINEFORM0 a masking function that takes as input the graph INLINEFORM1 and the node INLINEFORM2 that the robot reaches after following the sequence of behaviors INLINEFORM3 previously predicted by the model. The INLINEFORM4 function returns a vector of the same dimensionality as the logits INLINEFORM5 , but with zeros for the valid behaviors after the last location INLINEFORM6 and for the special stop symbol, and INLINEFORM7 for any invalid predictions according to the connectivity of the behavioral navigation graph.
+
+## Dataset
+
+We created a new dataset for the problem of following navigation instructions under the behavioral navigation framework of BIBREF5 . This dataset was created using Amazon Mechanical Turk and 100 maps of simulated indoor environments, each with 6 to 65 rooms. To the best of our knowledge, this is the first benchmark for comparing translation models in the context of behavioral robot navigation.
+
+As shown in Table TABREF16 , the dataset consists of 8066 pairs of free-form natural language instructions and navigation plans for training. This training data was collected from 88 unique simulated environments, totaling 6064 distinct navigation plans (2002 plans have two different navigation instructions each; the rest has one). The dataset contains two test set variants:
+
+While the dataset was collected with simulated environments, no structure was imposed on the navigation instructions while crowd-sourcing data. Thus, many instructions in our dataset are ambiguous. Moreover, the order of the behaviors in the instructions is not always the same. For instance, a person said “turn right and advance” to describe part of a route, while another person said “go straight after turning right” in a similar situation. The high variability present in the natural language descriptions of our dataset makes the problem of decoding instructions into behaviors not trivial. See Appendix A of the supplementary material for additional details on our data collection effort.
+
+## Experiments
+
+This section describes our evaluation of the proposed approach for interpreting navigation commands in natural language. We provide both quantitative and qualitative results.
+
+## Evaluation Metrics
+
+While computing evaluation metrics, we only consider the behaviors present in the route because they are sufficient to recover the high-level navigation plan from the graph. Our metrics treat each behavior as a single token. For example, the sample plan “R-1 oor C-1 cf C-1 lt C-0 cf C-0 iol O-3" is considered to have 5 tokens, each corresponding to one of its behaviors (“oor", “cf", “lt", “cf", “iol"). In this plan, “R-1",“C-1", “C-0", and “O-3" are symbols for locations (nodes) in the graph.
+
+We compare the performance of translation approaches based on four metrics:
+
+[align=left,leftmargin=0em,labelsep=0.4em,font=]
+
+As in BIBREF20 , EM is 1 if a predicted plan matches exactly the ground truth; otherwise it is 0.
+
+The harmonic average of the precision and recall over all the test set BIBREF26 .
+
+The minimum number of insertions, deletions or swap operations required to transform a predicted sequence of behaviors into the ground truth sequence BIBREF27 .
+
+GM is 1 if a predicted plan reaches the ground truth destination (even if the full sequence of behaviors does not match exactly the ground truth). Otherwise, GM is 0.
+
+## Models Used in the Evaluation
+
+We compare the proposed approach for translating natural language instructions into a navigation plan against alternative deep-learning models:
+
+[align=left,leftmargin=0em,labelsep=0.4em,font=]
+
+The baseline approach is based on BIBREF20 . It divides the task of interpreting commands for behavioral navigation into two steps: path generation, and path verification. For path generation, this baseline uses a standard sequence-to-sequence model augmented with an attention mechanism, similar to BIBREF23 , BIBREF6 . For path verification, the baseline uses depth-first search to find a route in the graph that matches the sequence of predicted behaviors. If no route matches perfectly, the baseline changes up to three behaviors in the predicted sequence to try to turn it into a valid path.
+
+To test the impact of using the behavioral graphs as an extra input to our translation model, we implemented a version of our approach that only takes natural language instructions as input. In this ablation model, the output of the bidirectional GRU that encodes the input instruction INLINEFORM0 is directly fed to the decoder layer. This model does not have the attention and FC layers described in Sec. SECREF4 , nor uses the masking function in the output layer.
+
+This model is the same as the previous Ablation model, but with the masking function in the output layer.
+
+## Implementation Details
+
+We pre-processed the inputs to the various models that are considered in our experiment. In particular, we lowercased, tokenized, spell-checked and lemmatized the input instructions in text-form using WordNet BIBREF28 . We also truncated the graphs to a maximum of 300 triplets, and the navigational instructions to a maximum of 150 words. Only 6.4% (5.4%) of the unique graphs in the training (validation) set had more than 300 triplets, and less than 0.15% of the natural language instructions in these sets had more than 150 tokens.
+
+The dimensionality of the hidden state of the GRU networks was set to 128 in all the experiments. In general, we used 12.5% of the training set as validation for choosing models' hyper-parameters. In particular, we used dropout after the encoder and the fully-connected layers of the proposed model to reduce overfitting. Best performance was achieved with a dropout rate of 0.5 and batch size equal to 256. We also used scheduled sampling BIBREF29 at training time for all models except the baseline.
+
+We input the triplets from the graph to our proposed model in alphabetical order, and consider a modification where the triplets that surround the start location of the robot are provided first in the input graph sequence. We hypothesized that such rearrangement would help identify the starting location (node) of the robot in the graph. In turn, this could facilitate the prediction of correct output sequences. In the remaining of the paper, we refer to models that were provided a rearranged graph, beginning with the starting location of the robot, as models with “Ordered Triplets”.
+
+## Quantitative Evaluation
+
+Table TABREF28 shows the performance of the models considered in our evaluation on both test sets. The next two sections discuss the results in detail.
+
+First, we can observe that the final model “Ours with Mask and Ordered Triplets” outperforms the Baseline and Ablation models on all metrics in previously seen environments. The difference in performance is particularly evident for the Exact Match and Goal Match metrics, with our model increasing accuracy by 35% and 25% in comparison to the Baseline and Ablation models, respectively. These results suggest that providing the behavioral navigation graph to the model and allowing it to process this information as a knowledge base in an end-to-end fashion is beneficial.
+
+We can also observe from Table TABREF28 that the masking function of Eq. ( EQREF12 ) tends to increase performance in the Test-Repeated Set by constraining the output sequence to a valid set of navigation behaviors. For the Ablation model, using the masking function leads to about INLINEFORM0 increase in EM and GM accuracy. For the proposed model (with or without reordering the graph triplets), the increase in accuracy is around INLINEFORM1 . Note that the impact of the masking function is less evident in terms of the F1 score because this metric considers if a predicted behavior exists in the ground truth navigation plan, irrespective of its specific position in the output sequence.
+
+The results in the last four rows of Table TABREF28 suggest that ordering the graph triplets can facilitate predicting correct navigation plans in previously seen environments. Providing the triplets that surround the starting location of the robot first to the model leads to a boost of INLINEFORM0 in EM and GM performance. The rearrangement of the graph triplets also helps to reduce ED and increase F1.
+
+Lastly, it is worth noting that our proposed model (last row of Table TABREF28 ) outperforms all other models in previously seen environments. In particular, we obtain over INLINEFORM0 increase in EM and GM between our model and the next best two models.
+
+The previous section evaluated model performance on new instructions (and corresponding navigation plans) for environments that were previously seen at training time. Here, we examine whether the trained models succeed on environments that are completely new.
+
+The evaluation on the Test-New Set helps understand the generalization capabilities of the models under consideration. This experiment is more challenging than the one in the previous section, as can be seen in performance drops in Table TABREF28 for the new environments. Nonetheless, the insights from the previous section still hold: masking in the output layer and reordering the graph triplets tend to increase performance.
+
+Even though the results in Table TABREF28 suggest that there is room for future work on decoding natural language instructions, our model still outperforms the baselines by a clear margin in new environments. For instance, the difference between our model and the second best model in the Test-New set is about INLINEFORM0 EM and GM. Note that the average number of actions in the ground truth output sequences is 7.07 for the Test-New set. Our model's predictions are just INLINEFORM1 edits off on average from the correct navigation plans.
+
+## Qualitative Evaluation
+
+This section discusses qualitative results to better understand how the proposed model uses the navigation graph.
+
+We analyze the evolution of the attention weights INLINEFORM0 in Eq. () to assess if the decoder layer of the proposed model is attending to the correct parts of the behavioral graph when making predictions. Fig FIGREF33 (b) shows an example of the resulting attention map for the case of a correct prediction. In the Figure, the attention map is depicted as a scaled and normalized 2D array of color codes. Each column in the array shows the attention distribution INLINEFORM1 used to generate the predicted output at step INLINEFORM2 . Consequently, each row in the array represents a triplet in the corresponding behavioral graph. This graph consists of 72 triplets for Fig FIGREF33 (b).
+
+We observe a locality effect associated to the attention coefficients corresponding to high values (bright areas) in each column of Fig FIGREF33 (b). This suggests that the decoder is paying attention to graph triplets associated to particular neighborhoods of the environment in each prediction step. We include additional attention visualizations in the supplementary Appendix, including cases where the dynamics of the attention distribution are harder to interpret.
+
+All the routes in our dataset are the shortest paths from a start location to a given destination. Thus, we collected a few additional natural language instructions to check if our model was able to follow navigation instructions describing sub-optimal paths. One such example is shown in Fig. FIGREF37 , where the blue route (shortest path) and the red route (alternative path) are described by:
+
+[leftmargin=*, labelsep=0.2em, itemsep=0em]
+
+“Go out the office and make a left. Turn right at the corner and go down the hall. Make a right at the next corner and enter the kitchen in front of table.”
+
+“Exit the room 0 and turn right, go to the end of the corridor and turn left, go straight to the end of the corridor and turn left again. After passing bookshelf on your left and table on your right, Enter the kitchen on your right.”
+
+For both routes, the proposed model was able to predict the correct sequence of navigation behaviors. This result suggests that the model is indeed using the input instructions and is not just approximating shortest paths in the behavioral graph. Other examples on the prediction of sub-obtimal paths are described in the Appendix.
+
+## Conclusion
+
+This work introduced behavioral navigation through free-form natural language instructions as a challenging and a novel task that falls at the intersection of natural language processing and robotics. This problem has a range of interesting cross-domain applications, including information retrieval.
+
+We proposed an end-to-end system to translate user instructions to a high-level navigation plan. Our model utilized an attention mechanism to merge relevant information from the navigation instructions with a behavioral graph of the environment. The model then used a decoder to predict a sequence of navigation behaviors that matched the input commands.
+
+As part of this effort, we contributed a new dataset of 11,051 pairs of user instructions and navigation plans from 100 different environments. Our model achieved the best performance in this dataset in comparison to a two-step baseline approach for interpreting navigation instructions, and a sequence-to-sequence model that does not consider the behavioral graph. Our quantitative and qualitative results suggest that attention mechanisms can help leverage the behavioral graph as a relevant knowledge base to facilitate the translation of free-form navigation instructions. Overall, our approach demonstrated practical form of learning for a complex and useful task. In future work, we are interested in investigating mechanisms to improve generalization to new environments. For example, pointer and graph networks BIBREF30 , BIBREF31 are a promising direction to help supervise translation models and predict motion behaviors.
+
+## Acknowledgments
+
+The Toyota Research Institute (TRI) provided funds to assist with this research, but this paper solely reflects the opinions and conclusions of its authors and not TRI or any other Toyota entity. This work is also partially funded by Fondecyt grant 1181739, Conicyt, Chile. The authors would also like to thank Gabriel Sepúlveda for his assistance with parts of this project.

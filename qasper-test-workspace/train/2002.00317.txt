@@ -1,0 +1,129 @@
+# Citation Text Generation
+
+**Paper ID:** 2002.00317
+
+## Abstract
+
+We introduce the task of citation text generation: given a pair of scientific documents, explain their relationship in natural language text in the manner of a citation from one text to the other. This task encourages systems to learn rich relationships between scientific texts and to express them concretely in natural language. Models for citation text generation will require robust document understanding including the capacity to quickly adapt to new vocabulary and to reason about document content. We believe this challenging direction of research will benefit high-impact applications such as automatic literature review or scientific writing assistance systems. In this paper we establish the task of citation text generation with a standard evaluation corpus and explore several baseline models.
+
+## Introduction
+
+The output of the world's scientists doubles roughly every nine years BIBREF0, and their pace is quickening. As a result, scientists and other experts must devote significant time to the difficult task of literature review, or coming to understand the context in which they work. Might artificial intelligence help to reduce that time?
+
+Several lines of research seek to do so. Citation recommendations systems BIBREF1, BIBREF2, BIBREF3 suggest references to relevant published work for a given document such as a current draft. Summarization systems BIBREF4, BIBREF5 condense the information in one or more documents, allowing researchers to more quickly understand the basic ideas in a piece of research.
+
+We introduce a complementary—but so far unaddressed—problem, citation text generation, where the relationship between a document and one or several others is expressed in natural language text. This differs from traditional summarization in that the primary focus is explaining the relationship between the two documents rather than their content. Automatically describing inter-document relationships could dramatically decrease the time researchers devote to literature review. For instance, a new paper could be explained in terms of its relationships to relevant works that a particular reader is most familiar with, rather than just those which the authors elected to cite (personalization). Further, such technology could be incorporated into writing assistance systems to help less experienced or non-native writers better articulate the connection between their work and prior art. Additionally, users of citation recommendation systems can benefit from natural language explanations of recommendation system choices.
+
+Beyond the immediate utility of citation text generation systems, the task offers significant challenges for language understanding and generation research. A major challenge is how to represent the information in one or more scientific texts. These documents are longer than those in most other domains typically studied in NLP, and make use of a long-tailed, open-domain technical vocabulary. Often an important phrase in the citing sentence output occurs only in a specific cited document and not elsewhere in the corpus. This requires a model that can learn phrase meanings from very few exposures, an important but unsolved problem for text generation systems. Possibly more challenging is understanding and expressing the various and nuanced relationships between related scientific works.
+
+In this work, we introduce the task of citation text generation. Leveraging the full texts of English-language scientific articles, we construct a dataset of citation sentences in the computer science domain for training and evaluating citation text generation models. We investigate strong retrieval and neural baseline models against which future work can compare. For use cases where large models can be trained, we extend the successful GPT2 architecture BIBREF6 to the scientific domain with additional pre-training and subsequent fine-tuning on the citation generation task. We experiment with different kinds of document context in the fine-tuning and inference stages. We also explore retrieval-based techniques which may more easily generalize to lower-resource settings. These models retrieve citation sentences from training documents which are most similar to test inputs. Our evaluations show that these techniques often produce plausible citation sentences, but indicate clear directions for improvement. Code and artifacts are provided for future research.
+
+## Task
+
+Given the important research challenges posed by the citation text generation task, along with the potential social benefits of its solutions, let us continue with a formalization of the problem. Citation text generation is the task of generating a natural language citing sentence which explains the relationship between two documents. Examples of such citing sentences can be found in scientific documents as in-text citations to a previous work. Thus, we will formally distinguish one document as the source document, from which we will draw citing sentences which reference the cited document.
+
+If we want to leverage powerful modern neural text generation systems, we are faced with the problem of how to represent the documents in a way that these models can consume. In particular, language models like GPT2 are trained to predict next token probabilities given long stretches of contiguous text from a single document. It is not clear how to mix information from more than one document when providing context to these models.
+
+An additional difficulty of the citation text generation task is the vocabulary. In this domain, low-frequency, highly meaningful terms regularly appear in output texts. These terms may be completely novel to a single or small collection of papers (consider the phrase “citation text generation”, for instance), yet they are necessary for explaining the paper.
+
+This framing suggests a supervised learning setup. Let $t$ denote a citing sentence drawn from $S$, and $S^{\prime }$ denote $S$ without $t$. Then let
+
+be the probability of $t$ given $S^{\prime }$, cited document $C$, and model parameters $\theta $. The goal of learning a citation text generation model would be to maximize this probability across a large number of $t,S,C$ triples, so long as the parameters also generalize to unseen instances. At inference time, the goal is to generate a sentence $t^\ast $ which accurately describes the relationship between $S$ and $C$.
+
+The most appropriate evaluation metric for most text generation tasks is human judgment by potential users of the system. Evaluating citation text requires human judges with scientific expertise. For exploratory purposes, we use the standard automatic metrics for text generation tasks described in Section SECREF4, and we an expert error analysis in Section SECREF14.
+
+For source and cited documents, we use English-language computer science articles and annotation from the S2-GORC dataset BIBREF7. S2-GORC is a large citation graph dataset which includes full texts of 8.1 million scientific documents. We select a subset of 154K computer science articles as our corpus. From these, we extract 622K citing sentences that link back to other documents in our corpus. We hold 2500 examples for each of the validation and test sets. Detailed statistics can be found in Table TABREF4.
+
+## Models
+
+We explore two basic styles of model for citation text generation. Following current work in neural text generation, we fine-tune the predictions of a large pre-trained language model to the citation text generation task. Additionally, we investigate approximate nearest neighbor methods to retrieve plausible human-authored citation sentences from the training data.
+
+## Models ::: Neural Text Generation
+
+Recent work has shown that adapting large pre-trained language models to text generation tasks yields strong results BIBREF8. Due to its widespread use in text generation, we investigate the GPT model of BIBREF6 for the citation text generation task. GPT2 is a transformer model trained on 40 gigabytes of internet text with a language modeling objective BIBREF9. The adaptation process, called fine-tuning, involves continued training of the model on the target objective, in our case citation text generation.
+
+To fine-tune GPT2 for text generation, it is typical to concatenate the conditioning context $X = x_1 \ldots x_n$ and citing sentence $Y = y_1 \ldots y_m$ with a special separator token $\mho $. The model learns to approximate next token probabilities for each index after $\mho $:
+
+for $0<i<m$ and model parameters $\theta $. Cross-entropy loss is calculated for each $y_i$ and backpropagation is used find parameters $\theta $ which maximize $p(y_{i+1} \mid X,\mho ,y_1,\ldots ,y_i)$.
+
+To adapt Equation DISPLAY_FORM6 to the citation text generation task, we construct the conditioning context $X$ from the source and cited documents. We take $j$ tokens from source document $s_1,\ldots ,s_j$ along with $k$ tokens from the cited document $c_1,\ldots ,c_k$. (Which tokens are drawn from the two documents is an independent variable that we explore experimentally.) We then condition the generation of citing sentence $Y$ on $X = s_1,\ldots ,s_j,\mho ,c_1,\ldots ,c_k$. This model is trained to predict each token of $Y$ as described above.
+
+## Models ::: Neural Text Generation ::: Context
+
+The primary question we investigate with this model is what kind of input is best for generating accurate and informative citation sentences. Prior works in citation recommendation have made use of abstracts, which perhaps act as sufficient summaries of document content for this task. Additionally, we explore variants of extended context, such as the introduction or first section after the abstract. Since scientific texts are too long to fit into the context window of our generation model, we also investigate a “sampling” approach which samples sentences from throughout the document until the context window is full. In this work, we combine either the abstract or introduction of the source document with each of the abstract, introduction, or sampled sentences from the cited document.
+
+## Models ::: Retrieval with Approximate Nearest Neighbors
+
+While neural text generation techniques have advanced significantly in recent years, they are still inferior to human authored texts. For some tasks, it is better to retrieve a relevant human-authored text rather than generating novel text automatically BIBREF10. Is this also the case for citation text generation?
+
+To answer this question, we adapt an approximate nearest neighbor search algorithm to find similar pairs of documents. The basic search procedure is as follows: Given a test instance input $(S,C)$ for source $S$ and cited document $C$, we find the set $\bf {N}_C$, the nearest neighbors to $C$ in the training data. For each document $N_C$ from $\bf {N}_C$, let $\bf {N}_S$ be the set of documents that cite $N_C$. This means that each $N_S \in {\bf N}_S$ contains at least one citing sentence $t^{\prime }$ which cites $N_C$. We return the $t^{\prime }$ associated with the $(N_S,N_C)$ pair from the training which is closest to $(S,C)$.
+
+We measure the closeness of two pairs of documents by measuring cosine distances between vector representations of their content. The abstract of each document is embedded into a single dense vector by averaging the contextualized embeddings provided by the SciBERT model of BIBREF11 and normalizing. The distance between $(S,C)$ and candidate $(N_S,N_C)$ is computed as:
+
+where $\alpha $ and $\beta $ control the relative contribution of the two document similarities. We explore setting both $\alpha $ and $\beta $ to 1, or tuning them to optimize either BLEU or BERTScore on the validation set.
+
+## Models ::: Language Model Pretraining
+
+GPT2-based models have demonstrated an ability to capture long distance dependencies over hundreds of tokens, which we hypothesize will allow them to synthesize information in both the source and cited documents. But citation text generation models must also handle the challenging technical vocabulary of the scientific domain.
+
+Prior work has shown that pretraining on in-domain data improves the performance of large language models on domain-specific tasks BIBREF11. Inspired by this, we experiment with additional pretraining of GPT2 in the science domain. This model, SciGPT2, is trained for an additional 3 epochs over the full text of the documents in our corpus using a language modeling objective. We note that both SciGPT2 and the SciBERT language models used here have been exposed to citing sentences from the test and validation sets as in-line citations during their pre-training phases, which may improve their performance versus models without this exposure. Such exposure is typical when using pretrained language models, as text from test data cannot be guaranteed to be absent from the large task-independent corpora upon which these models are trained.
+
+## Evaluation
+
+We compare the different baseline systems using BLEU BIBREF12, ROUGE (specifically ROUGE 1, 2, and L; BIBREF13), and the recently introduced BertScore BIBREF14, a similarity metric based on BERT embeddings which has been shown to correlate well with human judgements on other tasks. To adapt the BertScore metric to the scientific text domain, we use SciBERT embeddings.
+
+Table TABREF7 (above the double line) shows the performance of the SciGPT2 model on the test set when provided with the different input context combinations outlined in Section SECREF5. We find that context does make a difference for this category of model, and that models which have access to the intro of the documents outperform those which use abstracts or sampling.
+
+Automatic evaluation of the retrieval-based methods on the test data are shown below the double line in Table TABREF7. This table shows that the retrieval methods perform well on this task. However we will show the limitations of these automatic metrics in Section SECREF14. We also observe that tuning the $\alpha $ and $\beta $ parameters on the validation set results in overfitting for this method. Outputs are largely unchanged by this tuning; fewer than 400 test datapoints differ from the untuned outputs. A larger validation split may alleviate this problem.
+
+Statistical significance is assessed for select results using bootstrapping with 1000 samples in each of 100 iterations. This test shows that conditioning on the introduction of the source document improves performance compared to conditioning on the abstract when using the SciGPT2 model. However, we see that IR methods perform better than the best neural models. We do not find enough evidence to reject the null hypothesis regarding what context from the cited document should be used.
+
+## Analysis
+
+In this section we take a closer look at the details of the SciGPT2 and IR system outputs on a collection of validation datapoints. We provide a quantitative error analysis as well as qualitative analysis and examples.
+
+## Analysis ::: Errors
+
+In order to better understand the performance of the models, we undertake a quantitative analysis of its output. One author randomly selected 200 datapoints from the validation set and their associated model outputs. Source and cited papers in the topic of NLP were used so as to facilitate expert judgement. For tractability, we limited the context presented to the annotator to the document abstracts and analyze the outputs of the abs $\times $ abs and IR systems.
+
+In this analysis, we ask whether the models are producing believable citing sentences given their input. In particular, we are interested in the relative believability of the SciGPT2 and IR systems, as well as how believability of a citing sentence changes when a reader can see the abstract of one document or both.
+
+We use 100 datapoints with outputs from the SciGPT2 system and 100 with outputs from the IR system. For 50 datapoints from each system, the cited document's abstract is initially masked such that only the source context is visible (Source, One Visible). Based only on the source context, the annotator judged whether the model output (1) could have convincingly been a citation in the source document based solely on the abstract (believable), (2) could have been a citation in the source document, but unclear from the abstract alone and depends on the rest of the paper's content (content-dependent), or (3) is unlikely to appear in this document (not believable). After making this judgment, the annotator was then shown the abstract of the cited document and asked to make the 3-way believability judgment based on both source and cited abstracts (Source, Both Visible). This process is repeated with the remaining 50 datapoints, but with the cited context masked initially (Cited, One Visible and Cited, Both Visible).
+
+The results of our analysis presented in Table TABREF13. We find that believability in the Cited, One Visible condition correlates well with the Cited, Both Visible condition. In the Source conditions, we see a greater difference in believability between One Visible and Both Visible. These findings makes sense: in-line citations often summarize a prior study rather than highlight the paper's own contributions. Together, these results indicate that the believability of citing sentences is more related to the cited document than to the source.
+
+Another interesting feature of this analysis is the difference between SciGPT2 and IR in terms of context-dependent citing sentences. We observe fewer such judgements in the IR outputs. This is probably due to the fact that neural text generation systems such as SciGPT2 will sometimes produce generic, uninformative outputs while the IR system outputs are usually specific enough that a stronger believability judgement can be made.
+
+We also observe an overall higher instance of not believable judgements of the IR model outputs. This implies that automatic metrics such as BLEU, where the IR system scored higher than SciGPT2, do not correlate with factual accuracy in citation text generation.
+
+Example citations and annotations are shown in Table TABREF15. We find that in the cases where the model generated outputs are unconvincing they are still on topic. All 10 cases in the Source, One Visible and 4 of the cases in Cited, One Visible that were no longer believable in the Both Visible conditions exhibit this quality. A common example (4 cases) of this phenomenon occurs when the model output references a dataset. While the dataset would be potentially relevant to both papers, the cited papers focus on modeling contributions and do not introduce a novel corpus.
+
+## Analysis ::: Examples
+
+Example system outputs for randomly selected validation instances are shown in Table TABREF18. We see that both the SciGPT2 and IR model outputs regularly hit on the correct broad topic of the cited text (such “literary analysis” or “image captioning evaluation metrics”). It is notable that the SciGPT2 model outputs syntactically correct and coherent citation sentences, even given the difficulty of the vocabulary in this domain. This is a testament to the power of the domain-specific language model training.
+
+We also observe that the outputs of the SciGPT2 model are often shorter than the desired citing sentence. Brevity is a known issue for neural text generation and may be alleviated by penalizing brevity in the inference procedure. More problematic are the factual errors in the generated text. In the last example, for instance, we see that SciGPT2 fails to cite the specific image captioning dataset described in the cited paper (Pascal1K) and instead focuses on the more general evaluation metric for the image captioning task (CIDEr). This is typical of neural text generation systems, which often assign high probability to generic or frequent phrases and revert to these in the face of uncertainty.
+
+## Analysis ::: Future Work
+
+The fluency and topical relevance of the baseline models show the plausibility of the citation text generation task as well as the utility of including pretrained scientific language models in future models. But based on the kinds of errors we have seen, future work should focus on two complementary goals: ensuring the factual accuracy of the generated text and improved modeling of the cited document. Factual accuracy is difficult to enforce in statistical text generation systems, especially where inference includes sampling procedures. Grounding to knowledge bases could help. For this task, knowledge extracted from candidate generations could be compared with knowledge from the full source and cited documents to prune false or irrelevant statements. Further, modeling input documents as knowledge graphs of their contents may help these algorithms better understand the cited document, resulting in better outputs. However, such a model will have to address the open problem of combining pretrained language models with graph encoding techniques.
+
+## Related Work
+
+The current work builds on recent research in scientific document understanding, including citation recommendation and categorization, as well as scientific document summarization.
+
+Citation recommendation, or the task of selecting works related to a source document which would be suitable for citing, is a longstanding goal of AI research BIBREF15, BIBREF2, BIBREF16. Recently, researchers have sought to categorize citations using various ontologies of citation intents. BIBREF1 sought to discern “highly influential” citations from others. BIBREF17 uses six categories including “motivation”, “uses”, and “future work” among others. BIBREF3 condense this ontology to just three: “background”,“method”, and “result comparison”.
+
+We view the citation text generation task as an extension of these classification approaches with distinct advantages. While classification requires an extant citation link to exist, our generation task can describe possible relationships between works which do not cite each other, such as contemporaneous works. Additionally, because gold citation texts are readily available in scientific documents, the citation text generation task requires no task-specific annotated training data. In practice, citation classification is used to assist in suggesting relevant works to researchers; citation text generation complements this goal by providing rationales for the recommendation and furthering progress toward explainable AI.
+
+Generating a citation is also connected to summarizing scientific documents. There is a long history research on summarizing scientific documents BIBREF18, BIBREF19. More recently, researchers have included citing sentences as part of the input for summarization, hoping to capture the contribution of a work along with its content BIBREF20, BIBREF21, BIBREF5. Ours is the first to focus on the specific relationship between two documents when generating such sentences. Because of the emphasis on relational document understanding in our task, citation generation models can be used to assist with drafting papers as well, reducing researcher workload and providing non-native writers with a helpful first draft.
+
+Our work builds on recent advances in transfer learning in NLP. In particular, large pretrained models such as BERT BIBREF22 and GPT2 BIBREF6 have made strong advances on a number of tasks BIBREF23. It has also been shown that pretraining these models on domain-specific data further improves results on domain-speicific tasks BIBREF11, BIBREF24. In this work, we apply that methodology by adding an additional pretraining phase on in-domain data before finetuning a GPT2 model on the citation text generation task.
+
+## Conclusion
+
+We have introduced the challenging but useful task of citation text generation. This task requires reasoning about the relationships between documents and expressing these relationships in natural language text. We have established a dataset for this task and studied the performance of contemporary neural text generation and information retrieval models. Our analysis shows that while these models produce fluent and topical outputs, more research is needed to ensure factual accuracy and specificity in the generated text.
+
+## Acknowledgements
+
+This research was supported by the Office of Naval Research under the MURI grant N00014-18-1-2670.

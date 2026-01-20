@@ -1,0 +1,79 @@
+# Generating Natural Language Inference Chains
+
+**Paper ID:** 1606.01404
+
+## Abstract
+
+The ability to reason with natural language is a fundamental prerequisite for many NLP tasks such as information extraction, machine translation and question answering. To quantify this ability, systems are commonly tested whether they can recognize textual entailment, i.e., whether one sentence can be inferred from another one. However, in most NLP applications only single source sentences instead of sentence pairs are available. Hence, we propose a new task that measures how well a model can generate an entailed sentence from a source sentence. We take entailment-pairs of the Stanford Natural Language Inference corpus and train an LSTM with attention. On a manually annotated test set we found that 82% of generated sentences are correct, an improvement of 10.3% over an LSTM baseline. A qualitative analysis shows that this model is not only capable of shortening input sentences, but also inferring new statements via paraphrasing and phrase entailment. We then apply this model recursively to input-output pairs, thereby generating natural language inference chains that can be used to automatically construct an entailment graph from source sentences. Finally, by swapping source and target sentences we can also train a model that given an input sentence invents additional information to generate a new sentence.
+
+## Introduction
+
+The ability to determine entailment or contradiction between natural language text is essential for improving the performance in a wide range of natural language processing tasks. Recognizing Textual Entailment (RTE) is a task primarily designed to determine whether two natural language sentences are independent, contradictory or in an entailment relationship where the second sentence (the hypothesis) can be inferred from the first (the premise). Although systems that perform well in RTE could potentially be used to improve question answering, information extraction, text summarization and machine translation BIBREF0 , only in few of such downstream NLP tasks sentence-pairs are actually available. Usually, only a single source sentence (e.g. a question that needs to be answered or a source sentence that we want to translate) is present and models need to come up with their own hypotheses and commonsense knowledge inferences.
+
+The release of the large Stanford Natural Language Inference (SNLI) corpus BIBREF1 allowed end-to-end differentiable neural networks to outperform feature-based classifiers on the RTE task BIBREF2 , BIBREF3 , BIBREF4 , BIBREF5 , BIBREF6 .
+
+In this work, we go a step further and investigate how well recurrent neural networks can produce true hypotheses given a source sentence. Furthermore, we qualitatively demonstrate that by only training on input-output pairs and recursively generating entailed sentence we can generate natural language inference chains (see Figure 1 for an example). Note that every inference step is interpretable as it is mapping one natural language sentence to another one.
+
+Our contributions are fourfold: (i) we propose an entailment generation task based on the SNLI corpus (§ "Entailment Generation" ), (ii) we investigate a sequence-to-sequence model and find that $82\%$ of generated sentences are correct (§ "Example Generations" ), (iii) we demonstrate the ability to generate natural language inference chains trained solely from entailment pairs (§ "Entailment Generation"1 ), and finally (iv) we can also generate sentences with more specific information by swapping source and target sentences during training (§ "Entailment Generation"6 ).
+
+## Method
+
+In the section, we briefly introduce the entailment generation task and our sequence-to-sequence model.
+
+## Entailment Generation
+
+To create the entailment generation dataset, we simply filter the Stanford Natural Language Inference corpus for sentence-pairs of the entailment class. This results in a training set of $183,416$ sentence pairs, a development set of $3,329$ pairs and a test of $3,368$ pairs. Instead of a classification task, we can now use this dataset for a sequence transduction task.
+
+## Sequence-to-Sequence
+
+Sequence-to-sequence recurrent neural networks BIBREF7 have been successfully employed for many sequence transduction tasks in NLP such as machine translation BIBREF8 , BIBREF9 , constituency parsing BIBREF10 , sentence summarization BIBREF11 and question answering BIBREF12 . They consist of two recurrent neural networks (RNNs): an encoder that maps an input sequence of words into a dense vector representation, and a decoder that conditioned on that vector representation generates an output sequence. Specifically, we use long short-term memory (LSTM) RNNs BIBREF13 for encoding and decoding. Furthermore, we experiment with word-by-word attention BIBREF8 , which allows the decoder to search in the encoder outputs to circumvent the LSTM's memory bottleneck. We use greedy decoding at test time. The success of LSTMs with attention in sequence transduction tasks makes them a natural choice as a baseline for entailment generation, and we leave the investigation of more advanced models to future work.
+
+## Optimization and Hyperparameters
+
+We use stochastic gradient descent with a mini-batch size of 64 and the ADAM optimizer BIBREF14 with a first momentum coefficient of $0.9$ and a second momentum coefficient of $0.999$ . Word embeddings are initialized with pre-trained word2vec vectors BIBREF15 . Out-of-vocabulary words ( $10.5\%$ ) are randomly initialized by sampling values uniformly from $[-\sqrt{3}, \sqrt{3}]$ and optimized during training. Furthermore, we clip gradients using a norm of $5.0$ . We stop training after 25 epochs.
+
+## Experiments and Results
+
+We present results for various tasks: (i) given a premise, generate a sentence that can be inferred from the premise, (ii) construct inference chains by recursively generating sentences, and (iii) given a sentence, create a premise that would entail this sentence, i.e., make a more descriptive sentence by adding specific information.
+
+## Quantitative Evaluation
+
+We train an LSTM with and without attention on the training set. After training, we take the best model in terms of BLEU score BIBREF16 on the development set and calculate the BLEU score on the test set. To our surprise, we found that using attention yields only a marginally higher BLEU score (43.1 vs. 42.8). We suspect that this is due to the fact that generating entailed sentences has a larger space of valid target sequences, which makes the use of BLEU problematic and penalizes correct solutions. Hence, we manually annotated 100 random test sentences and decided whether the generated sentence can indeed be inferred from the source sentence. We found that sentences generated by an LSTM with attention are substantially more accurate ( $82\%$ accuracy) than those generated from an LSTM baseline ( $71.7\%$ ). To gain more insights into the model's capabilities, we turn to a thorough qualitative analysis of the attention LSTM model in the remainder of this paper.
+
+## Example Generations
+
+Figure 2 shows examples of generated sentences from the development set. Syntactic simplification of the input sentence seems to be the most common approach. The model removes certain parts of the premise such as adjectives, resulting in a more abstract sentence (see Figure 2 . UID8 ).
+
+Figure 2 . UID9 demonstrates that the system can recognize the number of subjects in the sentence and includes this information in the generated sentence. However, we did not observe such 'counting' behavior for more than four subjects, indicating that the system memorized frequency patterns from the training set.
+
+Furthermore, we found predictions that hint to common-sense assumptions: if a sentence talks about a father holding a newborn baby, it is most likely that the newborn baby is his own child (Example 2 . UID10 ).
+
+Two reappearing limitations of the proposed model are related to dealing with words that have a very different meaning but similar word2vec embeddings (e.g. colors), as well as ambiguous words. For instance, 'bar' in Figure 3 . UID8 refers to pole vault and not a place in which you can have a drink. Substituting one color by another one (Figure 3 . UID14 ) is a common mistake.
+
+The SNLI corpus might not reflect the variety of sentences that can be encountered in downstream NLP tasks. In Figure 4 we present generated sentences for randomly selected examples of out-of-domain textual resources. They demonstrate that the model generalizes well to out-of-domain sentences, making it a potentially very useful component for improving systems for question answering, information extraction, sentence summarization etc.
+
+## Inference Chain Generation
+
+Next, we test how well the model can generate inference chains by repeatedly passing generated output sentences as inputs to the model. We stop once a sentence has already been generated in the chain. Figure 5 shows that this works well despite that the model was only trained on sentence-pairs.
+
+Furthermore, by generating inference chains for all sentences in the development set we construct an entailment graph. In that graph we found that sentences with shared semantics are eventually mapped to the same sentence that captures the shared meaning.
+
+A visualization of the topology of the entailment graph is shown in Figure 6 . Note that there are several long inference chains, as well as large clusters of sentences (nodes) that are mapped (links) to the same shared meaning.
+
+## Inverse Inference
+
+By swapping the source and target sequences for training, we can train a model that given a sentence invents additional information to generate a new sentence (Figure 7 ). We believe this might prove useful to increase the language variety and complexity of AI unit tests such as the Facebook bAbI task BIBREF17 , but we leave this for future work.
+
+## Conclusion and Future Work
+
+We investigated the ability of sequence-to-sequence models to generate entailed sentences from a source sentence. To this end, we trained an attentive LSTM on entailment-pairs of the SNLI corpus. We found that this works well and generalizes beyond in-domain sentences. Hence, it could become a useful component for improving the performance of other NLP systems.
+
+We were able to generate natural language inference chains by recursively generating sentences from previously inferred ones. This allowed us to construct an entailment graph for sentences of the SNLI development corpus. In this graph, the shared meaning of two related sentences is represented by the first natural language sentence that connects both sentences. Every inference step is interpretable as it maps a natural language sentence to another one.
+
+Towards high-quality data augmentation, we experimented with reversing the generation task. We found that this enabled the model to learn to invent specific information.
+
+For future work, we want to integrate the presented model into larger architectures to improve the performance of downstream NLP tasks such as information extraction and question answering. Furthermore, we plan to use the model for data augmentation to train expressive neural networks on tasks where only little annotated data is available. Another interesting research direction is to investigate methods for increasing the diversity of the generated sentences.
+
+## Acknowledgments
+
+We thank Guillaume Bouchard for suggesting the reversed generation task, and Dirk Weissenborn, Isabelle Augenstein and Matko Bosnjak for comments on drafts of this paper. This work was supported by Microsoft Research through its PhD Scholarship Programme, an Allen Distinguished Investigator Award, and a Marie Curie Career Integration Award.

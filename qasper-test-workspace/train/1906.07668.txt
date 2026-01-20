@@ -1,0 +1,129 @@
+# Yoga-Veganism: Correlation Mining of Twitter Health Data
+
+**Paper ID:** 1906.07668
+
+## Abstract
+
+Nowadays social media is a huge platform of data. People usually share their interest, thoughts via discussions, tweets, status. It is not possible to go through all the data manually. We need to mine the data to explore hidden patterns or unknown correlations, find out the dominant topic in data and understand people's interest through the discussions. In this work, we explore Twitter data related to health. We extract the popular topics under different categories (e.g. diet, exercise) discussed in Twitter via topic modeling, observe model behavior on new tweets, discover interesting correlation (i.e. Yoga-Veganism). We evaluate accuracy by comparing with ground truth using manual annotation both for train and test data.
+
+## Introduction
+
+The main motivation of this work has been started with a question "What do people do to maintain their health?"– some people do balanced diet, some do exercise. Among diet plans some people maintain vegetarian diet/vegan diet, among exercises some people do swimming, cycling or yoga. There are people who do both. If we want to know the answers of the following questions– "How many people follow diet?", "How many people do yoga?", "Does yogi follow vegetarian/vegan diet?", may be we could ask our acquainted person but this will provide very few intuition about the data. Nowadays people usually share their interests, thoughts via discussions, tweets, status in social media (i.e. Facebook, Twitter, Instagram etc.). It's huge amount of data and it's not possible to go through all the data manually. We need to mine the data to get overall statistics and then we will also be able to find some interesting correlation of data.
+
+Several works have been done on prediction of social media content BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 . Prieto et al. proposed a method to extract a set of tweets to estimate and track the incidence of health conditions in society BIBREF5 . Discovering public health topics and themes in tweets had been examined by Prier et al. BIBREF6 . Yoon et al. described a practical approach of content mining to analyze tweet contents and illustrate an application of the approach to the topic of physical activity BIBREF7 .
+
+Twitter data constitutes a rich source that can be used for capturing information about any topic imaginable. In this work, we use text mining to mine the Twitter health-related data. Text mining is the application of natural language processing techniques to derive relevant information BIBREF8 . Millions of tweets are generated each day on multifarious issues BIBREF9 . Twitter mining in large scale has been getting a lot of attention last few years. Lin and Ryaboy discussed the evolution of Twitter infrastructure and the development of capabilities for data mining on "big data" BIBREF10 . Pandarachalil et al. provided a scalable and distributed solution using Parallel python framework for Twitter sentiment analysis BIBREF9 . Large-scale Twitter Mining for drug-related adverse events was developed by Bian et al. BIBREF11 .
+
+In this paper, we use parallel and distributed technology Apache Kafka BIBREF12 to handle the large streaming twitter data. The data processing is conducted in parallel with data extraction by integration of Apache Kafka and Spark Streaming. Then we use Topic Modeling to infer semantic structure of the unstructured data (i.e Tweets). Topic Modeling is a text mining technique which automatically discovers the hidden themes from given documents. It is an unsupervised text analytic algorithm that is used for finding the group of words from the given document. We build the model using three different algorithms Latent Semantic Analysis (LSA) BIBREF13 , Non-negative Matrix Factorization (NMF) BIBREF14 , and Latent Dirichlet Allocation (LDA) BIBREF15 and infer the topic of tweets. To observe the model behavior, we test the model to infer new tweets. The implication of our work is to annotate unlabeled data using the model and find interesting correlation.
+
+## Data Collection
+
+Tweet messages are retrieved from the Twitter source by utilizing the Twitter API and stored in Kafka topics. The Producer API is used to connect the source (i.e. Twitter) to any Kafka topic as a stream of records for a specific category. We fetch data from a source (Twitter), push it to a message queue, and consume it for further analysis. Fig. FIGREF2 shows the overview of Twitter data collection using Kafka.
+
+## Apache Kafka
+
+In order to handle the large streaming twitter data, we use parallel and distributed technology for big data framework. In this case, the output of the twitter crawling is queued in messaging system called Apache Kafka. This is a distributed streaming platform created and open sourced by LinkedIn in 2011 BIBREF12 . We write a Producer Client which fetches latest tweets continuously using Twitter API and push them to single node Kafka Broker. There is a Consumer that reads data from Kafka (Fig. FIGREF2 ).
+
+## Apache Zookeeper
+
+Apache Zookeeper is a distributed, open-source configuration, synchronization service along with naming registry for distributed applications. Kafka uses Zookeeper to store metadata about the Kafka cluster, as well as consumer client details.
+
+## Data Extraction using Tweepy
+
+The twitter data has been crawled using Tweepy which is a Python library for accessing the Twitter API. We use Twitter streaming API to extract 40k tweets (April 17-19, 2019). For the crawling, we focus on several keywords that are related to health. The keywords are processed in a non-case-sensitive way. We use filter to stream all tweets containing the word `yoga', `healthylife', `healthydiet', `diet',`hiking', `swimming', `cycling', `yogi', `fatburn', `weightloss', `pilates', `zumba', `nutritiousfood', `wellness', `fitness', `workout', `vegetarian', `vegan', `lowcarb', `glutenfree', `calorieburn'.
+
+The streaming API returns tweets, as well as several other types of messages (e.g. a tweet deletion notice, user update profile notice, etc), all in JSON format. We use Python libraries json for parsing the data, pandas for data manipulation.
+
+## Data Pre-processing
+
+Data pre-processing is one of the key components in many text mining algorithms BIBREF8 . Data cleaning is crucial for generating a useful topic model. We have some prerequisites i.e. we download the stopwords from NLTK (Natural Language Toolkit) and spacy's en model for text pre-processing.
+
+It is noticeable that the parsed full-text tweets have many emails, `RT', newline and extra spaces that is quite distracting. We use Python Regular Expressions (re module) to get rid of them. Then we tokenize each text into a list of words, remove punctuation and unnecessary characters. We use Python Gensim package for further processing. Gensim's simple_preprocess() is used for tokenization and removing punctuation. We use Gensim's Phrases model to build bigrams. Certain parts of English speech, like conjunctions ("for", "or") or the word "the" are meaningless to a topic model. These terms are called stopwords and we remove them from the token list. We use spacy model for lemmatization to keep only noun, adjective, verb, adverb. Stemming words is another common NLP technique to reduce topically similar words to their root. For example, "connect", "connecting", "connected", "connection", "connections" all have similar meanings; stemming reduces those terms to "connect". The Porter stemming algorithm BIBREF16 is the most widely used method.
+
+## Methodology
+
+We use Twitter health-related data for this analysis. In subsections [subsec:3.1]3.1, [subsec:3.2]3.2, [subsec:3.3]3.3, and [subsec:3.4]3.4 elaborately present how we can infer the meaning of unstructured data. Subsection [subsec:3.5]3.5 shows how we do manual annotation for ground truth comparison. Fig. FIGREF6 shows the overall pipeline of correlation mining.
+
+## Construct document-term matrix
+
+The result of the data cleaning stage is texts, a tokenized, stopped, stemmed and lemmatized list of words from a single tweet. To understand how frequently each term occurs within each tweet, we construct a document-term matrix using Gensim's Dictionary() function. Gensim's doc2bow() function converts dictionary into a bag-of-words. In the bag-of-words model, each tweet is represented by a vector in a m-dimensional coordinate space, where m is number of unique terms across all tweets. This set of terms is called the corpus vocabulary.
+
+## Topic Modeling
+
+Topic modeling is a text mining technique which provides methods for identifying co-occurring keywords to summarize collections of textual information. This is used to analyze collections of documents, each of which is represented as a mixture of topics, where each topic is a probability distribution over words BIBREF17 . Applying these models to a document collection involves estimating the topic distributions and the weight each topic receives in each document. A number of algorithms exist for solving this problem. We use three unsupervised machine learning algorithms to explore the topics of the tweets: Latent Semantic Analysis (LSA) BIBREF13 , Non-negative Matrix Factorization (NMF) BIBREF14 , and Latent Dirichlet Allocation (LDA) BIBREF15 . Fig. FIGREF7 shows the general idea of topic modeling methodology. Each tweet is considered as a document. LSA, NMF, and LDA use Bag of Words (BoW) model, which results in a term-document matrix (occurrence of terms in a document). Rows represent terms (words) and columns represent documents (tweets). After completing topic modeling, we identify the groups of co-occurring words in tweets. These group co-occurring related words makes "topics".
+
+LSA (Latent Semantic Analysis) BIBREF13 is also known as LSI (Latent Semantic Index). It learns latent topics by performing a matrix decomposition on the document-term matrix using Singular Value Decomposition (SVD) BIBREF18 . After corpus creation in [subsec:3.1]Subsection 3.1, we generate an LSA model using Gensim.
+
+Non-negative Matrix Factorization (NMF) BIBREF14 is a widely used tool for the analysis of high-dimensional data as it automatically extracts sparse and meaningful features from a set of non-negative data vectors. It is a matrix factorization method where we constrain the matrices to be non-negative.
+
+We apply Term Weighting with term frequency-inverse document frequency (TF-IDF) BIBREF19 to improve the usefulness of the document-term matrix (created in [subsec:3.1]Subsection 3.1) by giving more weight to the more "important" terms. In Scikit-learn, we can generate at TF-IDF weighted document-term matrix by using TfidfVectorizer. We import the NMF model class from sklearn.decomposition and fit the topic model to tweets.
+
+Latent Dirichlet Allocation (LDA) BIBREF15 is widely used for identifying the topics in a set of documents, building on Probabilistic Latent Semantic Analysis (PLSI) BIBREF20 . LDA considers each document as a collection of topics in a certain proportion and each topic as a collection of keywords in a certain proportion. We provide LDA the optimal number of topics, it rearranges the topics' distribution within the documents and keywords' distribution within the topics to obtain a good composition of topic-keywords distribution.
+
+We have corpus generated in [subsec:3.1]Subsection 3.1 to train the LDA model. In addition to the corpus and dictionary, we provide the number of topics as well.
+
+## Optimal number of Topics
+
+Topic modeling is an unsupervised learning, so the set of possible topics are unknown. To find out the optimal number of topic, we build many LSA, NMF, LDA models with different values of number of topics (k) and pick the one that gives the highest coherence score. Choosing a `k' that marks the end of a rapid growth of topic coherence usually offers meaningful and interpretable topics.
+
+We use Gensim's coherencemodel to calculate topic coherence for topic models (LSA and LDA). For NMF, we use a topic coherence measure called TC-W2V. This measure relies on the use of a word embedding model constructed from the corpus. So in this step, we use the Gensim implementation of Word2Vec BIBREF21 to build a Word2Vec model based on the collection of tweets.
+
+We achieve the highest coherence score = 0.4495 when the number of topics is 2 for LSA, for NMF the highest coherence value is 0.6433 for K = 4, and for LDA we also get number of topics is 4 with the highest coherence score which is 0.3871 (see Fig. FIGREF8 ).
+
+For our dataset, we picked k = 2, 4, and 4 with the highest coherence value for LSA, NMF, and LDA correspondingly (Fig. FIGREF8 ). Table TABREF13 shows the topics and top-10 keywords of the corresponding topic. We get more informative and understandable topics using LDA model than LSA. LSA decomposed matrix is a highly dense matrix, so it is difficult to index individual dimension. LSA is unable to capture the multiple meanings of words. It offers lower accuracy than LDA.
+
+In case of NMF, we observe same keywords are repeated in multiple topics. Keywords "go", "day" both are repeated in Topic 2, Topic 3, and Topic 4 (Table TABREF13 ). In Table TABREF13 keyword "yoga" has been found both in Topic 1 and Topic 4. We also notice that keyword "eat" is in Topic 2 and Topic 3 (Table TABREF13 ). If the same keywords being repeated in multiple topics, it is probably a sign that the `k' is large though we achieve the highest coherence score in NMF for k=4.
+
+We use LDA model for our further analysis. Because LDA is good in identifying coherent topics where as NMF usually gives incoherent topics. However, in the average case NMF and LDA are similar but LDA is more consistent.
+
+## Topic Inference
+
+After doing topic modeling using three different method LSA, NMF, and LDA, we use LDA for further analysis i.e. to observe the dominant topic, 2nd dominant topic and percentage of contribution of the topics in each tweet of training data. To observe the model behavior on new tweets those are not included in training set, we follow the same procedure to observe the dominant topic, 2nd dominant topic and percentage of contribution of the topics in each tweet on testing data. Table TABREF30 shows some tweets and corresponding dominant topic, 2nd dominant topic and percentage of contribution of the topics in each tweet.
+
+## Manual Annotation
+
+To calculate the accuracy of model in comparison with ground truth label, we selected top 500 tweets from train dataset (40k tweets). We extracted 500 new tweets (22 April, 2019) as a test dataset. We did manual annotation both for train and test data by choosing one topic among the 4 topics generated from LDA model (7th, 8th, 9th, and 10th columns of Table TABREF13 ) for each tweet based on the intent of the tweet. Consider the following two tweets:
+
+Tweet 1: Learning some traditional yoga with my good friend.
+
+Tweet 2: Why You Should #LiftWeights to Lose #BellyFat #Fitness #core #abs #diet #gym #bodybuilding #workout #yoga
+
+The intention of Tweet 1 is yoga activity (i.e. learning yoga). Tweet 2 is more about weight lifting to reduce belly fat. This tweet is related to workout. When we do manual annotation, we assign Topic 2 in Tweet 1, and Topic 1 in Tweet 2. It's not wise to assign Topic 2 for both tweets based on the keyword "yoga". During annotation, we focus on functionality of tweets.
+
+## Visualization
+
+We use LDAvis BIBREF22 , a web-based interactive visualization of topics estimated using LDA. Gensim's pyLDAVis is the most commonly used visualization tool to visualize the information contained in a topic model. In Fig. FIGREF21 , each bubble on the left-hand side plot represents a topic. The larger the bubble, the more prevalent is that topic. A good topic model has fairly big, non-overlapping bubbles scattered throughout the chart instead of being clustered in one quadrant. A model with too many topics, is typically have many overlaps, small sized bubbles clustered in one region of the chart. In right hand side, the words represent the salient keywords.
+
+If we move the cursor over one of the bubbles (Fig. FIGREF21 ), the words and bars on the right-hand side have been updated and top-30 salient keywords that form the selected topic and their estimated term frequencies are shown.
+
+We observe interesting hidden correlation in data. Fig. FIGREF24 has Topic 2 as selected topic. Topic 2 contains top-4 co-occurring keywords "vegan", "yoga", "job", "every_woman" having the highest term frequency. We can infer different things from the topic that "women usually practice yoga more than men", "women teach yoga and take it as a job", "Yogi follow vegan diet". We would say there are noticeable correlation in data i.e. `Yoga-Veganism', `Women-Yoga'.
+
+## Topic Frequency Distribution
+
+Each tweet is composed of multiple topics. But, typically only one of the topics is dominant. We extract the dominant and 2nd dominant topic for each tweet and show the weight of the topic (percentage of contribution in each tweet) and the corresponding keywords.
+
+We plot the frequency of each topic's distribution on tweets in histogram. Fig. FIGREF25 shows the dominant topics' frequency and Fig. FIGREF25 shows the 2nd dominant topics' frequency on tweets. From Fig. FIGREF25 we observe that Topic 1 became either the dominant topic or the 2nd dominant topic for most of the tweets. 7th column of Table TABREF13 shows the corresponding top-10 keywords of Topic 1.
+
+## Comparison with Ground Truth
+
+To compare with ground truth, we gradually increased the size of dataset 100, 200, 300, 400, and 500 tweets from train data and test data (new tweets) and did manual annotation both for train/test data based on functionality of tweets (described in [subsec:3.5]Subsection 3.5).
+
+For accuracy calculation, we consider the dominant topic only. We achieved 66% train accuracy and 51% test accuracy when the size of dataset is 500 (Fig. FIGREF28 ). We did baseline implementation with random inference by running multiple times with different seeds and took the average accuracy. For dataset 500, the accuracy converged towards 25% which is reasonable as we have 4 topics.
+
+## Observation and Future Work
+
+In Table TABREF30 , we show some observations. For the tweets in 1st and 2nd row (Table TABREF30 ), we observed understandable topic. We also noticed misleading topic and unrelated topic for few tweets (3rd and 4th row of Table TABREF30 ).
+
+In the 1st row of Table TABREF30 , we show a tweet from train data and we got Topic 2 as a dominant topic which has 61% of contribution in this tweet. Topic 1 is 2nd dominant topic and 18% contribution here.
+
+2nd row of Table TABREF30 shows a tweet from test set. We found Topic 2 as a dominant topic with 33% of contribution and Topic 4 as 2nd dominant topic with 32% contribution in this tweet.
+
+In the 3rd (Table TABREF30 ), we have a tweet from test data and we got Topic 2 as a dominant topic which has 43% of contribution in this tweet. Topic 3 is 2nd dominant with 23% contribution which is misleading topic. The model misinterprets the words `water in hand' and infers topic which has keywords "swimming, swim, pool". But the model should infer more reasonable topic (Topic 1 which has keywords "diet, workout") here.
+
+We got Topic 2 as dominant topic for the tweet in 4th row (Table TABREF30 ) which is unrelated topic for this tweet and most relevant topic of this tweet (Topic 2) as 2nd dominant topic. We think during accuracy comparison with ground truth 2nd dominant topic might be considered.
+
+In future, we will extract more tweets and train the model and observe the model behavior on test data. As we found misleading and unrelated topic in test cases, it is important to understand the reasons behind the predictions. We will incorporate Local Interpretable model-agnostic Explanation (LIME) BIBREF23 method for the explanation of model predictions. We will also do predictive causality analysis on tweets.
+
+## Conclusions
+
+It is challenging to analyze social media data for different application purpose. In this work, we explored Twitter health-related data, inferred topic using topic modeling (i.e. LSA, NMF, LDA), observed model behavior on new tweets, compared train/test accuracy with ground truth, employed different visualizations after information integration and discovered interesting correlation (Yoga-Veganism) in data. In future, we will incorporate Local Interpretable model-agnostic Explanation (LIME) method to understand model interpretability.

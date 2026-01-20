@@ -1,0 +1,77 @@
+# Representation Learning for Discovering Phonemic Tone Contours
+
+**Paper ID:** 1910.08987
+
+## Abstract
+
+Tone is a prosodic feature used to distinguish words in many languages, some of which are endangered and scarcely documented. In this work, we use unsupervised representation learning to identify probable clusters of syllables that share the same phonemic tone. Our method extracts the pitch for each syllable, then trains a convolutional autoencoder to learn a low dimensional representation for each contour. We then apply the mean shift algorithm to cluster tones in high-density regions of the latent space. Furthermore, by feeding the centers of each cluster into the decoder, we produce a prototypical contour that represents each cluster. We apply this method to spoken multi-syllable words in Mandarin Chinese and Cantonese and evaluate how closely our clusters match the ground truth tone categories. Finally, we discuss some difficulties with our approach, including contextual tone variation and allophony effects.
+
+## Introduction
+
+Tonal languages use pitch to distinguish different words, for example, yi in Mandarin may mean `one', `to move', `already', or `art', depending on the pitch contour. Of over 6000 languages in the world, it is estimated that as many as 60-70% are tonal BIBREF0, BIBREF1. A few of these are national languages (e.g., Mandarin Chinese, Vietnamese, and Thai), but many tonal languages have a small number of speakers and are scarcely documented. There is a limited availability of trained linguists to perform language documentation before these languages become extinct, hence the need for better tools to assist linguists in these tasks.
+
+One of the first tasks during the description of an unfamiliar language is determining its phonemic inventory: what are the consonants, vowels, and tones of the language, and which pairs of phonemes are contrastive? Tone presents a unique challenge because unlike consonants and vowels, which can be identified in isolation, tones do not have a fixed pitch, and vary by speaker and situation. Since tone data is subject to interpretation, different linguists may produce different descriptions of the tone system of the same language BIBREF1.
+
+In this work, we present a model to automatically infer phonemic tone categories of a tonal language. We use an unsupervised representation learning and clustering approach, which requires only a set of spoken words in the target language, and produces clusters of syllables that probably have the same tone. We apply our method on Mandarin Chinese and Cantonese datasets, for which the ground truth annotation is used for evaluation. Our method does not make any language-specific assumptions, so it may be applied to low-resource languages whose phonemic inventories are not already established.
+
+## Introduction ::: Tone in Mandarin and Cantonese
+
+Mandarin Chinese (1.1 billion speakers) and Cantonese (74 million speakers) are two tonal languages in the Sinitic family BIBREF0. Mandarin has four lexical tones: high (55), rising (25), low-dipping (214), and falling (51). The third tone sometimes undergoes sandhi, addressed in section SECREF3. We exclude a fifth, neutral tone, which can only occur in word-final positions and has no fixed pitch.
+
+Cantonese has six lexical tones: high-level (55), mid-rising (25), mid-level (33), low-falling (21), low-rising (23), and low-level (22). Some descriptions of Cantonese include nine tones, of which three are checked tones that are flat, shorter in duration, and only occur on syllables ending in /p/, /t/, or /k/. Since each one of the checked tones are in complementary distribution with an unchecked tone, we adopt the simpler six tone model that treats the checked tones as variants of the high, mid, and low level tones. Contours for the lexical tones in both languages are shown in Figure FIGREF2.
+
+## Related Work
+
+Many low-resource languages lack sufficient transcribed data for supervised speech processing, thus unsupervised models for speech processing is an emerging area of research. The Zerospeech 2015 and 2017 challenges featured unsupervised learning of contrasting phonemes in English and Xitsonga, evaluated by an ABX phoneme discrimination task BIBREF3. One successful approach used denoising and correspondence autoencoders to learn a representation that avoided capturing noise and irrelevant inter-speaker variation BIBREF4. Deep LSTMs for segmenting and clustering phonemes in speech have also been explored in BIBREF5 and BIBREF6.
+
+In Mandarin Chinese, deep neural networks have been successful for tone classification in isolated syllables BIBREF7 as well as in continuous speech BIBREF8, BIBREF9. Both of these models found that Mel-frequency cepstral coefficients (MFCCs) outperformed pitch contour features, despite the fact that MFCC features do not contain pitch information. In Cantonese, support vector machines (SVMs) have been applied to classify tones in continuous speech, using pitch contours as input BIBREF10.
+
+Unsupervised learning of tones remains largely unexplored. Levow BIBREF11 performed unsupervised and semi-supervised tone clustering in Mandarin, using average pitch and slope as features, and $k$-means and asymmetric $k$-lines for clustering. Graph-based community detection techniques have been applied to group $n$-grams of contiguous contours into clusters in Mandarin BIBREF12. Our work appears to be the first model to use unsupervised deep neural networks for phonemic tone clustering.
+
+## Data and Preprocessing
+
+We use data from Mandarin Chinese and Cantonese. For each language, the data consists of a list of spoken words, recorded by the same speaker. The Mandarin dataset is from a female speaker and is provided by Shtooka, and the Cantonese dataset is from a male speaker and is downloaded from Forvo, an online crowd-sourced pronunciation dictionary. We require all samples within each language to be from the same speaker to avoid the difficulties associated with channel effects and inter-speaker variation. We randomly sample 400 words from each language, which are mostly between 2 and 4 syllables; to reduce the prosody effects with longer utterances, we exclude words longer than 4 syllables.
+
+We extract ground-truth tones for evaluation purposes. In Mandarin, the tones are extracted from the pinyin transcription; in Cantonese, we reference the character entries on Wiktionary to retrieve the romanized pronunciation and tones. For Mandarin, we correct for third-tone sandhi (a phonological rule where a pair of consecutive third-tones is always realized as a second-tone followed by a third-tone). We also exclude the neutral tone, which has no fixed pitch and is sometimes thought of as a lack of tone.
+
+## Data and Preprocessing ::: Pitch extraction and syllable segmentation
+
+We use Praat's autocorrelation-based pitch estimation algorithm to extract the fundamental frequency (F0) contour for each sample, using a minimum frequency of 75Hz and a maximum frequency of 500Hz BIBREF13. The interface between Python and Praat is handled using Parselmouth BIBREF14. We normalize the contour to be between 0 and 1, based on the speaker's pitch range.
+
+Next, we segment each speech sample into syllables, which is necessary because syllable boundaries are not provided in our datasets. This is done using a simple heuristic that detects continuously voiced segments, and manual annotation where the heuristic fails. To obtain a constant length pitch contour as input to our model, we sample the pitch at 40 equally spaced points. Note that by sampling a variable length contour to a constant length, information about syllable length is lost; this is acceptable because we consider tones which differ on length as variations of the same tone.
+
+## Model ::: Convolutional autoencoder
+
+We use a convolutional autoencoder (Figure FIGREF4) to learn a two-dimensional latent vector for each syllable. Convolutional layers are widely used in computer vision and speech processing to learn spatially local features that are invariant of position. We use a low dimensional latent space so that the model learns to generate a representation that only captures the most important aspects of the input contour, and also because clustering algorithms tend to perform poorly in high dimensional spaces.
+
+Our encoder consists of three layers. The first layer applies 2 convolutional filters (kernel size 4, stride 1) followed by max pooling (kernel size 2) and a tanh activation. The second layer applies 4 convolutional filters (kernel size 4, stride 1), again with max pooling (kernel size 2) and a tanh activation. The third layer is a fully connected layer with two dimensional output. Our decoder is the encoder in reverse, consisting of one fully connected layer and two deconvolution layers, with the same layer shapes as the encoder.
+
+We train the autoencoder using PyTorch BIBREF15, for 500 epochs, with a batch size of 60. The model is optimized using Adam BIBREF16 with a learning rate of 5e-4 to minimize the mean squared error between the input and output contours.
+
+## Model ::: Mean shift clustering
+
+We run the encoder on each syllable's pitch contour to get their latent representations; we apply principal component analysis (PCA) to remove any correlation between the two dimensions. Then, we run mean shift clustering BIBREF17, BIBREF18, estimating a probability density function in the latent space. The procedure performs gradient ascent on all the points until they converge to a set of stationary points, which are local maxima of the density function. These stationary points are taken to be cluster centers, and points that converge to the same stationary point belong to the same cluster.
+
+Unlike $k$-means clustering, the mean shift procedure does not require the number of clusters to be specified, only a bandwidth parameter (set to 0.6 for our experiments). The cluster centers are always in regions of high density, so they can be viewed as prototypes that represent their respective clusters. Another advantage is that unlike $k$-means, mean shift clustering is robust to outliers.
+
+Although the mean shift procedure technically assigns every point to a cluster, not all such clusters are linguistically plausible as phonemic tones, because they contain very few points. Thus, we take only clusters larger than a threshold, determined empirically from the distribution of cluster sizes; the rest are considered spurious clusters and we treat them as unclustered. Finally, we feed the remaining cluster centers into the decoder to generate a prototype pitch contour for each cluster.
+
+## Results
+
+Figure FIGREF9 shows the latent space learned by the autoencoders and the clustering output. Our model found 4 tone clusters in Mandarin, matching the number of phonemic tones (Table TABREF12) and 5 in Cantonese, which is one fewer than the number of phonemic tones (Table TABREF13). In Mandarin, the 4 clusters correspond very well with the the 4 phonemic tone categories, and the generated contours closely match the ground truth in Figure FIGREF2. There is some overlap between tones 3 and 4; this is because tone 3 is sometimes realized a low-falling tone without the final rise, a process known as half T3 sandhi BIBREF19, thus, it may overlap with tone 4 (falling tone).
+
+In Cantonese, the 5 clusters A-E correspond to low-falling, mid-level, high-level, mid-rising, and low-rising tones. Tone clustering in Cantonese is expected to be more difficult than in Mandarin because of 6 contrastive tones, rather than 4. The model is more effective at clustering the higher tones (1, 2, 3), and less effective at clustering the lower tones (4, 5, 6), particularly tone 4 (low-falling) and tone 6 (low-level). This confirms the difficulties in prior work, which reported worse classification accuracy on the lower-pitched tones because the lower region of the Cantonese tone space is more crowded than the upper region BIBREF10.
+
+Two other sources of error are carry-over and declination effects. A carry-over effect is when the pitch contour of a tone undergoes contextual variation depending on the preceding tone; strong carry-over effects have been observed in Mandarin BIBREF20. Prior work BIBREF11 avoided carry-over effects by using only the second half of every syllable, but we do not consider language-specific heuristics in our model. Declination is a phenomenon in which the pitch declines over an utterance BIBREF1, BIBREF10. This is especially a problem in Cantonese, which has tones that differ only on pitch level and not contour: for example, a mid-level tone near the end of a phrase may have the same absolute pitch as a low-level tone at the start of a phrase.
+
+To test this hypothesis, we evaluate the model on only the first syllable of every word, which eliminates carry-over and declination effects (Table TABREF14). In both Mandarin and Cantonese, the clustering is more accurate when using only the first syllables, compared to using all of the syllables.
+
+## Conclusions and future work
+
+We propose a model for unsupervised clustering and discovery of phonemic tones in tonal languages, using spoken words as input. Our model extracts the F0 pitch contour, trains a convolutional autoencoder to learn a low-dimensional representation for each contour, and applies mean shift clustering to the resulting latent space. We obtain promising results with both Mandarin Chinese and Cantonese, using only 400 spoken words from each language. Cantonese presents more difficulties because of its larger number of tones, especially at the lower half of the pitch range, and also due to multiple contrastive level tones. Finally, we briefly explore the influence of contextual variation on our model.
+
+A limitation of this study is that our model only considers pitch, which is only one aspect of tone. In reality, pitch is determined not only by tone, but by a complex mixture of intonation, stress, and other prosody effects. Tone is not a purely phonetic property – it is impossible to determine on a phonetic basis whether two pitch contours have distinct underlying tones, or are variants of the same underlying tone (perhaps in complementary distribution). Instead, two phonemic tones can be shown to be contrastive only by providing a minimal pair, where two semantically different lexical items are identical in every respect other than their tones. The last problem is not unique to tone: similar difficulties have been noted when attempting to identify consonant and vowel phonemes automatically BIBREF21. In future work, we plan to further explore these issues and develop more nuanced models to learn tone from speech.
+
+## Acknowledgments
+
+We thank Prof Gerald Penn for his help suggestions during this project. Rudzicz is a CIFAR Chair in AI.

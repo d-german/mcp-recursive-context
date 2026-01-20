@@ -1,0 +1,237 @@
+# Unsupervised Question Decomposition for Question Answering
+
+**Paper ID:** 2002.09758
+
+## Abstract
+
+We aim to improve question answering (QA) by decomposing hard questions into easier sub-questions that existing QA systems can answer. Since collecting labeled decompositions is cumbersome, we propose an unsupervised approach to produce sub-questions. Specifically, by leveraging>10M questions from Common Crawl, we learn to map from the distribution of multi-hop questions to the distribution of single-hop sub-questions. We answer sub-questions with an off-the-shelf QA model and incorporate the resulting answers in a downstream, multi-hop QA system. On a popular multi-hop QA dataset, HotpotQA, we show large improvements over a strong baseline, especially on adversarial and out-of-domain questions. Our method is generally applicable and automatically learns to decompose questions of different classes, while matching the performance of decomposition methods that rely heavily on hand-engineering and annotation.
+
+## Introduction
+
+Question answering (QA) systems have become remarkably good at answering simple, single-hop questions but still struggle with compositional, multi-hop questions BIBREF0, BIBREF1. In this work, we examine if we can answer hard questions by leveraging our ability to answer simple questions. Specifically, we approach QA by breaking a hard question into a series of sub-questions that can be answered by a simple, single-hop QA system. The system's answers can then be given as input to a downstream QA system to answer the hard question, as shown in Fig. FIGREF1. Our approach thus answers the hard question in multiple, smaller steps, which can be easier than answering the hard question all at once. For example, it may be easier to answer “What profession do H. L. Mencken and Albert Camus have in common?” when given the answers to the sub-questions “What profession does H. L. Mencken have?” and “Who was Albert Camus?”
+
+Prior work in learning to decompose questions into sub-questions has relied on extractive heuristics, which generalizes poorly to different domains and question types, and requires human annotation BIBREF2, BIBREF3. In order to scale to any arbitrary question, we would require sophisticated natural language generation capabilities, which often relies on large quantities of high-quality supervised data. Instead, we find that it is possible to learn to decompose questions without supervision.
+
+Specifically, we learn to map from the distribution of hard questions to the distribution of simpler questions. First, we automatically construct a noisy, “pseudo-decomposition” for each hard question by retrieving relevant sub-question candidates based on their similarity to the given hard question. We retrieve candidates from a corpus of 10M simple questions that we extracted from Common Crawl. Second, we train neural text generation models on that data with (1) standard sequence-to-sequence learning and (2) unsupervised sequence-to-sequence learning. The latter has the advantage that it can go beyond the noisy pairing between questions and pseudo-decompositions. Fig. FIGREF2 overviews our decomposition approach.
+
+We use decompositions to improve multi-hop QA. We first use an off-the-shelf single-hop QA model to answer decomposed sub-questions. We then give each sub-question and its answer as additional input to a multi-hop QA model. We test our method on HotpotQA BIBREF0, a popular multi-hop QA benchmark.
+
+Our contributions are as follows. First, QA models relying on decompositions improve accuracy over a strong baseline by 3.1 F1 on the original dev set, 11 F1 on the multi-hop dev set from BIBREF4, and 10 F1 on the out-of-domain dev set from BIBREF3. Our most effective decomposition model is a 12-block transformer encoder-decoder BIBREF5 trained using unsupervised sequence-to-sequence learning, involving masked language modeling, denoising, and back-translation objectives BIBREF6. Second, our method is competitive with state-of-the-art methods SAE BIBREF7 and HGN BIBREF8 which leverage strong supervision. Third, we show that our approach automatically learns to generate useful decompositions for all 4 question types in HotpotQA, highlighting the general nature of our approach. In our analysis, we explore how sub-questions improve multi-hop QA, and we provide qualitative examples that highlight how question decomposition adds a form of interpretability to black-box QA models. Our ablations show that each component of our pipeline contributes to QA performance. Overall, we find that it is possible to successfully decompose questions without any supervision and that doing so improves QA.
+
+## Method
+
+We now formulate the problem and overview our high-level approach, with details in the following section. We aim to leverage a QA model that is accurate on simple questions to answer hard questions, without using supervised question decompositions. Here, we consider simple questions to be “single-hop” questions that require reasoning over one paragraph or piece of evidence, and we consider hard questions to be “multi-hop.” Our aim is then to train a multi-hop QA model $M$ to provide the correct answer $a$ to a multi-hop question $q$ about a given a context $c$ (e.g., several paragraphs). Normally, we would train $M$ to maximize $\log p_M(a | c, q)$. To help $M$, we leverage a single-hop QA model that may be queried with sub-questions $s_1, \dots , s_N$, whose “sub-answers” to each sub-question $a_1, \dots , a_N$ may be provided to the multi-hop QA model. $M$ may then instead maximize the (potentially easier) objective $\log p_M(a | c, q, [s_1, a_1], \dots , [a_N, s_N])$.
+
+Supervised decomposition models learn to map each question $q \in Q$ to a decomposition $d = [s_1; \dots ; s_N]$ of $N$ sub-questions $s_n \in S$ using annotated $(q, d)$ examples. In this work, we do not assume access to strong $(q, d)$ supervision. To leverage the single-hop QA model without supervision, we follow a three-stage approach: 1) map a question $q$ into sub-questions $s_1, \dots , s_N$ via unsupervised techniques, 2) find sub-answers $a_1, \dots , a_N$ with the single-hop QA model, and 3) provide $s_1, \dots , s_N$ and $a_1, \dots , a_N$ to help predict $a$.
+
+## Method ::: Unsupervised Question Decomposition
+
+To train a decomposition model, we need appropriate training data. We assume access to a hard question corpus $Q$ and a simple question corpus $S$. Instead of using supervised $(q, d)$ training examples, we design an algorithm that constructs pseudo-decompositions $d^{\prime }$ to form $(q, d^{\prime })$ pairs from $Q$ and $S$ using an unsupervised approach (§SECREF4). We then train a model to map $q$ to a decomposition. We explore learning to decompose with standard and unsupervised sequence-to-sequence learning (§SECREF6).
+
+## Method ::: Unsupervised Question Decomposition ::: Creating Pseudo-Decompositions
+
+For each $q \in Q$, we construct a pseudo-decomposition set $d^{\prime } = \lbrace s_1; \dots ; s_N\rbrace $ by retrieving simple question $s$ from $S$. We concatenate all $N$ simple questions in $d^{\prime }$ to form the pseudo-decomposition used downstream. $N$ may be chosen based on the task or vary based on $q$. To retrieve useful simple questions for answering $q$, we face a joint optimization problem. We want sub-questions that are both (i) similar to $q$ according to some metric $f$ and (ii) maximally diverse:
+
+## Method ::: Unsupervised Question Decomposition ::: Learning to Decompose
+
+Having now retrieved relevant pseudo-decompositions, we examine different ways to learn to decompose (with implementation details in the following section):
+
+## Method ::: Unsupervised Question Decomposition ::: Learning to Decompose ::: No Learning
+
+We use pseudo-decompositions directly, employing retrieved sub-questions in downstream QA.
+
+## Method ::: Unsupervised Question Decomposition ::: Learning to Decompose ::: Sequence-to-Sequence (Seq2Seq)
+
+We train a Seq2Seq model with parameters $\theta $ to maximize $\log p_{\theta }(d^{\prime } | q)$.
+
+## Method ::: Unsupervised Question Decomposition ::: Learning to Decompose ::: Unsupervised Sequence-to-Sequence (USeq2Seq)
+
+We start with paired $(q, d^{\prime })$ examples but do not learn from the pairing, because the pairing is noisy. We use unsupervised sequence-to-sequence learning to learn a $q \rightarrow d$ mapping instead of training directly on the noisy pairing.
+
+## Method ::: Answering Sub-Questions
+
+To answer the generated sub-questions, we use an off-the-shelf QA model. The QA model may answer sub-questions using any free-form text (i.e., a word, phrase, sentence, etc.). Any QA model is suitable, so long as it can accurately answer simple questions in $S$. We thus leverage good accuracy on questions in $S$ to help QA models on questions in $Q$.
+
+## Method ::: QA using Decompositions
+
+Downstream QA systems may use sub-questions and sub-answers in various ways. We add sub-questions and sub-answers as auxiliary input for a downstream QA model to incorporate in its processing. We now describe the implementation details of our approach outlined above.
+
+## Experimental Setup ::: Question Answering Task
+
+We test unsupervised decompositions on HotpotQA BIBREF0, a standard benchmark for multi-hop QA. We use HotpotQA's “Distractor Setting,” which provides 10 context paragraphs from Wikipedia. Two (or more) paragraphs contain question-relevant sentences called “supporting facts,” and the remaining paragraphs are irrelevant, “distractor paragraphs.” Answers in HotpotQA are either yes, no, or a span of text in an input paragraph. Accuracy is measured with F1 and Exact Match (EM) scores between the predicted and gold spans.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Question Data
+
+We use HotpotQA questions as our initial multi-hop, hard question corpus $Q$. We use SQuAD 2 questions as our initial single-hop, simple question corpus $S$. However, our pseudo-decomposition corpus should be large, as the corpus will be used to train neural Seq2Seq models, which are data hungry. A larger $|S|$ will also improve the relevance of retrieved simple questions to the hard question. Thus, we take inspiration from work in machine translation on parallel corpus mining BIBREF9, BIBREF10 and in unsupervised QA BIBREF11. We augment $Q$ and $S$ by mining more questions from Common Crawl. We choose sentences which start with common “wh”-words and end with “?” Next, we train a FastText classifier BIBREF12 to classify between 60K questions sampled from Common Crawl, SQuAD 2, and HotpotQA. Then, we classify Common Crawl questions, adding questions classified as SQuAD 2 questions to $S$ and questions classified as HotpotQA questions to $Q$. Question mining greatly increases the number of single-hop questions (130K $\rightarrow $ 10.1M) and multi-hop questions (90K $\rightarrow $ 2.4M). Thus, our unsupervised approach allows us to make use of far more data than supervised counterparts.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Creating Pseudo-Decompositions
+
+To create pseudo-decompositions, we set the number $N$ of sub-questions per question to 2, as questions in HotpotQA usually involve two reasoning hops. In Appendix §SECREF52, we discuss how our method works when $N$ varies per question.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Creating Pseudo-Decompositions ::: Similarity-based Retrieval
+
+To retrieve question-relevant sub-questions, we embed any text $t$ into a vector $\mathbf {v}_t$ by summing the FastText vectors BIBREF13 for words in $t$. We use cosine similarity as our similarity metric $f$. Let $q$ be a multi-hop question used to retrieve pseudo-decomposition $(s_1^*, s_2^*)$, and let $\hat{\mathbf {v}}$ be the unit vector of $\mathbf {v}$. Since $N=2$, Eq. DISPLAY_FORM5 reduces to:
+
+The last term requires $O(|S|^2)$ comparisons, which is expensive as $|S|$ is large ($>$10M). Instead of solving Eq. (DISPLAY_FORM19) exactly, we find an approximate pseudo-decomposition $(s_1^{\prime }, s_2^{\prime })$ by computing Eq. (DISPLAY_FORM19) over $S^{\prime } = \operatornamewithlimits{topK}_{\lbrace s \in S\rbrace }\left[ \mathbf {\hat{v}}_{q}^{\top } \mathbf {\hat{v}}_s\right]$, using $K=1000$. We use FAISS BIBREF14 to efficiently build $S^{\prime }$.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Creating Pseudo-Decompositions ::: Random Retrieval
+
+For comparison, we test random pseudo-decompositions, where we randomly retrieve $s_1, \dots , s_N$ by sampling from $S$. USeq2Seq trained on random $d^{\prime } = [s_1; \dots ; s_N]$ should at minimum learn to map $q$ to multiple simple questions.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Creating Pseudo-Decompositions ::: Editing Pseudo-Decompositions
+
+Since the sub-questions are retrieval-based, the sub-questions are often not about the same entities as $q$. As a post-processing step, we replace entities in $(s^{\prime }_1, s^{\prime }_2)$ with entities from $q$. We find all entities in $(s^{\prime }_1, s^{\prime }_2)$ that do not appear in $q$ using spaCy BIBREF15. We replace these entities with a random entity from $q$ with the same type (e.g., “Date” or “Location”) if and only if one exists. We use entity replacement on pseudo-decompositions from both random and similarity-based retrieval.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Unsupervised Decomposition Models ::: Pre-training
+
+Pre-training is a key ingredient for unsupervised Seq2Seq methods BIBREF16, BIBREF17, so we initialize all decomposition models with the same pre-trained weights, regardless of training method (Seq2Seq or USeq2Seq). We warm-start our pre-training with the pre-trained, English Masked Language Model (MLM) from BIBREF6, a 12-block decoder-only transformer model BIBREF5 trained to predict masked-out words on Toronto Books Corpus BIBREF18 and Wikipedia. We train the model with the MLM objective for one epoch on the augmented corpus $Q$ (2.4 M questions), while also training on decompositions $D$ formed via random retrieval from $S$. For our pre-trained encoder-decoder, we initialize a 6-block encoder with the first 6 MLM blocks, and we initialize a 6-block decoder with the last 6 MLM blocks, randomly initializing the remaining weights as in BIBREF6.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Unsupervised Decomposition Models ::: Seq2Seq
+
+We fine-tune the pre-trained encoder-decoder using maximum likelihood. We stop training based on validation BLEU BIBREF19 between generated decompositions and pseudo-decompositions.
+
+## Experimental Setup ::: Unsupervised Decomposition ::: Unsupervised Decomposition Models ::: USeq2Seq
+
+We follow the approach by BIBREF6 in unsupervised translation. Training follows two stages: (1) MLM pre-training on the training corpora (described above), followed by (2) training simultaneously with denoising and back-translation objectives. For denoising, we produce a noisy input $\hat{d}$ by randomly masking, dropping, and locally shuffling tokens in $d \sim D$, and we train a model with parameters $\theta $ to maximize $\log p_{\theta }(d | \hat{d})$. We likewise maximize $\log p_{\theta }(q | \hat{q})$. For back-translation, we generate a multi-hop question $\hat{q}$ for a decomposition $d \sim D$, and we maximize $\log p_{\theta }(d | \hat{q})$. Similarly, we maximize $\log p_{\theta }(q | \hat{d})$. To stop training without supervision, we use a modified version of round-trip BLEU BIBREF17 (see Appendix §SECREF56 for details). We train with denoising and back-translation on smaller corpora of HotpotQA questions ($Q$) and their pseudo-decompositions ($D$).
+
+## Experimental Setup ::: Single-hop Question Answering Model
+
+We train our single-hop QA model following prior work from BIBREF3 on HotpotQA.
+
+## Experimental Setup ::: Single-hop Question Answering Model ::: Model Architecture
+
+We fine-tune a pre-trained model to take a question and several paragraphs and predicts the answer, similar to the single-hop QA model from BIBREF21. The model computes a separate forward pass on each paragraph (with the question). For each paragraph, the model learns to predict the answer span if the paragraph contains the answer and to predict “no answer” otherwise. We treat yes and no predictions as spans within the passage (prepended to each paragraph), as in BIBREF22 on HotpotQA. During inference, for the final softmax, we consider all paragraphs as a single chunk. Similar to BIBREF23, we subtract a paragraph's “no answer” logit from the logits of all spans in that paragraph, to reduce or increase span probabilities accordingly. In other words, we compute the probability $p(s_p)$ of each span $s_p$ in a paragraph $p \in \lbrace 1, \dots , P \rbrace $ using the predicted span logit $l(s_p)$ and “no answer” paragraph logit $n(p)$ as follows:
+
+We use $\textsc {RoBERTa}_{\textsc {LARGE}}$ BIBREF24 as our pre-trained initialization. Later, we also experiment with using the $\textsc {BERT}_{\textsc {BASE}}$ ensemble from BIBREF3.
+
+## Experimental Setup ::: Single-hop Question Answering Model ::: Training Data and Ensembling
+
+Similar to BIBREF3, we train an ensemble of 2 single-hop QA models using data from SQuAD 2 and HotpotQA questions labeled as “easy” (single-hop). To ensemble, we average the logits of the two models before predicting the answer. SQuAD is a single-paragraph QA task, so we adapt SQuAD to the multi-paragraph setting by retrieving distractor paragraphs from Wikipedia for each question. We use the TFIDF retriever from DrQA BIBREF25 to retrieve 2 distractor paragraphs, which we add to the input for one model in the ensemble. We drop words from the question with a 5% probability to help the model handle any ill-formed sub-questions. We use the single-hop QA ensemble as a black-box model once trained, never training the model on multi-hop questions.
+
+## Experimental Setup ::: Single-hop Question Answering Model ::: Returned Text
+
+We have the single-hop QA model return the sentence containing the model's predicted answer span, alongside the sub-questions. Later, we compare against alternatives, i.e., returning the predicted answer span without its context or not returning sub-questions.
+
+## Experimental Setup ::: Multi-hop Question Answering Model
+
+Our multi-hop QA architecture is identical to the single-hop QA model, but the multi-hop QA model also uses sub-questions and sub-answers as input. We append each (sub-question, sub-answer) pair in order to the multi-hop question along with separator tokens. We train one multi-hop QA model on all of HotpotQA, also including SQuAD 2 examples used to train the single-hop QA model. Later, we experiment with using $\textsc {BERT}_{\textsc {LARGE}}$ and $\textsc {BERT}_{\textsc {BASE}}$ instead of $\textsc {RoBERTa}_{\textsc {LARGE}}$ as the multi-hop QA model. All reported error margins show the mean and std. dev. across 5 multi-hop QA training runs using the same decompositions.
+
+## Results on Question Answering
+
+We compare variants of our approach that use different learning methods and different pseudo-aligned training sets. As a baseline, we compare RoBERTa with decompositions to a RoBERTa model that does not use decompositions but is identical in all other respects. We train the baseline for 2 epochs, sweeping over batch size $\in \lbrace 64, 128\rbrace $, learning rate $\in \lbrace 1 \times 10^{-5}, 1.5 \times 10^{-5}, 2 \times 10^{-5}, 3 \times 10^{-5}\rbrace $, and weight decay $\in \lbrace 0, 0.1, 0.01, 0.001\rbrace $; we choose the hyperparameters that perform best on our dev set. We then use the best hyperparameters for the baseline to train our RoBERTa models with decompositions.
+
+We report results on 3 versions of the dev set: (1) the original version, (2) the multi-hop version from BIBREF4 which created some distractor paragraphs adversarially to test multi-hop reasoning, and (3) the out-of-domain version from BIBREF3 which retrieved distractor paragraphs using the same procedure as the original version, but excluded paragraphs in the original version.
+
+## Results on Question Answering ::: Main Results
+
+Table shows how unsupervised decompositions affect QA. Our RoBERTa baseline performs quite well on HotpotQA (77.0 F1), despite processing each paragraph separately, which prohibits inter-paragraph reasoning. The result is in line with prior work which found that a version of our baseline QA model using BERT BIBREF26 does well on HotpotQA by exploiting single-hop reasoning shortcuts BIBREF21. We achieve significant gains over our strong baseline by leveraging decompositions from our best decomposition model, trained with USeq2Seq on FastText pseudo-decompositions; we find a 3.1 F1 gain on the original dev set, 11 F1 gain on the multi-hop dev set, and 10 F1 gain on the out-of-domain dev set. Unsupervised decompositions even match the performance of using (within our pipeline) supervised and heuristic decompositions from DecompRC (i.e., 80.1 vs. 79.8 F1 on the original dev set).
+
+More generally, all decomposition methods improve QA over the baseline by leveraging the single-hop QA model (“1hop” in Table ). Using FastText pseudo-decompositions as sub-questions directly improves QA over using random sub-questions on the multi-hop set (72.4 vs. 70.9 F1) and out-of-domain set (72.0 vs. 70.7 F1). USeq2Seq on random pseudo-decompositions also improves over the random sub-question baseline (e.g., 79.8 vs. 78.4 F1 on HotpotQA). However, we only find small improvements when training USeq2Seq on FastText vs. Random pseudo-decompositions (e.g., 77.1 vs. 76.5 F1 on the out-of-domain dev set).
+
+The best decomposition methods learn with USeq2Seq. Using Seq2Seq to generate decompositions gives similar QA accuracy as the “No Learning” setup, e.g. both approaches achieve 78.9 F1 on the original dev set for FastText pseudo-decompositions. The results are similar perhaps since supervised learning is directly trained to place high probability on pseudo-decompositions. USeq2Seq may improve over Seq2Seq by learning to align hard questions and pseudo-decompositions while ignoring the noisy pairing.
+
+After our experimentation, we chose USeq2Seq trained on FastText pseudo-decompositions as the final model, and we submitted the model for hidden test evaluation. Our approach achieved a test F1 of 79.34 and Exact Match (EM) of 66.33. Our approach is competitive with concurrent, state-of-the-art systems SAE BIBREF7 and HGN BIBREF8, which both (unlike our approach) learn from additional, strong supervision about which sentences are necessary to answer the question.
+
+## Results on Question Answering ::: Question Type Breakdown
+
+To understand where decompositions help, we break down QA performance across 4 question types from BIBREF3. “Bridge” questions ask about an entity not explicitly mentioned in the question (“When was Erik Watts' father born?”). “Intersection” questions ask to find an entity that satisfies multiple separate conditions (“Who was on CNBC and Fox News?”). “Comparison” questions ask to compare a property of two entities (“Which is taller, Momhil Sar or K2?”). “Single-hop” questions are likely answerable using single-hop shortcuts or single-paragraph reasoning (“Where is Electric Six from?”). We split the original dev set into the 4 types using the supervised type classifier from BIBREF3. Table shows F1 scores for RoBERTa with and without decompositions across the 4 types.
+
+Unsupervised decompositions improve QA across all question types. Our single decomposition model generates useful sub-questions for all question types without special case handling, unlike earlier work from BIBREF3 which handled each question type separately. For single-hop questions, our QA approach does not require falling back to a single-hop QA model and instead learns to leverage decompositions to better answer questions with single-hop shortcuts (76.9 vs. 73.9 F1 without decompositions).
+
+## Results on Question Answering ::: Answers to Sub-Questions are Crucial
+
+To measure the usefulness of sub-questions and sub-answers, we train the multi-hop QA model with various, ablated inputs, as shown in Table . Sub-answers are crucial to improving QA, as sub-questions with no answers or random answers do not help (76.9 vs. 77.0 F1 for the baseline). Only when sub-answers are provided do we see improved QA, with or without sub-questions (80.1 and 80.2 F1, respectively). It is important to provide the sentence containing the predicted answer span instead of the answer span alone (80.1 vs. 77.8 F1, respectively), though the answer span alone still improves over the baseline (77.0 F1).
+
+## Results on Question Answering ::: How Do Decompositions Help?
+
+Decompositions help to answer questions by retrieving important supporting evidence to answer questions. Fig. FIGREF41 shows that multi-hop QA accuracy increases when the sub-answer sentences are the “supporting facts” or sentences needed to answer the question, as annotated by HotpotQA. We retrieve supporting facts without learning to predict them with strong supervision, unlike many state-of-the-art models BIBREF7, BIBREF8, BIBREF22.
+
+## Results on Question Answering ::: Example Decompositions
+
+To illustrate how decompositions help QA, Table shows example sub-questions from our best decomposition model with predicted sub-answers. Sub-questions are single-hop questions relevant to the multi-hop question. The single-hop QA model returns relevant sub-answers, sometimes in spite of grammatical errors (Q1, SQ$_1$) or under-specified questions (Q2, SQ$_1$). The multi-hop QA model then returns an answer consistent with the predicted sub-answers. The decomposition model is largely extractive, copying from the multi-hop question rather than hallucinating new entities, which helps generate relevant sub-questions. To better understand our system, we analyze the model for each stage: decomposition, single-hop QA, and multi-hop QA.
+
+## Analysis ::: Unsupervised Decomposition Model ::: Intrinsic Evaluation of Decompositions
+
+We evaluate the quality of decompositions on other metrics aside from downstream QA. To measure the fluency of decompositions, we compute the likelihood of decompositions using the pre-trained GPT-2 language model BIBREF27. We train a classifier on the question-wellformedness dataset of BIBREF28, and we use the classifier to estimate the proportion of sub-questions that are well-formed. We measure how abstractive decompositions are by computing (i) the token Levenstein distance between the multi-hop question and its generated decomposition and (ii) the ratio between the length of the decomposition and the length of the multi-hop question. We compare our best decomposition model against the supervised+heuristic decompositions from DecompRC BIBREF3 in Table .
+
+Unsupervised decompositions are both more natural and well-formed than decompositions from DecompRC. Unsupervised decompositions are also closer in edit distance and length to the multi-hop question, consistent with our observation that our decomposition model is largely extractive.
+
+## Analysis ::: Unsupervised Decomposition Model ::: Quality of Decomposition Model
+
+Another way to test the quality of the decomposition model is to test if the model places higher probability on decompositions that are more helpful for downstream QA. We generate $N=5$ hypotheses from our best decomposition model using beam search, and we train a multi-hop QA model to use the $n$th-ranked hypothesis as a question decomposition (Fig. FIGREF46, left). QA accuracy decreases as we use lower probability decompositions, but accuracy remains relatively robust, at most decreasing from 80.1 to 79.3 F1. The limited drop suggests that decompositions are still useful if they are among the model's top hypotheses, another indication that our model is trained well for decomposition.
+
+## Analysis ::: Single-hop Question Answering Model ::: Sub-Answer Confidence
+
+Figure FIGREF46 (right) shows that the model's sub-answer confidence correlates with downstream multi-hop QA performance for all HotpotQA dev sets. A low confidence sub-answer may be indicative of (i) an unanswerable or ill-formed sub-question or (ii) a sub-answer that is more likely to be incorrect. In both cases, the single-hop QA model is less likely to retrieve the useful supporting evidence to answer the multi-hop question.
+
+## Analysis ::: Single-hop Question Answering Model ::: Changing the Single-hop QA Model
+
+We find that our approach is robust to the single-hop QA model that answers sub-questions. We use the $\textsc {BERT}_{\textsc {BASE}}$ ensemble from BIBREF3 as the single-hop QA model. The model performs much worse compared to our $\textsc {RoBERTa}_{\textsc {LARGE}}$ single-hop ensemble when used directly on HotpotQA (56.3 vs. 66.7 F1). However, the model results in comparable QA when used to answer single-hop sub-questions within our larger system (79.9 vs. 80.1 F1 for our $\textsc {RoBERTa}_{\textsc {LARGE}}$ ensemble).
+
+## Analysis ::: Multi-hop Question Answering Model ::: Varying the Base Model
+
+To understand how decompositions impact performance as the multi-hop QA model gets stronger, we vary the base pre-trained model. Table shows the impact of adding decompositions to $\textsc {BERT}_{\textsc {BASE}}$ , $\textsc {BERT}_{\textsc {LARGE}}$ , and finally $\textsc {RoBERTa}_{\textsc {LARGE}}$ (see Appendix §SECREF64 for hyperparameters). The gain from using decompositions grows with strength of the multi-hop QA model. Decompositions improve QA by 1.2 F1 for a $\textsc {BERT}_{\textsc {BASE}}$ model, by 2.6 F1 for the stronger $\textsc {BERT}_{\textsc {LARGE}}$ model, and by 3.1 F1 for our best $\textsc {RoBERTa}_{\textsc {LARGE}}$ model.
+
+## Related Work
+
+Answering complicated questions has been a long-standing challenge in natural language processing. To this end, prior work has explored decomposing questions with supervision or heuristic algorithms. IBM Watson BIBREF29 decomposes questions into sub-questions in multiple ways or not at all. DecompRC BIBREF3 largely frames sub-questions as extractive spans of a multi-hop question, learning to predict span-based sub-questions via supervised learning on human annotations. In other cases, DecompRC decomposes a multi-hop question using a heuristic algorithm, or DecompRC does not decompose at all. Watson and DecompRC use special case handling to decompose different questions, while our algorithm is fully automated and requires minimal hand-engineering.
+
+More traditional, semantic parsing methods map questions to compositional programs, whose sub-programs can be viewed as question decompositions in a formal language BIBREF2, BIBREF30. Examples include classical QA systems like SHRDLU BIBREF31 and LUNAR BIBREF32, as well as neural Seq2Seq semantic parsers BIBREF33 and neural module networks BIBREF34, BIBREF35. Such methods usually require strong, program-level supervision to generate programs, as in visual QA BIBREF36 and on HotpotQA BIBREF37. Some models use other forms of strong supervision, e.g. predicting the “supporting evidence” to answer a question annotated by HotpotQA. Such an approach is taken by SAE BIBREF7 and HGN BIBREF8, whose methods may be combined with our approach.
+
+Unsupervised decomposition complements strongly and weakly supervised decomposition approaches. Our unsupervised approach enables methods to leverage millions of otherwise unusable questions, similar to work on unsupervised QA BIBREF11. When decomposition examples exist, supervised and unsupervised learning can be used in tandem to learn from both labeled and unlabeled examples. Such semi-supervised methods outperform supervised learning for tasks like machine translation BIBREF38. Other work on weakly supervised question generation uses a downstream QA model's accuracy as a signal for learning to generate useful questions. Weakly supervised question generation often uses reinforcement learning BIBREF39, BIBREF40, BIBREF41, BIBREF42, BIBREF43, where an unsupervised initialization can greatly mitigate the issues of exploring from scratch BIBREF44.
+
+## Conclusion
+
+We proposed an algorithm that decomposes questions without supervision, using 3 stages: (1) learning to decompose using pseudo-decompositions without supervision, (2) answering sub-questions with an off-the-shelf QA system, and (3) answering hard questions more accurately using sub-questions and their answers as additional input. When evaluated on HotpotQA, a standard benchmark for multi-hop QA, our approach significantly improved accuracy over an equivalent model that did not use decompositions. Our approach relies only on the final answer as supervision but works as effectively as state-of-the-art methods that rely on strong supervision, such as supporting fact labels or example decompositions. Qualitatively, we found that unsupervised decomposition resulted in fluent sub-questions whose answers often match the annotated supporting facts in HotpotQA. Our unsupervised decompositions are largely extractive, which is effective for compositional, multi-hop questions but not all complex questions, showing room for future work. Overall, this work opens up exciting avenues for leveraging methods in unsupervised learning and natural language generation to improve the interpretability and generalization of machine learning systems.
+
+## Acknowledgements
+
+EP is supported by the NSF Graduate Research Fellowship. KC is supported by Samsung Advanced Institute of Technology (Next Generation Deep Learning: from pattern recognition to AI) and Samsung Research (Improving Deep Learning using Latent Structure). KC also thanks eBay and NVIDIA for their support. We thank Paul Christiano, Sebastian Riedel, He He, Jonathan Berant, Alexis Conneau, Jiatao Gu, Sewon Min, Yixin Nie, Lajanugen Logeswaran, and Adam Fisch for helpful feedback, as well as Yichen Jiang and Peng Qi for help with evaluation.
+
+## Pseudo-Decompositions
+
+Tables - show examples of pseudo-decompositions and learned decompositions from various models.
+
+## Pseudo-Decompositions ::: Variable Length Pseudo-Decompositions
+
+In §SECREF15, we leveraged domain knowledge about the task to fix the pseudo-decomposition length $N=2$. A general algorithm for creating pseudo-decompositions should find a suitable $N$ for each question. We find that Eq. DISPLAY_FORM5 in SECREF4 always results in decompositions of length $N=2$, as the regularization term grows quickly with $N$. Thus, we test another formulation based on Euclidean distance:
+
+We create pseudo-decompositions in an similar way as before, first finding a set of candidate sub-questions $S^{\prime } \in S$ with high cosine similarity to $\mathbf {v}_q$, then performing beam search up to a maximum value of $N$. We test pseudo-decomposition formulations by creating synthetic compositional questions by combining 2-3 single-hop questions with “and.” We then measure the ranking of the correct decomposition (a concatenation of the single-hop questions). For $N=2$, both methods perform well, but Eq. DISPLAY_FORM5 does not work for decompositions where $N=3$, whereas Eq. DISPLAY_FORM53 does, achieving a mean reciprocal rank of 30%. However, Eq. DISPLAY_FORM5 outperforms Eq. DISPLAY_FORM53 on HotpotQA, e.g., achieving 79.9 vs. 79.4 F1 when using the $\textsc {BERT}_{\textsc {BASE}}$ ensemble from BIBREF3 to answer sub-questions. Eq. DISPLAY_FORM5 is also faster to compute and easier to scale. Moreover, Eq. DISPLAY_FORM53 requires an embedding space where summing sub-question representations is meaningful, whereas Eq. DISPLAY_FORM5 only requires embeddings that encode semantic similarity. Thus, we adopt Eq. DISPLAY_FORM5 for our main experiments. Table contains an example where the variable length decomposition method mentioned above produces a three-subquestion decomposition whereas the other methods are fixed to two subquestions.
+
+## Pseudo-Decompositions ::: Impact of Question Corpus Size
+
+In addition to our previous results on FastText vs. Random pseudo-decompositions, we found it important to use a large question corpus to create pseudo-decompositions. QA F1 increased from 79.2 to 80.1 when we trained decomposition models on pseudo-decompositions comprised of questions retrieved from Common Crawl ($>$10M questions) rather than only SQuAD 2 ($\sim $130K questions), using an appropriately larger beam size (100 $\rightarrow $ 1000).
+
+## Pseudo-Decompositions ::: Pseudo-Decomposition Retrieval Method
+
+Table shows QA results with pseudo-decompositions retrieved using sum-bag-of-word representations from FastText, TFIDF, $\textsc {BERT}_{\textsc {LARGE}}$ first layer hidden states. We also vary the learning method and include results Curriculum Seq2Seq (CSeq2Seq), where we initialize the USeq2Seq approach with the Seq2Seq model trained on the same data.
+
+## Unsupervised Decomposition Model ::: Unsupervised Stopping Criterion
+
+To stop USeq2Seq training, we use an unsupervised stopping criterion to avoid relying on a supervised validation set of decompositions. We generate a decomposition $\hat{d}$ for a multi-hop question $q$, and we measure BLEU between $q$ and the model-generated question $\hat{q}$ for $\hat{d}$, similar to round-trip BLEU in unsupervised translation BIBREF17. We scale round-trip BLEU score by the fraction of “good” decompositions, where a good decomposition has (1) 2 sub-questions (question marks), (2) no sub-question which contains all words in the multi-hop question, and (3) no sub-question longer than the multi-hop question. Without scaling, decomposition models achieve perfect round-trip BLEU by copying the multi-hop question as the decomposition. We measure scaled BLEU across multi-hop questions in HotpotQA dev, and we stop training when the metric does not increase for 3 consecutive epochs.
+
+It is possible to stop training the decomposition model based on downstream QA accuracy. However, training a QA model on each decomposition model checkpoint (1) is computationally expensive and (2) ties decompositions to a specific, downstream QA model. In Figure FIGREF57, we show downstream QA results across various USeq2Seq checkpoints when using the $\textsc {BERT}_{\textsc {BASE}}$ single-hop QA ensemble from BIBREF3. The unsupervised stopping criterion does not significantly hurt downstream QA compared to using a weakly-supervised stopping criterion.
+
+## Unsupervised Decomposition Model ::: Training Hyperparameters ::: MLM Pre-training
+
+We pre-train our encoder-decoder distributed across 8 DGX-1 machines, each with 8, 32GB NVIDIA V100 GPUs interconnected by Infiniband. We pre-train using the largest possible batch size (1536), and we choose the best learning rate ($3 \times 10^{-5}$) based on training loss after a small number of iterations. We chose a maximum sequence length of 128. We keep other hyperparameters identical to those from BIBREF6 used in unsupervised translation.
+
+## Unsupervised Decomposition Model ::: Training Hyperparameters ::: USeq2Seq
+
+We train each decomposition model with distributed training across 8, 32GB NVIDIA V100 GPUs. We chose the largest possible batch size (256) and then the largest learning rate which resulted in stable training ($3 \times 10^{-5}$). Other hyperparameters are the same as BIBREF6.
+
+## Unsupervised Decomposition Model ::: Training Hyperparameters ::: Seq2Seq
+
+We use a large batch size (1024) and chose the largest learning rate which resulted in stable training across many pseudo-decomposition training corpora ($1 \times 10^{-4}$). We keep other training settings and hyperparameters the same as for USeq2Seq.
+
+## Multi-hop QA Model ::: Varying the Number of Training Examples
+
+To understand how decompositions impact performance given different amounts of training data, we vary the number of multi-hop training examples. We use the “medium” and “hard” level labels in HotpotQA to determine which examples are multi-hop. We consider training setups where the multi-hop QA model does or does not use data augmentation via training on hotpot “easy”/single-hop questions and SQuAD 2 questions. Fig. FIGREF63 shows the results. Decompositions improve QA, so long as the multi-hop QA model has enough training data, either via single-hop QA examples or enough multi-hop QA examples.
+
+## Multi-hop QA Model ::: Training Hyperparameters
+
+To train $\textsc {RoBERTa}_{\textsc {LARGE}}$ , we fix the number of training epochs to 2, as training longer did not help. We sweep over batch size $\in \lbrace 64, 128\rbrace $, learning rate $\in \lbrace 1 \times 10^{-5}, 1.5 \times 10^{-5}, 2 \times 10^{-5}, 3 \times 10^{-5}\rbrace $, and weight decay $\in \lbrace 0, 0.1, 0.01, 0.001\rbrace $, similar to the ranges used in the original paper BIBREF24. We chose the hyperparameters that did best for the baseline QA model (without decompositions) on our validation set: batch size 64, learning rate $1.5 \times 10^{-5}$, and weight decay $0.01$. Similarly, for the experiments with BERT, we fix the number of epochs to 2 and choose hyperparameters by sweeping over the recommended ranges from BIBREF26 for learning rate ($\lbrace 2 \times 10^{-5}, 3 \times 10^{-5}, 5 \times 10^{-5}\rbrace $) and batch size ($\lbrace 16, 32\rbrace $). For $\textsc {BERT}_{\textsc {BASE}}$ , we thus choose learning rate $2 \times 10^{-5}$ and batch size 16, and for $\textsc {BERT}_{\textsc {LARGE}}$ , we use the whole-word masking model with learning rate $2 \times 10^{-5}$ and batch size 32. We train all QA models with mixed precision floating point arithmetic BIBREF45, distributing training across 8, 32GB NVIDIA V100 GPUs.
+
+## Multi-hop QA Model ::: Improvements across Detailed Question Types
+
+To better understand where decompositions improve QA, we show the improvement across various fine-grained splits of the evaluation sets in Figures FIGREF66-FIGREF70.

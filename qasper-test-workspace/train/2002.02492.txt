@@ -1,0 +1,263 @@
+# Consistency of a Recurrent Language Model With Respect to Incomplete Decoding
+
+**Paper ID:** 2002.02492
+
+## Abstract
+
+Despite strong performance on a variety of tasks, neural sequence models trained with maximum likelihood have been shown to exhibit issues such as length bias and degenerate repetition. We study the related issue of receiving infinite-length sequences from a recurrent language model when using common decoding algorithms. To analyze this issue, we first define inconsistency of a decoding algorithm, meaning that the algorithm can yield an infinite-length sequence that has zero probability under the model. We prove that commonly used incomplete decoding algorithms - greedy search, beam search, top-k sampling, and nucleus sampling - are inconsistent, despite the fact that recurrent language models are trained to produce sequences of finite length. Based on these insights, we propose two remedies which address inconsistency: consistent variants of top-k and nucleus sampling, and a self-terminating recurrent language model. Empirical results show that inconsistency occurs in practice, and that the proposed methods prevent inconsistency.
+
+## Introduction
+
+Neural sequence models trained with maximum likelihood estimation (MLE) have become a standard approach to modeling sequences in a variety of natural language applications such as machine translation BIBREF0, dialogue modeling BIBREF1, and language modeling BIBREF2. Despite this success, MLE-trained neural sequence models have been shown to exhibit issues such as length bias BIBREF3, BIBREF4 and degenerate repetition BIBREF5. These issues are suspected to be related to the maximum likelihood objective's local normalization, which results in a discrepancy between the learned model's distribution and the distribution induced by the decoding algorithm used to generate sequences BIBREF6, BIBREF7. This has prompted the development of alternative decoding methods BIBREF8, BIBREF5 and training objectives BIBREF9, BIBREF10. In this paper, we formalize and study this discrepancy between the model and the decoding algorithm.
+
+We begin by formally defining recurrent neural language models, a family that encompasses neural models used in practice, such as recurrent neural networks BIBREF11, BIBREF12, BIBREF13, and transformers BIBREF14. Next, we formally define a decoding algorithm – a function that induces a distribution over sequences given a recurrent language model and a context distribution – which is used to obtain probable sequences from a model. In this paper, we show that the distribution induced by a decoding algorithm can contradict this intended use; instead, the decoding algorithm may return improbable, infinite-length sequences.
+
+Our main finding is that a sequence which receives zero probability under a recurrent language model's distribution can receive nonzero probability under the distribution induced by a decoding algorithm. This occurs when the recurrent language model always ranks the sequence termination token outside of the set of tokens considered at each decoding step, yielding an infinite-length, zero probability sequence. This holds whenever the decoding algorithm is incomplete, in the sense that the algorithm excludes tokens from consideration at each step of decoding, which is the case for common methods such as greedy search, beam search, top-$k$ sampling BIBREF15, and nucleus sampling BIBREF5. We formalize our main finding using the notion of consistency BIBREF16 – whether a distribution assigns probability mass only to finite sequences – and prove that a consistent recurrent language model paired with an incomplete decoding algorithm can induce an inconsistent sequence distribution.
+
+Based on the insight that inconsistency occurs due to the behavior of the termination token under incomplete decoding, we develop two methods for addressing inconsistency. First, we propose consistent sampling methods which guarantee that the termination token is not excluded from selection during decoding. Second, we introduce a self-terminating recurrent language model which ensures that the termination token is eventually ranked above all others, guaranteeing consistency under incomplete decoding.
+
+To empirically measure inconsistency, we decode sequences from trained recurrent language models and measure the proportion of sequences with lengths far exceeding the maximum training sequence length. Our experiments on the Wikitext2 dataset BIBREF17 suggest that inconsistency occurs in practice when using incomplete decoding methods, while the proposed consistent sampling methods and self-terminating model parameterization prevent inconsistency and maintain language modeling quality.
+
+The theoretical analysis reveals defects of existing decoding algorithms, providing a way to develop future models, inference procedures, and learning algorithms. We present methods related to sampling and model parameterization, but there are more directions which we leave to the future; we close with directions related to sequence-level learning.
+
+## Background
+
+We begin our discussion by establishing background definitions. First, we define a sequence which is the main object of our investigation.
+
+Definition 2.1 (Sequence) A sequence $Y$ is an ordered collection of items from a predefined finite vocabulary $V$. A sequence of finite length always ends with a special token $\left<\text{eos}\right>\in V$ that only appears at the end of a sequence.
+
+Each model we consider generates a sequence conditioned on context information, such as a prefix in sentence completion. To consider this, we define a context distribution.
+
+Definition 2.2 (Context distribution) A context distribution $p(C)$ is a probability distribution defined over a set $\mathcal {C}$. An element $C\in \mathcal {C}$ is called a context.
+
+## Background ::: Recurrent Language Models
+
+A recurrent language model is an autoregressive model of a sequence distribution, where each conditional probability is parameterized with a neural network. Importantly, we assume that all tokens in a sequence are dependent on each other under a recurrent language model. This allows us to avoid cases in which the model degenerates to a Markovian language model, such as an $n$-gram model with a finite $n$.
+
+Definition 2.3 (Recurrent language model) A recurrent language model $p_\theta $ is a neural network that computes the following conditional probability at each time step
+
+where $h_t = f_{\theta }(y_t, h_{t-1})$ and $h_0 = g_{\theta }(C)$, and $u,c,\theta $ are parameters. A recurrent language model thereby computes the probability of a sequence $Y=(y_1, \ldots , y_T)$ by
+
+where $y_{<t}=(y_1,\ldots ,y_{t-1})$. This distribution satisfies
+
+Practical variants of the recurrent language model differ by the choice of transition function $f_{\theta }$ BIBREF11, BIBREF13, BIBREF12, BIBREF14. The use of softmax BIBREF18 implies that every unique token in the vocabulary is considered at every location of a sequence.
+
+Remark 2.1 Under the conditional distribution of a recurrent language model, every token $v\in V$ is assigned a positive probability. This implies that $0 < p_\theta (v\,|\,y_{<t}, C) < 1.$ In addition, it follows that any finite sequence is probable by a recurrent language model under any context, i.e., $p_{\theta }(Y\,|\,C) > 0$ for any sequence $Y$ of finite length.
+
+## Background ::: Decoding Algorithms
+
+Because it is intractable to decode the most probable sequence, it is necessary in practice to use an approximate decoding algorithm.
+
+Definition 2.4 (Decoding algorithm) A decoding algorithm $\mathcal {F}(p_{\theta }, C)$ is a function that generates a sequence $\tilde{Y}$ given a recurrent language model $p_{\theta }$ and context $C$. Let $q_{\mathcal {F}}$ denote the distribution induced by the decoding algorithm $\mathcal {F}$.
+
+We consider two families of decoding algorithms. In our analysis we only consider decoding algorithms that decode in a single pass, forward in time, without modifying previously selected tokens.
+
+## Background ::: Decoding Algorithms ::: Stochastic decoding.
+
+The first family consists of stochastic algorithms. Among them, ancestral sampling is asymptotically unbiased and can be used for finding the most probable sequence, although it requires a substantial number of samples to achieve a low-variance estimate.
+
+Definition 2.5 (Ancestral sampling) Ancestral sampling $\mathcal {F}_{\text{anc}}$ generates a sequence from a recurrent language model $p_{\theta }$ given context $C$ by recursively sampling from $p_{\theta }(y_t\,|\,\tilde{y}_{<t}, C)$ until $\tilde{y}_t = \left<\text{eos}\right>$:
+
+In order to avoid the high variance, two approximate stochastic decoding algorithms have recently been proposed and tested with recurrent language models. Top-$k$ sampling considers only a subset of the $k$ most probable tokens from the vocabulary at a time, while nucleus sampling considers only the minimal subset of most probable tokens whose total probability is higher than a predefined threshold.
+
+Definition 2.6 (Top-$k$ sampling BIBREF15) Top-$k$ sampling $\mathcal {F}_{\text{top-k}}$ generates a sequence from a recurrent language model $p_{\theta }$ given context $C$ by recursively sampling from the following proposal distribution:
+
+Definition 2.7 (Nucleus sampling BIBREF5) Nucleus sampling $\mathcal {F}_{\text{nuc-}\mu }$ generates a sequence from a recurrent language model $p_{\theta }$ given context $C$ by recursively sampling from the following proposal distribution. Let $v_1,\ldots ,v_{|V|}$ denote tokens in $V$ such that $p_{\theta }(v_i\,|\,y_{<t},C) \ge p_{\theta }(v_j\,|\,y_{<t},C)$ for all $i < j$, and define
+
+where $V_{\mu } = \left\lbrace v_1, \cdots , v_{k_\mu } \right\rbrace $ with
+
+## Background ::: Decoding Algorithms ::: Deterministic decoding.
+
+The other family consists of deterministic decoding algorithms, where a token is selected deterministically according to a rule at each decoding step. The most naive algorithm, called greedy decoding, simply takes the most probable token at each step.
+
+Definition 2.8 (Greedy decoding) Greedy decoding $\mathcal {F}_{\text{greedy}}$ generates a sequence from a recurrent language model $p_{\theta }$ given context $C$ by recursively selecting the most likely token from $p_{\theta }(y_t | \tilde{y}_{<t}, C)$ until $\tilde{y}_t = \left<\text{eos}\right>$:
+
+In contrast to greedy decoding, beam search operates on the level of partial sequences or prefixes.
+
+Definition 2.9 (Prefix) A prefix $\rho _t$ is an ordered collection of items from $V$. The score of a prefix is
+
+where $\rho _t[\tau ]$ is a token at time $\tau $ from $\rho _t$.
+
+Starting from a set of empty prefixes, at each iteration a new prefix set is formed by expanding each prefix, then choosing the highest scoring expanded prefixes.
+
+Definition 2.10 (Beam search) Beam search with width $k$, $\mathcal {F}_{\text{beam}-k}$, generates a sequence from a recurrent language model $p_{\theta }$ by maintaining a size-$k$ prefix set $\mathrm {P}_t^{\text{top}}$. Starting with $P_0^{top}=\varnothing $, at each iteration $t\in \lbrace 1,2,\ldots \rbrace $ beam search forms a new prefix set $\mathrm {P}_t^{\text{top}}$ by expanding the current set, $\mathrm {P}_t = \bigcup _{\rho \in \mathrm {P}_{t-1}^{\text{top}}} \lbrace \rho \circ v\, |\, v\in V\rbrace $ (where $\rho \circ v$ is concatenation), then choosing the $k$ highest scoring elements,
+
+Any $\rho \in \mathrm {P}_t^{\text{top}}$ ending with $\left<\text{eos}\right>$ is restricted from being expanded further, and is added to a set $S$. Beam search ends when $S$ contains $k$ sequences, and returns the highest scoring sequence in $S$.
+
+## Background ::: Decoding Algorithms ::: Incompleteness.
+
+Other than ancestral sampling, the decoding algorithms above are incomplete in that they only consider a strict subset of the the full vocabulary $V$ at each time step, aside from the trivial case of $k=|V|$.
+
+Definition 2.11 (Incomplete Decoding) A decoding algorithm $\mathcal {F}$ is incomplete when for each context $C$ and prefix $y_{<t}$, there is a strict subset $V^{\prime }_t\subsetneq V$ such that
+
+## Consistency of a Decoding Algorithm ::: Definition of consistency.
+
+A recurrent language model $p_{\theta }$ may assign a positive probability to an infinitely long sequence, in which case we call the model inconsistent. This notion of consistency was raised and analyzed earlier, for instance by BIBREF19 and BIBREF16, in terms of whether the distribution induced by $p_{\theta }$ is concentrated on finite sequences. We extend their definition to account for the context $C$.
+
+Definition 3.1 (Consistency of a recurrent language model) A recurrent language model is consistent under a context distribution $p(C)$ if $p_{\theta }(|Y|=\infty ) = 0$. Otherwise, the recurrent language model is said to be inconsistent.
+
+Any sequence decoded from a consistent model for a given probable context is guaranteed to terminate.
+
+Lemma 3.1 If a recurrent language model $p_{\theta }$ is consistent, $p_{\theta }(|Y|=\infty \,|\,C)=0$ for any probable context $C$.
+
+Next, we establish a practical condition under which a recurrent language model is consistent.
+
+Lemma 3.2 A recurrent language model $p_{\theta }$ is consistent if $\Vert h_t\Vert _p$ is uniformly bounded for some $p\ge 1$.
+
+[Proof sketch] If $\Vert h_t\Vert _p$ is bounded, then each $u_v^\top h_t$ is bounded, hence $p_{\theta }(\left<\text{eos}\right>| y_{<t}, C)>\xi >0$ for a constant $\xi $. Thus $p_{\theta }(|Y|=\infty ) \le \lim _{t\rightarrow \infty } (1 - \xi )^t = 0$, meaning that $p_{\theta }$ is consistent.
+
+Although this condition is practical because layer normalization or bounded activation functions BIBREF11, BIBREF12, BIBREF14 result in bounded $h_t$, we show that even if a recurrent language model is consistent, a decoding algorithm may produce an infinite-length sequence. We formalize this discrepancy using the consistency of a decoding algorithm.
+
+Definition 3.2 (Consistency of a decoding algorithm) A decoding algorithm $\mathcal {F}$ is consistent with respect to a consistent recurrent language model $p_{\theta }$ under a context distribution $p(C)$ if the decoding algorithm $\mathcal {F}$ preserves the consistency of the model $p_{\theta }$, that is, $q_{\mathcal {F}}(|Y|=\infty )=0$.
+
+When a consistent recurrent language model $p_{\theta }$ and a decoding algorithm $\mathcal {F}$ induce a consistent distribution $q_{\mathcal {F}}$, we say that $p_{\theta }$ paired with $\mathcal {F}$ is consistent. For instance, any consistent recurrent language model paired with ancestral sampling is consistent, because the induced distribution $q_{\mathcal {F}_{\text{anc}}}$ is the same as the distribution of the original model. We also have an analogue of Lemma UNKREF21.
+
+Lemma 3.3 A consistent decoding algorithm with respect to a consistent recurrent language model decodes only probable sequences. That is, if $q_{\mathcal {F}}(Y\,|\,C)>0$, then $p_{\theta }(Y\,|\,C)>0$ for any probable context $C$.
+
+## Consistency of a Decoding Algorithm ::: Inconsistency of incomplete decoding.
+
+Any incomplete decoding algorithm (Definition UNKREF18) can be inconsistent regardless of the context distribution, because there is a recurrent language model that places $\left<\text{eos}\right>$ outside of $V^{\prime }_t$ at every step of decoding. To show this, we construct a consistent recurrent language model whose distribution induced by an incomplete decoding algorithm is inconsistent.
+
+Theorem 3.4 (Inconsistency of an incomplete decoding algorithm) There exists a consistent recurrent language model $p_{\theta }$ from which an incomplete decoding algorithm $\mathcal {F}$, that considers only up to $(|V|-1)$-most likely tokens according to $p_{\theta }(y_t\,|\,y_{<t},C)$ at each step $t$, finds a sequence $\tilde{Y}$ whose probability under $p_{\theta }$ is 0 for any context distribution.
+
+We prove this theorem by constructing a $\tanh $ recurrent network. We define the recurrent function $f_{\theta }$ as
+
+where $e(y_{t}) \in \mathbb {R}^{|V|}$ is a one-hot representation of $y_t$, $W_h \in \mathbb {R}^{d \times d}$ where every entry is positive, and $I$ is an identity matrix of size $|V| \times |V|$. $h_0 = g_{\theta }(C)$ is constructed to consist of positive values only. Because each element of $|h_t|$ is bounded by 1, the constructed recurrent language model $p_{\theta }$ is consistent by Lemma UNKREF23.
+
+For $v \ne \left<\text{eos}\right>$, we set $u_v$ (see Definition UNKREF4) to be
+
+where all elements of $\bar{u}_v$ are positive and $e(v)$ is a one-hot representation of $v$. $c_v$ is set to zero. Next, let
+
+where all elements of $\bar{u}_{\left<\text{eos}\right>}$ are negative.
+
+This defines a valid recurrent language model (Definition UNKREF4), since the conditional distribution at each time $t$ is influenced by all the previous tokens. More specifically, the logit of a token $v$ depends on $\sum _{t^{\prime }=1}^t {1}(y_{t^{\prime }} = v)$, where 1 is an indicator function.
+
+This recurrent language model always outputs positive logits for non-$\left<\text{eos}\right>$ tokens, and outputs negative logits for the $\left<\text{eos}\right>$ token. This implies $p(\left<\text{eos}\right>|\,y_{<t}, C) < p(v\,|\,y_{<t}, C)$ for all $v \in V \backslash \left\lbrace \left<\text{eos}\right>\right\rbrace $. This means that $\left<\text{eos}\right>$ is always ranked last at each time step, so an incomplete decoding algorithm that considers at most $(|V|-1)$ most probable tokens at each time step from $p_{\theta }(y_t\,|\,y_{<t}, C)$ cannot decode $\left<\text{eos}\right>$ and thus always decodes an infinitely long sequence.
+
+The log-probability of this infinitely long sequence $\hat{Y}$ is
+
+For any $v\in V$,
+
+where $b_v = \sum _{v^{\prime }\ne v} \exp (-\Vert u_{v^{\prime }}\Vert _1)$. The last inequality holds because $x/(x+b_v)$ is increasing in $x>0$. Therefore, the log-probability $\log p_{\theta }(\hat{Y}\,|\,C)$ diverges as $|\hat{Y}| \rightarrow \infty $, and thus $p_{\theta }(\hat{Y}\,|\,C) = 0$, which implies the decoding algorithm $\mathcal {F}$ is inconsistent by Lemma UNKREF25. Greedy decoding, beam search, top-$k$ sampling, and nucleus sampling are all inconsistent according to this theorem; there are consistent models $p_{\theta }$ that induce inconsistent distributions when paired with these decoding algorithms.
+
+## Fixing the inconsistency
+
+In this section, we consider two ways to prevent inconsistency arising from incomplete decoding algorithms. First, we introduce consistent versions of top-$k$ and nucleus sampling. Second, we introduce the self-terminating recurrent language model, which is consistent when paired with any of the decoding algorithms considered in this paper.
+
+## Fixing the inconsistency ::: Consistent Sampling Algorithms
+
+The proof of Theorem UNKREF27 suggests that inconsistency of incomplete decoding algorithms arises from the fact that $\left<\text{eos}\right>$ may be excluded indefinitely from the set of top-ranked tokens. We propose a simple modification to top-$k$ and nucleus sampling that forces $\left<\text{eos}\right>$ to be included at each step of decoding. First, we give a condition for when a particular model $p_{\theta }$ paired with a decoding algorithm $\mathcal {F}$ is consistent.
+
+Theorem 4.1 Let $p_{\theta }$ be a consistent recurrent language model. If a decoding algorithm $\mathcal {F}$ satisfies $q_{\mathcal {F}}(\left<\text{eos}\right>|\,y_{<t}, C) \ge p_{\theta }(\left<\text{eos}\right>|\,y_{<t}, C)$ for every prefix $y_{<t}$ and context $C$, then the decoding algorithm $\mathcal {F}$ is consistent with respect to the model $p_{\theta }$.
+
+Let $P^{\prime }_{t-1}$ denote a set of all prefixes $y_{<t}$ of length $t-1$. For $t\ge 1$,
+
+Taking the limit $t\rightarrow \infty $ and expectation over $C$ on both sides, we have
+
+from which the decoding algorithm is consistent.
+
+We define consistent variants of top-$k$ and nucleus sampling which satisfy this condition.
+
+Definition 4.1 (Consistent top-$k$ sampling) Consistent top-$k$ sampling is top-$k$ sampling with the following modified proposal distribution:
+
+where $V^{\prime } = \left\lbrace \left<\text{eos}\right>\right\rbrace \cup \underset{v^{\prime }}{\arg \text{top-k}}\ p_{\theta }(v^{\prime }\,|\,y_{<t}, C)$.
+
+Definition 4.2 (Consistent nucleus sampling) Consistent nucleus sampling is nucleus sampling with the following modified proposal distribution:
+
+The induced probability of $\left<\text{eos}\right>$ under these two algorithms is always equal to or larger than the model's probability. By Theorem UNKREF29, these algorithms are consistent with respect to any consistent recurrent language model.
+
+## Fixing the inconsistency ::: A Self-Terminating Recurrent Language Model
+
+Although these consistent sampling algorithms can be used with any recurrent language model, their stochastic nature may not be suitable for finding a single, highly probable sequence. To avoid this limitation, we propose the self-terminating recurrent language model (STRLM).
+
+Definition 4.3 (Self-terminating recurrent language model) A self-terminating recurrent language model computes the following conditional probability at each time step:
+
+where
+
+with $\sigma : \mathbb {R} \rightarrow [0,1-\epsilon ]$ and $\epsilon \in (0,1)$. $h_t$ is computed as in the original recurrent language model.
+
+The underlying idea is that the probability of $\left<\text{eos}\right>$ increases monotonically. The model is consistent when paired with greedy decoding.
+
+Theorem 4.2 Greedy decoding is consistent with respect to any self-terminating recurrent language model.
+
+Let $p_{t}^{\left<\text{eos}\right>}$ denote $p_{\theta }(\left<\text{eos}\right>|\,y_{<t}, C)$ and $a_{t}^{\left<\text{eos}\right>}$ denote $u_{\left<\text{eos}\right>}^\top h_t + c_{\left<\text{eos}\right>}$. By Definition UNKREF33 we have
+
+Take $B=-\log 2 / \log (1-\epsilon )$. We then have $p_{t}^{\left<\text{eos}\right>}>1/2$ for all $t > B$, which implies that $\left<\text{eos}\right>$ is always the most probable token after time step $B$. Hence, the sequence length is less than $B$ with probability 1. Beam search is also consistent with respect to any self-terminating recurrent language model according to a similar argument; see Appendix for the proof.
+
+## Empirical Validation
+
+The theoretical results rely on the existence of a model that results in inconsistency; it remains to be shown that inconsistency with respect to incomplete decoding occurs with recurrent language models encountered in practice. Moreover, while the proposed consistent sampling methods and self-terminating recurrent language model carry theoretical guarantees in terms of consistency, we must check whether they retain language modeling quality. To do so, we perform two experiments using a sequence completion task. In each experiment, we use the beginning of a sequence as context, then decode continuations from a trained recurrent language model and measure the proportion of non-terminated sequences in order to approximately measure inconsistency. The first experiment (§SECREF45) shows that inconsistency occurs in practice, and the second experiment (§SECREF47) shows the effectiveness of the proposed approaches.
+
+## Empirical Validation ::: Sequence completion.
+
+We evaluate recurrent language models on a sequence completion task, which has previously been used to evaluate the effectiveness of sequence models, e.g. BIBREF20, BIBREF21, BIBREF2, BIBREF5, BIBREF10. Sequence completion is a general setting for studying the behavior of language models, encompassing machine translation BIBREF0, story generation BIBREF15, and dialogue modeling BIBREF1. The task consists of decoding a continuation $\hat{Y}\sim \mathcal {F}(p_{\theta }, C)$ given a length-$k$ prefix $C=(c_1,\ldots ,c_k)$, resulting in a completion $(c_1,\ldots ,c_k,\hat{y}_1\ldots ,\hat{y}_T)$.
+
+## Empirical Validation ::: Dataset.
+
+We use the Wikitext2 dataset BIBREF17 consisting of paragraphs from Wikipedia, since it has frequently been used to evaluate language models BIBREF22, BIBREF23, BIBREF24. We split each paragraph into sentences using Spacy, resulting in roughly 100k sequences (78,274 train, 8,464 valid, 9,708 test). We split each sequence, using the first $k$ tokens as a context and the remaining tokens as a continuation. To ensure that each sequence contains a prefix, we prepend padding tokens to make it length $k$. Special $\left<\text{bos}\right>$ and $\left<\text{eos}\right>$ tokens are then inserted at the beginning and end of every sequence. Our experiments use $k=10$. We model sequences at the word level with a vocabulary size of 33,182. The average training sequence length is 24 tokens, with a maximum of 137.
+
+## Empirical Validation ::: Context distribution.
+
+We define empirical context distributions with prefixes from the train, valid, and test sets,
+
+where $\mathcal {D}=\lbrace (C^{(n)},Y^{(n)})\rbrace _{n=1}^{N}$ is a dataset split.
+
+## Empirical Validation ::: Evaluation metrics.
+
+We use finite sequences to approximately measure the consistency of a model paired with a decoding algorithm, since decoding an infinite-length sequence is impossible. We use the proportion of decoded continuations that are longer than a predefined limit,
+
+where $\hat{Y}^{(n)}\sim \mathcal {F}(p_{\theta }, C^{(n)})$ for each context $C^{(n)}$ in $\mathcal {D}$. We call $r_L$ the non-termination ratio of the decoding algorithm $\mathcal {F}$ for an underlying model and context distribution. A value of $r_L$ greater than zero means that some sequences did not terminate within $L$ steps. When $L$ is infinity, this implies that the model paired with the decoding algorithm is inconsistent. In practice, we use a finite $L$ that is substantially larger than the maximum training sequence length, and we interpret a non-zero $r_L$ as evidence that the model paired with the decoding algorithm is inconsistent. We use $L=1500$, which is more than 10 times the maximum training sequence length.
+
+In each experiment, we report the mean and standard deviation of metrics across 10 independent initializations. Unless specified otherwise, we report metrics using the test context distribution, since the train, valid, and randomly generated context distributions had similar results.
+
+## Empirical Validation ::: Training.
+
+We train recurrent language models for sequence completion with maximum likelihood, using the following loss on each sequence $Y=(c_1,\ldots ,c_k,y_1,\ldots ,y_T)$:
+
+This amounts to running the full training sequence through a recurrent model and zeroing the loss for the first $k$ tokens, so that the first $k$ steps correspond to learning a $g_{\theta }$ that encodes the context. Each model is trained on a single Nvidia P40 GPU for up to 100 epochs, stopping early when validation perplexity does not decrease for 10 consecutive epochs.
+
+## Empirical Validation ::: Models.
+
+We consider recurrent neural networks with hyperbolic tangent activations ($\tanh $-RNN) BIBREF11 and LSTM units (LSTM-RNN) BIBREF13. We perform an initial hyper-parameter sweep and select the best set of hyper-parameters for each of $\tanh $-RNN and LSTM-RNN based on the validation perplexities. With this best set of hyperparameters, we train each of these models with 10 different initializations. The choice of $\tanh $ and LSTM RNNs implies that all of the recurrent language models that we train are consistent according to Lemma UNKREF23. Our LSTM models achieve similar test perplexity ($91.86 \pm 0.4$) to those reported in previous work BIBREF24; see Appendix for further details.
+
+Additionally, we train self-terminating $\tanh $-RNN and LSTM-RNN variants (Definition UNKREF33) at various values of $\epsilon $, which controls a lower bound on the termination probability at each step. We use $\sigma (x)=(1-\epsilon )\text{sigmoid}(x)$. We use the hyper-parameters selected in the preceding grid search.
+
+## Empirical Validation ::: Inconsistency of Recurrent Language Models
+
+In this experiment, we demonstrate evidence of inconsistency with incomplete decoding methods (Theorem UNKREF27).
+
+Table TABREF43 shows non-termination ratios for the recurrent language models using the incomplete decoding algorithms considered in this work, along with ancestral sampling. Decoding with ancestral sampling always resulted in sequences that terminated within $L$ steps, since the induced distribution is the same as that of the consistent model. On the other hand, the non-zero non-termination ratios for the incomplete decoding algorithms suggest inconsistency with respect to each algorithm, providing evidence for Theorem UNKREF27.
+
+In particular, greedy search, beam search, and nucleus sampling yielded non-terminating sequences with both the $\tanh $ and LSTM RNNs. Using greedy decoding, roughly 6% of all contexts resulted in a non-terminating continuation with the $\tanh $-RNN, and roughly 1% with the LSTM-RNN. Nucleus sampling also produced non-terminating sequences with the $\tanh $-RNN (2.49%, nuc-0.2) and LSTM-RNN (0.76%, nuc-0.2), with the amount of non-termination decreasing as $\mu $ increased (see Definition UNKREF11), likely due to $\left<\text{eos}\right>$ having a higher chance of being included in $V_{\mu }$. Top-$k$ sampling resulted in non-terminating sequences with the $\tanh $-RNN, but not with the LSTM, implying that $\left<\text{eos}\right>$ was ranked within the top $k$ positions on at least one timestep during each decoding. Beam search produced non-terminating sequences with both the $\tanh $-RNN (beam-2,4) and LSTM-RNN (beam-2) models. This means that $\left<\text{eos}\right>$ was outside of the top tokens (determined by the beam width) considered at each step, since in our experiments we terminated the beam search when a single beam prefix contained $\left<\text{eos}\right>$. With the LSTM-RNN, a larger beam width (beam-4) prevented non-termination.
+
+## Empirical Validation ::: Consistency of the Proposed Methods
+
+In this experiment, we evaluate the consistent variants of top-$k$ and nucleus sampling (§SECREF28) as well as the self-terminating recurrent language model (§SECREF32) in terms of consistency and language modeling quality.
+
+## Empirical Validation ::: Consistency of the Proposed Methods ::: Consistent sampling.
+
+Table TABREF44 shows that consistent nucleus and top-$k$ sampling (§SECREF28) resulted in only terminating sequences, except for a few cases that we attribute to the finite limit $L$ used to measure the non-termination ratio. The example continuations in Table TABREF46 show that the sampling tends to preserve language modeling quality on prefixes that led to termination with the baseline (first row). On prefixes that led to non-termination with the baseline (second & third rows), the quality tends to improve since the continuation now terminates. Since the model's non-$\left<\text{eos}\right>$ token probabilities at each step are only modified by a multiplicative constant, the sampling process can still enter a repetitive cycle (e.g. when the constant is close to 1), though the cycle is guaranteed to eventually terminate.
+
+## Empirical Validation ::: Consistency of the Proposed Methods ::: Self-terminating RNN.
+
+As seen in Table TABREF50, the self-terminating recurrent language models with $\epsilon \in \lbrace 10^{-2},10^{-3}\rbrace $ are consistent with respect to greedy decoding, at the expense of perplexity compared to the vanilla model. The value of $\epsilon $ from Definition UNKREF33, which controls a lower-bound on termination probability at each step, influences both $r_L$ and perplexity. When $\epsilon $ is too large ($\epsilon =10^{-2}$), perplexity degrades. When $\epsilon $ is too small ($\epsilon =10^{-4}$), the lower-bound grows slowly, so $\left<\text{eos}\right>$ is not guaranteed to be top-ranked within $L$ steps, and the metrics resemble the baseline's. An $\epsilon $ of $10^{-3}$ balanced consistency and language modeling quality, with a zero non-termination ratio and perplexity within 3 points of the baseline.
+
+For the example decoded sequences in Table TABREF46, generation quality is similar when both the self-terminating and baseline models terminate (first row). For prefixes that led to non-termination with the baseline, the self-terminating variant can yield a finite sequence with reasonable quality (second row). This suggests that some cases of degenerate repetition BIBREF5, BIBREF10 may be attributed to inconsistency. However, in other cases the self-terminating model enters a repetitive (but finite) cycle that resembles the baseline (third row), showing that consistency does not necessarily eliminate degenerate repetition.
+
+## Future Directions
+
+The methods we proposed in this paper have focused on how to resolve inconsistency from the viewpoint of decoding algorithms or model parameterization. Another approach is to address the issue of inconsistency in the learning phase.
+
+One interesting direction is to investigate whether maximum likelihood learning is a cause of inconsistency. Given a training set $\left\lbrace (C^{(n)}, Y^{(n)}) \right\rbrace _{n=1}^N$ drawn from a data distribution, maximum likelihood learning solves:
+
+where $\Omega (\theta )$ is a regularizer and $\lambda $ is a regularization weight.
+
+Inconsistency may arise from the lack of decoding in solving this optimization problem. Maximum likelihood learning fits the model $p_{\theta }$ using the data distribution, whereas a decoded sequence from the trained model follows the distribution $q_{\mathcal {F}}$ induced by a decoding algorithm. Based on this discrepancy, we make a strong conjecture: we cannot be guaranteed to obtain a good consistent sequence generator using maximum likelihood learning and greedy decoding. Sequence-level learning, however, uses a decoding algorithm during training BIBREF25, BIBREF26. We hypothesize that sequence-level learning can result in a good sequence generator that is consistent with respect to incomplete decoding.
+
+## Conclusion
+
+We extended the notion of consistency of a recurrent language model put forward by BIBREF16 to incorporate a decoding algorithm, and used it to analyze the discrepancy between a model and the distribution induced by a decoding algorithm. We proved that incomplete decoding is inconsistent, and proposed two methods to prevent this: consistent decoding and the self-terminating recurrent language model. Using a sequence completion task, we confirmed that empirical inconsistency occurs in practice, and that each method prevents inconsistency while maintaining the quality of generated sequences. We suspect the absence of decoding in maximum likelihood estimation as a cause behind this inconsistency, and suggest investigating sequence-level learning as an alternative in the future.
+
+## Acknowledgements
+
+We thank Chris Dyer, Noah Smith and Kevin Knight for valuable discussions. This work was supported by Samsung Advanced Institute of Technology (Next Generation Deep Learning: from pattern recognition to AI) and Samsung Research (Improving Deep Learning using Latent Structure). KC thanks eBay and NVIDIA for their support.

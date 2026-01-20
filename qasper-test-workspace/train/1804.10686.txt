@@ -1,0 +1,101 @@
+# An Unsupervised Word Sense Disambiguation System for Under-Resourced Languages
+
+**Paper ID:** 1804.10686
+
+## Abstract
+
+In this paper, we present Watasense, an unsupervised system for word sense disambiguation. Given a sentence, the system chooses the most relevant sense of each input word with respect to the semantic similarity between the given sentence and the synset constituting the sense of the target word. Watasense has two modes of operation. The sparse mode uses the traditional vector space model to estimate the most similar word sense corresponding to its context. The dense mode, instead, uses synset embeddings to cope with the sparsity problem. We describe the architecture of the present system and also conduct its evaluation on three different lexical semantic resources for Russian. We found that the dense mode substantially outperforms the sparse one on all datasets according to the adjusted Rand index.
+
+## Introduction
+
+Word sense disambiguation (WSD) is a natural language processing task of identifying the particular word senses of polysemous words used in a sentence. Recently, a lot of attention was paid to the problem of WSD for the Russian language BIBREF0 , BIBREF1 , BIBREF2 . This problem is especially difficult because of both linguistic issues – namely, the rich morphology of Russian and other Slavic languages in general – and technical challenges like the lack of software and language resources required for addressing the problem.
+
+To address these issues, we present Watasense, an unsupervised system for word sense disambiguation. We describe its architecture and conduct an evaluation on three datasets for Russian. The choice of an unsupervised system is motivated by the absence of resources that would enable a supervised system for under-resourced languages. Watasense is not strictly tied to the Russian language and can be applied to any language for which a tokenizer, part-of-speech tagger, lemmatizer, and a sense inventory are available.
+
+The rest of the paper is organized as follows. Section 2 reviews related work. Section 3 presents the Watasense word sense disambiguation system, presents its architecture, and describes the unsupervised word sense disambiguation methods bundled with it. Section 4 evaluates the system on a gold standard for Russian. Section 5 concludes with final remarks.
+
+## Related Work
+
+Although the problem of WSD has been addressed in many SemEval campaigns BIBREF3 , BIBREF4 , BIBREF5 , we focus here on word sense disambiguation systems rather than on the research methodologies.
+
+Among the freely available systems, IMS (“It Makes Sense”) is a supervised WSD system designed initially for the English language BIBREF6 . The system uses a support vector machine classifier to infer the particular sense of a word in the sentence given its contextual sentence-level features. Pywsd is an implementation of several popular WSD algorithms implemented in a library for the Python programming language. It offers both the classical Lesk algorithm for WSD and path-based algorithms that heavily use the WordNet and similar lexical ontologies. DKPro WSD BIBREF7 is a general-purpose framework for WSD that uses a lexical ontology as the sense inventory and offers the variety of WordNet-based algorithms. Babelfy BIBREF8 is a WSD system that uses BabelNet, a large-scale multilingual lexical ontology available for most natural languages. Due to the broad coverage of BabelNet, Babelfy offers entity linking as part of the WSD functionality.
+
+Panchenko:17:emnlp present an unsupervised WSD system that is also knowledge-free: its sense inventory is induced based on the JoBimText framework, and disambiguation is performed by computing the semantic similarity between the context and the candidate senses BIBREF9 . Pelevina:16 proposed a similar approach to WSD, but based on dense vector representations (word embeddings), called SenseGram. Similarly to SenseGram, our WSD system is based on averaging of word embeddings on the basis of an automatically induced sense inventory. A crucial difference, however, is that we induce our sense inventory from synonymy dictionaries and not distributional word vectors. While this requires more manually created resources, a potential advantage of our approach is that the resulting inventory contains less noise.
+
+## Watasense, an Unsupervised System for Word Sense Disambiguation
+
+Watasense is implemented in the Python programming language using the scikit-learn BIBREF10 and Gensim BIBREF11 libraries. Watasense offers a Web interface (Figure FIGREF2 ), a command-line tool, and an application programming interface (API) for deployment within other applications.
+
+## System Architecture
+
+A sentence is represented as a list of spans. A span is a quadruple: INLINEFORM0 , where INLINEFORM1 is the word or the token, INLINEFORM2 is the part of speech tag, INLINEFORM3 is the lemma, INLINEFORM4 is the position of the word in the sentence. These data are provided by tokenizer, part-of-speech tagger, and lemmatizer that are specific for the given language. The WSD results are represented as a map of spans to the corresponding word sense identifiers.
+
+The sense inventory is a list of synsets. A synset is represented by three bag of words: the synonyms, the hypernyms, and the union of two former – the bag. Due to the performance reasons, on initialization, an inverted index is constructed to map a word to the set of synsets it is included into.
+
+Each word sense disambiguation method extends the BaseWSD class. This class provides the end user with a generic interface for WSD and also encapsulates common routines for data pre-processing. The inherited classes like SparseWSD and DenseWSD should implement the disambiguate_word(...) method that disambiguates the given word in the given sentence. Both classes use the bag representation of synsets on the initialization. As the result, for WSD, not just the synonyms are used, but also the hypernyms corresponding to the synsets. The UML class diagram is presented in Figure FIGREF4 .
+
+Watasense supports two sources of word vectors: it can either read the word vector dataset in the binary Word2Vec format or use Word2Vec-Pyro4, a general-purpose word vector server. The use of a remote word vector server is recommended due to the reduction of memory footprint per each Watasense process.
+
+## User Interface
+
+ FIGREF2 shows the Web interface of Watasense. It is composed of two primary activities. The first is the text input and the method selection ( FIGREF2 ). The second is the display of the disambiguation results with part of speech highlighting ( FIGREF7 ). Those words with resolved polysemy are underlined; the tooltips with the details are raised on hover.
+
+## Word Sense Disambiguation
+
+We use two different unsupervised approaches for word sense disambiguation. The first, called `sparse model', uses a straightforward sparse vector space model, as widely used in Information Retrieval, to represent contexts and synsets. The second, called `dense model', represents synsets and contexts in a dense, low-dimensional space by averaging word embeddings.
+
+In the vector space model approach, we follow the sparse context-based disambiguated method BIBREF12 , BIBREF13 . For estimating the sense of the word INLINEFORM0 in a sentence, we search for such a synset INLINEFORM1 that maximizes the cosine similarity to the sentence vector: DISPLAYFORM0 
+
+where INLINEFORM0 is the set of words forming the synset, INLINEFORM1 is the set of words forming the sentence. On initialization, the synsets represented in the sense inventory are transformed into the INLINEFORM2 -weighted word-synset sparse matrix efficiently represented in the memory using the compressed sparse row format. Given a sentence, a similar transformation is done to obtain the sparse vector representation of the sentence in the same space as the word-synset matrix. Then, for each word to disambiguate, we retrieve the synset containing this word that maximizes the cosine similarity between the sparse sentence vector and the sparse synset vector. Let INLINEFORM3 be the maximal number of synsets containing a word and INLINEFORM4 be the maximal size of a synset. Therefore, disambiguation of the whole sentence INLINEFORM5 requires INLINEFORM6 operations using the efficient sparse matrix representation.
+
+In the synset embeddings model approach, we follow SenseGram BIBREF14 and apply it to the synsets induced from a graph of synonyms. We transform every synset into its dense vector representation by averaging the word embeddings corresponding to each constituent word: DISPLAYFORM0 
+
+where INLINEFORM0 denotes the word embedding of INLINEFORM1 . We do the same transformation for the sentence vectors. Then, given a word INLINEFORM2 , a sentence INLINEFORM3 , we find the synset INLINEFORM4 that maximizes the cosine similarity to the sentence: DISPLAYFORM0 
+
+On initialization, we pre-compute the dense synset vectors by averaging the corresponding word embeddings. Given a sentence, we similarly compute the dense sentence vector by averaging the vectors of the words belonging to non-auxiliary parts of speech, i.e., nouns, adjectives, adverbs, verbs, etc. Then, given a word to disambiguate, we retrieve the synset that maximizes the cosine similarity between the dense sentence vector and the dense synset vector. Thus, given the number of dimensions INLINEFORM0 , disambiguation of the whole sentence INLINEFORM1 requires INLINEFORM2 operations.
+
+## Evaluation
+
+We conduct our experiments using the evaluation methodology of SemEval 2010 Task 14: Word Sense Induction & Disambiguation BIBREF5 . In the gold standard, each word is provided with a set of instances, i.e., the sentences containing the word. Each instance is manually annotated with the single sense identifier according to a pre-defined sense inventory. Each participating system estimates the sense labels for these ambiguous words, which can be viewed as a clustering of instances, according to sense labels. The system's clustering is compared to the gold-standard clustering for evaluation.
+
+## Quality Measure
+
+The original SemEval 2010 Task 14 used the V-Measure external clustering measure BIBREF5 . However, this measure is maximized by clustering each sentence into his own distinct cluster, i.e., a `dummy' singleton baseline. This is achieved by the system deciding that every ambiguous word in every sentence corresponds to a different word sense. To cope with this issue, we follow a similar study BIBREF1 and use instead of the adjusted Rand index (ARI) proposed by Hubert:85 as an evaluation measure.
+
+In order to provide the overall value of ARI, we follow the addition approach used in BIBREF1 . Since the quality measure is computed for each lemma individually, the total value is a weighted sum, namely DISPLAYFORM0 
+
+where INLINEFORM0 is the lemma, INLINEFORM1 is the set of the instances for the lemma INLINEFORM2 , INLINEFORM3 is the adjusted Rand index computed for the lemma INLINEFORM4 . Thus, the contribution of each lemma to the total score is proportional to the number of instances of this lemma.
+
+## Dataset
+
+We evaluate the word sense disambiguation methods in Watasense against three baselines: an unsupervised approach for learning multi-prototype word embeddings called AdaGram BIBREF15 , same sense for all the instances per lemma (One), and one sense per instance (Singletons). The AdaGram model is trained on the combination of RuWac, Lib.Ru, and the Russian Wikipedia with the overall vocabulary size of 2 billion tokens BIBREF1 .
+
+As the gold-standard dataset, we use the WSD training dataset for Russian created during RUSSE'2018: A Shared Task on Word Sense Induction and Disambiguation for the Russian Language BIBREF16 . The dataset has 31 words covered by INLINEFORM0 instances in the bts-rnc subset and 5 words covered by 439 instances in the wiki-wiki subset.
+
+The following different sense inventories have been used during the evaluation:
+
+[leftmargin=4mm]
+
+Watlink, a word sense network constructed automatically. It uses the synsets induced in an unsupervised way by the Watset[CWnolog, MCL] method BIBREF2 and the semantic relations from such dictionaries as Wiktionary referred as Joint INLINEFORM0 Exp INLINEFORM1 SWN in Ustalov:17:dialogue. This is the only automatically built inventory we use in the evaluation.
+
+RuThes, a large-scale lexical ontology for Russian created by a group of expert lexicographers BIBREF17 .
+
+RuWordNet, a semi-automatic conversion of the RuThes lexical ontology into a WordNet-like structure BIBREF18 .
+
+Since the Dense model requires word embeddings, we used the 500-dimensional word vectors from the Russian Distributional Thesaurus BIBREF19 . These vectors are obtained using the Skip-gram approach trained on the lib.rus.ec text corpus.
+
+## Results
+
+We compare the evaluation results obtained for the Sparse and Dense approaches with three baselines: the AdaGram model (AdaGram), the same sense for all the instances per lemma (One) and one sense per instance (Singletons). The evaluation results are presented in Table TABREF25 . The columns bts-rnc and wiki-wiki represent the overall value of ARI according to Equation ( EQREF15 ). The column Avg. consists of the weighted average of the datasets w.r.t. the number of instances.
+
+We observe that the SenseGram-based approach for word sense disambiguation yields substantially better results in every case (Table TABREF25 ). The primary reason for that is the implicit handling of similar words due to the averaging of dense word vectors for semantically related words. Thus, we recommend using the dense approach in further studies. Although the AdaGram approach trained on a large text corpus showed better results according to the weighted average, this result does not transfer to languages with less available corpus size.
+
+## Conclusion
+
+In this paper, we presented Watasense, an open source unsupervised word sense disambiguation system that is parameterized only by a word sense inventory. It supports both sparse and dense sense representations. We were able to show that the dense approach substantially boosts the performance of the sparse approach on three different sense inventories for Russian. We recommend using the dense approach in further studies due to its smoothing capabilities that reduce sparseness. In further studies, we will look at the problem of phrase neighbors that influence the sentence vector representations.
+
+Finally, we would like to emphasize the fact that Watasense has a simple API for integrating different algorithms for WSD. At the same time, it requires only a basic set of language processing tools to be available: tokenizer, a part-of-speech tagger, lemmatizer, and a sense inventory, which means that low-resourced language can benefit of its usage.
+
+## Acknowledgements
+
+We acknowledge the support of the Deutsche Forschungsgemeinschaft (DFG) under the project “Joining Ontologies and Semantics Induced from Text” (JOIN-T), the RFBR under the projects no. 16-37-00203 mol_a and no. 16-37-00354 mol_a, and the RFH under the project no. 16-04-12019. The research was supported by the Ministry of Education and Science of the Russian Federation Agreement no. 02.A03.21.0006. The calculations were carried out using the supercomputer “Uran” at the Krasovskii Institute of Mathematics and Mechanics.

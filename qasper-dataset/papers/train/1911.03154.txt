@@ -1,0 +1,167 @@
+# How to Do Simultaneous Translation Better with Consecutive Neural Machine Translation?
+
+**Paper ID:** 1911.03154
+
+## Abstract
+
+Despite the success of neural machine translation (NMT), simultaneous neural machine translation (SNMT), the task of translating in real time before a full sentence has been observed, remains challenging due to the syntactic structure difference and simultaneity requirements. In this paper, we propose a general framework to improve simultaneous translation with a pretrained consecutive neural machine translation (CNMT) model. Our framework contains two parts: prefix translation that utilizes a pretrained CNMT model to better translate source prefixes and a stopping criterion that determines when to stop the prefix translation. Experiments on three translation corpora and two language pairs show the efficacy of the proposed framework on balancing the quality and latency in simultaneous translation.
+
+## Introduction
+
+Simultaneous translation BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5, the task of producing a partial translation of a sentence before the whole input sentence ends, is useful in many scenarios including outbound tourism, international summit and multilateral negotiations. Different from the consecutive translation in which translation quality alone matters, simultaneous translation trades off between translation quality and latency. The syntactic structure difference between the source and target language makes simultaneous translation more challenging. For example, when translating from a verb-final (SOV) language (e.g., Japanese) to a verb-media (SVO) language (e.g., English), the verb appears much later in the source sequence than in the target language. Some premature translations can lead to significant loss in quality BIBREF5.
+
+Recently, a number of researchers have endeavored to explore methods for simultaneous translation in the context of NMT BIBREF6, BIBREF7, BIBREF8, BIBREF9. Some of them propose sophisticated training frameworks explicitly designed for simultaneous translation BIBREF5, BIBREF10. These approaches are either memory inefficient during training BIBREF5 or hard to implement BIBREF10. Others utilize a full-sentence base model to perform simultaneous translation by modifications to the encoder and the decoding process. To match the incremental source context, they replace the bidirectional encoder with a left-to-right encoder BIBREF3, BIBREF11, BIBREF4, BIBREF12 or recompute the encoder hidden states BIBREF13. On top of that, heuristic algorithms BIBREF3, BIBREF14 or a READ/WRITE model trained with reinforcement learning BIBREF11, BIBREF4, BIBREF12 or supervised learning BIBREF13 are used to decide, at every step, whether to wait for the next source token or output a target token. However, these models either cannot directly use a pretrained vanilla CNMT model with bidirectional encoder as the base model or work in a sub-optimal way in the decoding stage.
+
+In this paper, we study the problem of how to do simultaneous translation better with a pretrained vanilla CNMT model. We formulate simultaneous translation as two nested loops: an outer loop that updates input buffer with newly observed source tokens and an inner loop that translates source tokens in the buffer updated at each outer step. For the outer loop, the input buffer can be updated by an ASR system with an arbitrary update schedule. For the inner loop, we perform prefix translation using the pretrained CNMT model with dynamically built encoder and decoder hidden states. We also design two novel stopping criteria for the inner loop: Length and EOS (LE) controller that stops with heuristics, and Trainable (TN) controller that learns to stop with a better quality and latency balance. We evaluate our method on IWSLT16 German-English (DE-EN) translation in both directions, WMT15 English-German (EN-DE) translation in both directions, and NIST Chinese-to-English (ZH$\rightarrow $EN) translation. The result shows our method consistently improves over the de-facto baselines, and achieves low latency and reasonable BLEU scores.
+
+## Background
+
+Given a set of source–target sentence pairs $\left\langle \mathbf {x}_m,\mathbf {y}^*_m\right\rangle _{m=1}^M$, a consecutive NMT model can be trained by maximizing the log-likelihood of the target sentence from its entire source side context:
+
+where $\phi $ is a set of model parameters. At inference time, the NMT model first encodes a source language sentence $\mathbf {x}=\lbrace x_1,...,x_{T_\eta }\rbrace $ with its encoder and passes the encoded representations $\mathbf {h}=\lbrace h_1,...,h_{T_\eta }\rbrace $ to a greedy decoder. Then the greedy decoder generates a translated sentence in the target language by sequentially choosing the most likely token at each step $t$:
+
+The distribution of next target word is defined as:
+
+where $z_{t}$ is the decoder hidden state at position $t$. In consecutive NMT, once obtained, the encoder hidden states $\mathbf {h}$ and the decoder hidden state $z_t$ are not updated anymore and will be reused during the entire decoding process.
+
+## Simultaneous NMT
+
+In SNMT, we receive streaming input tokens, and learn to translate them in real-time. We formulate simultaneous translation as two nested loops: the outer loop that updates an input buffer with newly observed source tokens and the inner loop that translates source tokens in the buffer updated at each outer step.
+
+More precisely, suppose at the end of an outer step $s-1$, the input buffer is $\mathbf {x}^{s-1} = \lbrace x_1, ..., x_{\eta \left[ s-1\right]}\rbrace $, and the output buffer is $\mathbf {y}^{s-1} = \lbrace y_1, ..., y_{\tau \left[ s-1\right]}\rbrace $. Then at outer step $s$, the system translates with the following steps:
+
+The system observes $c_s > 0$ new source tokens and updates the input buffer to be $\mathbf {x}^{s} = \lbrace x_1, ..., x_{\eta \left[ s\right]}\rbrace $ where $\eta \left[ s\right]=\eta \left[ s-1\right]+c_s$.
+
+Then, the system starts inner loop translation and writes $w_s>=0$ target tokens to the output buffer. The output buffer is updated to be $\mathbf {y}^{s} = \lbrace y_1, ..., y_{\tau \left[ s\right]}\rbrace $ where $\tau \left[ s\right]=\tau \left[ s-1\right]+w_s$.
+
+The simultaneous decoding process continues until no more source tokens are added in the outer loop. We define the last outer step as the terminal outer step $S$, and other outer steps as non-terminal outer steps.
+
+For the outer loop, we make no assumption about the value of $c_s$, while all previous work assumes $c_s=1$. This setting is more realistic because a) increasing $c_s$ can reduce the number of outer steps, thus reducing computation cost; b) in a real speech translation application, an ASR system may generate multiple tokens at a time.
+
+For the inner loop, we adapt a pretrained vanilla CNMT model to perform partial translation with two important concerns:
+
+Prefix translation: given a source prefix $\mathbf {x}^s = \lbrace x_1, ..., x_{\eta \left[ s\right]}\rbrace $ and a target prefix $\mathbf {y}^s_{\tau \left[ s-1\right]} = \lbrace y_1, ..., y_{\tau \left[ s-1\right]}\rbrace $, how to predict the remaining target tokens?
+
+Stopping criterion: since the NMT model is trained with full sentences, how to design the stopping criterion for it when translating partial source sentcnes?
+
+## Simultaneous NMT ::: Prefix Translation
+
+At an outer step $s$, given encoder hidden states $\mathbf {h}^s$ for source prefix $\mathbf {x}^s= \lbrace x_1, ..., x_{\eta \left[ s\right]}\rbrace $ and decoder hidden states $\mathbf {z}_{\tau \left[ s\right]-1}^s$ for target prefix $\mathbf {y}_{\tau \left[ s-1\right]}^s= \lbrace y_1, ..., y_{\tau \left[ s-1\right]}\rbrace $, we perform prefix translation sequentially with a greedy decoder:
+
+where $t$ starts from $t=\tau \left[ s-1\right]+1$. The prefix translation terminates when a stopping criterion meets, yielding a translation $\mathbf {y}^s = \lbrace y_1, ..., y_{\tau \left[ s\right]}\rbrace $.
+
+However, a major problem comes from the above translation method: how can we obtain the encoder hidden states $\mathbf {h}^s$ and decoder hidden states $\mathbf {z}_{\tau \left[ s\right]-1}^s$ at the beginning of prefix translation? In CNMT, the encoder hidden states and previous decoder hidden states are reused at each decoding time step. Different from CNMT, SNMT is fed with an incremental source side context. On the encoder side, we can address this by either reusing previous encoder hidden states BIBREF3, BIBREF4, BIBREF14, BIBREF12:
+
+or dynamically re-building all encoder hidden states BIBREF5:
+
+On the decoder side, since the encoder hidden states have been updated from $\mathbf {h}^{s-1}$ to $\mathbf {h}^s$, we can choose to reuse previous decoder hidden states BIBREF3, BIBREF4, BIBREF14, BIBREF5:
+
+or rebuild all previous decoder hidden states from current encoder hidden states $\mathbf {h}^s$ with force decoding:
+
+To better predict the remaining target tokens, we rebuild all encoder and decoder hidden states following Eq. DISPLAY_FORM11 and DISPLAY_FORM13 at the beginning of prefix translation. This strategy ensures that all encoder and decoder hidden states are obtained by attending to the same source tokens, which is consistent with how encoder and decoder hidden states are computed at training time. Besides, these attainable source tokens are all available source context at current time. Compared with using Eq. DISPLAY_FORM10 or DISPLAY_FORM12, our method can potentially better utilize the available source context.
+
+## Simultaneous NMT ::: Stopping Criterion
+
+In consecutive NMT, the decoding algorithm such as greedy decoding or beam search terminates when the translator predicts an EOS token or the length of the translation meets a predefined threshold：
+
+where $\text{maxlen}$, $u$ and $v$ are all hyper-parameters. In fairseq-py, they set $\text{maxlen}=+\infty $, $u=0$ and $v=200$ at inference time by default. The decoding for most source sentences terminates when the translator predicts the EOS token. In simultaneous decoding, since we use a NMT model pretrained on full sentences to translate partial source sentences, it tends to predict EOS when the source context has been fully translated. However, such strategy could be too aggressive for simultaneous translation. Fig. FIGREF18 shows such an example. At outer step 2, the translator predicts “you EOS", emiting target token “you". However, “you" is not the expected translation for “你" in the context of “你好。". The right decision is that prefix translation at outer step 2 should stop without emitting any words.
+
+To alleviate such problems and do better simultaneous translation with pretrained CNMT model, we propose two novel stopping criteria for prefix translation.
+
+## Simultaneous NMT ::: Stopping Criterion ::: Length and EOS Control
+
+In consecutive translation, the decoding process stops mainly when predicting EOS. In contrast, for prefix translation at non-terminal outer step, we use both length and EOS to stop the prefix translation process. We achieve this by setting the hyper-parameters in Eq. DISPLAY_FORM15 as $\text{maxlen}=+\infty $, $u=1$ and $v=-d$, where $d$ is a non-negative integer. The hyper-parameter $d$ determines the translation latency of the system.
+
+More specifically, before prefix translation at outer step $s$, we have source prefix $\mathbf {x}^s = \lbrace x_1, ..., x_{\eta \left[ s\right]}\rbrace $ and target prefix $\mathbf {y}_{\tau \left[ s-1\right]}^s = \lbrace y_1, ..., y_{\tau \left[ s-1\right]}\rbrace $. Prefix translation terminates at inner step $w_s$ when predicting an EOS token or satisfying:
+
+We call this stopping criterion as Length and EOS (LE) stopping controller.
+
+## Simultaneous NMT ::: Stopping Criterion ::: Learning When to Stop
+
+Although simple and easy to implement, LE controller lacks the capability to learn the optimal timing with which to stop prefix translation. Therefore, we design a small trainable network called Trainable (TN) stopping controller to learn when to stop prefix translation for non-terminal outer step. Fig. FIGREF22 shows the illustration.
+
+At each inner decoding step $k$ for non-terminal outer step $s$, the TN controller utilizes a stochastic policy $\pi _\theta $ parameterized by a neural network to make the binary decision on whether to stop translation at current stage:
+
+where $z_{\tau \left[ s-1\right]+k}^s$ is the current decoder hidden state. The prefix translation stops if the TN controller predicts $a_{\tau \left[ s-1\right]+k}=1$. The controller function $f_\theta $ can take on a variety of forms, and for simplicity we implement with a feedforward network with two hidden layers, followed by a softmax layer.
+
+To train the TN controller, we freeze the NMT model with pretrained parameters, and optimize the TN network with policy gradient for reward maximization $\mathcal {J}= \mathbb {E}_{\pi _{\theta }}(\sum _{t=1}^{T_\tau } r_t )$. With a trained TN controller, prefix translation stops at inner decoding step $w_s$ when predicting an EOS token or satisfying:
+
+In the following, we talk about the details of the reward function and the training detail with policy gradient.
+
+## Simultaneous NMT ::: Stopping Criterion ::: Learning When to Stop ::: Reward
+
+To trade-off between translation quality and latency, we define the reward function at inner decoding step $k$ of outer step $s$ as:
+
+where $t=\tau \left[ s-1\right]+k$, and $r_t^Q$ and $r_t^D$ are rewards related to quality and delay, respectively. $\alpha \ge 0$ is a hyper-parameter that we adjust to balance the trade-off between translation quality and delay. Similar to BIBREF4, we utilize sentence-level BLEU BIBREF15, BIBREF16 with reward shaping BIBREF17 as the reward for quality:
+
+where
+
+is the intermediate reward. Note that the higher the values of BLEU are, the more rewards the TN controller receives.
+
+Following BIBREF4, BIBREF5, we use average lagging (AL) as the reward for latency:
+
+where
+
+$l(t)$ is the number of observed source tokens when generating the $t$-th target token, $t_e= \mathop {\rm argmin}_{t}{(l(t)=|\mathbf {x}|)}$ denotes the earliest point when the system observes the full source sentence, $\lambda =\frac{|\mathbf {y}|}{|\mathbf {x}|}$ represents the target-to-source length ratio and $d^* \ge 0$ is a hyper-parameter called target delay that indicates the desired system latency. Note that the lower the values of AL are, the more rewards the TN controller receives.
+
+## Simultaneous NMT ::: Stopping Criterion ::: Learning When to Stop ::: Policy Gradient
+
+We train the TN controller with policy gradientBIBREF18, and the gradients are:
+
+where $R_t=\sum _{i=t}^{T_\tau } r_i$ is the cumulative future rewards for the current decision. We can adopt any sampling approach to estimate the expected gradient. In our experiments, we randomly sample multiple action trajectories from the current policy $\pi _{\theta }$ and estimate the gradient with the collected accumulated reward. We try the variance reduction techniques by subtracting a baseline average reward estimated by a linear regression model from $R_t$ and find that it does not help to improve the performance. Therefore, we just normalize the reward in each mini batch without using baseline reward for simplicity.
+
+## Experiments ::: Settings ::: Dataset
+
+We compare our approach with the baselines on WMT15 German-English (DE-EN) translation in both directions. This is also the most widely used dataset to evaluate SNMT's performance BIBREF3, BIBREF4, BIBREF5, BIBREF10, BIBREF13. To further evaluate our approach's efficacy in trading off translation quality and latency on other language pair and spoken language, we also conduct experiments with the proposed LE and TN method on NIST Chinese-to-English (ZH$\rightarrow $EN) translation and IWSLT16 German-English (DE-EN) translation in both directions. For WMT15, we use newstest2014 for validation and newstest2015 for test. For NIST, we use MT02 for validation, and MT05, MT06, MT08 for test. For IWSLT16, we use tst13 for validation and tst14 for test. Table TABREF32 shows the details. All the data is tokenized and segmented into subword symbols using byte-pair encoding BIBREF19 to restrict the size of the vocabulary. We use 40,000 joint merge operations on WMT15, and 24,000 on IWSLT16. For NIST, we use 30,000 merge operations for source and target side separately. Without explicitly mention, we simulate simultaneous translation scenario at inference time with these datasets by assuming that the system observes one new source token at each outer step, i.e., $c_s=1$.
+
+## Experiments ::: Settings ::: Pretrained NMT Model
+
+We use Transformer BIBREF8 trained with maximum likelihood estimation as the pretrained CNMT model and implement our method based on fairseq-py. We follow the setting in transformer_iwslt_de_en for IWSLT16 dataset, and transformer_wmt_en_de for WMT15 and NIST dataset. Fairseq-py adds an EOS token for all source sentences during training and inference. Therefore, to be consistent with the CNMT model implemented with fairseq-py, we also add an EOS token at the end of the source prefix for prefix translation.
+
+## Experiments ::: Settings ::: TN Controller
+
+To train the TN controller, we use a mini-batch size of 8,16,16 and sample 5,10,10 trajectories for each sentence pair in a batch for IWSLT16, WMT15 and NIST, respectively. We set the number of newly observed source tokens at each outer step to be 1 during the training for simplicity. We set $\alpha $ to be $0.04$, and $d^*$ to be $2,5,8$. All our TN controllers are trained with policy gradient using Adam optimizer BIBREF20 with 30,000 updates. We select the last model as our final TN controller.
+
+## Experiments ::: Settings ::: Baseline
+
+We compare our model against three baselines that utilize a pretrained CNMT model to perform simultaneous translation:
+
+test_time_waitk: the test-time waitk simultaneous decoding algorithm proposed in BIBREF5, i.e., using a full-sentence model but decoding it with a waitk policy. We report the results when $k=1,3,5,7,9$.
+
+SL: the SL model proposed in BIBREF13, which learns an adaptive READ/WRITE policy from oracle READ/WRITE sequences generated with heuristics. We report the results $\rho =0.65,0.6,0.55,0.5,0.45,0.4$.
+
+BIBREF4: the adaptation of BIBREF4's two-staged full-sentence model + reinforcement learning on Transformer by BIBREF5. We report the results when using $CW=2,5,8$ as the target delay.
+
+We report the result with $d=0,2,4,6,8$ for our proposed LE method and $d^*=2,5,8$ for our proposed TN method. For all baselines, we cite the results reported in BIBREF13. Since they did not mention the details of data preprocessing, we cannot compare the BLEU and AL scores directly with theirs. Therefore, we normalize the BLEU and AL scores with its corresponding upper bound, i.e. the BLEU and AL scores obtained when the pretrained Transformer performs standard greedy decoding (Greedy).
+
+## Experiments ::: Results
+
+We compare our method with the baselines on the test set of WMT15 EN$\rightarrow $DE and DE$\rightarrow $EN translation tasks. Fig. FIGREF40 shows the result. The points closer to the upper left corner indicate better overall performance, namely low latency and high quality. In all these figures, we observe that, as latency increases, all methods improve in quality. The TN stopping controller significantly outperforms all the baseline systems in both translation tasks, demonstrating that it indeed learns the appropriate timing to stop prefix translation. The LE controller outperforms the baselines on WMT15 EN$\rightarrow $DE translation at high latency region and performs similarly or worse on other cases.
+
+We show the model's efficacy in trading off quality and latency on other language pair and spoken language in Fig. FIGREF41. The TN controller obtains better performance on all translation tasks, especially at the low latency region. For example, on IWSLT16 EN$\rightarrow $ DE translation, it is +$2.5$ to +$3.3$ BLEU ahead of the LE method. TN also obtains promising translation quality with acceptable latency: with a lag of $<7$ tokens, TN obtains 96.95%, 97.20% and 94.03% BLEU with respect to consecutive greedy decoding for IWSLT16 EN$\rightarrow $DE, IWSLT16 DE$\rightarrow $EN and NIST ZH$\rightarrow $EN translation, respectively.
+
+## Experiments ::: Analyze
+
+We analyze the effect of different ways (Eq. DISPLAY_FORM10-DISPLAY_FORM13) to obtain the encoder and decoder hidden states at the beginning of prefix translation with the LE controller. Fig. FIGREF42 shows the result. We try three variants: a) dynamically rebuild all encoder/decoder hidden states (none); b) reuse decoder hidden states and rebuild all encoder hidden states (decoder); c) reuse previous encoder hidden states and rebuild all decoder hidden states (encoder). The left Y axis and X axis show BLEU-vs-AL curve. We observe that if reusing previous encoder hidden states (encoder), the translation fails. We ascribe this to the discrepancy between training and decoding for the encoder. We also observe that when $d=0,2$, reusing decoder hidden states (decoder) obtain negative AL. To analyze this, we plot the translation to reference length ratio versus AL curve with the right Y axis and X axis. It shows that with decoder, the decoding process stops too early and generates too short translations. Therefore, to avoid such problem and to be consistent with the training process of the CNMT model, it is important to dynamically rebuild all encoder/decoder hidden states for prefix translation.
+
+Since we make no assumption about the $c_s$, i.e., the number of newly observed source tokens at each outer step, we test the effect of different $c_s$ at this section. Fig. FIGREF43 shows the result with the LE and TN controllers on the test set of WMT15 EN$\rightarrow $DE translation. We observe that as $c_s$ increases, both LE and TN trend to improve in quality and worsen in latency. When $c_s=1$, LE controller obtains the best balance between quality and latency. In contrast, TN controller obtains similar quality and latency balance with different $c_s$, demonstrating that TN controller successfully learns the right timing to stop regardless of the input update schedule.
+
+We also analyze the TN controller's adaptability by monitoring the initial delay, i.e., the number of observed source tokens before emitting the first target token, on the test set of WMT15 EN$\rightarrow $DE translation, as shown in Fig. FIGREF52. $d^*$ is the target delay measured with AL (used in Eq. DISPLAY_FORM29). It demonstrates that the TN controller has a lot of variance in it's initial delay. The distribution of initial delay changes with different target delay: with higher target delay, the average initial delay is larger. For most sentences, the initial delay is within $1-7$.
+
+In speech translation, listeners are also concerned with long silences during which no translation occurs. Following BIBREF4, BIBREF5, we use Consecutive Wait (CW) to measure this:
+
+Fig. FIGREF54 shows the BLEU-vs-CW plots for our proposed two algorithms. The TN controller has higher CW than the LE controller. This is because TN controller prefers consecutive updating output buffer (e.g., it often produces $w_s$ as $0\ 0\ 0\ 0\ 3\ 0\ 0\ 0\ 0\ 0\ 5\ 0\ 0\ 0\ 0\ 4\ ...$) while the LE controller often updates its output buffer following the input buffer (e.g., it often produces $w_s$ as $0\ 0\ 0\ 0\ 1\ 1\ 1\ 1\ 1\ 1\ ...$ when $d=4$). Although larger than LE, the CW for TN ($< 6$) is acceptable for most speech translation scenarios.
+
+## Experiments ::: Translation Examples
+
+Fig. FIGREF55 shows three translation examples with the LE and TN controllers on the test set of NIST ZH$\rightarrow $EN and WMT15 EN$\rightarrow $DE translation. In manual inspection of these examples and others, we find that the TN controller learns a conservative timing for stopping prefix translation. For example, in example 2, our method outputs translation “wu bangguo attended the signing ceremony” when observing “吴邦国 出席 签字 仪式 并”, instead of a more radical translation “wu bangguo attended the signing ceremony and”. Such strategy helps to alleviate the problem of premature translation, i.e., translating before observing enough future context.
+
+## Related Work
+
+A number of works in simultaneous translation divide the translation process into two stages. A segmentation component first divides the incoming text into segments, and then each segment is translated by a translator independently or with previous context. The segmentation boundaries can be predicted by prosodic pauses detected in speech BIBREF0, BIBREF21, linguistic cues BIBREF22, BIBREF23, or a classifier based on alignment information BIBREF24, BIBREF25 and translation accuracy BIBREF1, BIBREF2, BIBREF26.
+
+Some authors have recently endeavored to perform simultaneous translation in the context of NMT. BIBREF3, BIBREF14, BIBREF5 introduce a manually designed criterion to control when to translate. BIBREF11, BIBREF4, BIBREF12 extend the criterion into a trainable agent in a reinforcement learning framework. However, these work either develop sophisticated training frameworks explicitly designed for simultaneous translation BIBREF5 or fail to use a pretrained consecutive NMT model in an optimal way BIBREF3, BIBREF14, BIBREF11, BIBREF4, BIBREF12, BIBREF13. In contrast, our work is significantly different from theirs in the way of using pretrained consecutive NMT model to perform simultaneous translation and the design of the two stopping criteria.
+
+## Conclusion
+
+We have presented a novel framework for improving simultaneous translation with a pretrained consecutive NMT model. The basic idea is to translate partial source sentence with the pretrained consecutive NMT model and stops the translation with two novel stopping criteria. Extensive experiments demonstrate that our method outperforms the state-of-the-art baselines in balancing between translation quality and latency.

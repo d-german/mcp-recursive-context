@@ -1,0 +1,877 @@
+# Integration of Japanese Papers Into the DBLP Data Set
+
+**Paper ID:** 1709.09119
+
+## Abstract
+
+If someone is looking for a certain publication in the field of computer science, the searching person is likely to use the DBLP to find the desired publication. The DBLP data set is continuously extended with new publications, or rather their metadata, for example the names of involved authors, the title and the publication date. While the size of the data set is already remarkable, specific areas can still be improved. The DBLP offers a huge collection of English papers because most papers concerning computer science are published in English. Nevertheless, there are official publications in other languages which are supposed to be added to the data set. One kind of these are Japanese papers. This diploma thesis will show a way to automatically process publication lists of Japanese papers and to make them ready for an import into the DBLP data set. Especially important are the problems along the way of processing, such as transcription handling and Personal Name Matching with Japanese names.
+
+## List of Acronyms
+
+tocchapterList of Acronyms
+
+[OAI-PMH] ACMAssociation for Computing Machinery ASCIIAmerican Standard Code for Information Interchange APIApplication Programming Interface BHTBibliography HyperText DBLPDigital Bibliography & Library Project (former meaning: DataBase systems and Logic Programming) FAQFrequently Asked Questions GBGigaByte HTMLHyperText Markup Language HTTPHyperText Transfer Protocol IDIdentifier IEEEInstitute of Electrical and Electronics Engineers IFIPInternational Federation for Information Processing IPSJInformation Processing Society of Japan IPSJ DLDigital Library of the Information Processing Society of Japan ISOInternational Organization for Standardization JARJava ARchive JDBCJava DataBase Connectivity JDKJava Development Kit OAIOpen Archives Initiative OAI-PMHOpen Archives Initiative - Protocol for Metadata Harvesting PDFPortable Document Format RAMRandom Access Memory SAXSimple API for XML SQLStructured Query Language SPFSingle Publication Format TOCTables Of Contents URLUniform Resource Locator XMLeXtensible Markup Language
+
+## About This Diploma Thesis
+
+The idea for this work was born when the author was searching for a possibility to combine computer science with his minor subject Japan studies in his diploma thesis. After dismissing some ideas leaning towards Named Entity Recognition and computer linguistics the author chose “Integration of Japanese Papers Into the DBLP Data Set” as his subject. The DBLP is a well-known and useful tool for finding papers published in the context of computer science. The challenge to deal with such a huge database and the problems that occur when processing Japanese input data was the reason why this idea has been chosen. The hope is that, in the future, many Japanese papers can be added by the responsible people of the DBLP project.
+
+## Motivation
+
+Computer scientists are likely to use the DBLP to find information about certain papers or authors. Therefore, the DBLP is supposed to provide information about as many papers as possible. For example, one could be interested in the paper “Analysis of an Entry Term Set of a Civil Engineering Dictionary and Its Application to Information Retrieval Systems” by Akiko Aizawa et al. (2005) but DBLP does not include it yet. Japanese scientists might look for the original (Japanese) title “土木関連用語辞典の見出し語の分析と検索システムにおける活用に関する考察” or use Aizawa's name in Japanese characters (相澤彰子) for a search in DBLP. The DBLP contains the author “Akiko Aizawa” but does not contain this specific paper or the author's original name in Japanese characters. Our work is to implement a tool which addresses these questions, support the DBLP team in the integration of Japanese papers and reveal the difficulties of realizing the integration.
+
+## Composition of the Diploma Thesis
+
+Dates are displayed in the ISO 8601 standard format YYYY-MM-DD, e.g. 2012-10-19.
+
+Although scientific works about the Japanese language often display the Sino-Japanese reading of kanji (a Japanese character set) with uppercase letters to distinguish them from the other “pure” Japanese reading, we will not use uppercase letters to distinguish them in this work.
+
+When a Japanese word is used in its plural form in this work, the word always stays unmodified. The reason is that in the Japanese language there is no differentiation between a singular and plural form.
+
+We use a macron instead of a circumflex to display a long vowel of a Japanese word in Latin transcription (see section SECREF14 ).
+
+## Acknowledgement
+
+First I would like to thank Prof. Dr. Bernd Walter and Prof. Dr. Peter Sturm for making this diploma thesis possible. Special thanks go to Florian Reitz for the great support and the useful answers for the questions I had while I have been working on this diploma thesis. I also want to acknowledge the help of Peter Sommerhoff, Daniel Fett, David Christ and Kana Matsumoto for proofreading my work. I thank Dr. Michael Ley, Oliver Hoffmann, Peter Birke and the other members of the Chair of Database and Information Systems of the University of Trier. Last but not least I want to tell some personal words to my family in my and their native language German:
+
+Ich möchte nun noch meinen Eltern und meinem Bruder Peter dafür danken, dass sie mich in meiner Diplomarbeitsphase, meinem Studium und auch schon davor immer unterstützt haben und immer für mich da waren, wenn ich sie brauchte. Ich weiß es zu schätzen.
+
+## Writing in Japanese
+
+“My view is that if your philosophy is not unsettled daily
+
+then you are blind to all the universe has to offer.”
+
+(Neil deGrasse Tyson)
+
+First we need to understand some aspects of the Japanese language and especially the different ways of writing Japanese because the peculiarities of the Japanese writing system are a crucial point of our work. It lays the foundation for all Japanese-related subjects such as the structure of Japanese names (discussed in section SECREF19 ), a dictionary for Japanese names (discussed in section SECREF36 ) or the publication metadata source for Japanese publications (discussed in section SECREF39 ).
+
+Hadamitzky ( BIBREF0 , p. 8-57) gives an overview about the basics of Japanese writing. The Japanese writing system includes kanji, hiragana, katakana and the possibility to use Latin characters.
+
+## Kanji
+
+Kanji is the Japanese script which consists of traditional Chinese characters. It came to Japan around the 4th century. Since the Japanese had not developed an own writing system yet they began to use the Chinese characters. At the beginning, the characters were linked phonetically with a certain sound, so that they could write down all existing words by their sound. Applying this principle the man'yōgana were created. Every character had one defined way to pronounce it. In addition to this, a second principle was introduced to write Japanese. This time the people orientated themselves on the meaning of the Chinese characters to choose a writing for a word. Applying the second principle, the kanji were created. While the man'yōgana were simplified to hiragana and katakana (see following sections SECREF7 and SECREF11 ) the general usage of kanji did not change.
+
+Due to an increase in number and possible readings of characters, the government began to try to simplify the Japanese writing system after the Meiji Restoration at the end of the 19th century. The last important reform took place after World War II. Along with some other changes and regulations, the permitted characters in official documents (tōyō kanji) were limited to 1850 in 1946 and increased to 1900 in a draft from 1977. In 1981 they were replaced by the “List of Characters for General Use” (jōyō kanji) containing 1945 characters. In 1951 the government published a list of additional 92 kanji permitted for personal names. The number of kanji permitted for personal names increased with time passing by. Eschbach-Szabo ( BIBREF2 , p. 175) says the last change permitted 983 kanji for personal names in 2004. The press tries to abide by the jōyō kanji. Japanese literature (science, fiction, etc.) uses about 4000 characters (comprehensive Sino-Japanese kanji dictionaries contain ca. 10000 characters). Japanese people know approximately 3000 kanji on average.
+
+Due to their capability to give a word a meaning, kanji are used in substantives, verbs, adjectives and Japanese personal names.
+
+An important aspect is reading a kanji because there are several possibilities to read one. Saitō and Silberstein ( BIBREF3 , p. 31-34) describe how to read a kanji. There is a Japanese reading kun and a Sino-Japanese reading on. Depending on the text and grammar context either the kun or on reading is required. For example the kanji 生 is read sei in 学生 (gakusei, meaning: student, on reading) but is read INLINEFORM0 in 生まれる (umareru, meaning: being born, kun reading). A single kanji can have several kun and several on readings.
+
+For our work it is important to know that one character can have several readings in names too.
+
+## Hiragana
+
+The syllabary hiragana evolved from the man'yōgana by simplifying the characters. Every syllable is phonetically assigned to one sound of the spoken language (with two exceptions which can have two sounds each). The gojūon table shown in figure FIGREF9 lists the 46 syllables used today in a certain way (it can be compared with the ABC for letters). Another but obsolete way to order the syllables is iroha which is a poem containing all syllables. Although the name implies 50 sounds (gojū means “50”, on means “sound”) there are only 46 syllables left in modern Japanese. Actually, only 45 syllables belong to the gojūon table. The INLINEFORM0 counts as extra symbol (see gojūon tables in figures FIGREF9 and FIGREF12 ).
+
+Other additional syllables are dakuon (e.g. だ/ INLINEFORM0 , recognizable by two little strokes), handakuon (e.g. ぱ/ INLINEFORM1 , recognizable by a little circle) and yōon (e.g. しゃ/ INLINEFORM2 , recognizable by a normally sized character that is followed by a smaller character).
+
+You can write every Japanese word in hiragana but if possible, kanji are usually preferred to avoid problems with homonyms (we take a look at homonyms in chapter SECREF5 ). Hiragana is mainly used to write words not covered by kanji and as inflected endings. Kanji and hiragana are often combined within one word. For example 読む (yomu) is the basic form of the verb “to read”. The kanji 読 means reading by itself and in combination with the hiragana syllable む it becomes the verb “to read” in a special grammatical form specifying tense, politeness level and other properties.
+
+## Katakana
+
+The syllabary katakana also evolved from the man'yōgana by simplifying the characters, consists of 46 characters nowadays (representing the same syllables as hiragana) and is usually ordered by the gojūon table. Figure FIGREF12 presents the katakana in a gojūon table. Besides optical differences with hiragana, katakana are used in other contexts. Japanese mostly use them to write foreign words including foreign personal names.
+
+So foreigners often apply katakana for their names. For example, the author's name can be transcribed as パウル·ソマホフ. The dot · in the middle separates family and given name. Foreign names are often written with the given name preceding the family name.
+
+## Latin Characters/Transcription
+
+Transcription systems which convert kanji, hiragana and katakana to Latin characters are usually called rōmaji. Japanese can be easily transcribed by 22 letters and two additional signs. Due to many words having the same pronunciation, the meaning of words is sometimes ambiguous if they are transcribed into Latin characters. In 1954 the government released recommendations for transcribing Japanese. It recommended following two transcription systems:
+
+The kunreishiki rōmaji assigns transcriptions according to the order in the gojūon table without regard to phonetic divergences of some consonants (we will discuss these divergences later). It has been introduced for official usage by the government only slightly different in 1937. It became the preferred transcription system in the standard ISO 3602 “Documentation - Romanization of Japanese (kana script)” BIBREF6 .
+
+The hebonshiki rōmaji was developed by a council of Japanese and foreign erudites in 1885 and spread by the American missionary James C. Hepburn (Hebon in Japanese), especially thanks to his Japanese-English dictionary published one year later. This work also employs hebonshiki. Kunreishiki would lead to transcriptions like kunreisiki, hebonsiki and kanzi.
+
+Although the kunreishiki became the preferred system of the government, the international community often prefers the Hepburn system because the written words suggest a more intuitive pronunciation than kunreishiki. There are also language-related transcription systems that are rarely used. Kaneko and Stickel ( BIBREF7 , p. 53-55) mention them:
+
+The important aspect are the system differences because we need to know where they occur when we deal with Personal Name Matching problems later. Figure FIGREF165 in the appendix reveals the differences between the transcription systems. It summarizes 18 differences in all syllables including INLINEFORM0 , INLINEFORM1 and INLINEFORM2 . Unfortunately, there can be even more transcription differences. ISO 3602 highlights some more special cases when it comes to transcribing Japanese. One is the question whether to put an apostrophe after an INLINEFORM3 . To avoid misunderstandings, one should put an apostrophe behind an INLINEFORM4 in certain cases. Otherwise, people could misinterpret the syllable INLINEFORM5 followed by a syllable composed of a vowel or “y” and a vowel as syllables na, ni, nu, ne, no, nya, nyu or nyo. We will outline a practical example of this case in section UID99 .
+
+A second irregularity occurs when the same vowel appears right after another. If there is a morpheme boundary between the vowels, they should be transcribed as “aa”, “ii”, etc. but should be transcribed by an additional circumflex otherwise.
+
+Koop and Inada BIBREF4 write about another difficulty called nigori.
+
+“The nigori (濁, literally, `turbidity', `impurity') ... [means] modifying the pronunciation of the consonant in certain of the kana sounds. It may be either (1) inherent, as in suge (`sedge'), suzu (`grelot'), go (`five'), or (2) applied incidentally to the initial consonant of a word or name-element following another in composition, e.g., Shimabara from shima and hara, nenjū from nen and chū, Harada from hara and ta.” ( BIBREF4 , p. 34)
+
+So, if we want to derive a transcription from the family name 中田, we cannot tell whether to take Nakata or Nakada as the rightful transcription.
+
+## Japanese Personal Names
+
+七転び、八起き。 Nana korobi, ya oki.
+
+(Fall seven times, get up eight times.)
+
+Japanese saying
+
+One of the central problems in this work is to deal with Japanese personal names. We need to get a picture of Japanese personal names in general to deal with multiple data sources (like the introduced publication metadata sources in chapter SECREF4 ) which may represent the same name with different scripts or transcription methods. The dictionary ENAMDICT will be very helpful when it comes to extracting and verifying name information.
+
+## Structure of Japanese Names
+
+Having the urge to name things is part of the human nature. Names make it easy to refer to things, people or any other object in this world. When it comes to name giving, history shows a development in the Japanese society.
+
+Japanese names are divided into family and given name, similar to the system in the Western culture. When Japanese write their name in kanji they put the family name first, followed by the given name (usually without leaving spaces between them), for example 中村武志 (Takeshi Nakamura). While introducing themselves, they often tell their family name and skip the given name. When Japanese refer to others, they have many name particles they put after a name to express the relationship to the other person. There is the neutral san, chan for children, kun particular for boys or sensei for teachers and doctors. ( BIBREF5 , p. 18-19)
+
+Kagami ( BIBREF8 , p. 913) writes about Japanese personal names. Only the samurai and nobility were allowed to carry family names before the Meiji Restoration in 1868. Merchants carried shop names instead (recognizable by the suffix -ya), for example Kinokuniya (shop name) Bunzaemon (given name). Then everybody had to pick a family name after the Meiji Restoration. Approximately 135000 family names are recognized now. The most common family names are Suzuki, Satō, Tanaka, Yamamoto, Watanabe, Takahashi, Kobayashi, Nakamura, Itō, Saitō and others.
+
+“In the feudal age, first and second given names were used as male names. The first name was Kemyoo which was the order of brothers, and the second name was the formal name given at the coming of age ceremony (genpuku), e.g. the name of a famous general in 12c.: Minamoto (family name) no (of) Kuroo (kemyoo) Yoshitune (formal given name), and before the genpuku ceremony, he was called by Yoomyoo (child name) Ushiwakamaru.” ( BIBREF8 , p. 913)
+
+While there were no restrictions to the number of personal names visible until the Meiji Restoration, due to modernization, Japanese people got the restriction to carry only one given and one family name. ( BIBREF2 , p. 167-169)
+
+Some indicators for assigning the gender to a name also exist. The suffixes -ko (e.g. Hanako), -mi (Natsumi) and -yo (Yachiyo) indicate a female name. Male names are harder to identify because they have no fixed pattern. The suffix -o (Kazuo) mostly belongs to a male name though.
+
+Family names often consist of two kanji characters, rarely of one or three characters. ( BIBREF8 , p. 913)
+
+Eschbach-Szabo ( BIBREF2 , p. 157-309) dedicates an elaborate chapter to Japanese personal names. Compared to the Chinese system, the Japanese naming system shows more tolerance. Several readings are left besides each other, formal rules are not always applied in practice. Japanese apprehend names mainly visually by the characters, secondarily by the reading and sound. This is why several readings for a written name are still acceptable in the modern Japanese world. In the feudal system, names were needed to determine the position and roles of a person in the family and the society rather than characterizing him or her as an individual. Japan has an open naming system which allows adding new names. This is a difference to the exclusive name lists in Germany or France. ( BIBREF2 , p. 157-166)
+
+Even the apparently simple kanji 正 has a lot of possible readings: Akira, Kami, Sada, Taka, Tadashi, Tsura, Nao, Nobu, Masa. We can see the same phenomenon in recently approved kanji too. When we see 昴 we cannot be sure whether it is read Kō or Subaru. ( BIBREF9 )
+
+“Conversely, it often happens that one does not know to write a name of given pronunciation. For example, Ogawa can be written 尾川 or 小川. In Japan, when two people meet for the first time, they exchange business cards. This custom often baffles foreigners, but for Japanese it is a ritual with practical purpose: Japanese do not feel at ease until they see how a name is spelled out in kanji.” ( BIBREF9 )
+
+Figure FIGREF22 illustrates the problem. The cashier tries to read the customer's name and cannot determine the right name. According to the customer's reaction, his first two trials Hiroko and Yūko seem to be wrong. Ogawa considers the name polygraphy as a reason why the creation of new name characters is still allowed.
+
+Some characteristics of the Japanese naming system are: only little renaming of people semantic variance (names indicate different meanings/attributes) admission of foreign elements (foreign names get assimilated) possibility of polygraphic writing diversity of writing (many scripts usable, weak orthographic normalization) number of personal names for one person 
+
+In academic circles a Sino-Japanese reading led to a more reputable name. So the famous linguist 上田万年 from the Meiji era became known as Kazutoshi Ueda AND Mannen Ueda (Mannen is the Sino-Japanese on reading, Kazutoshi is the Japanese kun reading). Modern guidebooks underline that maybe one has to take a loan word from another language to find the corresponding reading for a name in kanji. For example, 宇宙 could be read as Kosumo (from the Greek word for cosmos) instead of Uchū. Also ノイ (Noi), derived from the German word “neu” (new), became a Japanese given name. Another imaginable name is “Sky” written as 空海 (meanings: 空 Sky, 海 sea) and transcribed as Sukai (actually kūkai). This would finally show the impact of globalization also on the Japanese naming system. If one has lived in Japan for a while and wants to adapt or register his or her Western name, one can choose corresponding kanji either by meaning or reading of the original name. Another possibility is transcribing the name with katakana. ( BIBREF2 , p. 170-171, 305-309)
+
+The name Anna exists in many cultures. The girls in figure FIGREF29 are both called Anna. Both turn around when they hear their name and respond in their mother tongue (“Yes!” and “Hai!”, respectively).
+
+One principle of Japanese name giving is ateji. Ateji (当て字) means “appropriate characters”. It says Japanese try to find characters with good, positive meanings for their children's name. Examples are 愛子 (愛: ai, love; 子: ko, child), 夏美 (夏: natsu, summer; 美: mi, beauty) or 正 (Tadashi, correct, honest). There is also a list with characters that are allowed but should be avoided because of bad associations. Characters like 蟻 (ari, ant), 苺 (ichigo, strawberry), 陰 (kage, shadow), 悪 (aku, bad/evil) belong to this list. ( BIBREF2 , p. 172-176)
+
+A particular case drew public attention from June 1993 to February 1994 when Shigeru Satō wanted to call his son Akuma, written as 悪魔 (devil/demon). The civil registry office declined the registration after some discussion because they were worried about other children teasing him. The father went to court but the judges also declined the wish. Although the father wanted to give his son a unique, rememberable name, the judges saw a possible problem in his individual identification process and also getting teased (ijime) by other children in school someday. Then Satō tried to choose other characters while keeping the reading Akuma. But also changing the name partly into man'yōgana (亜久魔) did not change anything about the declination because of the phonological equality implying the same negative associations. Thereupon the father picked the character 神 (god) and its unusual reading Jin. Even though Shintoistic gods can be good or evil, the civil registry office accepted the name. Satō announced his intention to keep calling his son Akuma anyway. So a new (yet unofficial) reading for a character might be established. ( BIBREF2 , p. 271-278)
+
+An article of “Japan Today” from December 2012 shows that there is still a debate about this subject.
+
+“[...]Shinzo Abe, the leader of the Liberal Democratic Party made a stand against kirakira names last week when he stated that giving a child a name like Pikachu, which could be written something like 光宙 (`light' and `space'), is tantamount to child abuse, saying: `Children are not pets; we have to provide guidance for parents who would name their child in such a way.' ”( BIBREF11 )
+
+Despite regulations, the discussion about the culture of name giving does not seem to have ended yet. Japanese comics like the one in figure FIGREF34 suggest a happy-go-lucky life if one has a common everyday name like Keiko.
+
+Today's registration of names allows 2983 kanji for given names, 4000 kanji for family names, 700 man'yōgana, 46 hiragana and 46 katakana. There are still people whose names are written with the obsolete kana syllabary hentaigana which has been prohibited in 1948 ( BIBREF2 , p. 176-177; BIBREF12 ). Regarding this variety of characters (and readings) it is not surprising that even well educated Japanese have problems reading certain names too, respectively they cannot be sure that the chosen reading is the correct reading in the current situation. Forbidden is the usage of geometrical and punctuation signs. The sign ◯ (maru) is an example of such a forbidden one. Also forbidden is the usage of Latin characters (rōmaji) at the registration of a name. Rōmaji can be used privately, though. ( BIBREF2 , p. 176-177)
+
+Names can be changed by marriage, adoption or getting a pseudonym or special posthumous name. Titles can be acquired too. ( BIBREF2 , p. 251)
+
+After disestablishing the patriarchal ie system in which a man (for example the husband) is the dominating householder of a family, the family name has not been focused on the affiliation to a family anymore but has been focused on the couple living together in joint lives. ( BIBREF2 , p. 253-255)
+
+Writing a Japanese name can be ambiguous. While the name written in kanji is definite, displaying it in Latin characters leads to several possibilities. Japanese themselves usually write their name using kanji. To find matching authors in the DBLP, it will be crucial for us to have names in Latin characters later on (in chapter SECREF6 ) because the standard encoding format of the file containing the main data of the DBLP project is ISO 8859-1 (Latin-1).
+
+We sometimes talk about “kanji names” or “names in kanji representation” in this work. Although the expression does not suggest it, they shall include all names in Japanese characters, ergo names in kanji, hiragana and katakana.
+
+## ENAMDICT
+
+To automatically detect where a Japanese family name in kanji notation ends and the given name begins, we should factor a name dictionary into our work. It is important that this dictionary includes the names written in kanji and a clear transcription for them in Latin characters. A useful dictionary for our purposes is ENAMDICT.
+
+ENAMDICT BIBREF13 is a free dictionary for Japanese proper names, maintained by the Monash University in Victoria (Australia). The Electronic Dictionary Research and Development Group owns the copyright. In 1995, ENAMDICT became an independent project by dividing the universal dictionary EDICT into two projects. ENAMDICT contains person names and non-person names like places and companies as well. Table TABREF38 shows the online statistics about the content of the ENAMDICT file. We will call the categories “name types” in subsequent chapters.
+
+“A proper name is a word or group of words which is recognized as having identification as its specific purpose, and which achieves, or tends to achieve that purpose by means of its distinctive sound alone, without regard to any meaning possessed by that sound from the start, or aquired by it through association with the object thereby identified.” ( BIBREF14 , p. 73)
+
+these intern abbreviations occur again when we construct a database for Japanese names in chapter SECREF74 
+
+## Publication Metadata Sources
+
+百語より一笑 Hyaku go yori isshō
+
+(A smile is more worth than a hundred words.)
+
+Japanese saying
+
+This chapter gives an overview of the publication metadata sources that we will need later. We take a look at these sources because we will discuss a way to extract metadata information from one source containing Japanese papers and import them into another source in chapter SECREF6 .
+
+## Digital Library of the IPSJ
+
+The IPSJ is a Japanese society in the area of information processing and computer science. It was founded in April 1960 and, by its own account, helps evolving computer science and technology and contributes new ideas in the digital age. It regularly publishes the magazine “Information Processing” (jōhō shori) and a journal, holds symposiums and seminars, Special Interest Groups issue technical reports and hold conferences. It is also the Japan representative member of the IFIP and established partnerships with the IEEE, ACM and other organizations. -2 IPSJ develops drafts of international standards and Japanese industrial standards as well. Eight regional research sections are widespread over Japan. IPSJ had over 17000 members in March 2011. ( BIBREF15 ; BIBREF16 )
+
+The IPSJ provides a Digital Library (referenced as IPSJ DL in this work) where everybody can search Japanese papers in the field of computer science. The search page can be displayed in Japanese and English, most papers are written in Japanese. Free papers are accessible in PDF format, non-free can be bought. A tree view provides the order structure of the papers and there is a keyword search available. We are especially interested in the metadata export functions, though. The online application offers following export formats:
+
+OAI-PMH
+
+BibTeX
+
+OWL SWRC
+
+WEKO Export
+
+For our purposes the OAI-PMH is the most suitable solution because we can send simple HTTP requests to the server and get publication metadata as a result. It “provides an application-independent interoperability framework based on metadata harvesting” ( BIBREF17 ) and consists of two groups of participants. Data Providers can be servers hosting and supplying the metadata. Service Providers take the harvester role and process the recieved metadata from the Data Provider. The application-independent interoperability is achieved by using XML as basic exchange format. Arbitrary programs can parse XML input data very easily, so can we.
+
+While accessing the server, the data can be extracted in several ways. We can either access an OAI-PMH repository by the repository name, the metadata format prefix of the record and a unique identifier or get a list of records with only one request.
+
+A request for a list of records looks like this: 1.5 em1.5 em(*@@*)false6pt http: //ipsj.ixsq.nii.ac.jp/ej/ ?action=repository_oaipmh&verb=ListRecords &metadataPrefix=oai_dc It may also contain a start date and an end date or a resumption token. The headers of records include a corresponding time stamp. The server's response to a request offers only 100 publications. We need this resumption token because it determines the point where we resume the harvest.
+
+In the beginning and for debugging, it was more comfortable to increment a counter that acts as the unique identifier and send requests for single entries with the respective ID multiple times. Fortunately, the entries can be addressed by such an integer ID (plus some constant name):
+
+1.5 em1.5 em(*@@*)false6pt
+
+http: //ipsj.ixsq.nii.ac.jp/ej/
+
+ ?action=repository_oaipmh&verb=GetRecord&metadataPrefix=oai_dc
+
+ &(*@\textbf{identifier}@*)=oai:ipsj.ixsq.nii.ac.jp:(*@\textbf{27130} @*)
+
+The last entry containing real publication metadata has the suffix integer 87045 in its ID. After that some entries with status INLINEFORM0 follow. If we continue requesting even higher IDs, we soon get only a reply with the error code INLINEFORM1 anymore, implying there are no publications with higher IDs. We will discuss the implementation of an OAI-PMH harvester for the IPSJ DL in section UID99 .
+
+## DBLP Project
+
+The DBLP is a worldwide known database for publication metadata in the field of computer science. Ley BIBREF19 gives a brief explanation of the DBLP, additional information is extracted from the online DBLP FAQ BIBREF20 . It was started in 1993 as a test server for web technologies and named “Database systems and Logic Programming” in the beginning. But it grew and became a popular web application for computer scientists. The Computer Science department of the University of Trier founded the project, since summer 2011 it is a joint project of Schloss Dagstuhl - Leibniz Center for Informatics and the University of Trier.
+
+“For computer science researchers the DBLP web site is a popular tool to trace the work of colleagues and to retrieve bibliographic details when composing the lists of references for new papers. Ranking and profiling of persons, institutions, journals, or conferences is another sometimes controversial usage of DBLP.” ( BIBREF19 )
+
+The publication metadata is stored in the XML file INLINEFORM0 containing more than 2 million publications and exceeding a size of 1 GB (state of October 2012). An excerpt of the beginning of INLINEFORM1 can be found in the appendix section SECREF171 . The header dictates ISO-8859-1 (Latin-1) as encoding of the file. Considering that we want to import Japanese names in kanji (which are not included in Latin-1) we must handle that issue somehow. We will discuss the solution in section UID121 .
+
+The web front end of the DBLP provides an overview of coauthor relationships by a Coauthor Index (see figure FIGREF53 ). The Coauthor Index can be found at the author's page after the list of the author's publications itself. It shows all coauthors, common papers and categorizes the coauthors into groups that worked together by giving the author names corresponding background colors.
+
+In his diploma thesis Vollmer BIBREF23 gives useful hints in terms of converting the INLINEFORM0 file to a relational database. He also compares the performance of several relational database management systems for this conversion.
+
+The DBLP team developed a special format for the integration of new publications. It is called Bibliography Hypertext (BHT), is based on HTML and similar to the HTML code of the tables of contents (TOCs) at the DBLP website. An example of a publication list in BHT format can be found in the appendix in section SECREF168 . A BHT file has the following structure. The header (text between h2 tags) contains the volume, the number/issue and the date of issue. A list of corresponding publications follows next. The list is surrounded by a beginning and a closing INLINEFORM0 tag, single publication entries start with a INLINEFORM1 tag. A comma is used for the separation of authors while there should be a colon after the last author name. Then comes the title which has to end with a period, question mark or exclamation point. The next line provides the start and end page in the volume/issue. At last, an optional URL can be added by an INLINEFORM2 element to specify an “electronic edition” for a paper. Some guidelines need to be considered, too:
+
+there is no closing INLINEFORM0 tag
+
+initials should be avoided (full name is preferred)
+
+titles with only upper case letters should be avoided
+
+“0-” is the default page number value if the page information is missing
+
+The BHT file may contain additional information. For example, conference proceedings may have more headers to achieve a better clarity. But it should be as close to the proposed format as possible to guarantee an easy import without unnecessary burdens. ( BIBREF24 ; BIBREF20 , “What is the preferred format to enter publications into DBLP?”)
+
+We will extend the original format in section UID121 to satisfy our needs in the context of Japanese papers.
+
+## Personal Name Matching
+
+“The important thing is not to stop questioning;
+
+curiosity has its own reason for existing.”
+
+(Albert Einstein)
+
+After looking at transcription systems, Japanese personal names and publication metadata sources, we will now have to look at Personal Name Matching to enable us to deal with the Japanese names extracted from the metadata sources. First we will discuss Personal Name Matching in general and then problems of Personal Name Matching for Japanese names in particular.
+
+The expression Personal Name Matching comes from the work by Borgman and Siegfried BIBREF25 and is used here as in the extended definition from Reuther's work ( BIBREF26 , p. 48-51). Borgman and Siegfried only talk about synonyms. Synonyms are possible names for the same person. Reuther extended the definition by also including homonyms. A name is a homonym if it can belong to several persons. Personal Name Matching is known by other titles in literature, too. Niu et al. BIBREF27 discuss Cross Document Name Disambiguation:
+
+“Cross document name disambiguation is required for various tasks of knowledge discovery from textual documents, such as entity tracking, link discovery, information fusion and event tracking. This task is part of the co-reference task: if two mentions of the same name refer to same (different) entities, by definition, they should (should not) be co-referenced. As far as names are concerned, co-reference consists of two sub-tasks:
+
+On et al. BIBREF28 formally express their Name Disambiguation problem as follows:
+
+“Given two long lists of author names, INLINEFORM0 and INLINEFORM1 , for each author name INLINEFORM2 , find a set of author names, INLINEFORM3 such that both INLINEFORM4 and INLINEFORM5 are name variants of the same author.” ( BIBREF28 )
+
+In contrast to the previous definitions Han et al. BIBREF29 define Name Disambiguation like this:
+
+“Name disambiguation can have several causes. Because of name variations, identical names, name misspellings or pseudonyms, two types of name ambiguities in research papers and bibliographies (citations) can be observed. The first type is that an author has multiple name labels. For example, the author `David S. Johnson' may appear in multiple publications under different name abbreviations such as `David Johnson', `D. Johnson', or `D. S. Johnson', or a misspelled name such as `Davad Johnson'. The second type is that multiple authors may share the same name label. For example, 'D. Johnson' may refer to `David B. Johnson' from Rice University, `David S. Johnson' from AT&T research lab, or `David E. Johnson' from Utah University (assuming the authors still have these affiliations).”( BIBREF29 )
+
+The citations above show that there are many expressions for Personal Name Matching (or sub-categories) which are not equally used by different authors. Niu et al. and On et al. restrict Name Disambiguation to finding synonyms, Han et al. include homonyms in their definition. Even more related expressions can be found in literature. As mentioned, we will use Personal Name Matching in this work as Reuther uses it.
+
+The main aspect of Personal Name Matching is handling synonyms and homonyms. Trying to express the problems formally leads to the following description: Let INLINEFORM0 be a set of persons, especially characterized by their names, in a certain data set and INLINEFORM1 a set of all existing persons. We are also being given a function INLINEFORM2 and a relation INLINEFORM3 . The actual problems can be described as
+
+with INLINEFORM0 ; INLINEFORM1 ; INLINEFORM2 .
+
+Case UID60 checks for each person INLINEFORM0 from the person set INLINEFORM1 whether another person INLINEFORM2 from INLINEFORM3 exists, so that their name labels are different ( INLINEFORM4 ) but the person is the same ( INLINEFORM5 ). So this case covers the synonym problem because the same person has several names here.
+
+Case UID61 checks for each person INLINEFORM0 from the person set INLINEFORM1 whether another person INLINEFORM2 exists in INLINEFORM3 , so that their name labels are equal ( INLINEFORM4 ) but the persons behind the names differ ( INLINEFORM5 ). So this case covers the homonym problem because the same name is taken by several people.
+
+The problem Personal Name Matching arises because such a relation INLINEFORM0 usually does not exist and needs to be approximated as good as possible: INLINEFORM1 
+
+Thanks to appropriate similarity measurements and a matching threshold INLINEFORM0 , we can find such a relation INLINEFORM1 which is approximately equivalent to the original relation INLINEFORM2 . The main task in Personal Name Matching is finding a good similarity measure for the described problem. ( BIBREF26 , p. 52)
+
+Let us have a look at a vivid example.
+
+The birth name of the famous actor Michael Keaton is Michael John Douglas. Keaton took a pseudonym because he could have been confused with the more famous actor Michael Douglas. Synonyms for Keaton are “Michael Keaton”, “Michael Douglas”, “Michael John Douglas”, “Michael J. Douglas”, “M. Keaton” or “M. J. Douglas”. -1
+
+On the other hand, when we hear the name “Michael Douglas” we cannot be sure which famous actor is referred to, because Michael Douglas is a valid name for both of them. Figure FIGREF62 illustrates this Personal Name Matching problem with Michael Keaton.
+
+The process of Personal Name Matching can be divided into the following steps ( BIBREF26 , p. 56-87):
+
+Criteria for the evaluation of such a process are Precision and Recall ( BIBREF35 , p. 75-81; BIBREF26 , p. 83-85). Let INLINEFORM0 be a set of items, INLINEFORM1 be the set of relevant items (e.g. synonyms) with INLINEFORM2 and INLINEFORM3 be the answer of a request. In our scenario, the request is usually the question “Is the item INLINEFORM4 a synonym, or accordingly INLINEFORM5 ?”. Then we can define: INLINEFORM6 INLINEFORM7 
+
+Precision testifies whether the reported synonyms during the Name Matching process are really synonyms, Recall allows us to say whether there are synonyms which have not been found.
+
+We use a combination of the Jaccard Similarity Coefficient and Levenshtein Distance in our tool. Bilenko et al. BIBREF36 explain these string matching methods isolated. Given two word sets INLINEFORM0 and INLINEFORM1 , the simple Jaccard Similarity Coefficient is: INLINEFORM2 
+
+The Levenshtein Distance uses the operations replacement, insertion and deletion of a character and is defined by a matrix. Let INLINEFORM0 and INLINEFORM1 be words, INLINEFORM2 and INLINEFORM3 their lengths. Then we can define: DISPLAYFORM0 
+
+We modify the Jaccard Similarity Coefficient in a way that it classifies two set items as intersected if their Levenshtein Distance is lower than a certain threshold.
+
+In addition to the general Personal Name Matching, we must take the characteristics of Japanese names into account. Particularly the usage of kanji and several possibilities to transcribe a name make it hard to compare Japanese names. For example, we cannot compare kanji names from the IPSJ DL with the author names in DBLP. Even though kanji are suited best for name comparison it does not work here because the standard encoding of names in DBLP is “Latin-1” which does not support kanji natively.
+
+A big problem for our work is revealed by looking at the given name Akiko with its kanji representation 章子. As we can see in table TABREF71 章子 has several possible readings besides Akiko (left column) and Akiko written in Latin characters does not determine a nonambiguous match in kanji (right column).
+
+The same problem applies to Japanese family names. Table TABREF72 presents the problem with Kojima as a family name example.
+
+## Preparation of Japanese Papers for the Import Into the DBLP Data Set
+
+大事の前の小事 Daiji no mae no shōji
+
+(Who wants to achieve big things must do the little things first.)
+
+Japanese saying
+
+This chapter explains the approach to process and combine the various data sources so that we can import Japanese publications in the end. We will proceed step by step to make the ideas behind the solution as comprehensible as possible.
+
+## General Approach
+
+First we will construct a table in a relational database containing information about Japanese names and their transcriptions by converting the ENAMDICT name dictionary. Then we set up a data structure for Japanese names that handles the problem of assigning a given and a family name to a newly instantiated author during parsing the publications of IPSJ DL. At last, we will discuss the actual and titular integration of Japanese papers into the DBLP data set including an explanation that shows how to create a harvester for the OAI-PMH protocol.
+
+## Converting an ENAMDICT File to a Relational Database
+
+The first step towards being able to handle Japanese names is distinguishing given and family name in the input text. A relational database containing information about Japanese names and their transcriptions is useful for this task. The database should contain names in kanji, their transcriptions in hiragana and Latin characters and the name type to have a good match with the data source ENAMDICT and to provide all necessary name information we need.
+
+To fill the empty database, the ENAMDICT file needs to be analyzed and its data needs to be extracted. The entries usually have the form
+
+KANJI [TRANSCRIPTION] /LATIN (TYPE)/.
+
+We can take the following line as an example of an existing entry:
+
+森田 [もりだ] /Morida (s)/
+
+A parser should export the single entries. First it saves the text between the slashes and searches for the type of the entry. It must be assured that all person name types and no undesired or alleged types will be stored. Types can consist of the characters “s” (surname), “g” (given name), “f” (female name), “m” (male name), “u” (unclassified name), “p” (place name), “h” (full name of a particular person), “pr” (product name), “co” (company name) or “st” (station name). But only the types “s”, “g”, “f” and “m” are important in this case because the parser should only store person names in the database. One exception are the unclassified names and they need to be stored too because they can also contain person names. Using unclassified names carelessly leads to problems, though. On the one hand it is useful if you find a match for the given name but not for the assumed family name. Then it helps to find an unclassified name matching the assumed family name. On the other hand some unclassified names in the ENAMDICT file decrease the data quality of the database. The entry
+
+スターウォーズ /(u) Star Wars (film)/
+
+shows that there are undesired names like film titles in the category “unclassified”. The example also reveals that there is no overall standard for an entry format. Analyzing the file leads to following observations:
+
+text in round brackets might be type or additional commentary (see entry example above)
+
+when only hiragana or katakana are used instead of kanji to display the Japanese name the transcription part is missing because it is not required (see entry example above)
+
+the type information in brackets might actually consist of several type declarations, separated by commas
+
+the type information might be placed before or after the transcription in Latin characters
+
+one entry line might contain several possibilities to interpret the name, the example
+
+イブ /(f) Eve/(u) Ib/Ibu (f)/(m) Yves/
+
+clarifies this aspect
+
+We must consider these observations when we implement the parser.
+
+To handle the problems in UID76 and UID78 we can filter the contents in round brackets. One possibility is using a regular expression like (,|s|u|g|f|m|p|h|pr|co|st) INLINEFORM0 to filter all valid types. Regular expressions are powerful and popular tools for pattern matching. In our case we are looking for valid type expressions including commas to get rid of commentaries. After eliminating commentaries we also want to get rid of unwanted types like place names. So we filter again and only process desired types this way. To handle UID77 we just ignore missing transcriptions in square brackets. Our parser also needs to be flexible enough to deal with observation UID79 which means that it must expect the type(s) at two possible places (before and after the transcription in Latin characters). We can handle the last observation UID80 by using recursive function calls. We call the function that exports one entry with a modified parameter value within the function itself when there is more than one entry in the input line (noticeable by additional slashes).
+
+Before parsing we need to change the original encoding of the ENAMDICT file from “EUC-JP” to “UTF-8” to make it compatible with our program.
+
+During parsing a few inconsistencies in the syntax of the ENAMDICT file occurred:
+
+there were four times no slash in the end of the entry:
+
+甲子太郎 [かしたろう] /Kashitarou (m)
+
+there was once an unnecessary closing bracket without an opening bracket:
+
+近松秋江 [ちかまつしゅうこう] /Chikamatsu Shuukou) (h)/
+
+there was once a backslash where a square bracket was supposed to be put:
+
+キルギス共和国 [キルギスきょうわこく\ /(p) Kyrgyz Republic/Kirghiz Republic/
+
+Instead of constructing a workaround for these problems we should rather correct the only few inconsistencies manually.
+
+## A Data Structure for Japanese Names
+
+We will construct a class which is responsible for handling Japanese names and representing them in a convenient way. Therefore, it must be able to save the name in kanji and in at least one Latin transcription. The transcription is necessary to compare found authors in IPSJ DL with authors in the DBLP. The kanji name can be stored as additional author metadata in the DBLP later. Our goal is a standardized representation of a Japanese person. So first we can construct a simple helper class for a single name containing given and family name as strings. This class can be applied to both kanji and Latin names. Our Japanese person usually has these two name representations.
+
+When getting an input name from the IPSJ DL we try to determine the separation point and categorize the tokens into given and family names. The separation point can mostly be identified by white space or a comma between the words. The categorization is done by including information from ENAMDICT. Thanks to ENAMDICT's classification into name types we can use this information to categorize our input name tokens into given and family names. However, we have to cover some unusual cases too because IPSJ DL has no standardized way to provide names. So we get names in various formats. For example, there are entries in which the family name follows the given name directly without any separation markers. Then we can try to take advantage of upper and lower case letters assuming that an uppercase letter means the beginning of a new name token. But we must also be aware of existing input names like “KenjiTODA”. If we get a longer sequence of uppercase letters, this sequence is probably a family name. We can filter these names with a regular expression like [A-Z][a-z]{1,}[A-Z]{3,} (first character is an uppercase letter, followed by at least one lowercase letter, followed by at least three uppercase letters). We also have to recognize abbreviated names and normalize Latin names.
+
+Let us have a look at what we can observe about necessary transcription customizations. One peculiarity is that Japanese like to transcribe their names with an INLINEFORM0 instead of a double vowel. An example is “Hitoshi Gotoh”. The INLINEFORM1 symbolizes the lengthening of a vowel and is a substitute for INLINEFORM2 or INLINEFORM3 in this case. To enable our class to find names like this in ENAMDICT, we have to replace the INLINEFORM4 's lengthening a vowel by the vowel itself because ENAMDICT entries contain double vowels instead of INLINEFORM5 's with this semantic function.
+
+Another observation is ENAMDICT's usage of the Hepburn transcription system throughout the entire dictionary. So we have to convert the name to match the Hepburn system and to check a name via ENAMDICT. The needed character replacements for a conversion into the Hepburn system are shown in table TABREF86 (see also figure FIGREF165 in the appendix).
+
+In addition to the replacements from table TABREF86 , we must consider that names usually start with uppercase letters and replace “Tu”, “Ti”, “Sya” and so on by “Tsu”, “Chi”, “Sha”, etc. as well.
+
+The Japanese INLINEFORM0 is sometimes transcribed as INLINEFORM1 . If INLINEFORM2 is followed by INLINEFORM3 or INLINEFORM4 , this INLINEFORM5 is likely to be transcribed as INLINEFORM6 . The reason is a correlative modification in the pronunciation of INLINEFORM7 in these cases. For example, the family name Kanbe is often transcribed as Kambe in the IPSJ DL data set. -1
+
+Double vowels are sometimes completely dropped in some IPSJ DL author elements. While this might be okay for aesthetic reasons when transcribing the own name, it becomes a problem when we try to find a matching name in a dictionary like ENAMDICT. So we also have to check additional modified names. If there is a single vowel in the name, we must also check the same name whose vowel has become a double vowel. If several single vowels occur in a name, the number of names to be checked rapidly increases too. We have to pay special attention to the doubling of the vowel INLINEFORM0 because INLINEFORM1 AND INLINEFORM2 are possible doublings for the single INLINEFORM3 . Doubling the vowel INLINEFORM4 leads either to INLINEFORM5 or INLINEFORM6 . All other double vowels are intuitive: INLINEFORM7 becomes INLINEFORM8 , INLINEFORM9 becomes INLINEFORM10 , INLINEFORM11 becomes INLINEFORM12 . Taking “Gotoh” as an example we remove the INLINEFORM13 first and check a list of names via ENAMDICT. The list of names consists of “Goto”, “Gooto”, “Gouto”, “Gotoo”, “Gotou”, “Gootoo”, “Goutoo”, “Gootou” and “Goutou”. We can remove “Goto”, “Gooto” and “Gouto” from the list if we know that the INLINEFORM14 (representing a double vowel) has been removed before.
+
+If the input metadata contains a Latin and kanji representation of the author's name, we will try to find a match for these. Names in kanji usually do not have any separation mark, so we must distinguish given and family name by taking advantage of the ENAMDICT dictionary and checking the possible name combinations. Processing author names without kanji representation is okay but a missing Latin representation becomes a problem when it comes to actually integrating the publication into the DBLP data set because all DBLP data are supposed to have a Latin representation. The solution is a search for name candidates (we will discuss it more detailed in section UID121 ).
+
+We cannot be sure that our name matching for Latin and kanji names always succeeds. Therefore, we add some status information to our Japanese name to get a chance to evaluate the outcome of the program. Possible status types are:
+
+The status “ok” means that given and family name have successfully been found in the name dictionary and (if available) the kanji names have successfully been assigned to their corresponding name in Latin characters.
+
+An undefined status usually means that the Latin name is missing. A missing Latin name leads to a never changed name status. In these cases, the name in kanji usually exists anyway.
+
+This is the status type for an abbreviated name like “T. Nakamura”.
+
+If this status occurs, the Latin name could not be found in the name dictionary.
+
+If a kanji name has not been found in the name dictionary or could not be assigned to the Latin name, this status will occur.
+
+As the name suggests, this status means that the data quality of the publication metadata source is most likely bad. Our tool can handle some of these cases well by normalizing the name.
+
+We could have stumbled upon a name anomaly when we see this status type. During implementation this status was narrowed down to a possible name anomaly for abbreviated names.
+
+This status indicates a critical name anomaly. This is the only case in which the tool cannot even give a recommendation for given and family name. The output is the full name of the input data for both given and family name.
+
+In chapter SECREF5 we discussed synonyms and homonyms. With the strategies from above we can deal with synonyms pretty well. Yet, homonyms cannot be recognized this way and are not covered at all by our tool.
+
+## Import Into the DBLP Data Set
+
+To be able to import the harvested data into the DBLP, we still need to make the existing publication data processable in an appropriate way for our program, construct a coauthor table for these data, compare publications from the Digital Library of the IPSJ with those available in the DBLP project and provide the new publication metadata for the DBLP adequately.
+
+It is important to convert the DBLP file INLINEFORM0 to a relational database to gain an easier and more efficient access to the data while running our program. We are mainly interested in the basic publication metadata. So we will skip some non-publication records of the DBLP like INLINEFORM1 elements. Our publication database table shall contain columns for an ID, the authors, title, publication year, journal title, journal pages and the volume. Whenever we come across the beginning of a publication type element ( INLINEFORM3 , INLINEFORM4 , INLINEFORM5 , INLINEFORM6 , INLINEFORM7 , INLINEFORM8 , INLINEFORM9 ) during parsing, we reinitialize the variables which store this metadata for the table columns. When we encounter the according XML end tag of the publication we add an SQL INSERT command to a batch of commands. This batch is regularly executed after processing a certain amount of publications. The regular execution of batches allows a better performance than sending single INSERT commands to the database server. There are some recommendations in the DBLP FAQ BIBREF20 for parsing the INLINEFORM10 file. We use the Apache Xerces parser instead of the standard Java SAX parser and need to increase the allocatable heap space for our parser.
+
+While parsing the DBLP file we can construct a table with coauthor relationships along with the DBLP publication table. This coauthor table stores two author names and a publication ID. The ID shows which publication has been written together by the authors and matches the ID in the DBLP publication table. New coauthor relationships will only be inserted if there are at least two authors mentioned in the metadata. If the metadata mentions more than two authors, every possible pair of authors will be inserted into the database.
+
+As already explained in section SECREF39 , we access the OAI-PMH repository by the repository name and the metadata format prefix to get a list of publication metadata entries. The specification of OAI-PMH 2.0 BIBREF17 describes a possibility to retrieve a list of all metadata formats which a Data Provider has to offer. The HTTP request
+
+1.5 em1.5 em(*@@*)false6pt
+
+http: //ipsj.ixsq.nii.ac.jp/ej/?action=repository_oaipmh
+
+ &verb=ListMetadataFormats
+
+informs us that there are two metadata formats called oai_dc and junii2. oai_dc is the standard Dublin Core format all Data Providers provide, also traceable in the protocol specification. The “Implementation Guidelines for the Open Archives Initiative Protocol for Metadata Harvesting” BIBREF37 classify the metadata format oai_dc as mandatory. The name junii2 suggests that it is a self-developed format of the National Institute of Informatics (in Tokyo). Comparing these two in IPSJ DL, we notice that junii2 provides a more accurate description of the data, for example regarding additional XML attributes telling us whether the element value is English or Japanese. This additional information is helpful when we process the data in a later step and is missing in the oai_dc representation of the IPSJ server's data. So we will take the metadata prefix junii2 as initial point for harvesting the server's metadata. Figure FIGREF102 shows an according metadata example (also compare figure FIGREF46 ).
+
+The harvesting includes the following steps:
+
+we load the DBLP publication, coauthor relationship and the ENAMDICT data into the RAM
+
+we access the IPSJ server to get publication metadata
+
+we parse the accessed XML metadata (concerning the thoughts from section SECREF85 ) and store the needed publication data temporarily in the RAM.
+
+we add the parsed publication to an SQL command batch to insert the metadata into a relational database (the batch is regularly executed)
+
+we create a BHT file for the parsed publication
+
+at the end we go into all directories with BHT files and concatenate them to one bigger BHT file
+
+During the implementation and testing, some exceptional incidents occurred. We try to cover them besides the expected difficulties like Personal Name Matching and transcriptions. For example, we get “NobukazuYOSHIOKA” as a full input name. Algorithm UID99 shows a way to handle these unusual input data. Japanese sometimes write their family names in upper case letters to distinguish given and family name. [htb]
+
+ INLINEFORM0 : full input name
+
+ INLINEFORM0 : list of name representations for a Japanese person
+
+function split( INLINEFORM0 ): searches for regular expression and splits text,
+
+ splitted text does not contain text that matches the regular expression
+
+function normalize( INLINEFORM0 ): normalizes personal name
+
+new name for person found and added (given and family name separated)
+
+ INLINEFORM0 matches regular expression INLINEFORM1 INLINEFORM2 split INLINEFORM3 INLINEFORM4 split INLINEFORM5 normalize INLINEFORM6 INLINEFORM7 BAD_DATA_QUALITY_IN_SOURCE INLINEFORM8 add(new PersonName INLINEFORM9 Categorizing names like “NobukazuYOSHIOKA”
+
+Another observation during testing the program and checking the data is the following. Searching the Japanese given name “Shin'ichi” in the DBLP we notice that there is no uniform way to store certain names in the database. We find “Shin'ichi Aihara” but also “Shin-ichi Adachi” along with other results indicating the same phenomenon. So we see the apostrophe and the hyphen are used equally as syllable separators (we discussed the syllable separation in chapter SECREF14 ). Comparing the author “Shinichi Horiden” from the IPSJ data set and the one from the DBLP data set we can assume they are the same person because they have common coauthors (e.g. Kenji Taguchi and Kiyoshi Itoh) in both databases. The IPSJ data set tells us that the name written in kanji is 本位田真一. We are interested in the part 真一 (Shin'ichi) because we get to know that the separator symbol is sometimes missing. The kanji indicates the syllables INLINEFORM0 , especially focused on INLINEFORM1 and INLINEFORM2 instead of INLINEFORM3 . We would expect an additional separator symbol for a clear (nonambiguous) transcription; but obviously, it has been dropped in this case. A separator symbol can also be found when some double vowels occur. For example, we find “Toru Moto'oka” (元岡達) instead of “Toru Motooka”. This makes it easier to identify the reading of a single kanji (元 moto, 岡 oka, 達 toru). When a separator symbol is needed for a clear transcription, an apostrophe is used as separator symbol in ENAMDICT. While ENAMDICT always uses an apostrophe as separator symbol, DBLP and IPSJ DL use an apostrophe, a hyphen or the separator symbol is missing. We must consider these differences in the data sources for a successful import. For an easier name matching between names in the ENAMDICT and IPSJ DL data set we can add names containing an apostrophe once as they are and once without apostrophes to the relational database when we parse the ENAMDICT file to store person names in a relational database.
+
+Our tool has a statistics class to get an overview over the parsed input data and the quality of the output data. We will have a look at these statistics created after the harvest. There are 81597 records with publication metadata and 8562 records which are marked as INLINEFORM0 in the parsed data. Figure FIGREF114 shows a visualization in pie chart form.
+
+The publication types are declared as “Technical Report”, “Conference Paper”, “Journal Article”, “Departmental Bulletin Paper” or “Article” (compare the table TABREF115 and figure FIGREF116 ).
+
+The statistics also reveal that 74971 publications are published in Japanese, only 4456 in English (compare the pie chart in figure FIGREF117 ).
+
+Our tool detects 1325 publications which are already included in DBLP. A publication is considered found in both databases if the title is the same and at least one author is the same.
+
+The most interesting statistics for our work are these about the evaluation of the quality of author name assignments (compare the bar chart in figure FIGREF119 ):
+
+Fortunately, 180221 of 231162 author names could be matched successfully. There are many reasons for the remaining uncovered cases. 9073 Latin names could not be found in the name dictionary ENAMDICT and 14827 name matchings between the names' Latin and kanji representations did not succeed. These names might be missing at all in the dictionary, delivered in a very unusual format that the tool does not cover, or might not be Japanese or human names at all. Of course, Japanese computer scientists sometimes also cooperate with foreign colleagues but our tool expects Japanese names and is optimized for them. Both IPSJ DL and ENAMDICT provide katakana representations for some Western names. However, katakana representations for Western names are irrelevant for projects like DBLP. But for instance, Chinese names in Chinese characters are relevant. Understandably, our tool does not support any special Personal Name Matching for Chinese names yet because our work is focused on Japanese names. The tool does not take account of the unclassified names of ENAMDICT by default. We can increase the general success rate of the Name Matching process by enabling the inclusion of unclassified names in the configuration file but the quality of the Name Matching process will decrease because the correct differentiation between given and family name cannot be guaranteed anymore. An unclassified name may substitute a given or a family name.
+
+There are 1203 entries that were qualified as “bad data quality in publication metadata source”. They might be handled alright but they are particularly marked to indicate that these cases should also be reviewed manually before any import action is performed.
+
+The numbers of abbreviated names, possible name anomalies and name anomalies are very low. While processing author names which will be later qualified as “possible name anomaly”, the tool cannot decide whether the assignment has been correct or the name is an anomaly. “Name anomalies” are critical anomalies that could not be categorized into any other status.
+
+There could be a few uncovered flaws, for example HTML or code in titles. We must be aware of those when we do the actual import into the DBLP data set.
+
+We will discuss the creation of BHT files and important extensions for the BHT format that fit the requirements of Japanese papers well, based on our knowledge from section SECREF49 . As mentioned, the header dictates ISO-8859-1 (Latin-1) as encoding of the file INLINEFORM0 . Ley's work BIBREF19 reveals that we can use XML/HTML entities to solve this problem. Authors have person records in the DBLP providing additional information. For example, we can find the following entry for Atsuyuki Morishima (森嶋厚行) in the XML file:
+
+1.5 em1.5 em(*@@*)false6pt
+
+<www mdate="2008-02-20" key="homepages/m/AtsuyukiMorishima">
+
+ <author>Atsuyuki Morishima</author>
+
+ <title>Home Page</title>
+
+ <url>http://www.kc.tsukuba.ac.jp/~mori/index.html</url>
+
+ <note>&#x68EE;&#x5D8B;&#x539A;&#x884C;</note>
+
+</www>
+
+We must extend the BHT format to fulfill the requirements and add extra metadata for authors, title and relevant process information. The author talked to members of the DBLP team personally and got the permission to extend the original BHT format to enable us to adapt the format to Japanese papers. Our additions are well formed XML elements. We must substitute all non-ASCII characters by escape characters (XML entities) to ensure the compatibility for DBLP. The additional elements are:
+
+Every author that has a kanji representation in its metadata gets an originalname element:
+
+1.5 em1.5 em(*@@*)false6pt
+
+ <originalname latin="Shinsuke Mori">&#x68EE;,&#x4FE1;&#x4ECB;
+
+ </originalname>
+
+If available, the Latin representation is added as an attribute INLINEFORM0 to avoid confusion on assigning the extra information to the right author later on. The element content has a fixed structure. The family name comes first, followed by a comma and the given name.
+
+Every author gets a status information that evaluates the author name assignment. It is displayed by a status element:
+
+1.5 em1.5 em(*@@*)false6pt
+
+ <status name="Shinsuke Mori">ok</status>
+
+The connected author is added as an attribute INLINEFORM0 .
+
+If there is no Latin representation of the name of an author, we will add Latin name candidates to the BHT file:
+
+1.5 em1.5 em(*@@*)false6pt
+
+ <namecandidates kanji="&#x83C5;&#x8C37;&#x6B63;&#x5F18;">Shougu Sugatani, Seihiro Sugatani, Tadahiro Sugatani, Masahiro Sugatani, Shougu Suganoya, Seihiro Suganoya, Tadahiro Suganoya, Masahiro Suganoya, Shougu Sugaya, Seihiro Sugaya, Tadahiro Sugaya, Masahiro Sugaya, Shougu Sugetani, Seihiro Sugetani, Tadahiro Sugetani, Masahiro Sugetani, Shougu Sugenoya, Seihiro Sugenoya, Tadahiro Sugenoya, Masahiro Sugenoya</namecandidates>
+
+The connected kanji representation is added as an attribute kanji in the namecandidates element. We seek the kanji in ENAMDICT and output all possible name combinations in a comma separated list.
+
+If the original language of the title is Japanese, we will add this title to the BHT file:
+
+1.5 em1.5 em(*@@*)false6pt
+
+ <originaltitle lang="ja" type="Journal Article">&#x70B9;&#x4E88;&#x6E2C;&#x306B;&#x3088;&#x308B;&#x81EA;&#x52D5;&#x5358;&#x8A9E;&#x5206;&#x5272;</originaltitle>
+
+The XML element originaltitle has the attributes lang (for the paper language) and type (for the publication type).
+
+The tool searches the authors in DBLP and tries to find additional common coauthors in DBLP. If at least two of the main authors of the paper also worked with a certain other person (that is retrieved from DBLP), this person is added to the comma separated list. The Personal Name Matching of author names uses a combination of Levenshtein Distance and Jaccard Similarity Coefficient here.
+
+1.5 em1.5 em(*@@*)false6pt
+
+ <commoncoauthors>Masato Mimura</commoncoauthors>
+
+If the tool finds the paper in DBLP, we also add the DBLP key. Records, such as elements with publication metadata, have a unique key in DBLP.
+
+1.5 em1.5 em(*@@*)false6pt
+
+ <dblpkey>conf/iscas/HiratsukaGI06</dblpkey>
+
+An example of a BHT file in SPF can be found in the appendix in section SECREF170 (also compare with the original BHT format in section SECREF168 ). After we have finished parsing all Japanese papers, we concatenate the BHT files in SPF that belong together to one bigger BHT file INLINEFORM0 . Publications, respectively BHT files, that belong together are recognizable by the directory structure. If they belong together, they will be in the same directory. We must simply go through the BHT root directory recursively.
+
+## Conclusion and Future Work
+
+“Creativity is seeing what everyone else sees,
+
+but then thinking a new thought that has never been
+
+thought before and expressing it somehow.”
+
+(Neil deGrasse Tyson)
+
+The integration of Japanese papers into the DBLP data set has revealed some major problems. The nonambiguous representation of Japanese names (and paper titles, etc.) is done by kanji while DBLP's standard encoding is Latin-1 and Japanese characters are only optionally added to the publications' metadata. This leads to the need of transcribing the Japanese names which in turn also evokes new problems because there is not the transcription but rather a lot of transcription possibilities.
+
+In addition to that, we must ensure a certain data quality even if one data source sometimes lacks this quality. Due to name matching with a name dictionary, format checking and conversions (if necessary), we can actually correct some flaws or at least assimilate the data into our project.
+
+The problem of synonyms is dealt with by transcription manipulations, homonyms could not be addressed in this work. Reuther ( BIBREF26 , p. 159-164) describes an idea to handle homonyms. We could extend our tool by a Coauthor Index as in DBLP for the publications of the IPSJ DL. The idea is based on the assumption that scientists often publish their papers with the same people as coauthors. If the coauthors match a certain coauthor group, the author is considered the same. -1 If the author's coauthors are not members of the expected coauthor groups, the author could be a different person than we expected and we might have a homonym here.
+
+The developed tool is usable and provides among relational databases customized Bibliography Hypertext (BHT) files as output data. Customizations were necessary to optimize the BHT files for Japanese papers and additional important metadata information. Desired but missing metadata like contributors or a short description of the content of a paper can be added without much effort because the relational database already contains these data, only the source code of Kankoukanyuu (our tool) needs to be extended by a few lines.
+
+Though having been created with care regarding correct and well-formed output data, it is not recommended to import the newly created BHT files unchecked. The DBLP team should check the files not to compromise the data quality of DBLP. There might still be undesired format anomalies in the BHT files. The DBLP team also needs to adapt their import system to the extended BHT format developed in this work for the actual import into DBLP.
+
+Titles might be in uppercase letters. This could be improved but we have to pay attention because a primitive solution will not work well. For example, we have to be aware of the popular usage of acronyms in computer science. So some words in uppercase letters can be correct.
+
+Our tool is optimized for the Digital Library of the IPSJ and their OAI-PMH metadata prefix junii2. It can easily be adapted to support the similar and commonly used metadata prefix oai_dc. So the tool would be able to handle other publication metadata sources that support OAI-PMH.
+
+The algorithm for detecting common papers in DBLP and IPSJ DL may be modified to achieve an even better comparison between the databases and detect more common papers.
+
+It would be useful to include a Chinese name dictionary in the future and extend the name search of our tool to cover Chinese names as well. -1
+
+One improvement in the future could be storing the most common names (for example, the 100 most common given and family names) in a separate data structure in the RAM. This way we can improve the runtime by often skipping the search in the huge name data.
+
+We can still increase the success rate of the Name Matching process too. One way is swapping kanji. A typical Japanese name has two kanji for the given name and two kanji for the family name. The family name shall precede the given name. However, this principle could be violated by the publication source. If the Name Matching is not successful, we may swap the first two for the last two characters and try to find a match again.
+
+A second advancement is the additional support of a special Latin character set that is used by Japanese. For instance, we can find the name “Ｋａｉ” instead of “Kai” in the metadata of IPSJ DL. They look very similar and both represent simple Latin letters but their character codes are different. So programs handle them differently. A simple (but yet unimplemented) substitution function can cover these rare and unusual cases.
+
+Another possibility to take advantage of this work is extracting the author names in kanji from the relational database. So the DBLP team can insert author metadata for already existing authors in DBLP.
+
+We can also have a look at what phases of the Personal Name Matching process have been implemented in this work and to which degree. There are actually different types of Personal Name Matching included in our tool:
+
+The “Standardization” is accomplished by a normalization of the Latin input names at the beginning of the process. Kanji input names get trimmed by removing all whitespace. We do not have a “Blocking” phase as it is proposed by Reuther BIBREF26 . When searching a match between transcribed Japanese names with their original kanji representation we even go a contrary way and increase the number of comparisons by adding reasonable other transcriptions to the matching process. Due to efficient data structures and a comparatively small amount of Japanese papers (less than 100000), our tool has an acceptable runtime (the retrieval of the publication metadata from the IPSJ server takes much longer than processing it). In addition, the search for common coauthors will only be done if the author exists in DBLP. The phases “Analysis” and “Decision Model” are entangled in our tool. If we find a match between a (normalized or modified) input name and a name in the name dictionary, we will immediately consider them a successful match and continue parsing the metadata. When we try to find coauthors in DBLP, we take advantage of the combined Jaccard Levenshtein Distance as explained in chapter SECREF5 .
+
+Instead of checking the complete output data in the “Performance Measurement” phase, we could only take control samples while implementing, debugging, testing and improving our program. A broad manual check of approximately 90000 publications is not possible within the scope of a diploma thesis. The control samples had the expected and desired content but we cannot guarantee the correctness of the output. Under the assumption that ENAMDICT's entries are correct, the predicted Precision should be about INLINEFORM0 because the tool probably does not produce many false positives. But we cannot say anything about the Recall because ENAMDICT does not cover all names that occur in IPSJ DL. All exceptions resulting from the limits of a name dictionary and a bad data quality are supposed to be handled by the status for author name assignments (described in section UID99 ). This gives us the chance to manually handle the noted exceptions afterwards.
+
+All in all, this work is a first approach for an integration of Japanese papers into the DBLP data set and provides a not yet perfect but usable tool for this task. Some major obstacles are overcome.
+
+## About the Tool
+
+The developed tool that is also part of this project is named Kankoukanyuu (刊行加入). Kankou means publication, kanyuu means admission. The whole name indicates the ability to import publications. The tool also allows the assimilation of imported publications, of course. The usable functionalities are:
+
+Parsing the DBLP file INLINEFORM0 and converting it to a MySQL database
+
+Converting an ENAMDICT name dictionary file to a MySQL database
+
+Harvesting the IPSJ server, processing the publication metadata and storing it in a MySQL database
+
+Making the harvested publications ready for an import into the DBLP data set by making BHT files
+
+## Usage
+
+The tool has been developed and tested on a Linux system with Intel Core 2 Quad and 8 GB RAM in the local computer pool. It has to be executed by command line like this:
+
+1.5 em1.5 em(*@@*)false6pt
+
+java -Xmx5400M -jar kankoukanyuu.jar
+
+The parameter -Xmx5400M allows our program to allocate more than 5 GB RAM and store all necessary data in the RAM for an unproblematic execution.
+
+Possible command line arguments are:
+
+Parse dplb.xml and fill database tables
+
+Convert ENAMDICT dictionary file to a relational database
+
+Harvest the IPSJ server, fill OAI-PMH data into databases and create BHT files (in SPF) - requires DBLP and ENAMDICT database tables from steps above
+
+Concatenate BHT files in Single Publication Format to one bigger file (file all.bht will be created in every folder with BHT files) - requires BHT files in SPF from step above
+
+Do all of the above
+
+Show help text about usage of the tool
+
+The configuration file INLINEFORM0 allows us to change following parameters:
+
+Database related parameters (in INLINEFORM0 section): URL ( INLINEFORM1 ), database name ( INLINEFORM2 ), user name ( INLINEFORM3 ) and password ( INLINEFORM4 )
+
+ENAMDICT related parameter (in INLINEFORM0 section): location of ENAMDICT file ( INLINEFORM1 )
+
+ENAMDICT database related parameters (in INLINEFORM0 section): database table name ( INLINEFORM1 ), decision whether to use unclassified names ( INLINEFORM2 )
+
+DBLP related parameter (in INLINEFORM0 section): location of INLINEFORM1 ( INLINEFORM2 )
+
+DBLP database related parameters (in INLINEFORM0 section): database table name for publications ( INLINEFORM1 ), database table name for coauthor relationships (authorscounttable)
+
+OAI-PMH database (contains output after harvest and parsing process) related parameters (in INLINEFORM0 section): publication table ( INLINEFORM1 ), authors table ( INLINEFORM2 ), titles table ( INLINEFORM3 ), contributors table ( INLINEFORM4 ), descriptions table ( INLINEFORM5 )
+
+Harvester related parameters (in INLINEFORM0 section): location for storing the harvest ( INLINEFORM1 ), start ID for harvester ( INLINEFORM2 ), end ID for harvester ( INLINEFORM3 ), decision whether to use record lists ( INLINEFORM4 )
+
+BHT export related parameters (in INLINEFORM0 section): location for BHT output files ( INLINEFORM1 ), decision whether to compute and show common coauthors (showcommoncoauthors)
+
+Log related parameter (in INLINEFORM0 section): location of log files ( INLINEFORM1 )
+
+A configuration example can be found in the appendix section SECREF172 .
+
+The system must support the Japanese language (meaning Japanese characters) to ensure a successful run.
+
+Kankoukanyuu does not use any Linux-only commands but has not been tested on Microsoft Windows yet.
+
+## Used Technologies
+
+The tool itself has been written in Java, using the OpenJDK 6. The handling of databases is done by MySQL 5 and JDBC is used to provide MySQL functionalities within Java.
+
+External libraries are the Apache Xerces parser and the MySQL Connector/J. The Fat Jar Eclipse Plug-In is used to deploy the complete project into one executable Java JAR file. The execution of Kankoukanyuu becomes more user-friendly this way because external libraries are already included and class paths for external libraries does not need to be specified anymore.
+
+## Runtime
+
+Measurement indicates the following approximated runtimes of Kankoukanyuu:
+
+We can make some observations. During the harvest, only ca. 30 minutes were spent on processing the harvested data, the rest is needed to retrieve the data from the Japanese server. Depending on whether the local file system or network file system was used, the runtime for the concatenation differs immensely.
+
+## BHT Example Proposed By DBLP
+
+1.5 em1.5 em(*@@*)false6pt
+
+Computer Languages, Systems &amp; Structures (journals/cl)
+
+<h2>Volume 34, Numbers 2-3, July-October 2008</h2>
+
+Best Papers 2006 International Smalltalk Conference
+
+<ul>
+
+<li>Wolfgang De Meuter:
+
+Preface.
+
+45
+
+<ee>http://dx.doi.org/10.1016/j.cl.2007.07.001</ee>
+
+<li>David R&ouml;thlisberger, Marcus Denker, &Eacute;ric Tanter:
+
+Unanticipated partial behavioral reflection: Adapting applications at runtime.
+
+46-65
+
+<ee>http://dx.doi.org/10.1016/j.cl.2007.05.001</ee>
+
+<li>Johan Brichau, Andy Kellens, Kris Gybels, Kim Mens, Robert Hirschfeld, Theo D'Hondt:
+
+Application-specific models and pointcuts using a logic metalanguage.
+
+66-82
+
+<ee>http://dx.doi.org/10.1016/j.cl.2007.05.004</ee>
+
+<li>Alexandre Bergel, St&eacute;phane Ducasse, Oscar Nierstrasz, Roel Wuyts:
+
+Stateful traits and their formalization.
+
+83-108
+
+<ee>http://dx.doi.org/10.1016/j.cl.2007.05.003</ee>
+
+<li>Alexandre Bergel, St&eacute;phane Ducasse, Colin Putney, Roel Wuyts:
+
+Creating sophisticated development tools with OmniBrowser.
+
+109-129
+
+<ee>http://dx.doi.org/10.1016/j.cl.2007.05.005</ee>
+
+<li>Luc Fabresse, Christophe Dony, Marianne Huchard:
+
+Foundations of a simple and unified component-oriented language.
+
+130-149
+
+<ee>http://dx.doi.org/10.1016/j.cl.2007.05.002</ee>
+
+</ul>
+
+This is a BHT example proposed by the DBLP team in the DBLP FAQ BIBREF20 .
+
+## BHT Example File Created By Kankoukanyuu
+
+1.5 em1.5 em(*@@*)false6pt
+
+<h2>Volume 52, Number 10, October 2011</h2>
+
+<ul>
+
+<li>Shinsuke Mori, Graham Neubig, Yuuta Tsuboi:
+
+A Pointwise Approach to Automatic Word Segmentation.
+
+2944-2952
+
+<ee>http://id.nii.ac.jp/1001/00078161/</ee>
+
+<originalname latin="Shinsuke Mori">&#x68EE;,&#x4FE1;&#x4ECB;</originalname>
+
+<status name="Shinsuke Mori">ok</status>
+
+<originalname latin="Graham Neubig">&#x30CB;&#x30E5;&#x30FC;&#x30D3;&#x30C3;&#x30B0;&#x30B0;&#x30E9;&#x30E0;,</originalname>
+
+<status name="Graham Neubig">no kanji matching found</status>
+
+<originalname latin="Yuuta Tsuboi">&#x576A;&#x4E95;,&#x7950;&#x592A;</originalname>
+
+<status name="Yuuta Tsuboi">ok</status>
+
+<originaltitle lang="ja" type="Journal Article">&#x70B9;&#x4E88;&#x6E2C;&#x306B;&#x3088;&#x308B;&#x81EA;&#x52D5;&#x5358;&#x8A9E;&#x5206;&#x5272;</originaltitle>
+
+<commoncoauthors>Masato Mimura</commoncoauthors>
+
+</ul>
+
+This is an output example of a BHT file in Single Publication Format (before the concatenation step), created by our tool.
+
+## Excerpt From dblp.xml
+
+1.5 em1.5 em(*@@*)false6pt
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<!DOCTYPE dblp SYSTEM "dblp.dtd">
+
+<dblp>
+
+<article mdate="2002-01-03" key="persons/Codd71a">
+
+<author>E. F. Codd</author>
+
+<title>Further Normalization of the Data Base Relational Model.</title>
+
+<journal>IBM Research Report, San Jose, California</journal>
+
+<volume>RJ909</volume>
+
+<month>August</month>
+
+<year>1971</year>
+
+<cdrom>ibmTR/rj909.pdf</cdrom>
+
+<ee>db/labs/ibm/RJ909.html</ee>
+
+</article>
+
+<article mdate="2002-01-03" key="persons/Hall74">
+
+<author>Patrick A. V. Hall</author>
+
+<title>Common Subexpression Identification in General Algebraic Systems.</title>
+
+<journal>Technical Rep. UKSC 0060, IBM United Kingdom Scientific Centre</journal>
+
+<month>November</month>
+
+<year>1974</year>
+
+</article>
+
+<article mdate="2002-01-03" key="persons/Tresch96">
+
+<author>Markus Tresch</author>
+
+<title>Principles of Distributed Object Database Languages.</title>
+
+<journal>technical Report 248, ETH Z&uuml;rich, Dept. of Computer Science</journal>
+
+<month>July</month>
+
+<year>1996</year>
+
+</article>
+
+...
+
+## Configuration File of Our Tool
+
+1.5 em1.5 em(*@@*)false6pt
+
+[db]
+
+url=myserver
+
+db=mydbname
+
+user=myusername
+
+password=mypassword
+
+[japnamesdb]
+
+table=japnames
+
+useunclassifiednames=false
+
+[dblpdb]
+
+authorscounttable=dblpauthors
+
+dblptable=dblp
+
+[oaidb]
+
+publicationtable=oai_publications
+
+authorstable=oai_authors
+
+titlestable=oai_titles
+
+contributorstable=oai_contributors
+
+descriptionstable=oai_descriptions
+
+[enamdict]
+
+file=./enamdict
+
+[harvester]
+
+filespath=./files-harvester
+
+minid=1
+
+maxid=100000
+
+uselistrecords=true
+
+[dblp]
+
+xmlfile=/dblp/dblp.xml
+
+[bhtexport]
+
+path=./bht
+
+showcommoncoauthors=true
+
+[log]
+
+path=./log

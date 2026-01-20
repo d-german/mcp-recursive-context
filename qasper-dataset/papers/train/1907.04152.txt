@@ -1,0 +1,129 @@
+# Clustering of Medical Free-Text Records Based on Word Embeddings
+
+**Paper ID:** 1907.04152
+
+## Abstract
+
+Is it true that patients with similar conditions get similar diagnoses? In this paper we show NLP methods and a unique corpus of documents to validate this claim. We (1) introduce a method for representation of medical visits based on free-text descriptions recorded by doctors, (2) introduce a new method for clustering of patients' visits and (3) present an~application of the proposed method on a corpus of 100,000 visits. With the proposed method we obtained stable and separated segments of visits which were positively validated against final medical diagnoses. We show how the presented algorithm may be used to aid doctors during their practice.
+
+## Introduction
+
+Processing of free-text clinical records play an important role in computer-supported medicine BIBREF0 , BIBREF1 . A detailed description of symptoms, examination and an interview is often stored in an unstructured way as free-text, hard to process but rich in important information. Some attempts of processing medical notes exist for English, while for other languages the problem is still challenging BIBREF2 .
+
+A clustering task is easier for structured data such as age, sex, place, history of diseases, ICD-10 code etc. (an example of patients clustering based only on their history of diseases is BIBREF3 ), but it is far from being solved for unstructured free-texts.
+
+The clustering of visits has many applications. If we are able to group visits into clusters based on interview with a patient and medical examination then (1) we can follow recommendations that were applied to patients with similar visits in the past to create a list of possible diagnoses, (2) reveal that the current diagnosis is unusual, (3) identify subsets of visits with the same diagnosis but different symptoms.
+
+A desired goal in the clustering is to divide patients into groups with similar properties. In the case of clustering hospitalized patients one of the most well-known examples are Diagnosis Related Groups BIBREF4 which aim to divide patients into groups with similar costs of treatment. Grouping visits of patients in health centers is a different issue. Here most of the information is unstructured and included in the visit's description written by a doctor: the description of the interview with the patient and the description of a medical examination of the patient.
+
+In general, there are two main approaches to generate vector representations of a text. The first takes into account the occurrence and the frequency of words in the considered text. The simplest example is one-hot encoding or weighting by Term Frequency-Inverse Document Frequency (TF-IDF, BIBREF5 ). The main disadvantage of these methods is that they do not take into account the semantic similarity between words. Thus very similar texts that do not have common words but do have some synonyms can be represented by totally different vectors. This is an especially serious problem in creating short text representations, like medical descriptions, where two random visits very often do not have any common word.
+
+We achieved better results from the second approach which generates text representation based on words/concepts embeddings.
+
+Medical concepts to be extracted from texts very often are taken from Unified Medical Language System (UMLS, BIBREF6 ), which is a commonly accepted base of biomedical terminology. Representations of medical concepts are computed based on various medical texts, like medical journals, books, etc. BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 or based directly on data from Electronic Health Records BIBREF12 , BIBREF13 , BIBREF10 .
+
+An interesting algorithm for patient clustering is given in BIBREF12 . A subset of medical concepts (e.g. diagnosis, medication, procedure codes) and computed embeddings is aggregated for all visits of a patient. This way we get patient embedding that summaries the medical history of a patient.
+
+In this work we present a different approach. Our data contains medical records for different medical domains. This allows us to create a more comprehensive description of a patient. A second difference is that the aim is a clustering of visits, not patients. This way a single patient may belong to several clusters.
+
+Our clustering is also based on a dictionary of medical concepts. We create our own dictionary as for Polish does not exist any classification of medical concepts like UMLS. It will be presented in details in the section Methodology.
+
+## Corpus of free-text clinical records
+
+The clustering method is developed and validated on a new dataset of free-text clinical records of about 100,000 visits.
+
+The data set consists of about 100,000 patients' visits from different primary health care centers and specialist clinics in Poland. The first part of the data contains descriptions of visits, which have a free-text form. They are written by doctors representing a wide range of medical professions, e.g. general practitioners, dermatologists, cardiologists or psychiatrists. Each description is divided into three parts: interview, examination, and recommendations.
+
+## Methodology
+
+In this section we describe our algorithm for visits clustering. The clustering is derived in four steps.
+
+(1) Medical concepts are extracted from free-text descriptions of an interview and examination. (2) A new representation of identified concepts is derived with concepts embedding. (3) Concept embeddings are transformed into visit embeddings. (4) Clustering is performed on visit embeddings.
+
+## Extraction of medical concepts
+
+As there are no generally available terminological resources for Polish medical texts, the first step of data processing was aimed at automatic identification of the most frequently used words and phrases. The doctors' notes are usually rather short and concise, so we assumed that all frequently appearing phrases are domain related and important for text understanding. The notes are built mostly from noun phrases so it was decided to extract simple noun phrases which consist of a noun optionally modified by a sequence of adjectives (in Polish they can occur both before and after a noun) or by another noun in the genitive. We only extracted sequences that can be interpreted as phrases in Polish, i.e. nouns and adjectives have to agree in case, number and gender.
+
+Phrase extraction and ordering was performed by TermoPL BIBREF14 . The program processes text which is tokenized, lemmatized and tagged with POS and morphological features values. It allows for defining a grammar describing extracted text fragments and order them according to the modified version of the C-value coefficient BIBREF15 . We preprocessed texts using Concraft tagger BIBREF16 and we used the standard grammar for describing noun phrases included in TermoPL.
+
+In order to get the most common phrases, we processed 220,000 visits by TermoPL. The first 4800 phrases (with C-value equal at least 20) from the obtained list were manually annotated with semantic labels. The list of labels covered most general concepts like anatomy, feature, disease, test. It contained 137 labels. Some labels were assigned to multi-word expressions (MWEs), in some cases all or some of their elements were also labeled separately, e.g. left hand is labeled as anatomy while hand is also labeled as anatomy and left as lateralization. The additional source of information was the list of 9993 names of medicines and dietary supplements.
+
+The above list of terms together with their semantic labels was then converted to the format of lexical resources of Categorial Syntactic-Semantic Parser „ENIAM” BIBREF17 , BIBREF18 . The parser recognized lexemes and MWEs in visits according to the provided list of terms, then the longest sequence of recognized terms was selected, and semantic representation was created. Semantic representation of a visit has a form of a set of pairs composed of recognized terms and their labels (not recognized tokens were omitted). The average coverage of semantic representation was 82.06% of tokens and 75.38% of symbols in section Interview and 87.43% of tokens and 79.28% of symbols in section Examination.
+
+Texts of visits are heterogeneous as they consist of: very frequent domain phrases; domain important words which are too infrequent to be at the top of the term list prepared by TermoPL; some general words which do not carry relevant information; numerical information; and words which are misspelled. In the clustering task we neglect the original text with inflected word forms and the experiment described in this paper is solely performed on the set of semantic labels attached to each interview and examination.
+
+## Embeddings for medical concepts
+
+Three most common classic non-contextual approaches to obtain word embeddings are skip-gram, Continuous Bag of Words (two algorithms from BIBREF19 ) and GloVe (Global Vectors, BIBREF20 , where higher accuracy than in previous algorithms was proved). Some authors use pretrained embeddings (especially when their data set is too small to train their own embeddings) or try to modify these embeddings and adjust to their set. But the biggest drawback of these approaches is that the corpus for training embeddings can be not related to the specific task where embeddings are utilized. A lot of medical concepts are not contained in well-known embeddings bases. Furthermore, the similarity of words may vary in different contexts.
+
+In the experiments, we reduce the description of visits to extracted concepts. Furthermore we choose only unique concepts and abandon their original order in the description. During creating the term coocurrence matrix the whole visit’s description is treated as the neighbourhood of the concept.
+
+Then, we compute embeddings of concepts (by GloVe) for interview descriptions and for examination descriptions separately. We compute two separate embeddings, because we want to catch the similarity between terms in their specific context, i.e. words similar in the interview may not be similar in the examination description (for example we computed that the nearest words to cough in interview descriptions was runny nose, sore throat, fever, dry cough but in examination description it was rash, sunny, laryngeal, dry cough).
+
+## Visit embeddings
+
+The simplest way to generate text embeddings based on term embeddings is to use some kind of aggregation of term embeddings such as an average. This approach was tested for example by BIBREF21 and BIBREF13 . BIBREF22 computed a weighted mean of term embeddings by the construction of a loss function and training weights by the gradient descent method.
+
+Final embeddings for visits are obtained by concatenation of average embeddings calculated separately for the interview and for the medical examination, see Figure FIGREF4 .
+
+## Visits clustering
+
+Based on Euclidean distance between vector representations of visits we applied and compared two clustering algorithms: k-means and hierarchical clustering with Ward's method for merging clusters BIBREF23 . The similarity of these clusterings was measured by the adjusted Rand index BIBREF24 . For the final results we chose the hierarchical clustering algorithm due to greater stability.
+
+For clustering, we selected only visits where the description of recommendation and at least one of interview and examination were not empty (that is, some concepts were recognized in the text). It significantly reduced the number of considered visits.
+
+Table TABREF6 gives basic statistics of obtained clusters. The last column contains the adjusted Rand index. It can be interpreted as a measure of the stability of the clustering. The higher similarity of the two algorithms, the higher stability of clustering.
+
+For determining the optimal number of clusters, for each specialty we consider the number of clusters between 2 and 15. We choose the number of clusters so that adding another cluster does not give a relevant improvement of a sum of differences between elements and clusters' centers (according to so called Elbow method).
+
+Clustering was performed separately for each specialty of doctors. Figure FIGREF11 illustrates two-dimensional projections of visit embeddings coloured by clusters. The projections were created by t-SNE algorithm BIBREF25 . For some domains clusters are very clear and separated (Figure FIGREF11 ). This corresponds with the high stability of clustering measured by Rand index.
+
+In order to validate the proposed methodology we evaluate how clear are derived segments when it comes to medical diagnoses (ICD-10 codes). No information about recommendations or diagnosis is used in the phase of clustering to prevent data leakage.
+
+Figure FIGREF13 (b) shows correspondence analysis between clusters and ICD-10 codes for family medicine clustering. There appeared two large groups of codes: first related to diseases of the respiratory system (J) and the second related to other diseases, mainly endocrine, nutritional and metabolic diseases (E) and diseases of the circulatory system (I). The first group corresponds to Cluster 1 and the second to Cluster 4. Clusters 3, 5 and 6 (the smallest clusters in this clustering) covered Z76 ICD-10 code (encounter for issue of repeat prescription).
+
+We also examined the distribution of doctors' IDs in the obtained clusters. It turned out that some clusters covered almost exactly descriptions written by one doctor. This situation took place in the specialties where clusters are separated with large margins (e.g. psychiatry, pediatrics, cardiology). Figure FIGREF13 (a) shows correspondence analysis between doctors' IDs and clusters for psychiatry clustering.
+
+## Results
+
+The evaluation of results is based on empirical studies described in separate subsections.
+
+## Analogies in medical concepts
+
+To better understand the structure of concept embeddings and to determine the optimal dimension of embedded vectors we use word analogy task introduced by BIBREF19 and examined in details in a medical context by BIBREF9 . In the former work the authors defined five types of semantic and nine types of syntactic relationship.
+
+We propose our own relationships between concepts based on the fact that a lot of concepts contain the same words.
+
+We would like embeddings to be able to catch relationships between terms. A question in the term analogy task is computing a vector: INLINEFORM0 and checking if the correct INLINEFORM1 is in the neighborhood (in the metric of cosine of the angle between the vectors) of this resulting vector.
+
+We defined seven types of such semantic questions and computed answers' accuracy in a similar way as BIBREF19 : we created manually the list of similar term pairs and then we formed the list of questions by taking all two-element subsets of the pairs list. Table TABREF7 shows the created categories of questions.
+
+We created one additional task, according to the observation that sometimes two different terms are related to the same object. This can be caused for example by the different order of words in the terms, e.g. left wrist and wrist left (in Polish both options are acceptable). We checked if the embeddings of such words are similar.
+
+We computed term embeddings for terms occurring at least 5 times in the descriptions of the chosen visits. The number of chosen terms in interview descriptions was equal to 3816 and in examination descriptions – 3559. Among these there were 2556 common terms for interview and examination.
+
+There were evaluated term embeddings for vectors of length from 10 to 200. For every embedding of interview terms there was measured accuracy of every of eight tasks. Table TABREF9 shows the mean of eight task results. The second column presents the results of the most restrictive rule: a question is assumed to be correctly answered only if the closest term of the vector computed by operations on related terms is the same as the desired answer. It should be noticed that the total number of terms in our data set (about 900,000 for interviews) was many times lower than sets examined by BIBREF19 . Furthermore, words in medical descriptions can have a different context that we expect. Taking this into account, the accuracy of about 0.17 is very high and better than we expected.
+
+We then checked the closest 3 and 5 words to the computed vector and assumed a correct answer if in this neighbourhood there was the correct vector. In the biggest neighbourhood the majority of embeddings returned accuracy higher than 0.5.
+
+For computing visit embeddings we chose embeddings of dimensionality 20, since this resulted in the best accuracy of the most restrictive analogy task and it allowed us to perform more efficient computations than higher dimensional representations
+
+Figure FIGREF8 illustrates term embeddings from four categories of analogies. Embeddings are projected using PCA method.
+
+## Recommendations in clusters
+
+According to the main goal of our clustering described in Introduction, we would like to obtain similar recommendations inside every cluster. Hence we examined the frequency of occurrence of the recommendation terms in particular clusters.
+
+We examined terms of recommendations related to one of five categories: procedure to carry out by patient, examination, treatment, diet and medicament. Table TABREF12 shows an example of an analysis of the most common recommendations in clusters in cardiology clustering. In order to find only characteristic terms for clusters we filtered the terms which belong to one of 15 the most common terms in at least three clusters.
+
+## ICD-10 codes embeddings
+
+Embeddings for visits can be used to generate vector representations of ICD-10 codes. For every ICD-10 code we computed an average of embeddings of all visits assigned by the doctor to this code. Figure FIGREF14 shows t-SNE visualisation of these embeddings. We can see clear groups of codes from the same categories of diseases.
+
+## Conclusions and applications
+
+We proposed a new method for clustering of visits in health centers based on descriptions written by doctors. We validated this new method on a new large corpus of Polish medical records. For this corpus we identified medical concepts and created their embeddings with GloVe algorithm. The quality of the embeddings was measured by the specific analogy task designed specifically for this corpus. It turns out that analogies work well, what ensures that concept embeddings store some useful information.
+
+Clustering was performed on visits embedding created based on word embedding. Visual and numerical examination of derived clusters showed an interesting structure among visits. As we have shown obtained segments are linked with medical diagnosis even if the information about recommendations nor diagnosis were not used for the clustering. This additionally convinces that the identified structure is related to some subgroups of medical conditions.
+
+Obtained clustering can be used to assign new visits to already derived clusters. Based on descriptions of an interview or a description of patient examination we can identify similar visits and show corresponding recommendations.

@@ -1,0 +1,157 @@
+# On the Relationship between Self-Attention and Convolutional Layers
+
+**Paper ID:** 1911.03584
+
+## Abstract
+
+Recent trends of incorporating attention mechanisms in vision have led researchers to reconsider the supremacy of convolutional layers as a primary building block. Beyond helping CNNs to handle long-range dependencies, Ramachandran et al. (2019) showed that attention can completely replace convolution and achieve state-of-the-art performance on vision tasks. This raises the question: do learned attention layers operate similarly to convolutional layers? This work provides evidence that attention layers can perform convolution and, indeed, they often learn to do so in practice. Specifically, we prove that a multi-head self-attention layer with sufficient number of heads is at least as powerful as any convolutional layer. Our numerical experiments then show that the phenomenon also occurs in practice, corroborating our analysis. Our code is publicly available.
+
+## Introduction
+
+Recent advances in Natural Language Processing (NLP) are largely attributed to the rise of the transformer BIBREF1. Pre-trained to solve an unsupervised task on large corpora of text, transformer-based architectures, such as GPT-2 BIBREF2, BERT BIBREF3 and Transformer-XL BIBREF4, seem to possess the capacity to learn the underlying structure of text and, as a consequence, to learn representations that generalize across tasks. The key difference between transformers and previous methods, such as recurrent neural networks BIBREF5 and convolutional neural networks (CNN), is that the former can simultaneously attend to every word of their input sequence. This is made possible thanks to the attention mechanism—originally introduced in Neural Machine Translation to better handle long-range dependencies BIBREF6. With self-attention in particular, the similarity of two words in a sequence is captured by an attention score measuring the distance of their representations. The representation of each word is then updated based on those words whose attention score is highest.
+
+Inspired by its capacity to learn meaningful inter-dependencies between words, researchers have recently considered utilizing self-attention in vision tasks. Self-attention was first added to CNN by either using channel-based attention BIBREF7 or non-local relationships across the image BIBREF8. More recently, BIBREF9 augmented CNNs by replacing some convolutional layers with self-attention layers, leading to improvements on image classification and object detection tasks. Interestingly, BIBREF0 noticed that, even though state-of-the art results are reached when attention and convolutional features are combined, under same computation and model size constraints, self-attention-only architectures also reach competitive image classification accuracy.
+
+These findings raise the question, do self-attention layers process images in a similar manner to convolutional layers? From a theoretical perspective, one could argue that transfomers have the capacity to simulate any function—including a CNN. Indeed, BIBREF10 showed that a multi-layer attention-based architecture with additive positional encodings is Turing complete under some strong theoretical assumptions, such as unbounded precision arithmetic. Unfortunately, universality results do not reveal how a machine solves a task, only that it has the capacity to do so. Thus, the question of how self-attention layers actually process images remains open.
+
+## Introduction ::: Contributions.
+
+In this work, we put forth theoretical and empirical evidence that self-attention layers can (and do) learn to behave similar to convolutional layers:
+
+From a theoretical perspective, we provide a constructive proof showing that self-attention layers can express any convolutional layers.
+
+Specifically, we show that a single multi-head self-attention layer using relative positional encoding can be re-parametrized to express any convolutional layer. Our insights lead to a relative positional encoding, that we refer to as quadratic encoding, that is very efficient in terms of size.
+
+Our experiments show that the first few layers of attention-only architectures BIBREF0 do learn to attend on grid-like pattern around each query pixel, similar to our theoretical construction.
+
+Strikingly, this behavior is confirmed both for our quadratic encoding, but also for relative encoding that is learned during training. Our results seem to suggest that localized convolution is the right inductive bias for the first few layers of an image classifying network. For deeper layers, on the other hand, long-range as well as horizontally-symmetric inter-dependencies become more relevant.
+
+For reproducibility purposes, our code is publicly available on GitHub.
+
+## Background on Attention Mechanisms for Vision
+
+We here recall the mathematical formulation of self-attention layers and emphasize the role of positional encodings.
+
+## Background on Attention Mechanisms for Vision ::: The Multi-Head Self-Attention Layer
+
+Let $\in ^{T\times D_{\textit {in}}}$ be an input matrix consisting of $T$ tokens in of ${D_{\textit {in}}}$ dimensions each. While in NLP each token corresponds to a word in a sentence, the same formalism can be applied to any sequence of $T$ discrete objects, e.g. pixels. A self-attention layer maps any query token $t \in [T]$ from $D_{\textit {in}}$ to $D_{\textit {out}}$ dimensions as follows: Self-Attention()t,: := ( t,: ) val, where we refer to the elements of the $T \times T$ matrix := qrykey as attention scores and the softmax output as attention probabilities. The layer is parametrized by a query matrix $_{\!\textit {qry}}\in ^{D_{\textit {in}} \times D_{k}}$, a key matrix $_{\!\textit {key}}\in ^{D_{\textit {in}} \times D_{k}}$ and a value matrix $_{\!\textit {val}}\in ^{D_{\textit {in}} \times D_{\textit {out}}}$.For simplicity, we exclude any residual connections, batch normalization and constant factors. A key property of the self-attention model described above is that it is equivariant to reordering, that is, it gives the same output independently of how the $T$ input tokens are shuffled. This is problematic for cases we expect the order of things to matter. To alleviate the limitation, a positional encoding is learned for each token in the sequence (or pixel in an image), and added to the representation of the token itself before applying self-attention := (+ ) qrykey(+ ), where $\in ^{T \times D_{\textit {in}}}$ contains the embedding vectors for each position. More generally, $$ may be substituted by any function that returns a vector representation of the position.
+
+It has been found beneficial in practice to replicate this self-attention mechanism into multiple heads, each being able to focus on different parts of the input by using different query, key and value matrices. In multi-head self-attention, the output of the $N_h$ heads of output dimension $D_h$ are concatenated and projected to dimension $D_{\textit {out}}$ as follows: MHSA() := *concath [Nh][Self-Attentionh()] out + out and two new parameters are introduced: the projection matrix $_{\!\textit {out}} \in ^{N_h D_h \times D_{\textit {out}}}$ and a bias term $_{\textit {out}}\in ^{D_{\textit {out}}}$.
+
+## Background on Attention Mechanisms for Vision ::: Attention for Images
+
+Convolutional layers are the de facto choice for building neural networks that operate on images. We recall that, given an image tensor $~\in ~^{W\times H \times D_{\textit {in}}}$ of width $W$, height $H$ and $D_{\textit {in}}$ channels, the output of a convolutional layer for pixel $(i,j)$ is given by Conv()i,j,: := (1, 2) K 1,2,:,: i+1, j+2, : + , where $$ is the $K \times K \times D_{\textit {out}} \times D_{\textit {in}}$ weight tensor , $\in ^{D_{\textit {out}}}$ is the bias vector and the set
+
+contains all possible shifts appearing when convolving the image with a $K\times K$ kernel.
+
+In the following, we review how self-attention can be adapted from 1D sequences to images.
+
+With images, rather than tokens, we have query and key pixels $, \in [W] \times [H]$. Accordingly, the input is a tensor $$ of dimension $W \times H \times D_{\textit {in}}$ and each attention score associates a query and a key pixel. To keep the formulas consistent with the 1D case, we abuse notation and slice tensors by using a 2D index vector: if $= (i,j)$, we write $_{,:}$ and $_{,:}$ to mean $_{i, j,:}$ and $_{i, j,:,:}$, respectively. With this notation in place, the multi-head self attention layer output at pixel $$ can be expressed as follows: Self-Attention(),: = ( ,: ) ,: val and accordingly for the multi-head case.
+
+## Background on Attention Mechanisms for Vision ::: Positional Encoding for Images
+
+There are two types of positional encoding that has been used in transformer-based architectures: the absolute and relative encoding (see also tab:relworkattention in the Appendix).
+
+With absolute encodings, a (fixed or learned) vector $_{,:}$ is assigned to each pixel $$. The computation of the attention scores we saw in eq:attcoeff can then be decomposed as follows: , abs = (,: + ,:) qrykey(,: + ,:)
+
+= ,: qrykey,: + ,: qrykey,: + ,:qrykey,: + ,: qrykey,: where $$ and $$ correspond to the query and key pixels, respectively.
+
+The relative positional encoding was introduced by BIBREF4. The main idea is to only consider the position difference between the query pixel (pixel we compute the representation of) and the key pixel (pixel we attend) instead of the absolute position of the key pixel: , rel := ,: qry key ,: + ,: qry key + key ,: + key In this manner, the attention scores only depend on the shift ${{\delta }}:= - $. Above, the learnable vectors $$ and $$ are unique for each head, whereas for every shift ${{\delta }}$ the relative positional encoding $_{{{\delta }}} \in ^{D_p}$ is shared by all layers and heads. Moreover, now the key weights are split into two types: $_{\!\textit {key}}$ pertain to the input and $\widehat{}_{\!\textit {key}}$ to the relative position of pixels.
+
+## Self-Attention as a Convolutional Layer
+
+This section derives sufficient conditions such that a multi-head self-attention layer can simulate a convolutional layer. Our main result is the following:
+
+Theorem 1 A multi-head self-attention layer with $N_h$ heads of dimension $D_h$, output dimension $D_{\textit {out}}$ and a relative positional encoding of dimension $D_p \ge 3$ can express any convolutional layer of kernel size $\sqrt{N_h} \times \sqrt{N_h}$ and $\min (D_h, D_{\textit {out}})$ output channels.
+
+The theorem is proven constructively by selecting the parameters of the multi-head self-attention layer so that the latter acts like a convolutional layer. In the proposed construction, the attention scores of each self-attention head should attend to a different relative shift within the set $\Delta \!\!\!\!\Delta _K = \lbrace -\lfloor K/2 \rfloor , \dots , \lfloor K/2 \rfloor \rbrace ^2$ of all pixel shifts in a $K\times K$ kernel. The exact condition can be found in the statement of Lemma UNKREF15.
+
+Then, Lemma UNKREF17 shows that the aforementioned condition is satisfied for the relative positional encoding that we refer to as the quadratic encoding: (h) := -(h) (1, -21(h), -22(h)) := (2 , 1, 2) qry = key := 0 key := The learned parameters ${{\Delta }}^{(h)} = ({{\Delta }}^{(h)}_1, {{\Delta }}^{(h)}_2)$ and $\alpha ^{(h)}$ determine the center and width of attention of each head, respectively. On the other hand, ${{\delta }}= ({{\delta }}_1, {{\delta }}_2)$ is fixed and expresses the relative shift between query and key pixels.
+
+It is important to stress that the above encoding is not the only one for which the conditions of Lemma UNKREF15 are satisfied. In fact, in our experiments, the relative encoding learned by the neural network also matched the conditions of the lemma (despite being different from the quadratic encoding). Nevertheless, the encoding defined above is very efficient in terms of size, as only $D_p = 3$ dimensions suffice to encode the relative position of pixels, while also reaching similar or better empirical performance (than the learned one). Though we lack a formal proof, we conjecture that every encoding that satisfies Lemma UNKREF15 should have at least three dimensions.
+
+## Self-Attention as a Convolutional Layer ::: Remark for the 1D case.
+
+Convolutional layers acting on sequences are commonly used in the literature for text BIBREF11, as well as audio BIBREF12 and time series BIBREF13. Theorem UNKREF11 can be straightforwardly extended to show that multi-head self-attention with $N_h$ heads can also simulate a 1D convolutional layer with a kernel of size $K=N_h$ with $\min (D_h, D_{\textit {out}})$ output channels using a positional encoding of dimension $D_p \ge 2$. Since we have not tested empirically if the preceding construction matches the behavior of 1D self-attention in practice, we cannot claim that it actually learns to convolve an input sequence—only that it has the capacity to do so.
+
+## Self-Attention as a Convolutional Layer ::: Proof of Main Theorem
+
+The proof follows directly from Lemmas UNKREF15 and UNKREF17 stated below:
+
+Lemma 1 Consider a multi-head self-attention layer consisting of $N_h = K^2$ heads, $D_h \ge D_{\textit {out}}$ and let $~:~[N_h]~\rightarrow ~{\Delta \!\!\!\!\Delta }_K$ be a bijective mapping of heads onto shifts. Further, suppose that for every head the following holds: ((h),:) = {ll 1 if (h) = -
+
+0 otherwise. . Then, for any convolutional layer with a $K \times K$ kernel and $D_{\textit {out}}$ output channels, there exists $\lbrace _{\!\textit {val}}^{(h)}\rbrace _{h \in [N_h]}$ such that $ \operatorname{MHSA}() = \operatorname{Conv}() $ for every $\in ^{W \times H \times D_{\textit {in}}}$.
+
+Our first step will be to rework the expression of the Multi-Head Self-Attention operator from (SECREF6) and (SECREF6) such that the effect of the multiple heads becomes more transparent: MHSA() = out+ h [Nh] ((h)) val(h) out[(h-1)Dh + 1:h Dh +1] (h) Note that each head's value matrix $_{\!\textit {val}}^{(h)} \in ^{D_{\textit {in}} \times D_{h}}$ and each block of the projection matrix $_{\textit {out}}$ of dimension $D_h \times D_{\textit {out}}$ are learned. Assuming that $D_h \ge D_{\textit {out}}$, we can replace each pair of matrices by a learned matrix $^{(h)}$ for each head. We consider one output pixel of the multi-head self-attention: MHSA(),: = h [Nh] ( ((h),:) ,: ) (h) + out Due to the conditions of the Lemma, for the $h$-th attention head the attention probability is one when $ = - (h) $ and zero otherwise. The layer's output at pixel $$ is thus equal to MHSA() = h [Nh] - (h),: (h) + out For $K = \sqrt{N_h}$, the above can be seen to be equivalent to a convolutional layer expressed in eq. SECREF8: there is a one to one mapping (implied by map $$) between the matrices $^{(h)}$ for $h = [N_h]$ and the matrices $_{k_1,k_2,:,:}$ for all $(k_1,k_2) \in [K]^2.$
+
+## Self-Attention as a Convolutional Layer ::: Proof of Main Theorem ::: Remark about @!START@$D_h$@!END@ and @!START@$D_{\textit {out}}$@!END@.
+
+It is frequent in transformer-based architectures to set $D_h~=~D_{\textit {out}}/N_h$, hence $D_h < D_{\textit {out}}$. In that case, $^{(h)}$ can be seen to be of rank $D_{\textit {out}} - D_h$, which does not suffice to express every convolutional layer with $D_{\textit {out}}$ channels. Nevertheless, it can be seen that any $D_h$ out of $D_{\textit {out}}$ outputs of $\operatorname{MHSA}()$ can express the output of any convolutional layer with $D_h$ output channels. To cover both cases, in the statement of the main theorem we assert that the output channels of the convolutional layer should be $\min (D_h, D_{\textit {out}})$. In practice, we advise to concatenate heads of dimension $D_h = D_{\textit {out}}$ instead of splitting the $D_{\textit {out}}$ dimensions among heads to have exact re-parametrization and no “unused” channels.
+
+Lemma 2 There exists a relative encoding scheme $\lbrace _{{\delta }}\in ^{D_p}\rbrace _{{{\delta }}\in \mathbb {Z}^2}$ with $D_p \ge 3$ and parameters $_{\!\textit {qry}}, _{\!\textit {key}}, \widehat{}_{\!\textit {key}},$ with $D_p \le D_k$ such that, for every ${{\Delta }}\in \Delta \!\!\!\!\Delta _K$ there exists some vector $$ (conditioned on ${{\Delta }}$) yielding $ (_{,:})_{} = 1 $ if $ - = {{\Delta }}$ and zero, otherwise.
+
+We show by construction the existence of a $D_p=3$ dimensional relative encoding scheme yielding the required attention probabilities.
+
+As the attention probabilities are independent of the input tensor $$, we set $_{\!\textit {key}}=_{\!\textit {qry}}={0}$ which leaves only the last term of eq:attrel. Setting $\widehat{}_{\!\textit {key}}\in ^{D_k \times D_p}$ to the identity matrix (with appropriate row padding), yields $_{, } = ^{\top } _{{{\delta }}}$ where $\quad {{\delta }}:= - $. Above, we have assumed that $D_p \le D_k$ such that no information from $_{{{\delta }}}$ is lost.
+
+Now, suppose that we could write: , = -(- 2 + c) for some constant $c$. In the above expression, the maximum attention score over $_{, :}$ is $-\alpha c$ and it is reached for $_{, }$ with ${{\delta }}= {{\Delta }}$. On the other hand, the $\alpha $ coefficient can be used to scale arbitrarily the difference between $_{,{{\Delta }}}$ and the other attention scores.
+
+In this way, for ${{\delta }}= {{\Delta }}$, we have (,:) = e-(- 2+c) ' e-((- ')- 2+c)
+
+= e-- 2 e-c ' e-(- ')- 2 e-c
+
+= e-- 2 ' e-(- ')- 2 = 1 1 + ' e-(- ')- 2 = 1 and for ${{\delta }}\ne {{\Delta }}$, the equation becomes $ \lim _{\alpha \rightarrow \infty } (_{,:})_{} = 0, $ exactly as needed to satisfy the lemma statement.
+
+What remains is to prove that there exist $$ and $\lbrace _{{\delta }}\rbrace _{{{\delta }}\in \mathcal {Z}^2}$ for which eq:isoattdecomposed holds. Expanding the rhs of the equation, we have $ -\alpha (\Vert {{\delta }}- {{\Delta }}\Vert ^2 + c) = -\alpha ( \Vert {{\delta }}\Vert ^2 + \Vert {{\Delta }}\Vert ^2 - 2\langle {{\delta }}, {{\Delta }}\rangle + c )\,. $ Now if we set $ = -\alpha \, (1, -2{{\Delta }}_1, -2{{\Delta }}_2) $ and $ _{{\delta }}= (\Vert {{\delta }}\Vert ^2 , {{\delta }}_1, {{\delta }}_2), $ then
+
+which matches eq:isoattdecomposed with $c = -\Vert {{\Delta }}\Vert ^2$ and the proof is concluded.
+
+## Experiments
+
+The aim of this section is to validate the applicability of our theoretical results—which state that self-attention can perform convolution—and to examine whether self-attention layers in practice do actually learn to operate like convolutional layers, when being trained on standard image classification tasks. In particular, we study the relationship between self-attention and convolution with quadratic and learned relative positional encodings. We find that for both cases, the attention probabilities learned tend to respect the conditions of Lemma UNKREF15, corroborating our hypothesis.
+
+## Experiments ::: Implementation Details
+
+We study a fully attentional model consisting of six multi-head self-attention layers. As it has already been shown by BIBREF9 that combining attention features with convolutional features improves performance on Cifar-100 and ImageNet, we do not focus on attaining state-of-the-art performance. Nevertheless, to validate that our model learns a meaningful classifier we compare it to the standard ResNet18 BIBREF14 on the CIFAR-10 dataset BIBREF15. In all experiments, we use a $2\times 2$ invertible down-sampling BIBREF16 on the input to reduce the size of the image as storing the attention coefficient tensor requires a large amount of GPU memory. The fixed size representation of the input image is computed as the average pooling of the last layer representations and given to a linear classifier.
+
+We used the PyTorch library BIBREF17 and based our implementation on PyTorch Transformers. We release our code on Github and all hyper-parameters are in tab:hyper-parameter in the Appendix.
+
+## Experiments ::: Quadratic Encoding
+
+As a first step, we aim to verify that, with the relative position encoding introduced in (SECREF3), attention layers learn to behave like convolutional layers. We train nine attention heads at each layer to be on par with the $3\times 3$ kernels used predominantly by the ResNet architecture. The center of attention of each head $h$ is initialized to $\Delta ^{(h)} \sim \mathcal {N}({0}, 2_2)$.
+
+fig:isoduringtraining shows how the initial positions of the heads (different colors) at layer 4 changed during training. We can see that after optimization, the heads attend on specific pixel of the image forming a grid around the query pixel. Our intuition that Self-Attention applied to images learn convolutional filter around the queried pixel is then confirmed.
+
+fig:isoattentionfinal displays all attention head at each layer of the model at the end of the training. It can be seen that in the first few layers the heads tend to focus on local patterns (layers 1 and 2), while deeper layers (layers 3-6) also attend to larger patterns by positioning the center of attention further from the queried pixel position. We also include in the Appendix a plot of the attention positions for a higher number of heads ($N_h=16$), fig:isomanyheads displays both local patterns similar to CNN and long range dependencies. Interestingly, attention heads do not overlap and seem to take an arrangement maximizing the coverage of the input space.
+
+To verify that our self-attention model performs equally well as a small ResNet (tab:parametersize), in fig:learnedattentionmap we display the evolution of the test accuracy on CIFAR-10 over the 300 epochs of training. The ResNet is faster to converge, but we cannot ascertain whether this corresponds to an inherent property of the architecture or an artifact of the adopted optimization procedures. Our implementation could be optimized to exploit the locality of Gaussian attention probabilities and reduce significantly the number of FLOPS.
+
+## Experiments ::: Learned Relative Positional Encoding
+
+We move on to study the positional encoding used in practice by fully-attentional models on images.
+
+We implemented the 2D relative positional encoding scheme used by BIBREF0, BIBREF9: we learn a $\lfloor D_p / 2 \rfloor $ position encoding vector for each row and each column pixel shift. Hence the relative positional encoding of a key pixel at position $$ with a query pixel at position $$ is the concatenation of the row shift embedding ${{\delta }}_1$ and the column shift embedding ${{\delta }}_2$ (where ${{\delta }}= - $). We chose $D_p = D_{\textit {out}} = 400$ in the experiment. We differ from the (unpublished) implementation described by BIBREF0 in the following points: (i) we do not use convolution stem and ResNet bottlenecks for downsampling, but only a $2\times 2$ invertible downsampling layer BIBREF16 at input, (ii) we use $D_h = D_{\textit {out}}$ instead of $D_h = D_{\textit {out}} / N_h$ backed from our theory that the effective number of learned filters is $\min (D_h, D_{\textit {out}})$, (iii) the attention scores are computed using only the relative positions of the pixels and not the data. As seen in tab:parametersize, our implementation achieves accuracy close to that of ResNet18.
+
+The attention probabilities of each head at each layer are displayed on fig:learnedattentionmap. The figure confirms our hypothesis for the first two layers and partially for the third: even when left to learn the encoding from the data, certain self-attention heads (depicted on the left) learn to attend to individual pixels, closely matching the condition of Lemma UNKREF15 and thus Theorem UNKREF11. At the same time, other heads pay attention to horizontally-symmetric but non-localized patterns, as well as to long-range pixel inter-dependencies. The phenomenon is particularly prominent for layers four to six, where the behavior of self-attention can be seen to deviate from that of convolution. We also notice that vertical symmetry is much more rare in the learned attention probabilities of high layers. This matches the intuition that, for image classification, distinguishing between what is above or below something is more crucial than what is left or right. Finally, the fact that some of the heads in the last two layers seem to be redundant, likely indicating that the computational and space complexity of the model could be amenable to further reduction, for example by pruning.
+
+## Conclusion
+
+We showed that self-attention layers applied to images can express any convolutional layer (given sufficiently many heads) and that learned fully-attentional models do behave similar to CNN in practice. More generally, fully-attentional models seem to learn a generalization of CNNs where the kernel pattern is learned at the same time as the filters—similar to deformable convolutions BIBREF18, BIBREF19. Interesting directions for future work include translating existing insights from the rich CNNs literature back to transformers on various data modalities, including images, text and time series. Also, though we currently lack the computational resources to do so, we would be interested to test whether our findings are replicated for datasets of larger-scale, such as ImageNet and COCO.
+
+## Appendix ::: Generalized Quadratic Positional Encoding
+
+We noticed the similarity of the attention probabilities in the quadratic positional encoding (sec:attentioncanimplementcnn) to isotropic bivariate Gaussian distributions with bounded support: (, :) = e-(- ) - 2' [W] [H] e-(' - ) - 2 . Building on this observation, we further extended our attention mechanism to non-isotropic Gaussian distribution over pixel positions. Each head is parametrized by a center of attention ${{\Delta }}$ and a covariance matrix $$ to obtain the following attention scores, , = -1 2 (- )-1 (- ) = -1 2 -1 + -1 - 1 2 -1 , where, once more, ${{\delta }}= - $. The last term can be discarded because the softmax is shift invariant and we rewrite the attention coefficient as a dot product between the head target vector $$ and the relative position encoding $_{{{\delta }}}$ (consisting of the first and second order combinations of the shift in pixels ${{\delta }}$):
+
+## Appendix ::: Generalized Quadratic Positional Encoding ::: Evaluation.
+
+We trained our model using this generalized quadratic relative position encoding. We were curious to see if, using the above encoding the self-attention model would learn to attend to non-isotropic groups of pixels—thus forming unseen patterns in CNNs. Each head was parametrized by ${{\Delta }}\in ^2$ and $^{-1/2} \in ^{2\times 2}$ to ensure that the covariance matrix remained positive semi-definite. We initialized the center of attention to ${{\Delta }}^{(h)} \sim \mathcal {N}(\mathbf {0}, 2 _2)$ and $^{-1/2} = _2 + \mathcal {N}(\mathbf {0}, 0.01 _2)$ so that initial attention probabilities were close to an isotropic Gaussian. fig:nonisoattentionfinal shows that the network did learn non-isotropic attention probability patterns, especially in high layers. Nevertheless, the fact that we do not obtain any performance improvement seems to suggest that attention non-isotropy is not particularly helpful in practice—the quadratic positional encoding suffices.
+
+## Appendix ::: Generalized Quadratic Positional Encoding ::: Pruning degenerated heads.
+
+We noticed that certain non-isotropic attention heads attended on “non-intuitive” patches of pixels: either attending a very thin stripe of pixels, when $^{-1}$ was almost singular, or attending all pixels uniformly, when $^{-1}$ was close to $\mathbf {0}$ (i.e. constant attention scores). We asked ourselves, are such attention patterns indeed useful for the model or are these heads degenerated and unused? To find out, we pruned all heads having largest eigen-values smaller than $10^{-5}$ or condition number (ratio of the biggest and smallest eigen-values) greater than $10^5$. Specifically in our model with 6-layer and 9-heads each, we pruned $[2, 4, 1, 2, 6, 0]$ heads from the first to the last layer. This means that these layers cannot express a $3 \times 3$ kernel anymore. As shown in yellow on fig:learningcurve, this ablation initially hurts a bit the performance, probably due to off biases, but after a few epochs of continued training with a smaller learning rate (divided by 10) the accuracy recovers its unpruned value. Hence, without sacrificing performance, we reduce the size of the parameters and the number of FLOPS by a fourth.
+
+## Appendix ::: Increasing the Number of Heads
+
+For completeness, we also tested increasing the number of heads of our architecture from 9 to 16.
+
+Similar to Figure FIGREF23, we see that the network distinguishes two main types of attention patterns. Localized heads (i.e., those that attend to nearly individual pixels) appear more frequently in the first few layers. The self-attention layer uses these heads to act in a manner similar to how convolutional layers do. Heads with less-localized attention become more common at higher layers.

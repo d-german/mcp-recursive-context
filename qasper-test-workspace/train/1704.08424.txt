@@ -1,0 +1,226 @@
+# Multimodal Word Distributions
+
+**Paper ID:** 1704.08424
+
+## Abstract
+
+Word embeddings provide point representations of words containing useful semantic information. We introduce multimodal word distributions formed from Gaussian mixtures, for multiple word meanings, entailment, and rich uncertainty information. To learn these distributions, we propose an energy-based max-margin objective. We show that the resulting approach captures uniquely expressive semantic information, and outperforms alternatives, such as word2vec skip-grams, and Gaussian embeddings, on benchmark datasets such as word similarity and entailment.
+
+## Introduction
+
+To model language, we must represent words. We can imagine representing every word with a binary one-hot vector corresponding to a dictionary position. But such a representation contains no valuable semantic information: distances between word vectors represent only differences in alphabetic ordering. Modern approaches, by contrast, learn to map words with similar meanings to nearby points in a vector space BIBREF0 , from large datasets such as Wikipedia. These learned word embeddings have become ubiquitous in predictive tasks.
+
+ BIBREF1 recently proposed an alternative view, where words are represented by a whole probability distribution instead of a deterministic point vector. Specifically, they model each word by a Gaussian distribution, and learn its mean and covariance matrix from data. This approach generalizes any deterministic point embedding, which can be fully captured by the mean vector of the Gaussian distribution. Moreover, the full distribution provides much richer information than point estimates for characterizing words, representing probability mass and uncertainty across a set of semantics.
+
+However, since a Gaussian distribution can have only one mode, the learned uncertainty in this representation can be overly diffuse for words with multiple distinct meanings (polysemies), in order for the model to assign some density to any plausible semantics BIBREF1 . Moreover, the mean of the Gaussian can be pulled in many opposing directions, leading to a biased distribution that centers its mass mostly around one meaning while leaving the others not well represented.
+
+In this paper, we propose to represent each word with an expressive multimodal distribution, for multiple distinct meanings, entailment, heavy tailed uncertainty, and enhanced interpretability. For example, one mode of the word `bank' could overlap with distributions for words such as `finance' and `money', and another mode could overlap with the distributions for `river' and `creek'. It is our contention that such flexibility is critical for both qualitatively learning about the meanings of words, and for optimal performance on many predictive tasks.
+
+In particular, we model each word with a mixture of Gaussians (Section "Word Representation" ). We learn all the parameters of this mixture model using a maximum margin energy-based ranking objective BIBREF2 , BIBREF1 (Section "Discussion" ), where the energy function describes the affinity between a pair of words. For analytic tractability with Gaussian mixtures, we use the inner product between probability distributions in a Hilbert space, known as the expected likelihood kernel BIBREF3 , as our energy function (Section "Energy Function" ). Additionally, we propose transformations for numerical stability and initialization "Implementation" , resulting in a robust, straightforward, and scalable learning procedure, capable of training on a corpus with billions of words in days. We show that the model is able to automatically discover multiple meanings for words (Section "Word Representation"7 ), and significantly outperform other alternative methods across several tasks such as word similarity and entailment (Section "Word Similarity" , "Word Similarity for Polysemous Words" , "Word Entailment" ). We have made code available at http://github.com/benathi/word2gm, where we implement our model in Tensorflow tensorflow.
+
+## Related Work
+
+In the past decade, there has been an explosion of interest in word vector representations. word2vec, arguably the most popular word embedding, uses continuous bag of words and skip-gram models, in conjunction with negative sampling for efficient conditional probability estimation BIBREF0 , BIBREF4 . Other popular approaches use feedforward BIBREF5 and recurrent neural network language models BIBREF6 , BIBREF7 , BIBREF8 to predict missing words in sentences, producing hidden layers that can act as word embeddings that encode semantic information. They employ conditional probability estimation techniques, including hierarchical softmax BIBREF9 , BIBREF10 , BIBREF11 and noise contrastive estimation BIBREF12 .
+
+A different approach to learning word embeddings is through factorization of word co-occurrence matrices such as GloVe embeddings BIBREF13 . The matrix factorization approach has been shown to have an implicit connection with skip-gram and negative sampling BIBREF14 . Bayesian matrix factorization where row and columns are modeled as Gaussians has been explored in BIBREF15 and provides a different probabilistic perspective of word embeddings.
+
+In exciting recent work, BIBREF1 propose a Gaussian distribution to model each word. Their approach is significantly more expressive than typical point embeddings, with the ability to represent concepts such as entailment, by having the distribution for one word (e.g. `music') encompass the distributions for sets of related words (`jazz' and `pop'). However, with a unimodal distribution, their approach cannot capture multiple distinct meanings, much like most deterministic approaches.
+
+Recent work has also proposed deterministic embeddings that can capture polysemies, for example through a cluster centroid of context vectors BIBREF16 , or an adapted skip-gram model with an EM algorithm to learn multiple latent representations per word BIBREF17 . BIBREF18 also extends skip-gram with multiple prototype embeddings where the number of senses per word is determined by a non-parametric approach. BIBREF19 learns topical embeddings based on latent topic models where each word is associated with multiple topics. Another related work by BIBREF20 models embeddings in infinite-dimensional space where each embedding can gradually represent incremental word sense if complex meanings are observed.
+
+Probabilistic word embeddings have only recently begun to be explored, and have so far shown great promise. In this paper, we propose, to the best of our knowledge, the first probabilistic word embedding that can capture multiple meanings. We use a Gaussian mixture model which allows for a highly expressive distributions over words. At the same time, we retain scalability and analytic tractability with an expected likelihood kernel energy function for training. The model and training procedure harmonize to learn descriptive representations of words, with superior performance on several benchmarks.
+
+## Methodology
+
+In this section, we introduce our Gaussian mixture (GM) model for word representations, and present a training method to learn the parameters of the Gaussian mixture. This method uses an energy-based maximum margin objective, where we wish to maximize the similarity of distributions of nearby words in sentences. We propose an energy function that compliments the GM model by retaining analytic tractability. We also provide critical practical details for numerical stability, hyperparameters, and initialization.
+
+## Word Representation
+
+We represent each word $w$ in a dictionary as a Gaussian mixture with $K$ components. Specifically, the distribution of $w$ , $f_w$ , is given by the density 
+
+$$f_w(\vec{x}) &= \sum _{i=1}^K p_{w,i} \ \mathcal {N}\left[ \vec{x}; \vec{\mu }_{w,i} , \Sigma _{w,i} \right]  \\
+&= \sum _{i=1}^K \frac{p_{w,i} }{\sqrt{2 \pi | \Sigma _{w,i} | }} e^{-\frac{1}{2} (\vec{x} - \vec{\mu }_{w,i})^{\top } \Sigma _{w,i}^{-1} (\vec{x} - \vec{\mu }_{w,i})} \,, $$   (Eq. 2) 
+
+ where $\sum _{i=1}^K p_{w,i} = 1$ .
+
+The mean vectors $\vec{\mu }_{w,i}$ represent the location of the $i^{th}$ component of word $w$ , and are akin to the point embeddings provided by popular approaches like word2vec. $p_{w,i}$ represents the component probability (mixture weight), and $\Sigma _{w,i}$ is the component covariance matrix, containing uncertainty information. Our goal is to learn all of the model parameters $\vec{\mu }_{w,i}, p_{w,i}, \Sigma _{w,i}$ from a corpus of natural sentences to extract semantic information of words. Each Gaussian component's mean vector of word $w$ can represent one of the word's distinct meanings. For instance, one component of a polysemous word such as `rock' should represent the meaning related to `stone' or `pebbles', whereas another component should represent the meaning related to music such as `jazz' or `pop'. Figure 1 illustrates our word embedding model, and the difference between multimodal and unimodal representations, for words with multiple meanings.
+
+## Skip-Gram
+
+The training objective for learning $\theta = \lbrace \vec{\mu }_{w,i}, p_{w,i}, \Sigma _{w,i}\rbrace $ draws inspiration from the continuous skip-gram model BIBREF0 , where word embeddings are trained to maximize the probability of observing a word given another nearby word. This procedure follows the distributional hypothesis that words occurring in natural contexts tend to be semantically related. For instance, the words `jazz' and `music' tend to occur near one another more often than `jazz' and `cat'; hence, `jazz' and `music' are more likely to be related. The learned word representation contains useful semantic information and can be used to perform a variety of NLP tasks such as word similarity analysis, sentiment classification, modelling word analogies, or as a preprocessed input for complex system such as statistical machine translation.
+
+## Energy-based Max-Margin Objective
+
+Each sample in the objective consists of two pairs of words, $(w,c)$ and $(w,c^{\prime })$ . $w$ is sampled from a sentence in a corpus and $c$ is a nearby word within a context window of length $\ell $ . For instance, a word $w = $ `jazz' which occurs in the sentence `I listen to jazz music' has context words (`I', `listen', `to' , `music'). $c^{\prime }$ is a negative context word (e.g. `airplane') obtained from random sampling.
+
+The objective is to maximize the energy between words that occur near each other, $w$ and $c$ , and minimize the energy between $w$ and its negative context $c^{\prime }$ . This approach is similar to negative sampling BIBREF0 , BIBREF4 , which contrasts the dot product between positive context pairs with negative context pairs. The energy function is a measure of similarity between distributions and will be discussed in Section "Energy Function" .
+
+We use a max-margin ranking objective BIBREF2 , used for Gaussian embeddings in BIBREF1 , which pushes the similarity of a word and its positive context higher than that of its negative context by a margin $m$ : 
+
+$$\nonumber L_\theta (w, c, c^{\prime }) = \max (0, \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \\
+\nonumber m - \log E_\theta (w, c) + \log E_\theta (w, c^{\prime }) )$$   (Eq. 6) 
+
+ This objective can be minimized by mini-batch stochastic gradient descent with respect to the parameters $\theta = \lbrace \vec{\mu }_{w,i}, p_{w,i}, \Sigma _{w,i}\rbrace $ – the mean vectors, covariance matrices, and mixture weights – of our multimodal embedding in Eq. ( 2 ).
+
+We use a word sampling scheme similar to the implementation in word2vec BIBREF0 , BIBREF4 to balance the importance of frequent words and rare words. Frequent words such as `the', `a', `to' are not as meaningful as relatively less frequent words such as `dog', `love', `rock', and we are often more interested in learning the semantics of the less frequently observed words. We use subsampling to improve the performance of learning word vectors BIBREF4 . This technique discards word $w_i$ with probability $P(w_i) = 1 - \sqrt{t/f(w_i)}$ , where $f(w_i)$ is the frequency of word $w_i$ in the training corpus and $t$ is a frequency threshold.
+
+To generate negative context words, each word type $w_i$ is sampled according to a distribution $P_n(w_i) \propto U(w_i)^{3/4}$ which is a distorted version of the unigram distribution $U(w_i)$ that also serves to diminish the relative importance of frequent words. Both subsampling and the negative distribution choice are proven effective in word2vec training BIBREF4 .
+
+## Energy Function
+
+For vector representations of words, a usual choice for similarity measure (energy function) is a dot product between two vectors. Our word representations are distributions instead of point vectors and therefore need a measure that reflects not only the point similarity, but also the uncertainty.
+
+We propose to use the expected likelihood kernel, which is a generalization of an inner product between vectors to an inner product between distributions BIBREF3 . That is, $
+E(f,g) = \int f(x) g(x) \ d x = \langle f, g \rangle _{L_2}
+$ 
+
+where $\langle \cdot , \cdot \rangle _{L_2} $ denotes the inner product in Hilbert space $L_2$ . We choose this form of energy since it can be evaluated in a closed form given our choice of probabilistic embedding in Eq. ( 2 ).
+
+For Gaussian mixtures $f,g$ representing the words $w_f, w_g$ , $f(x) = \sum _{i=1}^K p_i \mathcal {N}(x; \vec{\mu }_{f,i} , \Sigma _{f,i} ) $ and $g(x) = \sum _{i=1}^K q_i \mathcal {N}(x; \vec{\mu }_{g,i} , \Sigma _{g,i} )$ , $\sum _{i =1}^K p_i = 1 $ , and $\sum _{i =1}^K q_i = 1$ , we find (see Section "Derivation of Expected Likelihood Kernel" ) the log energy is 
+
+$$ 
+\log E_\theta (f,g) = \log \sum _{j=1}^K \sum _{i=1}^K p_i q_j e^{\xi _{i,j}}$$   (Eq. 9) 
+
+where 
+
+$$\nonumber \xi _{i,j} &\equiv \log \mathcal {N}(0; \vec{\mu }_{f,i} - \vec{\mu }_{g,j}, \Sigma _{f,i} + \Sigma _{g,j} ) \\ \nonumber &= - \frac{1}{2} \log \det ( \Sigma _{f,i} + \Sigma _{g,j} ) - \frac{D}{2} \log (2 \pi ) \\
+- \frac{1}{2} & (\vec{\mu }_{f,i} - \vec{\mu }_{g,j} )^\top (\Sigma _{f,i} + \Sigma _{g,j} )^{-1} (\vec{\mu }_{f,i} - \vec{\mu }_{g,j} ) $$   (Eq. 10) 
+
+ We call the term $\xi _{i,j}$ partial (log) energy. Observe that this term captures the similarity between the $i^{th}$ meaning of word $w_f$ and the $j^{th}$ meaning of word $w_g$ . The total energy in Equation 9 is the sum of possible pairs of partial energies, weighted accordingly by the mixture probabilities $p_i$ and $q_j$ .
+
+The term $- (\vec{\mu }_{f,i} - \vec{\mu }_{g,j} )^\top (\Sigma _{f,i} + \Sigma _{g,j} )^{-1} (\vec{\mu }_{f,i} - \vec{\mu }_{g,j} ) $ in $\xi _{i,j}$ explains the difference in mean vectors of semantic pair $(w_f, i)$ and $(w_g, j)$ . If the semantic uncertainty (covariance) for both pairs are low, this term has more importance relative to other terms due to the inverse covariance scaling. We observe that the loss function $L_\theta $ in Section "Discussion" attains a low value when $E_\theta (w,c)$ is relatively high. High values of $E_\theta (w,c)$ can be achieved when the component means across different words $\vec{\mu }_{f,i}$ and $\vec{\mu }_{g,j}$ are close together (e.g., similar point representations). High energy can also be achieved by large values of $\Sigma _{f,i}$ and $\xi _{i,j}$0 , which washes out the importance of the mean vector difference. The term $\xi _{i,j}$1 serves as a regularizer that prevents the covariances from being pushed too high at the expense of learning a good mean embedding.
+
+At the beginning of training, $\xi _{i,j}$ roughly are on the same scale among all pairs $(i,j)$ 's. During this time, all components learn the signals from the word occurrences equally. As training progresses and the semantic representation of each mixture becomes more clear, there can be one term of $\xi _{i,j}$ 's that is predominantly higher than other terms, giving rise to a semantic pair that is most related.
+
+The negative KL divergence is another sensible choice of energy function, providing an asymmetric metric between word distributions. However, unlike the expected likelihood kernel, KL divergence does not have a closed form if the two distributions are Gaussian mixtures.
+
+## Experiments
+
+We have introduced a model for multi-prototype embeddings, which expressively captures word meanings with whole probability distributions. We show that our combination of energy and objective functions, proposed in Section "Skip-Gram" , enables one to learn interpretable multimodal distributions through unsupervised training, for describing words with multiple distinct meanings. By representing multiple distinct meanings, our model also reduces the unnecessarily large variance of a Gaussian embedding model, and has improved results on word entailment tasks.
+
+To learn the parameters of the proposed mixture model, we train on a concatenation of two datasets: UKWAC (2.5 billion tokens) and Wackypedia (1 billion tokens) BIBREF21 . We discard words that occur fewer than 100 times in the corpus, which results in a vocabulary size of $314,129$ words. Our word sampling scheme, described at the end of Section "Qualitative Evaluation" , is similar to that of word2vec with one negative context word for each positive context word.
+
+After training, we obtain learned parameters $\lbrace \vec{\mu }_{w,i}, \Sigma _{w,i}, p_i\rbrace _{i=1}^K$ for each word $w$ . We treat the mean vector $\vec{\mu }_{w,i}$ as the embedding of the $i^{\text{th}}$ mixture component with the covariance matrix $\Sigma _{w,i}$ representing its subtlety and uncertainty. We perform qualitative evaluation to show that our embeddings learn meaningful multi-prototype representations and compare to existing models using a quantitative evaluation on word similarity datasets and word entailment.
+
+We name our model as Word to Gaussian Mixture (w2gm) in constrast to Word to Gaussian (w2g) BIBREF1 . Unless stated otherwise, w2g refers to our implementation of w2gm model with one mixture component.
+
+## Hyperparameters
+
+Unless stated otherwise, we experiment with $K=2$ components for the w2gm model, but we have results and discussion of $K=3$ at the end of section 4.3. We primarily consider the spherical case for computational efficiency. We note that for diagonal or spherical covariances, the energy can be computed very efficiently since the matrix inversion would simply require $\mathcal {O}(d)$ computation instead of $\mathcal {O}(d^3)$ for a full matrix. Empirically, we have found diagonal covariance matrices become roughly spherical after training. Indeed, for these relatively high dimensional embeddings, there are sufficient degrees of freedom for the mean vectors to be learned such that the covariance matrices need not be asymmetric. Therefore, we perform all evaluations with spherical covariance models.
+
+Models used for evaluation have dimension $D=50$ and use context window $\ell = 10$ unless stated otherwise. We provide additional hyperparameters and training details in the supplementary material ( "Implementation" ).
+
+## Similarity Measures
+
+Since our word embeddings contain multiple vectors and uncertainty parameters per word, we use the following measures that generalizes similarity scores. These measures pick out the component pair with maximum similarity and therefore determine the meanings that are most relevant.
+
+A natural choice for a similarity score is the expected likelihood kernel, an inner product between distributions, which we discussed in Section "Energy Function" . This metric incorporates the uncertainty from the covariance matrices in addition to the similarity between the mean vectors.
+
+This metric measures the maximum similarity of mean vectors among all pairs of mixture components between distributions $f$ and $g$ . That is, $\displaystyle d(f,g) = \max _{i,j= 1, \hdots , K} \frac{ \langle \mathbf {\mu }_{f,i}, \mathbf {\mu }_{g,j} \rangle }{ ||\mathbf {\mu }_{f,i}|| \cdot || \mathbf {\mu }_{g,j} || }$ , which corresponds to matching the meanings of $f$ and $g$ that are the most similar. For a Gaussian embedding, maximum similarity reduces to the usual cosine similarity.
+
+Cosine similarity is popular for evaluating embeddings. However, our training objective directly involves the Euclidean distance in Eq. ( 10 ), as opposed to dot product of vectors such as in word2vec. Therefore, we also consider the Euclidean metric: $\displaystyle d(f,g) = \min _{i,j= 1, \hdots , K} [ || \mathbf {\mu }_{f,i} - \mathbf {\mu }_{g,j} || ] $ .
+
+## Qualitative Evaluation
+
+In Table 1 , we show examples of polysemous words and their nearest neighbors in the embedding space to demonstrate that our trained embeddings capture multiple word senses. For instance, a word such as `rock' that could mean either `stone' or `rock music' should have each of its meanings represented by a distinct Gaussian component. Our results for a mixture of two Gaussians model confirm this hypothesis, where we observe that the 0th component of `rock' being related to (`basalt', `boulders') and the 1st component being related to (`indie', `funk', `hip-hop'). Similarly, the word bank has its 0th component representing the river bank and the 1st component representing the financial bank.
+
+By contrast, in Table 1 (bottom), see that for Gaussian embeddings with one mixture component, nearest neighbors of polysemous words are predominantly related to a single meaning. For instance, `rock' mostly has neighbors related to rock music and `bank' mostly related to the financial bank. The alternative meanings of these polysemous words are not well represented in the embeddings. As a numerical example, the cosine similarity between `rock' and `stone' for the Gaussian representation of BIBREF1 is only $0.029$ , much lower than the cosine similarity $0.586$ between the 0th component of `rock' and `stone' in our multimodal representation.
+
+In cases where a word only has a single popular meaning, the mixture components can be fairly close; for instance, one component of `stone' is close to (`stones', `stonework', `slab') and the other to (`carving, `relic', `excavated'), which reflects subtle variations in meanings. In general, the mixture can give properties such as heavy tails and more interesting unimodal characterizations of uncertainty than could be described by a single Gaussian.
+
+We provide an interactive visualization as part of our code repository: https://github.com/benathi/word2gm#visualization that allows real-time queries of words' nearest neighbors (in the embeddings tab) for $K=1, 2, 3$ components. We use a notation similar to that of Table 1 , where a token w:i represents the component i of a word w. For instance, if in the $K=2$ link we search for bank:0, we obtain the nearest neighbors such as river:1, confluence:0, waterway:1, which indicates that the 0th component of `bank' has the meaning `river bank'. On the other hand, searching for bank:1 yields nearby words such as banking:1, banker:0, ATM:0, indicating that this component is close to the `financial bank'. We also have a visualization of a unimodal (w2g) for comparison in the $K=1$ link.
+
+In addition, the embedding link for our Gaussian mixture model with $K=3$ mixture components can learn three distinct meanings. For instance, each of the three components of `cell' is close to (`keypad', `digits'), (`incarcerated', `inmate') or (`tissue', `antibody'), indicating that the distribution captures the concept of `cellphone', `jail cell', or `biological cell', respectively. Due to the limited number of words with more than 2 meanings, our model with $K=3$ does not generally offer substantial performance differences to our model with $K=2$ ; hence, we do not further display $K=3$ results for compactness.
+
+## Word Similarity
+
+We evaluate our embeddings on several standard word similarity datasets, namely, SimLex BIBREF22 , WS or WordSim-353, WS-S (similarity), WS-R (relatedness) BIBREF23 , MEN BIBREF24 , MC BIBREF25 , RG BIBREF26 , YP BIBREF27 , MTurk(-287,-771) BIBREF28 , BIBREF29 , and RW BIBREF30 . Each dataset contains a list of word pairs with a human score of how related or similar the two words are.
+
+We calculate the Spearman correlation BIBREF31 between the labels and our scores generated by the embeddings. The Spearman correlation is a rank-based correlation measure that assesses how well the scores describe the true labels.
+
+The correlation results are shown in Table 2 using the scores generated from the expected likelihood kernel, maximum cosine similarity, and maximum Euclidean distance.
+
+We show the results of our Gaussian mixture model and compare the performance with that of word2vec and the original Gaussian embedding by BIBREF1 . We note that our model of a unimodal Gaussian embedding w2g also outperforms the original model, which differs in model hyperparameters and initialization, for most datasets.
+
+Our multi-prototype model w2gm also performs better than skip-gram or Gaussian embedding methods on many datasets, namely, WS, WS-R, MEN, MC, RG, YP, MT-287, RW. The maximum cosine similarity yields the best performance on most datasets; however, the minimum Euclidean distance is a better metric for the datasets MC and RW. These results are consistent for both the single-prototype and the multi-prototype models.
+
+We also compare out results on WordSim-353 with the multi-prototype embedding method by BIBREF16 and BIBREF18 , shown in Table 3 . We observe that our single-prototype model w2g is competitive compared to models by BIBREF16 , even without using a corpus with stop words removed. This could be due to the auto-calibration of importance via the covariance learning which decrease the importance of very frequent words such as `the', `to', `a', etc. Moreover, our multi-prototype model substantially outperforms the model of BIBREF16 and the MSSG model of BIBREF18 on the WordSim-353 dataset.
+
+## Word Similarity for Polysemous Words
+
+We use the dataset SCWS introduced by BIBREF16 , where word pairs are chosen to have variations in meanings of polysemous and homonymous words.
+
+We compare our method with multiprototype models by Huang BIBREF16 , Tian BIBREF17 , Chen BIBREF32 , and MSSG model by BIBREF18 . We note that Chen model uses an external lexical source WordNet that gives it an extra advantage.
+
+We use many metrics to calculate the scores for the Spearman correlation. MaxSim refers to the maximum cosine similarity. AveSim is the average of cosine similarities with respect to the component probabilities.
+
+In Table 4 , the model w2g performs the best among all single-prototype models for either 50 or 200 vector dimensions. Our model w2gm performs competitively compared to other multi-prototype models. In SCWS, the gain in flexibility in moving to a probability density approach appears to dominate over the effects of using a multi-prototype. In most other examples, we see w2gm surpass w2g, where the multi-prototype structure is just as important for good performance as the probabilistic representation. Note that other models also use AvgSimC metric which uses context information which can yield better correlation BIBREF16 , BIBREF32 . We report the numbers using AvgSim or MaxSim from the existing models which are more comparable to our performance with MaxSim.
+
+## Reduction in Variance of Polysemous Words
+
+One motivation for our Gaussian mixture embedding is to model word uncertainty more accurately than Gaussian embeddings, which can have overly large variances for polysemous words (in order to assign some mass to all of the distinct meanings). We see that our Gaussian mixture model does indeed reduce the variances of each component for such words. For instance, we observe that the word rock in w2g has much higher variance per dimension ( $e^{-1.8} \approx 1.65 $ ) compared to that of Gaussian components of rock in w2gm (which has variance of roughly $e^{-2.5} \approx 0.82$ ). We also see, in the next section, that w2gm has desirable quantitative behavior for word entailment.
+
+## Word Entailment
+
+We evaluate our embeddings on the word entailment dataset from BIBREF33 . The lexical entailment between words is denoted by $w_1 \models w_2$ which means that all instances of $w_1$ are $w_2$ . The entailment dataset contains positive pairs such as aircraft $\models $ vehicle and negative pairs such as aircraft $\lnot \models $ insect.
+
+We generate entailment scores of word pairs and find the best threshold, measured by Average Precision (AP) or F1 score, which identifies negative versus positive entailment. We use the maximum cosine similarity and the minimum KL divergence, $\displaystyle d(f,g) = \min _{i,j= 1, \hdots , K} KL(f || g)$ , for entailment scores. The minimum KL divergence is similar to the maximum cosine similarity, but also incorporates the embedding uncertainty. In addition, KL divergence is an asymmetric measure, which is more suitable for certain tasks such as word entailment where a relationship is unidirectional. For instance, $w_1 \models w_2$ does not imply $w_2 \models w_1$ . Indeed, aircraft $\models $ vehicle does not imply vehicle $\models $ aircraft, since all aircraft are vehicles but not all vehicles are aircraft. The difference between $KL(w_1 || w_2)$ versus $KL(w_2 || w_1)$ distinguishes which word distribution encompasses another distribution, as demonstrated in Figure 1 .
+
+Table 5 shows the results of our w2gm model versus the Gaussian embedding model w2g. We observe a trend for both models with window size 5 and 10 that the KL metric yields improvement (both AP and F1) over cosine similarity. In addition, w2gm generally outperforms w2g.
+
+The multi-prototype model estimates the meaning uncertainty better since it is no longer constrained to be unimodal, leading to better characterizations of entailment. On the other hand, the Gaussian embedding model suffers from overestimatating variances of polysemous words, which results in less informative word distributions and reduced entailment scores.
+
+## Discussion
+
+We introduced a model that represents words with expressive multimodal distributions formed from Gaussian mixtures. To learn the properties of each mixture, we proposed an analytic energy function for combination with a maximum margin objective. The resulting embeddings capture different semantics of polysemous words, uncertainty, and entailment, and also perform favorably on word similarity benchmarks.
+
+Elsewhere, latent probabilistic representations are proving to be exceptionally valuable, able to capture nuances such as face angles with variational autoencoders BIBREF34 or subtleties in painting strokes with the InfoGAN BIBREF35 . Moreover, classically deterministic deep learning architectures are actively being generalized to probabilistic deep models, for full predictive distributions instead of point estimates, and significantly more expressive representations BIBREF36 , BIBREF37 , BIBREF38 , BIBREF39 , BIBREF40 .
+
+Similarly, probabilistic word embeddings can capture a range of subtle meanings, and advance the state of the art. Multimodal word distributions naturally represent our belief that words do not have single precise meanings: indeed, the shape of a word distribution can express much more semantic information than any point representation.
+
+In the future, multimodal word distributions could open the doors to a new suite of applications in language modelling, where whole word distributions are used as inputs to new probabilistic LSTMs, or in decision functions where uncertainty matters. As part of this effort, we can explore different metrics between distributions, such as KL divergences, which would be a natural choice for order embeddings that model entailment properties. It would also be informative to explore inference over the number of components in mixture models for word distributions. Such an approach could potentially discover an unbounded number of distinct meanings for words, but also distribute the support of each word distribution to express highly nuanced meanings. Alternatively, we could imagine a dependent mixture model where the distributions over words are evolving with time and other covariates. One could also build new types of supervised language models, constructed to more fully leverage the rich information provided by word distributions.
+
+## Acknowledgements
+
+We thank NSF IIS-1563887 for support.
+
+## Derivation of Expected Likelihood Kernel
+
+We derive the form of expected likelihood kernel for Gaussian mixtures. Let $f,g$ be Gaussian mixture distributions representing the words $w_f, w_g$ . That is, $f(x) = \sum _{i=1}^K p_i \mathcal {N}(x; \mu _{f,i} , \Sigma _{f,i} ) $ and $g(x) = \sum _{i=1}^K q_i \mathcal {N}(x; \mu _{g,i} , \Sigma _{g,i} )$ , $\sum _{i =1}^K p_i = 1 $ , and $\sum _{i =1}^K q_i = 1$ . The expected likelihood kernel is given by $
+E_\theta (f,g) &= \int \left( \sum _{i=1}^K p_i \mathcal {N}(x; \mu _{f,i} , \Sigma _{f,i} ) \right) \cdot \\ & \left( \sum _{j=1}^K q_j \mathcal {N}(x; \mu _{g,j} , \Sigma _{g,j} ) \right) \ d x \\
+&= \sum _{i=1}^K \sum _{j=1}^K p_i q_j \int \mathcal {N}(x; \mu _{f,i} , \Sigma _{f,i} ) \cdot \mathcal {N}(x; \mu _{g,j} , \Sigma _{g,j} ) \ d x \\
+&= \sum _{i=1}^K \sum _{j=1}^K p_i q_j \mathcal {N}(0; \mu _{f,i} - \mu _{g,j} , \Sigma _{f,i} + \Sigma _{g,j} ) \\
+&= \sum _{i=1}^K \sum _{j=1}^K p_i q_j e^{\xi _{i,j}}
+$ 
+
+ where we note that $\int \mathcal {N}(x; \mu _i, \Sigma _i) \mathcal {N}(x; \mu _j, \Sigma _j) \ dx = \mathcal {N}(0, \mu _i - \mu _j , \Sigma _i + \Sigma _j)$ BIBREF1 and $\xi _{i,j}$ is the log partial energy, given by equation 10 .
+
+## Implementation
+
+In this section we discuss practical details for training the proposed model.
+
+We use a diagonal $\Sigma $ , in which case inverting the covariance matrix is trivial and computations are particularly efficient.
+
+Let $\mathbf {d}^f, \mathbf {d}^g$ denote the diagonal vectors of $\Sigma _f, \Sigma _g$ The expression for $\xi _{i,j}$ reduces to $
+\xi _{i,j}
+= - \frac{1}{2} \sum _{r=1}^D \log ( d^p_r + d^q_r)
+\\ - \frac{1}{2} \sum \left[ (\mathbf {\mu }_{p,i} - \mathbf {\mu }_{q,j}) \circ \frac{1}{ \mathbf {d^p + d^q} } \circ (\mathbf {\mu }_{p, i} - \mathbf {\mu }_{q,j}) \right]
+$ 
+
+ where $\circ $ denotes element-wise multiplication. The spherical case which we use in all our experiments is similar since we simply replace a vector $\mathbf {d}$ with a single value.
+
+We optimize $\log \mathbf {d}$ since each component of diagonal vector $\mathbf {d}$ is constrained to be positive. Similarly, we constrain the probability $p_i$ to be in $[0,1]$ and sum to 1 by optimizing over unconstrained scores $s_i \in (-\infty , \infty )$ and using a softmax function to convert the scores to probability $p_i = \frac{e^{s_i}}{\sum _{j=1}^K e^{s_j} }$ .
+
+The loss computation can be numerically unstable if elements of the diagonal covariances are very small, due to the term $ \log ( d^f_r + d^g_r) $ and $ \frac{1}{ \mathbf {d}^q + \mathbf {d}^p} $ . Therefore, we add a small constant $\epsilon = 10^{-4}$ so that $d^f_r + d^g_r$ and $ \mathbf {d}^q + \mathbf {d}^p $ becomes $d^f_r + d^g_r + \epsilon $ and $ \mathbf {d^q + d^p} + \epsilon $ .
+
+In addition, we observe that $\xi _{i,j}$ can be very small which would result in $e^{\xi _{i,j}} \approx 0$ up to machine precision. In order to stabilize the computation in eq. 9 , we compute its equivalent form $
+\log E(f,g) = \xi _{i^{\prime },j^{\prime }} + \log \sum _{j=1}^K \sum _{i=1}^K p_i q_j e^{\xi _{i,j} - \xi _{i^{\prime },j^{\prime }}}
+$ 
+
+where $ \xi _{i^{\prime },j^{\prime }} = \max _{i,j} \xi _{i,j}$ .
+
+In the loss function $L_\theta $ , we use a margin $m= 1$ and a batch size of 128. We initialize the word embeddings with a uniform distribution over $[ -\sqrt{\frac{3}{D}}, \sqrt{\frac{3}{D}} ]$ so that the expectation of variance is 1 and the mean is zero BIBREF44 . We initialize each dimension of the diagonal matrix (or a single value for spherical case) with a constant value $v = 0.05$ . We also initialize the mixture scores $s_i$ to be 0 so that the initial probabilities are equal among all $K$ components. We use the threshold $t = 10^{-5}$ for negative sampling, which is the recommended value for word2vec skip-gram on large datasets.
+
+We also use a separate output embeddings in addition to input embeddings, similar to word2vec implementation BIBREF0 , BIBREF4 . That is, each word has two sets of distributions $q_{I}$ and $q_{O}$ , each of which is a Gaussian mixture. For a given pair of word and context $(w,c)$ , we use the input distribution $q_{I}$ for $w$ (input word) and the output distribution $q_{O}$ for context $c$ (output word). We optimize the parameters of both $q_{I}$ and $q_{O}$ and use the trained input distributions $q_{I}$ as our final word representations.
+
+We use mini-batch asynchronous gradient descent with Adagrad BIBREF41 which performs adaptive learning rate for each parameter. We also experiment with Adam BIBREF43 which corrects the bias in adaptive gradient update of Adagrad and is proven very popular for most recent neural network models. However, we found that it is much slower than Adagrad ( $\approx 10$ times). This is because the gradient computation of the model is relatively fast, so a complex gradient update algorithm such as Adam becomes the bottleneck in the optimization. Therefore, we choose to use Adagrad which allows us to better scale to large datasets. We use a linearly decreasing learning rate from $0.05$ to $0.00001$ .

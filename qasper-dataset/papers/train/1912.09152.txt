@@ -1,0 +1,153 @@
+# Annotating and normalizing biomedical NEs with limited knowledge
+
+**Paper ID:** 1912.09152
+
+## Abstract
+
+Named entity recognition (NER) is the very first step in the linguistic processing of any new domain. It is currently a common process in BioNLP on English clinical text. However, it is still in its infancy in other major languages, as it is the case for Spanish. Presented under the umbrella of the PharmaCoNER shared task, this paper describes a very simple method for the annotation and normalization of pharmacological, chemical and, ultimately, biomedical named entities in clinical cases. The system developed for the shared task is based on limited knowledge, collected, structured and munged in a way that clearly outperforms scores obtained by similar dictionary-based systems for English in the past. Along with this recovering of the knowledge-based methods for NER in subdomains, the paper also highlights the key contribution of resource-based systems in the validation and consolidation of both the annotation guidelines and the human annotation practices. In this sense, some of the authors discoverings on the overall quality of human annotated datasets question the above-mentioned `official' results obtained by this system, that ranked second (0.91 F1-score) and first (0.916 F1-score), respectively, in the two PharmaCoNER subtasks.
+
+## Introduction
+
+Named Entity Recognition (ner) is considered a necessary first step in the linguistic processing of any new domain, as it facilitates the development of applications showing co-occurrences of domain entities, cause-effect relations among them, and, eventually, it opens the (still to be reached) possibility of understanding full text content. On the other hand, Biomedical literature and, more specifically, clinical texts, show a number of features as regards ner that pose a challenge to NLP researchers BIBREF0: (1) the clinical discourse is characterized by being conceptually very dense; (2) the number of different classes for nes is greater than traditional classes used with, for instance, newswire text; (3) they show a high formal variability for nes (actually, it is rare to find entities in their “canonical form”); and, (4) this text type contains a great number of ortho-typographic errors, due mainly to time constraints when drafted.
+
+Many ways to approach ner for biomedical literature have been proposed, but they roughly fall into three main categories: rule-based, dictionary-based (sometimes called knowledge-based) and machine-learning based solutions. Traditionally, the first two approaches have been the choice before the availability of Human Annotated Datasets (had), albeit rule-based approaches require (usually hand-crafted) rules to identify terms in the text, while dictionary-based approaches tend to miss medical terms not mentioned in the system dictionary BIBREF1. Nonetheless, with the creation and distribution of had as well as the development and success of supervised machine learning methods, a plethora of data-driven approaches have emerged —from Hidden Markov Models (HMMs) BIBREF2, Support Vector Machines (SVMs) BIBREF3 and Conditional Random Fields (CRFs) BIBREF4, to, more recently, those founded on neural networks BIBREF5. This fact has had an impact on knowledge-based methods, demoting them to a second plane. Besides, this situation has been favoured by claims on the uselessness of gazetteers for ner in, for example, Genomic Medicine (GM), as it was suggested by BIBREF0 [p. 26]CohenandDemner-Fushman:2014:
+
+One of the findings of the first BioCreative shared task was the demonstration of the long-suspected fact that gazetteers are typically of little use in GM.
+
+Although one might think that this view could strictly refer to the subdomain of GM and to the past —BioCreative I was a shared task held back in 2004—, we can still find similar claims today, not only referred to rule-based and dictionary-based methods, but also to stochastic ones BIBREF5.
+
+In this paper, in spite of previous statements, we present a system that uses rule-based and dictionary-based methods combined (in a way we prefer to call resource-based). Our final goals in the paper are two-fold: on the one hand, to describe our system, developed for the PharmaCoNER shared task, dealing with the annotation of some of the nes in health records (namely, pharmacological, chemical and biomedical entities) using a revisited version of rule- and dictionary-based approaches; and, on the other hand, to give pause for thought about the quality of datasets (and, thus, the fairness) with which systems of this type are evaluated, and to highlight the key role of resource-based systems in the validation and consolidation of both the annotation guidelines and the human annotation practices.
+
+In section SECREF2, we describe our initial resources and explain how they were built, and try to address the issues posed by features (1) and (2) above. Section SECREF3 depicts the core of our system and the methods we have devised to deal with text features (3) and (4). Results obtained in PharmaCoNER by our system are presented in section SECREF4. Section SECREF5 details some of our errors, but, most importantly, focusses on the errors and inconsistencies found in the evaluation dataset, given that they may shed doubts on the scores obtained by any system in the competition. Finally, we present some concluding remarks in section SECREF6.
+
+## Resource building
+
+As it is common in resource-based system development, special effort has been devoted to the creation of the set of resources used by the system. These are mainly two —a flat subset of the snomed ct medical ontology, and the library and a part of the contextual regexp grammars developed by BIBREF6 FSL:2018 for a previous competition on abbreviation resolution in clinical texts written in Spanish. The process of creation and/or adaptation of these resources is described in this section.
+
+## Resource building ::: SNOMED CT
+
+Although the competition proposes two different scenarios, in fact, both are guided by the snomed ct ontology —for subtask 1, entities must be identified with offsets and mapped to a predefined set of four classes (PROTEINAS, NORMALIZABLES, NO_NORMALIZABLES and UNCLEAR); for subtask 2, a list of all snomed ct ids (sctid) for entities occurring in the text must be given, which has been called concept indexing by the shared task organizers. Moreover, PharmaCoNER organizers decided to promote snomed ct substance ids over product, procedure or other possible interpretations also available in this medical ontology for a given entity. This selection must be done even if the context clearly refers to a different concept, according to the annotation guidelines (henceforth, AnnotGuide) and the praxis. Finally, PROTEINAS is ranked as the first choice for substances in this category.
+
+These previous decisions alone on the part of the organizers greatly simplify the task at hand, making it possible to build (carefully compiled) subsets of the entities to be annotated. This is a great advantage over open domain ner, where (like in GM) the texts may contain an infinite (and very creative indeed) number of nes. For clinical cases, although the ne density is greater, there exist highly structured terminological resources for the domain. Moreover, the set of classes to use in the annotation exercise for subtask 1 has been dramatically cut down by the organizers.
+
+With the above-mentioned initial constraints in mind, we have painstakingly collected, from the whole set of snomed ct terms, instances of entities as classified by the human annotators in the datasets released by the organizers and, when browsing the snomed ct web version, we have tried to use the ontological hierarchical relations to pull a complete class down from snomed ct. This way, we have gathered 80 classes —from lipids to proteins to peptides or peptide hormones, from plasminogen activators to dyes to drugs or medicaments—, that have been arranged in a ranked way so as to mimic human annotators choices. The number of entities so collected (henceforth, `primary entities') is 51,309.
+
+## Resource building ::: Contextual regexp grammars
+
+Some of the entities to be annotated, specially those in abbreviated form, are ambiguous without a context. This is the case, for instance, of PCR, whose expanded forms are (among other meanings; we use only English expanded forms) `reactive protein c', `polymerase chain reaction', `cardiorespiratory arrest'. In order to deal with these cases, we use a contextual regexp rule system with a lean and simple rule formalism previously developed BIBREF6. As an exemplification, we include one rule to deal with one of the cases of the preceeding ambiguity:
+
+b:[il::bioquímica|en sangre|hemoglobina|
+
+hemograma|leucocit|parásito|plaqueta|
+
+prote.na|recuento|urea] - [PCR] - >
+
+[m=proteína]
+
+A rule has a left hand side (LHS) and a right hand side (RHS). There is a focus in the LHS (PCR, within dashes) and a left and right context (that may be empty). When the left context includes a b: (like in this case), it indicates either left or right context. The words in the context can take other qualifiers —in this case, the matching will be case insensitive (i to the left of bioquímica) and local (l), which means the disjunction of words and/or stems can be found in a distance of 40 characters (this can be modifified by the user). Hence, the rule applies, selecting the proteína expansion (in RHS) of PCR if any of the words/stems specified as local context (40 chars maximum) is matched either to the left or right of the focus term (which is usually an abbreviation).
+
+With no tweaking at all for the datasets in PharmaCoNER competition, the system annotates correctly 18 out of 20 occurrences of PCR in the test dataset (a precision of 0.9).
+
+This component of the system is important because, only when the previous abbreviation is expanded as the first string (that of a protein name), it must be annotated, according to the AnnotGuide. The same ambiguity happens with Cr, which may mean `creatinine' or `chrome'. These expansions are both NORMALIZABLES, but, obviously, their sctid is different.
+
+The system currently uses 104 context rules, only for abbreviations and acronyms in the clinical cases. These rules, contrary to what is commonly referred in the biomedical processing literature BIBREF5, do not require a special domain knowledge (none of the authors do have it) and can be written, most of the times, in a very straightforward way in the formalism briefly described above.
+
+## Development
+
+In general, dictionary-based methods rely on strict string matching over a fixed set of lexical entries from the domain. This is clearly insufficient to deal with non-canonical linguistic forms of nes as used in clinical texts. For this reason, we have devised two different solutions to this shortcoming.
+
+In the first place, we have munged a great number of our primary entities, in a way similar to that described in BIBREF7 FSL:2019a for gazetteers used for protected information anonymization in clinical texts. We basically transform canonical forms in other possible textual forms observed when working with biomedical texts. With such transformations, a system module converts a salt compound like clorhidrato de ciclopentolato into ciclopentolato clorhidrato, or simply the PP de potasio into its corresponding adjective potásico. Other, more complex conversions include the treatment of antibodies —for instance anticuerpo contra especie de Leishmania becomes ac. Leishmania, among other variants—, or pairs of antibiotics normally prescribed together —which have a unique sctid and whose order we handle just as the `glueing' characters. Note, incidentally, that, while the input to this pre-processing step is always a string, the output can be a regular expression, that is linked to a sctid. Plural forms are also generated through this module, that uses 45 transformations (not all equally productive). Using these transformation rules, we produce 139,150 `secondary entities', many of them regexps. As a final (simple) example of this, consider the entity antígeno CD13: after applying one of the previous string-to-regexp transformations, it is converted to:
+
+(?:antígeno )?CD[- ]?13
+
+With the previous regexp, the system is able to identify (and string-normalize) six different textual realizations of the same unique snomed ct term. There are more complex rules that, thus, produce many more potential strings. The important thing with this strategy is that through the generative power of these predictably-created regexps from snomed ct entities the system is able to improve its recall and overcome the limitations of traditional dictionary-based approaches.
+
+Secondly, to tackle with careless drafting of clinical reports, a Levenshtein edit distance library is used on the whole background dataset. The process is run once, using our secondary entities as lexicon and a general vocabulary lexicon to rule out common words in the candidate search process. We have used distances in the range 1-3 (depending on string length) for sequences up to 3 words long. The output of this process, which links forms with spelling errors with canonical ones and, thus, to sctids, can be inspected prior to its inclusion in the system lexicon, if so desired.
+
+## Development ::: Annotation process
+
+As such, the annotation process is very simple. The program reads the input byte stream trying to identify known entities by means of a huge regexp built through the pre-processing of the available resources. If the candidate entity is ambiguous and (at least) one contextual rule exists for it, it is applied. For the rest of the nes, the system assigns them the class and sctid found in our ranked in-memory lexicon. As already mentioned in passing, the system does not tokenize text prior to ner, a processing order that we consider the right choice for highly entity-dense texts. The data structures built during pre-processing are efficiently stored on disk for subsequent runs, so the pre-processing is redone only when resources are edited.
+
+## Results
+
+According to the organizers, and taking into account the ha of the tiny subset from the background dataset released to the participants, the system obtained the scores presented in table TABREF16, ranking as second best system for subtask1 and best system for subtask2 BIBREF8..
+
+Our results are consistent with our poor understanding of the classes for subtask 1. Having a null knowledge of Pharmacology, Biomedicine or even Chemistry, assigning classes (as requested for subtask 1) to entities is very hard, while providing a sctid (subtask 2) seems an easier goal. We will explain the point with an example entity —ácido hialurónico (`hyaluronic acid'). Using the ontological structure of snomed ct, one can find the following parent relations (just in English):
+
+hyaluronic acid is-a mucopolysaccharide is-a protein
+
+The authors have, in this case, promoted the PROTEINAS annotation for this entity, disregarding its interpretation as a replacement agent and overlooking a recommendation on polysaccharides in the AnnotGuide. Fortunately, all its interpretations share a unique sctid. The same may be true for
+
+haemosiderin is-a protein
+
+which is considered NORMALIZABLE in the test dataset. Similar cases are responsible for the lower performance on subtask 1 with respect to the more complex subtask 2.
+
+In spite of these human classification errors, our system scores outperform those obtained by PharmacoNER Tagger BIBREF5, a simpler system using a binary classification and a very different organization of the dataset with a smaller fragment for test (10% of the data as opposed to 25% for the official competition). In fact, our system improves their F1-score (89.06) by 1.3 points when compared with our results for the more complex PharmaCoNER subtask 1.
+
+## Discussion
+
+In this section, we perform error analysis for our system run on the test dataset. We will address both recall and precision errors, but mainly concentrate on the latter type, and on a thorough revision of mismatches between system and human annotations.
+
+In general, error analysis is favoured by knowledge-based methods, since it is through the understanding of the underlying reasons for an error that the system could be improved. Moreover, and differently to what happens with the current wave of artificial neural network methods, the whole annotation process —its guidelines for human annotators, the collection and appropriate structuring of resources, the adequate means to assign tags to certain entities but not to other, similar or even pertaining to the same class— must be clearly understood by the designer/developer/data architect of such systems. As a natural consequence of this attempt to mimick a task defined by humans to be performed, in the first place, also by humans, some inconsistencies, asystematic or missing assignments can be discovered, and this information is a valuable treasure not only for system developers but also for task organizers, guideline editors and future annotation campaigns, not to mention for the exactness of program evaluation results.
+
+Most of the error types made by the system (i.e., by the authors) in class assignment for subtask 1 have already been discussed. In the same vein, as regards subtask 2, a great number of errors come from the selection of the `product containing substance' reading from snomed ct rather to the `substance' itself. This is due to inexperience of the authors on the domain and the wrong consideration of context when tagging entities —the latter being clearly obviated in the AnnotGuide.
+
+In the following paragraphs, some of the most relevant inconsistencies found when performing error analysis of our system are highlighted. The list is necessarily incomplete due to space constraints, and it is geared towards the explanation of our possible errors.
+
+## Discussion ::: Inconsistency in the ag
+
+Among some of the paradoxical examples in the AnnotGuide it stands out the double explicit consideration of gen (`gene'), when occurs alone in context, as both an entity to be tagged (positive rule P2 of the AnnotGuide) and a noun not to be tagged (negative rule N2). This inconsistency (and a bit of bad luck) has produced that none of the 6 occurrences as an independent noun —not introducing an entity— is tagged in the train+dev (henceforth, t+d) while the only 2 in the same context in the test dataset have been tagged. This amounts for 2 true negatives (tns) for the evaluation script.
+
+## Discussion ::: Inconsistency in ha as regards ag
+
+The AnnotGuide proposal for the treatment of elliptical elements is somewhat confusing. For these cases, a longest match annotation is proposed, which is difficult to replicate automatically and not easy to remember for the human annotator. In many contexts, the annotator has made the right choice —for instance, in receptores de estrógeno y de progesterona— whereas in others do not —$|$anticuerpos anticardiolipina$|$ $|$IgG$|$ e $|$IgM$|$, with `$|$' marking the edges of the annotations. The last example occurs twice in the test dataset. Hence, the disagreement counts as 6 tns and 2 false positives (fps).
+
+On the other hand, there is a clear reference to food materials and nutrition in the AnnotGuide, where they are included in the class of substances. However, none of the following entities is tagged in the test dataset: azúcar (which is mandatory according to AnnotGuide and was tagged in t+d; 1 fp); almidón de maíz (also mandatory in AnnotGuide; 1 fp); and Loprofín, Aglutella, Aproten (hypoproteic nutrition products, 3 fps in total).
+
+There is an explicit indication in the AnnotGuide to annotate salts, with the example iron salts. However, in the context sales de litio (`lithium salts'), only the chemical element has been tagged (1 fp).
+
+There exist other differing-span mismatches between human and automatic annotation. These include anticuerpos anticitoplasma de neutrófilo, where the ha considers the first two words only (in one of the occurrences, 1 fp); in the text fragment b2 microglobulina, CEA y CA 19,9 normales, CA 19,9 is the correct span for the last entity (and not CA, 1 fp); A.S.T is the span selected (for A.S.T., 1 fp); finally, in the context lgM anticore only lgM has been tagged (1 fp).
+
+Other prominent mismatch between had and AnnotGuide is that of DNA, which is explicitly included in the AnnotGuide (sects. P2 and O1). It accounts for 2 fps.
+
+But perhaps one of the most common discrepancies between human and automatic annotation has to do with medicaments normally prescribed together, which have a unique sctid. Examples include amiloride/hidroclorotiazida (1 fp); and betametasona + calcipotriol (1 fp) in the test set. This situation was also observed in the t+d corpus fragment (tenofovir + emtricitabina, carbonato cálcico /colecalciferol, lopinavir/ritonavir).
+
+## Discussion ::: Inconsistency in ha on the test set as regards t+d sets
+
+Some inconsistencies between dataset annotations have turned the authors crazy: NPT (acronym for `total parenteral nutrition, TPN') is tagged in the train+dev dataset 15 out of 21 times it occurs. The common sense of frequency in the ha of texts has led us to tag it in the background set. Unluckily, neither NPT nor its expansion have been tagged in the test dataset. This has also been the behaviour in ha for `parenteral nutrition' and `enteral nutrition' (and their corresponding acronyms) in test dataset, since these entities have not been tagged. We asked the organizers about this and other entities for which we had doubts, either because the AnnotGuide didn't cover their cases or because the ha didn't match the recommendations in the AnnotGuide. Woefully, communication with the organizers has not been very fluent on this respect. All in all, this bad decision on the part of the authors amounts for 6 fps (more than 7.5% of our fps according to evaluation script).
+
+For other cases, decisions that may be clearly induced from the tagging of train+dev datasets, have not been applied in the test corpus fragment. These include cadenas ligeras (5 times in t+d, 1 fp in test); enzimas hepáticas (tagged systematically in t+d, 1 fp); p53 (also tagged in t+d, 1 fp).
+
+Another entity that stands out is hidratos de carbono (`carbohydrates'). It is tagged twice in the t+d dataset, occurring 4 times in the set (once as HC). However, although the form carbohidratos has been annotated twice in the test set, hidratos de carbono has been not (1 fp).
+
+Moreover, suero (`Sodium chloride solution' or `serum') deserves its own comment. Both entity references are tagged in the train+dev datasets (although with the latter meaning it is tagged only 4 out of 12 occurrences). We decided to tag it due to its relevance. In the test dataset, it occurs 5 times with the blood material meaning, but it has only been tagged twice as such (one of them being an error, since it refers to the former meaning). Our system tagged all occurrences, but tagged also one of the instances with the former meaning as serum (3 fps).
+
+Finally, there are some inconsistencies within the same dataset. For example, nutricional agent Kabiven is tagged as both NORMALIZABLES (with sctid) and NO_NORMALIZABLES in the very same text. The same happens with another nutritional complement, Cernebit, this time in two different files. The perfusion solution Isoplasmal G (with a typo in the datasets —Isoplasmar G) is tagged as NORMALIZABLES and UNCLEAR. These examples reveal a vague understanding (or definition) of criteria as regards fluids and nutrition, as we pointed out at the beginning of this section.
+
+## Discussion ::: Asystematic/incomplete annotation
+
+Some of the entities occurring in the test dataset have not always been tagged. This is the case for celulosa (annotated only once but used twice, 1 fp); vimentina (same situation as previous, 1 fp); LDH (tagged 20 times in t+d but not in one of the files, 1 fp); cimetidina (1 fp); reactantes de fase aguda (2 fps; 2 other occurrences were tagged); anticuerpos antinucleares (human annotators missed 1, considered fp).
+
+## Discussion ::: Incorrect sctids
+
+On our refinement work with the system, some incorrect sctids have emerged. These errors impact on subtask 2 (some also on subtask 1). A large sample of them is enumerated below.
+
+ARP (`actividad de renina plasmática', `plasma renin activity', PRA) cannot be linked to sctid for renina, which happens twice. In the context `perfil de antigenos [sic] extraíbles del núcleo (ENA)', ENA has been tagged with sctid of the antibody (1 fp). In one of the files, tioflavina is linked to sctid of tioflavina T, but it could be tioflavina S. Thus, it should be NO_NORMALIZABLE. Harvoni is ChEBI:85082 and not <null> (1 fp). AcIgM contra CMV has a wrong sctid (1 fp). HBsAg has no sctid in the test set; it should be 22290004 (`Hepatitis B surface antigen') (1 fp).
+
+There are other incorrect annotations, due to inadvertent human errors, like biotina tagged as PROTEINAS or VEB (`Epstein-Barr virus') being annotated when it is not a substance. Among these mismatches between ha and system annotation, the most remarkable is the case of synonyms in active principles. For instance, the brand name drug Dekapine has been linked to `ácido valproico' in the former case and to `valproato sódico' in the latter. These terms are synonymous, but sadly they don't share sctid. Hence, this case also counts as a fp.
+
+A gold standard dataset for any task is very hard to develop, so a continuous editing of it is a must. In this discussion, we have focused on false positives (fps) according to the script used for system evaluation, with the main purpose of understanding the domain knowledge encoded in the linguistic conventions (lexical/terminological items and constructions) used by health professionals, but also the decisions underlying both the AnnotGuide and the ha practice.
+
+In this journey to system improvement and authors enlightenment, some inconsistencies, errors, omissions have come up, as it has been reflected in this section, so both the guidelines for and the practice of annotation can also be improved in future use scenarios of the clinical case corpus built and maintained by the shared task organizers.
+
+Our conclusion on this state of affairs is that some of the inconsistencies spotted in this section show that there were not a rational approach to the annotation of certain entities contained in the datasets (apart from other errors and/or oversights), and, hence, the upper bound of any tagging system is far below the ideal 1.0 F1-score. To this respect, in very many cases, the authors have made the wrong choice, but in others they were guided by analogy or common sense. Maybe a selection founded on probability measures estimated on training material could have obtained better results with this specific test dataset. However, in the end, this cannot be considered as an indication of a better system performance, since, as it has been shown, the test dataset used still needs more refinement work to be used as the right dataset for automatic annotation evaluation.
+
+## Conclusions
+
+With this resource-based system developed for the PharmaCoNER shared task on ner of pharmacological, chemical and biomedical entities, we have demonstrated that, having a very limited knowledge of the domain, and, thus, making wrong choices many times in the creation of resources for the tasks at hand, but being more flexible with the matching mechanisms, a simple-design system can outperform a ner tagger for biomedical entities based on state-of-the-art artificial neural network technology. Thus, knowledge-based methods stand on their own merits in task resolution.
+
+But, perhaps most importantly, the other key point brought to light in this contribution is that a resource-based approach also favours a more critical stance on the dataset(s) used to evaluate system performance. With these methods, system development can go hand in hand with dataset refinement in a virtuous circle that let us think that maybe next time we are planning to add a new gazetteer or word embedding to our system in order to try to improve system performance, we should first look at our data and, like King Midas, turn our Human Annotated Dataset into a true Gold Standard Dataset.
+
+## Acknowledgements
+
+We thank three anonymous reviewers of our manuscript for their careful reading and their many insightful comments and suggestions. We have made our best in providing a revised version of the manuscript that reflects their suggestions. Any remaining errors are our own responsability.

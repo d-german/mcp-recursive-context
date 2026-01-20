@@ -1,0 +1,147 @@
+# Controlling Utterance Length in NMT-based Word Segmentation with Attention
+
+**Paper ID:** 1910.08418
+
+## Abstract
+
+One of the basic tasks of computational language documentation (CLD) is to identify word boundaries in an unsegmented phonemic stream. While several unsupervised monolingual word segmentation algorithms exist in the literature, they are challenged in real-world CLD settings by the small amount of available data. A possible remedy is to take advantage of glosses or translation in a foreign, well-resourced, language, which often exist for such data. In this paper, we explore and compare ways to exploit neural machine translation models to perform unsupervised boundary detection with bilingual information, notably introducing a new loss function for jointly learning alignment and segmentation. We experiment with an actual under-resourced language, Mboshi, and show that these techniques can effectively control the output segmentation length.
+
+## Introduction
+
+All over the world, languages are disappearing at an unprecedented rate, fostering the need for specific tools aimed to aid field linguists to collect, transcribe, analyze, and annotate endangered language data (e.g. BIBREF0, BIBREF1). A remarkable effort in this direction has improved the data collection procedures and tools BIBREF2, BIBREF3, enabling to collect corpora for an increasing number of endangered languages (e.g. BIBREF4).
+
+One of the basic tasks of computational language documentation (CLD) is to identify word or morpheme boundaries in an unsegmented phonemic or orthographic stream. Several unsupervised monolingual word segmentation algorithms exist in the literature, based, for instance, on information-theoretic BIBREF5, BIBREF6 or nonparametric Bayesian techniques BIBREF7, BIBREF8. These techniques are, however, challenged in real-world settings by the small amount of available data.
+
+A possible remedy is to take advantage of glosses or translations in a foreign, well-resourced language (WL), which often exist for such data, hoping that the bilingual context will provide additional cues to guide the segmentation algorithm. Such techniques have already been explored, for instance, in BIBREF9, BIBREF10 in the context of improving statistical alignment and translation models; and in BIBREF11, BIBREF12, BIBREF13 using Attentional Neural Machine Translation (NMT) models. In these latter studies, word segmentation is obtained by post-processing attention matrices, taking attention information as a noisy proxy to word alignment BIBREF14.
+
+In this paper, we explore ways to exploit neural machine translation models to perform unsupervised boundary detection with bilingual information. Our main contribution is a new loss function for jointly learning alignment and segmentation in neural translation models, allowing us to better control the length of utterances. Our experiments with an actual under-resourced language (UL), Mboshi BIBREF17, show that this technique outperforms our bilingual segmentation baseline.
+
+## Recurrent architectures in NMT
+
+In this section, we briefly review the main concepts of recurrent architectures for machine translation introduced in BIBREF18, BIBREF19, BIBREF20. In our setting, the source and target sentences are always observed and we are mostly interested in the attention mechanism that is used to induce word segmentation.
+
+## Recurrent architectures in NMT ::: RNN encoder-decoder
+
+Sequence-to-sequence models transform a variable-length source sequence into a variable-length target output sequence. In our context, the source sequence is a sequence of words $w_1, \ldots , w_J$ and the target sequence is an unsegmented sequence of phonemes or characters $\omega _1, \ldots , \omega _I$. In the RNN encoder-decoder architecture, an encoder consisting of a RNN reads a sequence of word embeddings $e(w_1),\dots ,e(w_J)$ representing the source and produces a dense representation $c$ of this sentence in a low-dimensional vector space. Vector $c$ is then fed to an RNN decoder producing the output translation $\omega _1,\dots ,\omega _I$ sequentially.
+
+At each step of the input sequence, the encoder hidden states $h_j$ are computed as:
+
+In most cases, $\phi $ corresponds to a long short-term memory (LSTM) BIBREF24 unit or a gated recurrent unit (GRU) BIBREF25, and $h_J$ is used as the fixed-length context vector $c$ initializing the RNN decoder.
+
+On the target side, the decoder predicts each word $\omega _i$, given the context vector $c$ (in the simplest case, $h_J$, the last hidden state of the encoder) and the previously predicted words, using the probability distribution over the output vocabulary $V_T$:
+
+where $s_i$ is the hidden state of the decoder RNN and $g$ is a nonlinear function (e.g. a multi-layer perceptron with a softmax layer) computed by the output layer of the decoder. The hidden state $s_i$ is then updated according to:
+
+where $f$ again corresponds to the function computed by an LSTM or GRU cell.
+
+The encoder and the decoder are trained jointly to maximize the likelihood of the translation $\mathrm {\Omega }=\Omega _1, \dots , \Omega _I$ given the source sentence $\mathrm {w}=w_1,\dots ,w_J$. As reference target words are available during training, $\Omega _i$ (and the corresponding embedding) can be used instead of $\omega _i$ in Equations (DISPLAY_FORM5) and (DISPLAY_FORM6), a technique known as teacher forcing BIBREF26.
+
+## Recurrent architectures in NMT ::: The attention mechanism
+
+Encoding a variable-length source sentence in a fixed-length vector can lead to poor translation results with long sentences BIBREF19. To address this problem, BIBREF20 introduces an attention mechanism which provides a flexible source context to better inform the decoder's decisions. This means that the fixed context vector $c$ in Equations (DISPLAY_FORM5) and (DISPLAY_FORM6) is replaced with a position-dependent context $c_i$, defined as:
+
+where weights $\alpha _{ij}$ are computed by an attention model made of a multi-layer perceptron (MLP) followed by a softmax layer. Denoting $a$ the function computed by the MLP, then
+
+where $e_{ij}$ is known as the energy associated to $\alpha _{ij}$. Lines in the attention matrix $A = (\alpha _{ij})$ sum to 1, and weights $\alpha _{ij}$ can be interpreted as the probability that target word $\omega _i$ is aligned to source word $w_j$. BIBREF20 qualitatively investigated such soft alignments and concluded that their model can correctly align target words to relevant source words (see also BIBREF27, BIBREF28). Our segmentation method (Section SECREF3) relies on the assumption that the same holds when aligning characters or phonemes on the target side to source words.
+
+## Attention-based word segmentation
+
+Recall that our goal is to discover words in an unsegmented stream of target characters (or phonemes) in the under-resourced language. In this section, we first describe a baseline method inspired by the “align to segment” of BIBREF12, BIBREF13. We then propose two extensions providing the model with a signal relevant to the segmentation process, so as to move towards a joint learning of segmentation and alignment.
+
+## Attention-based word segmentation ::: Align to segment
+
+An attention matrix $A = (\alpha _{ij})$ can be interpreted as a soft alignment matrix between target and source units, where each cell $\alpha _{ij}$ corresponds to the probability for target symbols $\omega _i$ (here, a phone) to be aligned to the source word $w_j$ (cf. Equation (DISPLAY_FORM10)). In our context, where words need to be discovered on the target side, we follow BIBREF12, BIBREF13 and perform word segmentation as follows:
+
+train an attentional RNN encoder-decoder model with attention using teacher forcing (see Section SECREF2);
+
+force-decode the entire corpus and extract one attention matrix for each sentence pair.
+
+identify boundaries in the target sequences. For each target unit $\omega _i$ of the UL, we identify the source word $w_{a_i}$ to which it is most likely aligned : $\forall i, a_i = \operatornamewithlimits{argmax}_j \alpha _{ij}$. Given these alignment links, a word segmentation is computed by introducing a word boundary in the target whenever two adjacent units are not aligned with the same source word ($a_i \ne a_{i+1}$).
+
+Considering a (simulated) low-resource setting, and building on BIBREF14's work, BIBREF11 propose to smooth attentional alignments, either by post-processing attention matrices, or by flattening the softmax function in the attention model (see Equation (DISPLAY_FORM10)) with a temperature parameter $T$. This makes sense as the authors examine attentional alignments obtained while training from UL phonemes to WL words. But when translating from WL words to UL characters, this seems less useful: smoothing will encourage a character to align to many words. This technique is further explored by BIBREF29, who make the temperature parameter trainable and specific to each decoding step, so that the model can learn how to control the softness or sharpness of attention distributions, depending on the current word being decoded.
+
+## Attention-based word segmentation ::: Towards joint alignment and segmentation
+
+One limitation in the approach described above lies in the absence of signal relative to segmentation during RNN training. Attempting to move towards a joint learning of alignment and segmentation, we propose here two extensions aimed at introducing constraints derived from our segmentation heuristic in the training process.
+
+## Attention-based word segmentation ::: Towards joint alignment and segmentation ::: Word-length bias
+
+Our first extension relies on the assumption that the length of aligned source and target words should correlate. Being in a relationship of mutual translation, aligned words are expected to have comparable frequencies and meaning, hence comparable lengths. This means that the longer a source word is, the more target units should be aligned to it. We implement this idea in the attention mechanism as a word-length bias, changing the computation of the context vector from Equation (DISPLAY_FORM9) to:
+
+where $\psi $ is a monotonically increasing function of the length $|w_j|$ of word $w_j$. This will encourage target units to attend more to longer source words. In practice, we choose $\psi $ to be the identity function and renormalize so as to ensure that lines still sum to 1 in the attention matrices. The context vectors $c_i$ are now computed with attention weights $\tilde{\alpha }_{ij}$ as:
+
+We finally derive the target segmentation from the attention matrix $A = (\tilde{\alpha }_{ij})$, following the method of Section SECREF11.
+
+## Attention-based word segmentation ::: Towards joint alignment and segmentation ::: Introducing an auxiliary loss function
+
+Another way to inject segmentation awareness inside our training procedure is to control the number of target words that will be produced during post-processing. The intuition here is that notwithstanding typological discrepancies, the target segmentation should yield a number of target words that is close to the length of the source.
+
+To this end, we complement the main loss function with an additional term $\mathcal {L}_\mathrm {AUX}$ defined as:
+
+The rationale behind this additional term is as follows: recall that a boundary is then inserted on the target side whenever two consecutive units are not aligned to the same source word. The dot product between consecutive lines in the attention matrix will be close to 1 if consecutive target units are aligned to the same source word, and closer to 0 if they are not. The summation thus quantifies the number of target units that will not be followed by a word boundary after segmentation, and $I - \sum _{i=1}^{I-1} \alpha _{i,*}^\top \alpha _{i+1, *}$ measures the number of word boundaries that are produced on the target side. Minimizing this auxiliary term should guide the model towards learning attention matrices resulting in target segmentations that have the same number of words on the source and target sides.
+
+Figure FIGREF25 illustrates the effect of our auxiliary loss on an example. Without auxiliary loss, the segmentation will yield, in this case, 8 target segments (Figure FIGREF25), while the attention learnt with auxiliary loss will yield 5 target segments (Figure FIGREF25); source sentence, on the other hand, has 4 tokens.
+
+## Experiments and discussion
+
+In this section, we describe implementation details for our baseline segmentation system and for the extensions proposed in Section SECREF17, before presenting data and results.
+
+## Experiments and discussion ::: Implementation details
+
+Our baseline system is our own reimplementation of Bahdanau's encoder-decoder with attention in PyTorch BIBREF31. The last version of our code, which handles mini-batches efficiently, heavily borrows from Joost Basting's code. Source sentences include an end-of-sentence (EOS) symbol (corresponding to $w_J$ in our notation) and target sentences include both a beginning-of-sentence (BOS) and an EOS symbol. Padding of source and target sentences in mini-batches is required, as well as masking in the attention matrices and during loss computation. Our architecture follows BIBREF20 very closely with some minor changes.
+
+We use a single-layer bidirectional RNN BIBREF32 with GRU cells: these have been shown to perform similarly to LSTM-based RNNs BIBREF33, while computationally more efficient. We use 64-dimensional hidden states for the forward and backward RNNs, and for the embeddings, similarly to BIBREF12, BIBREF13. In Equation (DISPLAY_FORM4), $h_j$ corresponds to the concatenation of the forward and backward states for each step $j$ of the source sequence.
+
+The alignment MLP model computes function $a$ from Equation (DISPLAY_FORM10) as $a(s_{i-1}, h_j)=v_a^\top \tanh (W_a s_{i-1} + U_a h_j)$ – see Appendix A.1.2 in BIBREF20 – where $v_a$, $W_a$, and $U_a$ are weight matrices. For the computation of weights $\tilde{\alpha _{ij}}$ in the word-length bias extension (Equation (DISPLAY_FORM21)), we arbitrarily attribute a length of 1 to the EOS symbol on the source side.
+
+The decoder is initialized using the last backward state of the encoder and a non-linear function ($\tanh $) for state $s_0$. We use a single-layer GRU RNN; hidden states and output embeddings are 64-dimensional. In preliminary experiments, and as in BIBREF34, we observed better segmentations adopting a “generate first” approach during decoding, where we first generate the current target word, then update the current RNN state. Equations (DISPLAY_FORM5) and (DISPLAY_FORM6) are accordingly modified into:
+
+During training and forced decoding, the hidden state $s_i$ is thus updated using ground-truth embeddings $e(\Omega _{i})$. $\Omega _0$ is the BOS symbol. Our implementation of the output layer ($g$) consists of a MLP and a softmax.
+
+We train for 800 epochs on the whole corpus with Adam (the learning rate is 0.001). Parameters are updated after each mini-batch of 64 sentence pairs. A dropout layer BIBREF35 is applied to both source and target embedding layers, with a rate of 0.5. The weights in all linear layers are initialized with Glorot's normalized method (Equation (16) in BIBREF36) and bias vectors are initialized to 0. Embeddings are initialized with the normal distribution $\mathcal {N}(0, 0.1)$. Except for the bridge between the encoder and the decoder, the initialization of RNN weights is kept to PyTorch defaults. During training, we minimize the NLL loss $\mathcal {L}_\mathrm {NLL}$ (see Section SECREF3), adding optionally the auxiliary loss $\mathcal {L}_\mathrm {AUX}$ (Section SECREF22). When the auxiliary loss term is used, we schedule it to be integrated progressively so as to avoid degenerate solutions with coefficient $\lambda _\mathrm {AUX}(k)$ at epoch $k$ defined by:
+
+where $K$ is the total number of epochs and $W$ a wait parameter. The complete loss at epoch $k$ is thus $\mathcal {L}_\mathrm {NLL} + \lambda _\mathrm {AUX} \cdot \mathcal {L}_\mathrm {AUX}$. After trying values ranging from 100 to 700, we set $W$ to 200. We approximate the absolute value in Equation (DISPLAY_FORM24) by $|x| \triangleq \sqrt{x^2 + 0.001}$, in order to make the auxiliary loss function differentiable.
+
+## Experiments and discussion ::: Data and evaluation
+
+Our experiments are performed on an actual endangered language, Mboshi (Bantu C25), a language spoken in Congo-Brazzaville, using the bilingual French-Mboshi 5K corpus of BIBREF17. On the Mboshi side, we consider alphabetic representation with no tonal information. On the French side,we simply consider the default segmentation into words.
+
+We denote the baseline segmentation system as base, the word-length bias extension as bias, and the auxiliary loss extensions as aux. We also report results for a variant of aux (aux+ratio), in which the auxiliary loss is computed with a factor corresponding to the true length ratio $r_\mathrm {MB/FR}$ between Mboshi and French averaged over the first 100 sentences of the corpus. In this variant, the auxiliary loss is computed as $\vert I - r_\mathrm {MB/FR} \cdot J - \sum _{i=1}^{I-1} \alpha _{i,*}^\top \alpha _{i+1, *} \vert $.
+
+We report segmentation performance using precision, recall, and F-measure on boundaries (BP, BR, BF), and tokens (WP, WR, WF). We also report the exact-match (X) metric which computes the proportion of correctly segmented utterances. Our main results are in Figure FIGREF47, where we report averaged scores over 10 runs. As a comparison with another bilingual method inspired by the “align to segment” approach, we also include the results obtained using the statistical models of BIBREF9, denoted Pisa, in Table TABREF46.
+
+## Experiments and discussion ::: Discussion
+
+A first observation is that our baseline method base improves vastly over Pisa's results (by a margin of about 30% on boundary F-measure, BF).
+
+## Experiments and discussion ::: Discussion ::: Effects of the word-length bias
+
+The integration of a word-bias in the attention mechanism seems detrimental to segmentation performance, and results obtained with bias are lower than those obtained with base, except for the sentence exact-match metric (X). To assess whether the introduction of word-length bias actually encourages target units to “attend more” to longer source word in bias, we compute the correlation between the length of source word and the quantity of attention these words receive (for each source position, we sum attention column-wise: $\sum _i \tilde{\alpha }_{ij}$). Results for all segmentation methods are in Table TABREF50. bias increases the correlation between word lengths and attention, but this correlation being already high for all methods (base, or aux and aux+ratio), our attempt to increase it proves here detrimental to segmentation.
+
+## Experiments and discussion ::: Discussion ::: Effects of the auxiliary loss
+
+For boundary F-measures (BF) in Figure FIGREF47, aux performs similarly to base, but with a much higher precision, and degraded recall, indicating that the new method does not oversegment as much as base. More insight can be gained from various statistics on the automatically segmented data presented in Table TABREF52. The average token and sentence lengths for aux are closer to their ground-truth values (resp. 4.19 characters and 5.96 words). The global number of tokens produced is also brought closer to its reference. On token metrics, a similar effect is observed, but the trade-off between a lower recall and an increased precision is more favorable and yields more than 3 points in F-measure. These results are encouraging for documentation purposes, where precision is arguably a more valuable metric than recall in a semi-supervised segmentation scenario.
+
+They, however, rely on a crude heuristic that the source and target sides (here French and Mboshi) should have the same number of units, which are only valid for typologically related languages and not very accurate for our dataset.
+
+As Mboshi is more agglutinative than French (5.96 words per sentence on average in the Mboshi 5K, vs. 8.22 for French), we also consider the lightly supervised setting where the true length ratio is provided. This again turns out to be detrimental to performance, except for the boundary precision (BP) and the sentence exact-match (X). Note also that precision becomes stronger than recall for both boundary and token metrics, indicating under-segmentation. This is confirmed by an average token length that exceeds the ground-truth (and an average sentence length below the true value, see Table TABREF52).
+
+Here again, our control of the target length proves effective: compared to base, the auxiliary loss has the effect to decrease the average sentence length and move it closer to its observed value (5.96), yielding an increased precision, an effect that is amplified with aux+ratio. By tuning this ratio, it is expected that we could even get slightly better results.
+
+## Related work
+
+The attention mechanism introduced by BIBREF20 has been further explored by many researchers. BIBREF37, for instance, compare a global to a local approach for attention, and examine several architectures to compute alignment weights $\alpha _{ij}$. BIBREF38 additionally propose a recurrent version of the attention mechanism, where a “dynamic memory” keeps track of the attention received by each source word, and demonstrate better translation results. A more general formulation of the attention mechanism can, lastly, be found in BIBREF39, where structural dependencies between source units can be modeled.
+
+With the goal of improving alignment quality, BIBREF40 computes a distance between attentions and word alignments learnt with the reparameterization of IBM Model 2 from BIBREF41; this distance is then added to the cost function during training. To improve alignments also, BIBREF14 introduce several refinements to the attention mechanism, in the form of structural biases common in word-based alignment models. In this work, the attention model is enriched with features able to control positional bias, fertility, or symmetry in the alignments, which leads to better translations for some language pairs, under low-resource conditions. More work seeking to improve alignment and translation quality can be found in BIBREF42, BIBREF43, BIBREF44, BIBREF45, BIBREF46, BIBREF47.
+
+Another important line of reseach related to work studies the relationship between segmentation and alignment quality: it is recognized that sub-lexical units such as BPE BIBREF48 help solve the unknown word problem; other notable works around these lines include BIBREF49 and BIBREF50.
+
+CLD has also attracted a growing interest in recent years. Most recent work includes speech-to-text translation BIBREF51, BIBREF52, speech transcription using bilingual supervision BIBREF53, both speech transcription and translation BIBREF54, or automatic phonemic transcription of tonal languages BIBREF55.
+
+## Conclusion
+
+In this paper, we explored neural segmentation methods extending the “align to segment” approach, and proposed extensions to move towards joint segmentation and alignment. This involved the introduction of a word-length bias in the attention mechanism and the design of an auxiliary loss. The latter approach yielded improvements over the baseline on all accounts, in particular for the precision metric.
+
+Our results, however, lag behind the best monolingual performance for this dataset (see e.g. BIBREF56). This might be due to the difficulty of computing valid alignments between phonemes and words in very limited data conditions, which remains very challenging, as also demonstrated by the results of Pisa. However, unlike monolingual methods, bilingual methods generate word alignments and their real benefit should be assessed with alignment based metrics. This is left for future work, as reference word alignments are not yet available for our data.
+
+Other extensions of this work will focus on ways to mitigate data sparsity with weak supervision information, either by using lists of frequent words or the presence of certain word boundaries on the target side or by using more sophisticated attention models in the spirit of BIBREF14 or BIBREF39.

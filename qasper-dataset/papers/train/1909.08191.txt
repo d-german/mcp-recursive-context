@@ -1,0 +1,123 @@
+# Exploring Scholarly Data by Semantic Query on Knowledge Graph Embedding Space
+
+**Paper ID:** 1909.08191
+
+## Abstract
+
+The trends of open science have enabled several open scholarly datasets which include millions of papers and authors. Managing, exploring, and utilizing such large and complicated datasets effectively are challenging. In recent years, the knowledge graph has emerged as a universal data format for representing knowledge about heterogeneous entities and their relationships. The knowledge graph can be modeled by knowledge graph embedding methods, which represent entities and relations as embedding vectors in semantic space, then model the interactions between these embedding vectors. However, the semantic structures in the knowledge graph embedding space are not well-studied, thus knowledge graph embedding methods are usually only used for knowledge graph completion but not data representation and analysis. In this paper, we propose to analyze these semantic structures based on the well-studied word embedding space and use them to support data exploration. We also define the semantic queries, which are algebraic operations between the embedding vectors in the knowledge graph embedding space, to solve queries such as similarity and analogy between the entities on the original datasets. We then design a general framework for data exploration by semantic queries and discuss the solution to some traditional scholarly data exploration tasks. We also propose some new interesting tasks that can be solved based on the uncanny semantic structures of the embedding space.
+
+## Introduction
+
+In recent years, digital libraries have moved towards open science and open access with several large scholarly datasets being constructed. Most popular datasets include millions of papers, authors, venues, and other information. Their large size and heterogeneous contents make it very challenging to effectively manage, explore, and utilize these datasets. The knowledge graph has emerged as a universal data format for representing knowledge about entities and their relationships in such complicated data. The main part of a knowledge graph is a collection of triples, with each triple $ (h, t, r) $ denoting the fact that relation $ r $ exists between head entity $ h $ and tail entity $ t $. This can also be formalized as a labeled directed multigraph where each triple $ (h, t, r) $ represents a directed edge from node $ h $ to node $ t $ with label $ r $. Therefore, it is straightforward to build knowledge graphs for scholarly data by representing natural connections between scholarly entities with triples such as (AuthorA, Paper1, write) and (Paper1, Paper2, cite).
+
+Notably, instead of using knowledge graphs directly in some tasks, we can model them by knowledge graph embedding methods, which represent entities and relations as embedding vectors in semantic space, then model the interactions between them to solve the knowledge graph completion task. There are many approaches BIBREF0 to modeling the interactions between embedding vectors resulting in many knowledge graph embedding methods such as ComplEx BIBREF1 and CP$ _h $ BIBREF2. In the case of word embedding methods such as word2vec, embedding vectors are known to contain rich semantic information that enables them to be used in many semantic applications BIBREF3. However, the semantic structures in the knowledge graph embedding space are not well-studied, thus knowledge graph embeddings are only used for knowledge graph completion but remain absent in the toolbox for data analysis of heterogeneous data in general and scholarly data in particular, although they have the potential to be highly effective and efficient. In this paper, we address these issues by providing a theoretical understanding of their semantic structures and designing a general semantic query framework to support data exploration.
+
+For theoretical analysis, we first analyze the state-of-the-art knowledge graph embedding model CP$ _h $ BIBREF2 in comparison to the popular word embedding model word2vec skipgram BIBREF3 to explain its components and provide understandings to its semantic structures. We then define the semantic queries on the knowledge graph embedding spaces, which are algebraic operations between the embedding vectors in the knowledge graph embedding space to solve queries such as similarity and analogy between the entities on the original datasets.
+
+Based on our theoretical results, we design a general framework for data exploration on scholarly data by semantic queries on knowledge graph embedding space. The main component in this framework is the conversion between the data exploration tasks and the semantic queries. We first outline the semantic query solutions to some traditional data exploration tasks, such as similar paper prediction and similar author prediction. We then propose a group of new interesting tasks, such as analogy query and analogy browsing, and discuss how they can be used in modern digital libraries.
+
+## Related Work ::: Knowledge graph for scholarly data
+
+Knowledge graph has gradually become the standard data format for heterogeneous and complicated datasets BIBREF4. There have been several attempts to build knowledge graph for scholarly data, either adopting the scholarly network directly BIBREF5, or deriving the knowledge graph from some similarity measures BIBREF6 BIBREF7, or constructing the knowledge graph from survey papers BIBREF8. However, they mostly focus on the data format or graph inference aspects of knowledge graph. In this paper, we instead focus on the knowledge graph embedding methods and especially the application of embedding vectors in data exploration.
+
+## Related Work ::: Knowledge graph embedding
+
+For a more in depth survey of knowledge graph embedding methods, please refer to BIBREF0, which defines their architecture, categorization, and interaction mechanisms. In this paper, we only focus on the semantic structures of the state-of-the-art model CP$ _h $ BIBREF2, which is an extension of CP BIBREF9.
+
+In CP, each entity $ e $ has two embedding vectors $ $ and $ ^{(2)} $ depending on its role in a triple as head or as tail, respectively. CP$ _h $ augments the data by making an inverse triple $ (t, h, r^{(a)}) $ for each existing triple $ (h, t, r) $, where $ r^{(a)} $ is the augmented relation corresponding to $ r $. When maximizing the likelihood by stochastic gradient descent, its score function is the sum:
+
+where $ , ^{(2)}, , ^{(2)}, , ^{(a)} \in ^{D} $ are the embedding vectors of $ h $, $ t $, and $ r $, respectively, and the trilinear-product $ \langle \cdot , \cdot , \cdot \rangle $ is defined as:
+
+where $ D $ is the embedding size and $ d $ is the dimension for which $ h_d $, $ t_d $, and $ r_d $ are the scalar entries.
+
+The validity of each triple is modeled as a Bernoulli distribution and its validity probability is computed by the standard logistic function $ \sigma (\cdot ) $ as:
+
+## Related Work ::: Word embedding
+
+The most popular word embedding models in recent years are word2vec variants such as word2vec skipgram BIBREF3, which predicts the context-words $ c_i $ independently given the target-word $ w $, that is:
+
+In practice, the expensive softmax functions in these multinoulli distributions are avoided by approximating them with negative sampling and solve for the Bernoulli distributions by using the standard logistic function $ \sigma (\cdot ) $:
+
+where $ _{c_i} $ is the context-embedding vector of context-word $ c_i $ and $ _w $ is the word-embedding vector of target-word $ w $.
+
+## Theoretical analysis
+
+Word2vec skipgram and its semantic structures are well-studied both theoretically and empirically BIBREF3. CP$ _h $ is a new state of the art among many knowledge graph embedding models. We first ground the theoretical basis of CP$ _h $ on word2vec skipgram to explain its components and understand its semantic structures. We then define semantic queries on knowledge graph embedding space.
+
+## Theoretical analysis ::: The semantic structures of CP@!START@$ _h $@!END@
+
+We first look at Eq. DISPLAY_FORM8 of word2vec skipgram and consider only one context-word $ c $ for simplicity. We can write the probability in proportional format as:
+
+Note that the context-word $ c $ and target-word $ w $ are ordered and in word2vec skipgram, the target-word is the central word in a sliding window, e.g., $ w_i $ is the target-word and $ w_{i-k}, \dots , w_{i-1}, w_{i+1}, \dots , w_{i+k} $ are context-words. Therefore, the roles in each word pair are symmetric over the whole dataset. When maximizing the likelihood by stochastic gradient descent, we can write the approximate probability of unordered word pair and expand the dot products as:
+
+where $ _c $ and $ _c $ are the context-embedding and word-embedding vectors of $ c $, respectively, $ _w $ and $ _w $ are the context-embedding and word-embedding vectors of $ w $, respectively, and $ {u_c}_d, {v_c}_d, {u_w}_d $, and $ {v_w}_d $ are their scalar entries, respectively.
+
+We now return to Eq. DISPLAY_FORM3 of CP$ _h $ to also write the probability in Eq. DISPLAY_FORM5 in proportional format and expand the trilinear products according to Eq. DISPLAY_FORM4 as:
+
+where $ , ^{(2)} $, $ , ^{(2)} $, $ , ^{(a)} $ are knowledge graph embedding vectors and $ h_d, h^{(2)}_d $, $ t_d, t^{(2)}_d $, $ r_d, r^{(a)}_d $ are the scalar entries.
+
+Comparing Eq. of word2vec skipgram and Eq. of CP$ _h $, we can see they have essentially the same form and mechanism. Note that the embedding vectors in word2vec skipgram are learned by aligning each target-word to different context-words and vice versa, which is essentially the same for CP$ _h $ by aligning each head entity to different tail entities in different triples and vice versa, with regards to the dimensions weighted by each relation. This result suggests that the semantic structures of CP$ _h $ are similar to those in word2vec skipgram and we can use the head-role-based entity embedding vectors, such as $ $, for semantic applications similarly to word embedding vectors. The tail-role-based entity embedding vectors, such as $ ^{(2)} $, contain almost the same information due to their symmetric roles, thus can be discarded in semantic tasks, which justifies this common practices in word embedding applications BIBREF3.
+
+## Theoretical analysis ::: Semantic query
+
+We mainly concern with the two following structures of the embedding space.
+
+Semantic similarity structure: Semantically similar entities are close to each other in the embedding space, and vice versa. This structure can be identified by a vector similarity measure, such as the dot product between two embedding vectors. The similarity between two embedding vectors is computed as:
+
+Semantic direction structure: There exist semantic directions in the embedding space, by which only one semantic aspect changes while all other aspects stay the same. It can be identified by a vector difference, such as the subtraction between two embedding vectors. The semantic direction between two embedding vectors is computed as:
+
+The algebraic operations, which include the above dot product and vector subtraction, or their combinations, can be used to approximate some important tasks on the original data. To do this, we first need to convert the data exploration task to the appropriate operations. We then conduct the operations on the embedding vectors and obtain the results. This process is defined as following.
+
+Definition 1 Semantic queries on knowledge graph embedding space are defined as the algebraic operations between the knowledge graph embedding vectors to approximate a given data exploration task on the original dataset.
+
+## Semantic query framework
+
+Given the theoretical results, here we design a general framework for scholarly data exploration by using semantic queries on knowledge graph embedding space. Figure FIGREF19 shows the architecture of the proposed framework. There are three main components, namely data processing, task processing, and query processing.
+
+Data processing: with two steps, (1) constructing the knowledge graph from scholarly data by using the scholarly graph directly with entities such as authors, papers, venues, and relations such as author-write-paper, paper-cite-paper, paper-in-venue, and (2) learning the knowledge graph embeddings as in BIBREF0.
+
+Task processing: converting data exploration tasks to algebraic operations on the embedding space by following task-specific conversion templates. Some important tasks and their conversion templates are discussed in Section SECREF5.
+
+Query processing: executing semantic query on the embedding space and return results. Note that the algebraic operations on embedding vectors are linear and can be performed in parallel. Therefore, the semantic query is efficient.
+
+Note that the proposed semantic query framework makes no assumption on the specific knowledge graph embedding models and the induced embedding spaces. Any embedding space that contains rich semantic information such as the listed semantic structures can be applied in this framework.
+
+## Exploration tasks and semantic queries conversion
+
+Here we present and discuss the semantic queries for some traditional and newly proposed data exploration tasks on scholarly data.
+
+## Exploration tasks and semantic queries conversion ::: Similar entities
+
+Tasks Given an entity $ e \in $, find entities that are similar to $ e $. For example, given AuthorA, find authors, papers, and venues that are similar to AuthorA. Note that we can restrict to find specific entity types. This is a traditional tasks in scholarly data exploration, whereas other below tasks are new.
+
+Semantic query We can solve this task by looking for the entities with highest similarity to $ e $. For example, the first result is:
+
+## Exploration tasks and semantic queries conversion ::: Similar entities with bias
+
+Tasks Given an entity $ e \in $ and some positive bias entities $ A = \lbrace a_1, \dots , a_k\rbrace $ known as expected results, find entities that are similar to $ e $ following the bias in $ A $. For example, given AuthorA and some successfully collaborating authors, find other similar authors that may also result in good collaborations with AuthorA.
+
+Semantic query We can solve this task by looking for the entities with highest similarity to both $ e $ and $ A $. For example, denoting the arithmetic mean of embedding vectors in $ A $ as $ \bar{A} $, the first result is:
+
+## Exploration tasks and semantic queries conversion ::: Analogy query
+
+Tasks Given an entity $ e \in $, positive bias $ A = \lbrace a_1, \dots , a_k\rbrace $, and negative bias $ B = \lbrace b_1, \dots , b_k\rbrace $, find entities that are similar to $ e $ following the biases in $ A $ and $ B $. The essence of this task is tracing along a semantic direction defined by the positive and negative biases. For example, start with AuthorA, we can trace along the expertise direction to find authors that are similar to AuthorA but with higher or lower expertise.
+
+Semantic query We can solve this task by looking for the entities with highest similarity to $ e $ and $ A $ but not $ B $. For example, denoting the arithmetic mean of embedding vectors in $ A $ and $ B $ as $ \bar{A} $ and $ \bar{B} $, respectively, note that $ \bar{A} - \bar{B} $ defines the semantic direction along the positive and negative biases, the first result is:
+
+## Exploration tasks and semantic queries conversion ::: Analogy browsing
+
+Tasks This task is an extension of the above analogy query task, by tracing along multiple semantic directions defined by multiple pairs of positive and negative biases. This task can be implemented as an interactive data analysis tool. For example, start with AuthorA, we can trace to authors with higher expertise, then continue tracing to new domains to find all authors similar to AuthorA with high expertise in the new domain. For another example, start with Paper1, we can trace to papers with higher quality, then continue tracing to new domain to look for papers similar to Paper1 with high quality in the new domain.
+
+Semantic query We can solve this task by simply repeating the semantic query for analogy query with each pair of positive and negative bias. Note that we can also combine different operations in different order to support flexible browsing.
+
+## Conclusion
+
+In this paper, we studied the application of knowledge graph embedding in exploratory data analysis. We analyzed the CP$ _h $ model and provided understandings to its semantic structures. We then defined the semantic queries on knowledge graph embedding space to efficiently approximate some operations on heterogeneous data such as scholarly data. We designed a general framework to systematically apply semantic queries to solve scholarly data exploration tasks. Finally, we outlined and discussed the solutions to some traditional and pioneering exploration tasks emerged from the semantic structures of the knowledge graph embedding space.
+
+This paper is dedicated to the theoretical foundation of a new approach and discussions of emerging tasks, whereas experiments and evaluations are left for the future work. There are several other promising directions for future research. One direction is to explore new tasks or new solutions of traditional tasks using the proposed method. Another direction is to implement the proposed exploration tasks on real-life digital libraries for online evaluation.
+
+## Acknowledgments
+
+This work was supported by “Cross-ministerial Strategic Innovation Promotion Program (SIP) Second Phase, Big-data and AI-enabled Cyberspace Technologies” by New Energy and Industrial Technology Development Organization (NEDO).
+
+1.0

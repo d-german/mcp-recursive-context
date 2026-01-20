@@ -1,0 +1,117 @@
+# Natural Language Processing with Small Feed-Forward Networks
+
+**Paper ID:** 1708.00214
+
+## Abstract
+
+We show that small and shallow feed-forward neural networks can achieve near state-of-the-art results on a range of unstructured and structured language processing tasks while being considerably cheaper in memory and computational requirements than deep recurrent models. Motivated by resource-constrained environments like mobile phones, we showcase simple techniques for obtaining such small neural network models, and investigate different tradeoffs when deciding how to allocate a small memory budget.
+
+## Introduction
+
+Deep and recurrent neural networks with large network capacity have become increasingly accurate for challenging language processing tasks. For example, machine translation models have been able to attain impressive accuracies, with models that use hundreds of millions BIBREF0 , BIBREF1 or billions BIBREF2 of parameters. These models, however, may not be feasible in all computational settings. In particular, models running on mobile devices are often constrained in terms of memory and computation.
+
+Long Short-Term Memory (LSTM) models BIBREF3 have achieved good results with small memory footprints by using character-based input representations: e.g., the part-of-speech tagging models of gillick2016brnn have only roughly 900,000 parameters. Latency, however, can still be an issue with LSTMs, due to the large number of matrix multiplications they require (eight per LSTM cell): kimrush2016 report speeds of only 8.8 words/second when running a two-layer LSTM translation system on an Android phone.
+
+Feed-forward neural networks have the potential to be much faster. In this paper, we show that small feed-forward networks can achieve results at or near the state-of-the-art on a variety of natural language processing tasks, with an order of magnitude speedup over an LSTM-based approach.
+
+We begin by introducing the network model structure and the character-based representations we use throughout all tasks (§ "Small Feed-Forward Network Models" ). The four tasks that we address are: language identification (Lang-ID), part-of-speech (POS) tagging, word segmentation, and preordering for translation. In order to use feed-forward networks for structured prediction tasks, we use transition systems BIBREF4 , BIBREF5 with feature embeddings as proposed by chen-manning:2014:EMNLP, and introduce two novel transition systems for the last two tasks. We focus on budgeted models and ablate four techniques (one on each task) for improving accuracy for a given memory budget:
+
+We achieve results at or near state-of-the-art with small ( $< 3$ MB) models on all four tasks.
+
+## Small Feed-Forward Network Models
+
+The network architectures are designed to limit the memory and runtime of the model. Figure 1 illustrates the model architecture:
+
+Memory needs are dominated by the embedding matrix sizes ( $\sum _g V_g D_g$ , where $V_g$ and $D_g$ are the vocabulary sizes and dimensions respectively for each feature group $g$ ), while runtime is strongly influenced by the hidden layer dimensions.
+
+## Experiments
+
+We experiment with small feed-forward networks for four diverse NLP tasks: language identification, part-of-speech tagging, word segmentation, and preordering for statistical machine translation.
+
+## Language Identification
+
+Recent shared tasks on code-switching BIBREF14 and dialects BIBREF15 have generated renewed interest in language identification. We restrict our focus to single language identification across diverse languages, and compare to the work of baldwin2010language on predicting the language of Wikipedia text in 66 languages. For this task, we obtain the input $\mathbf {h}_0$ by separately averaging the embeddings for each n-gram length ( $N=[1,4]$ ), as summation did not produce good results.
+
+Table 1 shows that we outperform the low-memory nearest-prototype model of baldwin2010language. Their nearest neighbor model is the most accurate but its memory scales linearly with the size of the training data.
+
+Moreover, we can apply quantization to the embedding matrix without hurting prediction accuracy: it is better to use less precision for each dimension, but to use more dimensions. Our subsequent models all use quantization. There is no noticeable variation in processing speed when performing dequantization on-the-fly at inference time. Our 16-dim Lang-ID model runs at 4450 documents/second (5.6 MB of text per second) on the preprocessed Wikipedia dataset.
+
+These techniques back the open-source Compact Language Detector v3 (CLD3) that runs in Google Chrome browsers. Our experimental Lang-ID model uses the same overall architecture as CLD3, but uses a simpler feature set, less involved preprocessing, and covers fewer languages.
+
+## POS Tagging
+
+We apply our model as an unstructured classifier to predict a POS tag for each token independently, and compare its performance to that of the byte-to-span (BTS) model BIBREF16 . BTS is a 4-layer LSTM network that maps a sequence of bytes to a sequence of labeled spans, such as tokens and their POS tags. Both approaches limit model size by using small input vocabularies: byte values in the case of BTS, and hashed character n-grams and (optionally) cluster ids in our case.
+
+It is well known that word clusters can be powerful features in linear models for a variety of tasks BIBREF17 , BIBREF18 . Here, we show that they can also be useful in neural network models. However, naively introducing word cluster features drastically increases the amount of memory required, as a word-to-cluster mapping file with hundreds of thousands of entries can be several megabytes on its own. By representing word clusters with a Bloom map BIBREF19 , a key-value based generalization of Bloom filters, we can reduce the space required by a factor of $\sim $ 15 and use 300KB to (approximately) represent the clusters for 250,000 word types.
+
+In order to compare against the monolingual setting of gillick2016brnn, we train models for the same set of 13 languages from the Universal Dependency treebanks v1.1 BIBREF20 corpus, using the standard predefined splits.
+
+As shown in Table 2 , our best models are 0.3% more accuate on average across all languages than the BTS monolingual models, while using 6x fewer parameters and 36x fewer FLOPs. The cluster features play an important role, providing a 15% relative reduction in error over our vanilla model, but also increase the overall size. Halving all feature embedding dimensions (except for the cluster features) still gives a 12% reduction in error and trims the overall size back to 1.1x the vanilla model, staying well under 1MB in total. This halved model configuration has a throughput of 46k tokens/second, on average.
+
+Two potential advantages of BTS are that it does not require tokenized input and has a more accurate multilingual version, achieving 95.85% accuracy. From a memory perspective, one multilingual BTS model will take less space than separate FF models. However, from a runtime perspective, a pipeline of our models doing language identification, word segmentation, and then POS tagging would still be faster than a single instance of the deep LSTM BTS model, by about 12x in our FLOPs estimate.
+
+## Segmentation
+
+Word segmentation is critical for processing Asian languages where words are not explicitly separated by spaces. Recently, neural networks have significantly improved segmentation accuracy BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 , BIBREF25 . We use a structured model based on the transition system in Table 3 , and similar to the one proposed by zhang-clark2007. We conduct the segmentation experiments on the Chinese Treebank 6.0 with the recommended data splits. No external resources or pretrained embeddings are used. Hashing was detrimental to quality in our preliminary experiments, hence we do not use it for this task. To learn an embedding for unknown characters, we cast characters occurring only once in the training set to a special symbol.
+
+Because we are not using hashing here, we need to be careful about the size of the input vocabulary. The neural network with its non-linearity is in theory able to learn bigrams by conjoining unigrams, but it has been shown that explicitly using character bigram features leads to better accuracy BIBREF21 , BIBREF26 . zhang-zhang-fu:2016:P16-1 suggests that embedding manually specified feature conjunctions further improves accuracy (`zhang-zhang-fu:2016:P16-1-combo' in Table 4 ). However, such embeddings could easily lead to a model size explosion and thus are not considered in this work.
+
+The results in Table 4 show that spending our memory budget on small bigram embeddings is more effective than on larger character embeddings, in terms of both accuracy and model size. Our model featuring bigrams runs at 110KB of text per second, or 39k tokens/second.
+
+## Preordering
+
+Preordering source-side words into the target-side word order is a useful preprocessing task for statistical machine translation BIBREF27 , BIBREF28 , BIBREF29 , BIBREF30 . We propose a novel transition system for this task (Table 5 ), so that we can repeatedly apply a small network to produce these permutations. Inspired by a non-projective parsing transition system BIBREF31 , the system uses a swap action to permute spans. The system is sound for permutations: any derivation will end with all of the input words in a permuted order, and complete: all permutations are reachable (use shift and swap operations to perform a bubble sort, then append $n-1$ times to form a single span). For training and evaluation, we use the English-Japanese manual word alignments from nakagawa2015efficient.
+
+For preordering, we experiment with either spending all of our memory budget on reordering, or spending some of the memory budget on features over predicted POS tags, which also requires an additional neural network to predict these tags. Full feature templates are in the supplementary material. As the POS tagger network uses features based on a three word window around the token, another possibility is to add all of the features that would have affected the POS tag of a token to the reorderer directly.
+
+Table 6 shows results with or without using the predicted POS tags in the preorderer, as well as including the features used by the tagger in the reorderer directly and only training the downstream task. The preorderer that includes a separate network for POS tagging and then extracts features over the predicted tags is more accurate and smaller than the model that includes all the features that contribute to a POS tag in the reorderer directly. This pipeline processes 7k tokens/second when taking pretokenized text as input, with the POS tagger accounting for 23% of the computation time.
+
+## Conclusions
+
+This paper shows that small feed-forward networks are sufficient to achieve useful accuracies on a variety of tasks. In resource-constrained environments, speed and memory are important metrics to optimize as well as accuracies. While large and deep recurrent models are likely to be the most accurate whenever they can be afforded, feed-foward networks can provide better value in terms of runtime and memory, and should be considered a strong baseline.
+
+## Acknowledgments
+
+We thank Kuzman Ganchev, Fernando Pereira, and the anonymous reviewers for their useful comments.
+
+## Supplementary Material
+
+## Quantization Details
+
+The values comprising a generic embedding matrix $\mathbf {E} \in \mathbb {R}^{V \times D}$ are ordinarily stored with 32-bit floating-point precision in our implementation. For quantization, we first calculate a scale factor $s_i$ for each embedding vector $\mathbf {e}_i$ as $s_i=\frac{1}{b-1}\max _j \left|e_{ij}\right|.$ 
+
+Each weight $e_{ij}$ is then quantized into an 8-bit integer as $q_{ij}=\lfloor \frac{1}{2} + \frac{e_{ij}}{s_i} + b\rfloor ,$ 
+
+where the bias $b=128$ . Hence, the number of bits required to store the embedding matrix is reduced by a factor of 4, in exchange for storing the $V$ additional scale values. At inference time, the embeddings are dequantized on-the-fly.
+
+## FLOPs Calculation
+
+The product of $\mathbf {A} \in \mathbb {R}^{P \times Q}$ and $\mathbf {b} \in \mathbb {R}^Q$ involves $P(2Q-1)$ FLOPs, and our single ReLu hidden layer requires performing this operation once per timestep ( $P$ = $M$ , $Q$ = $H_0$ ). Here, $H_0$ denotes the size of the embedding vector $\mathbf {h}_0$ , which equals 408, 464 and 260 for our respective POS models as ordered in Table 2 .
+
+In contrast, each LSTM layer requires eight products per timestep, and the BTS model has four layers ( $P$ = $Q$ =320). The particular sequence-to-sequence representation scheme of gillick2016brnn requires at least four timesteps to produce a meaningful output: the individual input byte(s), and a start, length and label of the predicted span. A single timestep is therefore a relaxed lower bound on the number of FLOPs needed for BTS inference.
+
+## Word Clusters
+
+The word clusters we use are for the 250k most frequent words from a large unannotated corpus that was clustered into 256 classes using the distributed Exchange algorithm BIBREF36 and the procedure described in Appendix A of tackstrom2012clusters.
+
+The space required to store them in a Bloom map is calculated using the formula derived by talbot2008bloom: each entry requires $1.23*(\log \frac{1}{\epsilon } + H)$ bits, where $H$ is the entropy of the distribution on the set of values, and $\epsilon =2^{-E}$ , with $E$ the number of error bits employed. We use 0 error bits and assume a uniform distribution for the 256 values, i.e. $H=8$ , hence we need 9.84 bits per entry, or 300KB for the 250k entries.
+
+## Lang-ID Details
+
+In our language identification evaluation, the 1,2,3,4-gram embedding vectors each have 6 or 16 dimensions, depending on the experimental setting. Their hashed vocabulary sizes ( $V_g$ ) are 100, 1000, 5000, and 5000, respectively. The hidden layer size is fixed at $M$ =208.
+
+We preprocess data by removing non-alphabetic characters and pieces of markup text (i.e., anything located between $<$ and $>$ , including the brackets). At test time, if this results in an empty string, we skip the markup removal, and if that still results in an empty string, we process the original string. This procedure is an artefact of the Wikipedia dataset, where some documents contain only punctuation or trivial HTML code, yet we must make predictions for them to render the results directly comparable to the literature.
+
+## POS Details
+
+The Small FF model in the comparison to BTS uses 2,3,4-grams and some byte unigrams (see feature templates in Table vii ). The n-grams have embedding sizes of 16 and the byte unigrams get 4 dimensions. In our $\frac{1}{2}$ -dimension setting, the aforementioned dimensions are halved to 8 and 2.
+
+Cluster features get embedding vectors of size 8. The hashed feature vocabularies for n-grams are 500, 200, and 4000, respectively. The hidden layer size is fixed at $M$ =320.
+
+## Segmentation Details
+
+Feature templates used in segmentation experiments are listed in Table viii . Besides, we define length feature to be the number of characters between top of $\sigma $ and the front of $\beta $ , this maximum feature value is clipped to 100. The length feature is used in all segmentation models, and the embedding dimension is set to 6. We set the cutoff for both character and character-bigrams to 2 in order to learn unknown character/bigram embeddings. The hidden layer size is fixed at $M$ =256.
+
+## Preordering Details
+
+The feature templates for the preorderer look at the top four spans on the stack and the first four spans in the buffer; for each span, the feature templates look at up to the first two words and last two words within the span. The “vanilla” variant of the preorderer includes character n-grams, word bytes, and whether the span has ever participated in a swap transition. The POS features are the predicted tags for the words in these positions. Table ix shows the full feature templates for the preorderer.

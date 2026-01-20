@@ -1,0 +1,85 @@
+# Incrementalizing RASA's Open-Source Natural Language Understanding Pipeline
+
+**Paper ID:** 1907.05403
+
+## Abstract
+
+As spoken dialogue systems and chatbots are gaining more widespread adoption, commercial and open-sourced services for natural language understanding are emerging. In this paper, we explain how we altered the open-source RASA natural language understanding pipeline to process incrementally (i.e., word-by-word), following the incremental unit framework proposed by Schlangen and Skantze. To do so, we altered existing RASA components to process incrementally, and added an update-incremental intent recognition model as a component to RASA. Our evaluations on the Snips dataset show that our changes allow RASA to function as an effective incremental natural language understanding service.
+
+## Introduction
+
+There is no shortage of services that are marketed as natural language understanding (nlu) solutions for use in chatbots, digital personal assistants, or spoken dialogue systems (sds). Recently, Braun2017 systematically evaluated several such services, including Microsoft LUIS, IBM Watson Conversation, API.ai, wit.ai, Amazon Lex, and RASA BIBREF0 . More recently, Liu2019b evaluated LUIS, Watson, RASA, and DialogFlow using some established benchmarks. Some nlu services work better than others in certain tasks and domains with a perhaps surprising pattern: RASA, the only fully open-source nlu service among those evaluated, consistently performs on par with the commercial services.
+
+Though these services yield state-of-the-art performance on a handful of nlu tasks, one drawback to sds and robotics researchers is the fact that all of these nlu solutions process input at the utterance level; none of them process incrementally at the word-level. Yet, research has shown that humans comprehend utterances as they unfold BIBREF1 . Moreover, when a listener feels they are missing some crucial information mid-utterance, they can interject with a clarification request, so as to ensure they and the speaker are maintaining common ground BIBREF2 . Users who interact with sdss perceive incremental systems as being more natural than traditional, turn-based systems BIBREF3 , BIBREF4 , BIBREF5 , offer a more human-like experience BIBREF6 and are more satisfying to interact with than non-incremental systems BIBREF7 . Users even prefer interacting with an incremental sds when the system is less accurate or requires filled pauses while replying BIBREF8 or operates in a limited domain as long as there is incremental feedback BIBREF9 .
+
+In this paper, we report our recent efforts in making the RASA nlu pipeline process incrementally. We explain briefly the RASA framework and pipeline, explain how we altered the RASA framework and individual components (including a new component which we added) to allow it to process incrementally, then we explain how we evaluated the system to ensure that RASA works as intended and how researchers can leverage this tool.
+
+## The RASA NLU Pipeline
+
+RASA consists of nlu and core modules, the latter of which is akin to a dialogue manager; our focus here is on the nlu. The nlu itself is further modularized as pipelines which define how user utterances are processed, for example an utterance can pass through a tokenizer, named entity recognizer, then an intent classifier before producing a distribution over possible dialogue acts or intents. The pipeline and the training data are authorable (following a markdown representation; json format can also be used for the training data) allowing users to easily setup and run experiments in any domain as a standalone nlu component or as a module in a sds or chatbot. Importantly, RASA has provisions for authoring new components as well as altering existing ones.
+
+Figure FIGREF7 shows a schematic of a pipeline for three components. The context (i.e., training data) is passed to Component A which performs its training, then persists a trained model for that component. Then the data is passed through Component A as input for Component B which also trains and persists, and so on for Component C. During runtime, the persisted models are loaded into memory and together form the nlu module.
+
+## Incrementalizing RASA
+
+Our approach to making RASA incremental follows the incremental unit (iu) framework Schlangen2011 as has been done in previous work for dialogue processing toolkits BIBREF10 . We treat each module in RASA as an iu processing module and specifically make use of the ADD and REVOKE iu operations; for example, ADD when a new word is typed or recognized by a speech recognizer, and REVOKE if that word is identified as having been erroneously recognized in light of new information.
+
+By default, RASA components expect full utterances, not single words. In addition to the challenge of making components in the nlu pipeline process word-by-word, we encounter another important problem: there is no ready-made signal for the end of an utterance. To solve this, we added functionality to signal the end of an utterance; this signal can be triggered by any component, including the speech recognizer where it has traditionally originated via endpointing. With this flexibility, any component (or set of components) can make a more informed decision about when an utterance is complete (e.g., if a user is uttering installments, endpointing may occur, but the intent behind the user's installments is not yet complete; the decision as to when an utterance is complete can be made by the nlu or dialogue manager).
+
+Training RASA nlu proceeds as explained above (i.e., non-incrementally). For runtime, processing incrementally through the RASA pipeline is challenging because each component must have provisions for handling word-level input and must be able to handle ADD and REVOKE iu operations. Each component in a pipeline, for example, as depicted in Figure FIGREF7 , must operate in lock-step with each other where a word is ADDed to Component A which beings processing immediately, then ADDs its processing result to Component B, then Component B processes and passes output to Component C all before the next word is produced for Component A.
+
+## Incrementalizing RASA Components
+
+We now explain how we altered specific RASA components to make them work incrementally.
+
+The Message class in RASA nlu is the main message bus between components in the pipeline. Message follows a blackboard approach to passing information between components. For example, in a pipeline containing a tokenizer, intent classifier, and entity extractor, each of the components would store the tokens, intent class, and entities in the Message object, respectively. Our modifications to Message were minimal; we simply used it to store ius and corresponding edit types (i.e., ADD or REVOKE).
+
+In order to incrementalize RASA nlu, we extended the base Component to make an addition of a new component, IncrementalComponent. A user who defines their own IncrementalComponent understands the difference in functionality, notably in the parse method. At runtime, a non-incremental component expects a full utterance, whereas an incremental one expects only a single iu. Because non-incremental components expect the entire utterance, they have no need to save any internal state across process calls, and can clear any internal data at the end of the method. However, with incremental components, that workflow changes; each call to process must maintain its internal state, so that it can be updated as it receives new ius. Moreover, IncrementalComponents additionally have a new_utterance method. In non-incremental systems, the call to process implicitly signals that the utterance has been completed, and there is no need to store internal data across process calls, whereas incremental systems lose that signal as a result. The new_utterance method acts as that signal.
+
+The Interpreter class in RASA nlu is the main interface between user input (e.g., asr) and the series of components in the pipeline. On training, the Interpreter prepares the training data, and serially calls train on each of the components in the pipeline. Similarly, to process input, one uses the Interpreter’s parse method, where the Interpreter prepares the input (i.e., the ongoing utterance) and serially calls process on the components in the pipeline (analgous to left buffer updates in the iu framework). As a result of its design, we were able to leverage the Interpreter class for incremental processing, notably because of its use of a persistent Message object as a bus of communication between Components.
+
+As with our implementation of the IncrementalComponent class, we created the IncrementalInterpreter. The IncrementalInterpreter class adds two new methods:
+
+new_utterance
+
+parse_incremental
+
+The new_utterance method is fairly straightforward; it clears RASA nlu’s internal Message object that is shared between components, and calls each IncrementalComponent in the pipeline’s new_utterance method, signaling that the utterance has been completed, and for each component to clear their internal states. The parse_incremental method takes the iu from the calling input (e.g., asr), and appends it to a list of previous ius being stored in the Message object. After the iu has been added to the Message, the IncrementalInterpreter calls each component’s process method, where they can operate on the newest iu. This was intentionally designed to be generalizable, so that future incremental components can use different formats or edit types for their respective iu framework implementation.
+
+## Incremental Intent Recognizer Components
+
+With the incremental framework in place, we further developed a sample incremental component to test the functionality of our changes. For this, we used the Simple Incremental Update Model (sium) described in BIBREF11 . This model is a generative factored joint distribution, which uses a simple Bayesian update as new words are added. At each iu, a distribution of intents and entities are generated with confidence scores, and the intent can be classified at each step as the output with the highest confidence value. Entities on the other hand, can be extracted if their confidence exceeds a predetermined threshold.
+
+Following khouzaimi-laroche-lefevre:2014:W14-43), we incrementalizaed RASA's existing Tensorflow Embedding component for intent recognition as an incremental component. The pipeline consists of a whitespace tokenizer, scikit-learn Conditional Random Field (crf) entity extractor, Bag-of-Words featurizer, and lastly, a TensorFlow Neural Network for intent classification. To start with incrementalizing, we modified the whitespace tokenizer to work on word-level increments, rather than the entire utterance. For the crf entity extractor, we modified it to update the entities up to that point in the utterance with each process call, and then modified the Bag-of-Words featurizer to update its embeddings with each process call by vectorizing the individual word in the iu, and summing that vector with the existing embeddings. At each word iu increment, we treat the entire utterance prefix to that point as a full utterance as input to the Tensorflow Embeddings component, which returns a distribution over intents. This process is repeated until all words in the utterance have been added to the prefix. In this way, the component differs from sium in that it doesn't update its internal state; rather, it treats each prefix as a full utterance (i.e., so-called restart-incrementality).
+
+## Experiment
+
+In this section, we explain a simple experiment we conducted to evaluate our work in incrementalizing RASA by using the update-incremental sium and restart-incremental tensorflow-embedding modules in a known nlu task.
+
+## Data, Task, Metrics
+
+To evaluate the performance of our approach, we used a subset of the SNIPS BIBREF12 dataset, which is readily available in RASA nlu format. Our training data consisted of 700 utterances, across 7 different intents (AddToPlaylist, BookRestaurant, GetWeather, PlayMusic, RateBook, SearchCreativeWork, and SearchScreeningEvent). In order to test our implementation of incremental components, we initially benchmarked their non-incremental counterparts, and used that as a baseline for the incremental versions (to treat the sium component as non-incremental, we simply applied all words in each utterance to it and obtained the distribution over intents after each full utterance had been processed).
+
+We use accuracy of intent and entity recognition as our task and metric. To evaluate the components worked as intended, we then used the IncrementalInterpreter to parse the messages as individual ius. To ensure REVOKE worked as intended, we injected random incorrect words at a rate of 40%, followed by subsequent revokes, ensuring that an ADD followed by a revoke resulted in the same output as if the incorrect word had never been added. While we implemented both an update-incremental and a restart-incremental RASA nlu component, the results of the two cannot be directly compared for accuracy as the underlying models differ greatly (i.e., sium is generative, whereas Tensorflow Embedding is a discriminative neural network; moreover, sium was designed to work as a reference resolution component to physical objects, not abstract intents), nor are these results conducive to an argument of update- vs. restart-incremental approaches, as the underlying architecture of the models vary greatly.
+
+## Results
+
+The results of our evaluation can be found in Table TABREF14 . These results show that our incremental implementation works as intended, as the incremental and non-incremental version of each component yieled the same results. While there is a small variation between the F1 scores between the non-incremental and incremental components, 1% is well within a reasonable tolerance as there is some randomness in training the underlying model.
+
+## Conclusion
+
+RASA nlu is a useful and well-evaluated toolkit for developing nlu components in sds and chatbot systems. We extended RASA by adding provisions for incremental processing generally, and we implemented two components for intent recognition that used update- and restart-incremental approaches. Our results show that the incrementalizing worked as expected. For ongoing and future work, we plan on developing an update-incremental counterpart to the Tensorflow Embeddings component that uses a recurrent neural network to maintain the state. We will further evaluate our work with incremental asr in live dialogue tasks. We will make our code available upon acceptance of this publication.
+
+## Appendix
+
+language: "en"
+
+pipeline:
+
+- name: "intent_featurizer_count_vectors"
+
+- name: "intent_..._tensorflow_embedding"
+
+ intent_tokenization_flag: true
+
+ intent_split_symbol: "+"

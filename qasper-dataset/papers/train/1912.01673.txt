@@ -1,0 +1,139 @@
+# COSTRA 1.0: A Dataset of Complex Sentence Transformations
+
+**Paper ID:** 1912.01673
+
+## Abstract
+
+COSTRA 1.0 is a dataset of Czech complex sentence transformations. The dataset is intended for the study of sentence-level embeddings beyond simple word alternations or standard paraphrasing.  ::: The dataset consist of 4,262 unique sentences with average length of 10 words, illustrating 15 types of modifications such as simplification, generalization, or formal and informal language variation.  ::: The hope is that with this dataset, we should be able to test semantic properties of sentence embeddings and perhaps even to find some topologically interesting “skeleton” in the sentence embedding space.
+
+## Introduction
+
+Vector representations are becoming truly essential in majority of natural language processing tasks. Word embeddings became widely popular with the introduction of word2vec BIBREF0 and GloVe BIBREF1 and their properties have been analyzed in length from various aspects.
+
+Studies of word embeddings range from word similarity BIBREF2, BIBREF3, over the ability to capture derivational relations BIBREF4, linear superposition of multiple senses BIBREF5, the ability to predict semantic hierarchies BIBREF6 or POS tags BIBREF7 up to data efficiency BIBREF8.
+
+Several studies BIBREF9, BIBREF10, BIBREF11, BIBREF12 show that word vector representations are capable of capturing meaningful syntactic and semantic regularities. These include, for example, male/female relation demonstrated by the pairs “man:woman”, “king:queen” and the country/capital relation (“Russia:Moscow”, “Japan:Tokyo”). These regularities correspond to simple arithmetic operations in the vector space.
+
+Sentence embeddings are becoming equally ubiquitous in NLP, with novel representations appearing almost every other week. With an overwhelming number of methods to compute sentence vector representations, the study of their general properties becomes difficult. Furthermore, it is not so clear in which way the embeddings should be evaluated.
+
+In an attempt to bring together more traditional representations of sentence meanings and the emerging vector representations, bojar:etal:jnle:representations:2019 introduce a number of aspects or desirable properties of sentence embeddings. One of them is denoted as “relatability”, which highlights the correspondence between meaningful differences between sentences and geometrical relations between their respective embeddings in the highly dimensional continuous vector space. If such a correspondence could be found, we could use geometrical operations in the space to induce meaningful changes in sentences.
+
+In this work, we present COSTRA, a new dataset of COmplex Sentence TRAnsformations. In its first version, the dataset is limited to sample sentences in Czech. The goal is to support studies of semantic and syntactic relations between sentences in the continuous space. Our dataset is the prerequisite for one of possible ways of exploring sentence meaning relatability: we envision that the continuous space of sentences induced by an ideal embedding method would exhibit topological similarity to the graph of sentence variations. For instance, one could argue that a subset of sentences could be organized along a linear scale reflecting the formalness of the language used. Another set of sentences could form a partially ordered set of gradually less and less concrete statements. And yet another set, intersecting both of the previous ones in multiple sentences could be partially or linearly ordered according to the strength of the speakers confidence in the claim.
+
+Our long term goal is to search for an embedding method which exhibits this behaviour, i.e. that the topological map of the embedding space corresponds to meaningful operations or changes in the set of sentences of a language (or more languages at once). We prefer this behaviour to emerge, as it happened for word vector operations, but regardless if the behaviour is emergent or trained, we need a dataset of sentences illustrating these patterns. If large enough, such a dataset could serve for training. If it will be smaller, it will provide a test set. In either case, these sentences could provide a “skeleton” to the continuous space of sentence embeddings.
+
+The paper is structured as follows: related summarizes existing methods of sentence embeddings evaluation and related work. annotation describes our methodology for constructing our dataset. data details the obtained dataset and some first observations. We conclude and provide the link to the dataset in conclusion
+
+## Background
+
+As hinted above, there are many methods of converting a sequence of words into a vector in a highly dimensional space. To name a few: BiLSTM with the max-pooling trained for natural language inference BIBREF13, masked language modeling and next sentence prediction using bidirectional Transformer BIBREF14, max-pooling last states of neural machine translation among many languages BIBREF15 or the encoder final state in attentionless neural machine translation BIBREF16.
+
+The most common way of evaluating methods of sentence embeddings is extrinsic, using so called `transfer tasks', i.e. comparing embeddings via the performance in downstream tasks such as paraphrasing, entailment, sentence sentiment analysis, natural language inference and other assignments. However, even simple bag-of-words (BOW) approaches achieve often competitive results on such tasks BIBREF17.
+
+Adi16 introduce intrinsic evaluation by measuring the ability of models to encode basic linguistic properties of a sentence such as its length, word order, and word occurrences. These so called `probing tasks' are further extended by a depth of the syntactic tree, top constituent or verb tense by DBLP:journals/corr/abs-1805-01070.
+
+Both transfer and probing tasks are integrated in SentEval BIBREF18 framework for sentence vector representations. Later, Perone2018 applied SentEval to eleven different encoding methods revealing that there is no consistently well performing method across all tasks. SentEval was further criticized for pitfalls such as comparing different embedding sizes or correlation between tasks BIBREF19, BIBREF20.
+
+shi-etal-2016-string show that NMT encoder is able to capture syntactic information about the source sentence. DBLP:journals/corr/BelinkovDDSG17 examine the ability of NMT to learn morphology through POS and morphological tagging.
+
+Still, very little is known about semantic properties of sentence embeddings. Interestingly, cifka:bojar:meanings:2018 observe that the better self-attention embeddings serve in NMT, the worse they perform in most of SentEval tasks.
+
+zhu-etal-2018-exploring generate automatically sentence variations such as:
+
+Original sentence: A rooster pecked grain.
+
+Synonym Substitution: A cock pecked grain.
+
+Not-Negation: A rooster didn't peck grain.
+
+Quantifier-Negation: There was no rooster pecking grain.
+
+and compare their triplets by examining distances between their embeddings, i.e. distance between (1) and (2) should be smaller than distances between (1) and (3), (2) and (3), similarly, (3) and (4) should be closer together than (1)–(3) or (1)–(4).
+
+In our previous study BIBREF21, we examined the effect of small sentence alternations in sentence vector spaces. We used sentence pairs automatically extracted from datasets for natural language inference BIBREF22, BIBREF23 and observed, that the simple vector difference, familiar from word embeddings, serves reasonably well also in sentence embedding spaces. The examined relations were however very simple: a change of gender, number, addition of an adjective, etc. The structure of the sentence and its wording remained almost identical.
+
+We would like to move to more interesting non-trivial sentence comparison, beyond those in zhu-etal-2018-exploring or BaBo2019, such as change of style of a sentence, the introduction of a small modification that drastically changes the meaning of a sentence or reshuffling of words in a sentence that alters its meaning.
+
+Unfortunately, such a dataset cannot be generated automatically and it is not available to our best knowledge. We try to start filling this gap with COSTRA 1.0.
+
+## Annotation
+
+We acquired the data in two rounds of annotation. In the first one, we were looking for original and uncommon sentence change suggestions. In the second one, we collected sentence alternations using ideas from the first round. The first and second rounds of annotation could be broadly called as collecting ideas and collecting data, respectively.
+
+## Annotation ::: First Round: Collecting Ideas
+
+We manually selected 15 newspaper headlines. Eleven annotators were asked to modify each headline up to 20 times and describe the modification with a short name. They were given an example sentence and several of its possible alternations, see tab:firstroundexamples.
+
+Unfortunately, these examples turned out to be highly influential on the annotators' decisions and they correspond to almost two thirds of all of modifications gathered in the first round. Other very common transformations include change of a word order or transformation into a interrogative/imperative sentence.
+
+Other interesting modification were also proposed such as change into a fairy-tale style, excessive use of diminutives/vulgarisms or dadaism—a swap of roles in the sentence so that the resulting sentence is grammatically correct but nonsensical in our world. Of these suggestions, we selected only the dadaistic swap of roles for the current exploration (see nonsense in Table TABREF7).
+
+In total, we collected 984 sentences with 269 described unique changes. We use them as an inspiration for second round of annotation.
+
+## Annotation ::: Second Round: Collecting Data ::: Sentence Transformations
+
+We selected 15 modifications types to collect COSTRA 1.0. They are presented in annotationinstructions.
+
+We asked for two distinct paraphrases of each sentence because we believe that a good sentence embedding should put paraphrases close together in vector space.
+
+Several modification types were specifically selected to constitute a thorough test of embeddings. In different meaning, the annotators should create a sentence with some other meaning using the same words as the original sentence. Other transformations which should be difficult for embeddings include minimal change, in which the sentence meaning should be significantly changed by using only very small modification, or nonsense, in which words of the source sentence should be shuffled so that it is grammatically correct, but without any sense.
+
+## Annotation ::: Second Round: Collecting Data ::: Seed Data
+
+The source sentences for annotations were selected from Czech data of Global Voices BIBREF24 and OpenSubtitles BIBREF25. We used two sources in order to have different styles of seed sentences, both journalistic and common spoken language. We considered only sentences with more than 5 and less than 15 words and we manually selected 150 of them for further annotation. This step was necessary to remove sentences that are:
+
+too unreal, out of this world, such as:
+
+Jedno fotonový torpédo a je z tebe vesmírná topinka.
+
+“One photon torpedo and you're a space toast.”
+
+photo captions (i.e. incomplete sentences), e.g.:
+
+Zvláštní ekvádorský případ Correa vs. Crudo
+
+“Specific Ecuadorian case Correa vs. Crudo”
+
+too vague, overly dependent on the context:
+
+Běž tam a mluv na ni.
+
+“Go there and speak to her.”
+
+Many of the intended sentence transformations would be impossible to apply to such sentences and annotators' time would be wasted. Even after such filtering, it was still quite possible that a desired sentence modification could not be achieved for a sentence. For such a case, we gave the annotators the option to enter the keyword IMPOSSIBLE instead of the particular (impossible) modification.
+
+This option allowed to explicitly state that no such transformation is possible. At the same time most of the transformations are likely to lead to a large number possible outcomes. As documented in scratching2013, Czech sentence might have hundreds of thousand of paraphrases. To support some minimal exploration of this possible diversity, most of sentences were assigned to several annotators.
+
+## Annotation ::: Second Round: Collecting Data ::: Spell-Checking
+
+The annotation is a challenging task and the annotators naturally make mistakes. Unfortunately, a single typo can significantly influence the resulting embedding BIBREF26. After collecting all the sentence variations, we applied the statistical spellchecker and grammar checker Korektor BIBREF27 in order to minimize influence of typos to performance of embedding methods. We manually inspected 519 errors identified by Korektor and fixed 129, which were identified correctly.
+
+## Dataset Description
+
+In the second round, we collected 293 annotations from 12 annotators. After Korektor, there are 4262 unique sentences (including 150 seed sentences) that form the COSTRA 1.0 dataset. Statistics of individual annotators are available in tab:statistics.
+
+The time needed to carry out one piece of annotation (i.e. to provide one seed sentence with all 15 transformations) was on average almost 20 minutes but some annotators easily needed even half an hour. Out of the 4262 distinct sentences, only 188 was recorded more than once. In other words, the chance of two annotators producing the same output string is quite low. The most repeated transformations are by far past, future and ban. The least repeated is paraphrase with only single one repeated.
+
+multiple-annots documents this in another way. The 293 annotations are split into groups depending on how many annotators saw the same input sentence: 30 annotations were annotated by one person only, 30 annotations by two different persons etc. The last column shows the number of unique outputs obtained in that group. Across all cases, 96.8% of produced strings were unique.
+
+In line with instructions, the annotators were using the IMPOSSIBLE option scarcely (95 times, i.e. only 2%). It was also a case of 7 annotators only; the remaining 5 annotators were capable of producing all requested transformations. The top three transformations considered unfeasible were different meaning (using the same set of words), past (esp. for sentences already in the past tense) and simple sentence.
+
+## Dataset Description ::: First Observations
+
+We embedded COSTRA sentences with LASER BIBREF15, the method that performed very well in revealing linear relations in BaBo2019. Having browsed a number of 2D visualizations (PCA and t-SNE) of the space, we have to conclude that visually, LASER space does not seem to exhibit any of the desired topological properties discussed above, see fig:pca for one example.
+
+The lack of semantic relations in the LASER space is also reflected in vector similarities, summarized in similarities. The minimal change operation substantially changed the meaning of the sentence, and yet the embedding of the transformation lies very closely to the original sentence (average similarity of 0.930). Tense changes and some form of negation or banning also keep the vectors very similar.
+
+The lowest average similarity was observed for generalization (0.739) and simplification (0.781), which is not any bad sign. However the fact that paraphrases have much smaller similarity (0.826) than opposite meaning (0.902) documents that the vector space lacks in terms of “relatability”.
+
+## Conclusion and Future Work
+
+We presented COSTRA 1.0, a small corpus of complex transformations of Czech sentences.
+
+We plan to use this corpus to analyze a wide spectrum sentence embeddings methods to see to what extent the continuous space they induce reflects semantic relations between sentences in our corpus. The very first analysis using LASER embeddings indicates lack of “meaning relatability”, i.e. the ability to move along a trajectory in the space in order to reach desired sentence transformations. Actually, not even paraphrases are found in close neighbourhoods of embedded sentences. More “semantic” sentence embeddings methods are thus to be sought for.
+
+The corpus is freely available at the following link:
+
+http://hdl.handle.net/11234/1-3123
+
+Aside from extending the corpus in Czech and adding other language variants, we are also considering to wrap COSTRA 1.0 into an API such as SentEval, so that it is very easy for researchers to evaluate their sentence embeddings in terms of “relatability”.

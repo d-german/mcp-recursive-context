@@ -1,0 +1,33 @@
+# CAiRE: An End-to-End Empathetic Chatbot
+
+**Paper ID:** 1907.12108
+
+## Abstract
+
+In this paper, we present an end-to-end empathetic conversation agent CAiRE. Our system adapts TransferTransfo (Wolf et al., 2019) learning approach that fine-tunes a large-scale pre-trained language model with multi-task objectives: response language modeling, response prediction and dialogue emotion detection. We evaluate our model on the recently proposed empathetic-dialogues dataset (Rashkin et al., 2019), the experiment results show that CAiRE achieves state-of-the-art performance on dialogue emotion detection and empathetic response generation.
+
+## Introduction
+
+Empathetic chatbots are conversational agents that can understand user emotions and respond appropriately. Incorporating empathy into the dialogue system is essential to achieve better human-robot interaction because naturally, humans express and perceive emotion in natural language to increase their sense of social bonding. In the early development stage of such conversational systems, most of the efforts were put into developing hand-crafted rules of engagement. Recently, a modularized empathetic dialogue system, XiaoIce BIBREF0 achieved an impressive number of conversational turns per session, which was even higher than average conversations between humans. Despite the promising results of XiaoIce, this system is designed using a complex architecture with hundreds of independent components, such as Natural Language Understanding and Response Generation modules, using a tremendous amount of labeled data for training each of them.
+
+In contrast to such modularized dialogue system, end-to-end systems learn all components as a single model in a fully data-driven manner, and mitigate the lack of labeled data by sharing representations among different modules. In this paper, we build an end-to-end empathetic chatbot by fine-tuning BIBREF1 the Generative Pre-trained Transformer (GPT) BIBREF2 on the PersonaChat dataset BIBREF3 and the Empathetic-Dialogue dataset BIBREF4 . We establish a web-based user interface which allows multiple users to asynchronously chat with CAiRE online. CAiRE can also collect user feedback and continuously improve its response quality and discard undesirable generation behaviors (e.g. unethical responses) via active learning and negative training.
+
+## User Interface
+
+As shown in Figure FIGREF4 , our user interface is based solely on text inputs. Users can type anything in the input box and get a response immediately from the server. A report button is added at the bottom to allow users to report unethical dialogues, which will then be marked and saved in our back-end server separately. To facilitate the need for teaching our chatbot how to respond properly, we add an edit button next to the response. When the user clicks it, a new input box will appear, and the user can type in the appropriate response they think the chatbot should have replied with.
+
+## Scalable to Multiple Users
+
+Due to the high demand for GPU computations during response generation, the computation cost needs to be well distributed across different GPUs to support multiple users. We adopt several approaches to maximize the utility of GPUs without crashing the system. Firstly, we set up two independent processes in each GTX 1080Ti, where we found the highest GPU utilities to be around 90%, with both processes working stably. Secondly, we employ a load-balancing module to distribute the requests to idle processes based on their working loads. During a stress testing, we simulated users sending requests every 2 seconds, and using 8 GPUs, we were able to support more than 50 concurrent requests.
+
+## Generative Conversational Model
+
+We apply the Generative Pre-trained Transformer (GPT) BIBREF2 as our pre-trained language model. GPT is a multi-layer Transformer decoder with a causal self-attention which is pre-trained, unsupervised, on the BooksCorpus dataset. BooksCorpus dataset contains over 7,000 unique unpublished books from a variety of genres. Pre-training on such large contiguous text corpus enables the model to capture long-range dialogue context information. Furthermore, as existing EmpatheticDialogue dataset BIBREF4 is relatively small, fine-tuning only on such dataset will limit the chitchat topic of the model. Hence, we first integrate persona into CAiRE, and pre-train the model on PersonaChat BIBREF3 , following a previous transfer-learning strategy BIBREF1 . This pre-training procedure allows CAiRE to have a more consistent persona, thus improving the engagement and consistency of the model. We refer interested readers to the code repository recently released by HuggingFace. Finally, in order to optimize empathy in CAiRE, we fine-tune this pre-trained model using EmpatheticDialogue dataset to help CAiRE understand users' feeling.
+
+## Active Learning of Ethical Values and Persona
+
+CAiRE was first presented in ACL 2019 keynote talk “Loquentes Machinea: Technology, Applications, and Ethics of Conversational Systems", and after that, we have released the chatbot to the public. In one week, we received traffic from more than 500 users, along with several reports of unethical dialogues. According to such feedback, CAiRE does not have any sense of ethical value due to the lack of training data informing of inappropriate behavior. Thus, when users raise some ethically concerning questions, CAiRE may respond without considering ethical implications. For example, a user might ask “Would you kill a human?", and CAiRE could respond “yes, I want!". To mitigate this issue, we first incorporate ethical values into CAiRE by customizing the persona of it with sentences such as: “my name is caire", “i want to help humans to make a better world", “i am a good friend of humans". Then we perform active learning based on the collected user-revised responses. We observe that this approach can greatly reduce unethical responses. As CAiRE gathers more unethical dialogues and their revisions, its performance can be further improved by negative training BIBREF5 and active learning.
+
+## Conclusion
+
+We presented CAiRE, an end-to-end generative empathetic chatbot that can understand the user's feeling and reply appropriately. We built a web interface for our model and have made it accessible to multiple users via a web-link. By further collecting user feedback and improving our model, we can make CAiRE more empathetic in the future, which can be a forward step for end-to-end dialogue models. 

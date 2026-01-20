@@ -1,0 +1,102 @@
+# Towards Neural Theorem Proving at Scale
+
+**Paper ID:** 1807.08204
+
+## Abstract
+
+Neural models combining representation learning and reasoning in an end-to-end trainable manner are receiving increasing interest. However, their use is severely limited by their computational complexity, which renders them unusable on real world datasets. We focus on the Neural Theorem Prover (NTP) model proposed by Rockt{\"{a}}schel and Riedel (2017), a continuous relaxation of the Prolog backward chaining algorithm where unification between terms is replaced by the similarity between their embedding representations. For answering a given query, this model needs to consider all possible proof paths, and then aggregate results - this quickly becomes infeasible even for small Knowledge Bases (KBs). We observe that we can accurately approximate the inference process in this model by considering only proof paths associated with the highest proof scores. This enables inference and learning on previously impracticable KBs.
+
+## Introduction
+
+Recent advancements in deep learning intensified the long-standing interests in integrating symbolic reasoning with connectionist models BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 . The attraction of said integration stems from the complementing properties of these systems. Symbolic reasoning models offer interpretability, efficient generalisation from a small number of examples, and the ability to leverage knowledge provided by an expert. However, these systems are unable to handle ambiguous and noisy high-dimensional data such as sensory inputs BIBREF5 . On the other hand, representation learning models exhibit robustness to noise and ambiguity, can learn task-specific representations, and achieve state-of-the-art results on a wide variety of tasks BIBREF6 . However, being universal function approximators, these models require vast amounts of training data and are treated as non-interpretable black boxes.
+
+One way of integrating the symbolic and sub-symbolic models is by continuously relaxing discrete operations and implementing them in a connectionist framework. Recent approaches in this direction focused on learning algorithmic behaviour without the explicit symbolic representations of a program BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 , and consequently with it BIBREF12 , BIBREF13 , BIBREF14 , BIBREF15 . In the inductive logic programming setting, two new models, NTP BIBREF0 and Differentiable Inductive Logic Programming ( $\partial $ ILP) BIBREF16 successfully combined the interpretability and data efficiency of a logic programming system with the expressiveness and robustness of neural networks.
+
+In this paper, we focus on the NTP model proposed by BIBREF0 . Akin to recent neural-symbolic models, NTP rely on a continuous relaxation of a discrete algorithm, operating over the sub-symbolic representations. In this case, the algorithm is an analogue to Prolog's backward chaining with a relaxed unification operator. The backward chaining algorithm constructs neural networks, which model continuously relaxed proof paths using sub-symbolic representations. These representations are learned end-to-end by maximising the proof scores of facts in the KB, while minimising the score of facts not in the KB, in a link prediction setting BIBREF17 . However, while the symbolic unification checks whether two terms can represent the same structure, the relaxed unification measures the similarity between their sub-symbolic representations.
+
+This continuous relaxation is at the crux of NTP' inability to scale to large datasets. During both training and inference, NTP need to compute all possible proof trees needed for proving a query, relying on the continuous unification of the query with all the rules and facts in the KB. This procedure quickly becomes infeasible for large datasets, as the number of nodes of the resulting computation graph grows exponentially.
+
+Our insight is that we can radically reduce the computational complexity of inference and learning by generating only the most promising proof paths. In particular, we show that the problem of finding the facts in the KB that best explain a query can be reduced to a $k$ -nearest neighbour problem, for which efficient exact and approximate solutions exist BIBREF18 . This enables us to apply NTP to previously unreachable real-world datasets, such as WordNet.
+
+## Background
+
+In NTP, the neural network structure is built recursively, and its construction is defined in terms of modules similarly to dynamic neural module networks BIBREF19 . Each module, given a goal, a KB, and a current proof state as inputs, produces a list of new proof states, where the proof states are neural networks representing partial proof success scores.
+
+Unification Module. In backward chaining, unification between two atoms is used for checking whether they can represent the same structure. In discrete unification, non-variable symbols are checked for equality, and the proof fails if the symbols differ. In NTP, rather than comparing symbols, their embedding representations are compared by means of a RBF kernel. This allows matching different symbols with similar semantics, such as matching relations like ${grandFatherOf}$ and ${grandpaOf}$ . Given a proof state $= (_, _)$ , where $_$ and $_$ denote a substitution set and a proof score, respectively, unification is computed as follows:
+
+ 1. unify(, , ) =
+
+2. unify(, G, ) =
+
+3. unify(H, , ) =
+
+4. unify(h::H, g::G, ) = unify(H,G,')
+
+ with ' = (', ') where:
+
+ '= {ll {h/g} if hV
+
+{g/h} if gV, hV
+
+ otherwise }
+
+'= ( , { ll k(h:, g:) if hV, gV
+
+1 otherwise } )
+
+where $_{h:}$ and $_{g:}$ denote the embedding representations of $h$ and $g$ , respectively.
+
+OR Module. This module attempts to apply rules in a KB. The name of this module stems from the fact that a KB can be seen as a large disjunction of rules and facts. In backward chaining reasoning systems, the OR module is used for unifying a goal with all facts and rules in a KB: if the goal unifies with the head of the rule, then a series of goals is derived from the body of such a rule. In NTP, we calculate the similarity between the rule and the facts via the unify operator. Upon calculating the continuous unification scores, OR calls AND to prove all sub-goals in the body of the rule.
+
+ or(G, d, ) = ' | ' and(B, d, unify(H, G, )),
+
+ H :– B 
+
+AND Module. This module is used for proving a conjunction of sub-goals derived from a rule body. It first applies substitutions to the first atom, which is afterwards proven by calling the OR module. Remaining sub-goals are proven by recursively calling the AND module.
+
+ 1. and(_, _, ) =
+
+2. and(_, 0, _) =
+
+3. and(, _, ) =
+
+4. and(G:G, d, ) = ” | ”and(G, d, '),
+
+ ' or(substitute(G, ), d-1, ) 
+
+For further details on NTPs and the particular implementation of these modules, see BIBREF0 
+
+After building all the proof states, NTPs define the final success score of proving a query as an $$ over all the generated valid proof scores (neural networks).
+
+Assume a KB $\mathcal {K}$ , composed of $|\mathcal {K}|$ facts and no rules, for brevity. Note that $|\mathcal {K}|$ can be impractical within the scope of NTP. For instance, Freebase BIBREF20 is composed of approximately 637 million facts, while YAGO3 BIBREF21 is composed by approximately 9 million facts. Given a query $g \triangleq [{grandpaOf}, {abe}, {bart}]$ , NTP compares its embedding representation – given by the embedding vectors of ${grandpaOf}$ , ${abe}$ , and ${bart}$ – with the representation of each of the $|\mathcal {K}|$ facts.
+
+The resulting proof score of $g$ is given by: 
+
+$$ 
+\begin{aligned}
+\max _{f \in \mathcal {K}} & \; {unify}_(g, [f_{p}, f_{s}, f_{o}], (\emptyset , )) \\
+& = \max _{f \in \mathcal {K}} \; \min \big \lbrace 
+,
+\operatorname{k}(_{\scriptsize {grandpaOf}:}, _{f_{p}:}),\\
+&\qquad \qquad \qquad \operatorname{k}(_{{abe}:}, _{f_{s}:}),
+\operatorname{k}(_{{bart}:}, _{f_{o}:})
+\big \rbrace ,
+\end{aligned}$$   (Eq. 3) 
+
+where $f \triangleq [f_{p}, f_{s}, f_{o}]$ is a fact in $\mathcal {K}$ denoting a relationship of type $f_{p}$ between $f_{s}$ and $f_{o}$ , $_{s:}$ is the embedding representation of a symbol $s$ , $$ denotes the initial proof score, and $\operatorname{k}({}\cdot {}, {}\cdot {})$ denotes the RBF kernel. Note that the maximum proof score is given by the fact $f \in \mathcal {K}$ that maximises the similarity between its components and the goal $\mathcal {K}$0 : solving the maximisation problem in eq:inference can be equivalently stated as a nearest neighbour search problem. In this work, we use ANNS during the forward pass for considering only the most promising proof paths during the construction of the neural network.
+
+## Nearest Neighbourhood Search
+
+From ex:inference, we can see that the inference problem can be reduced to a nearest neighbour search problem. Given a query $g$ , the problem is finding the fact(s) in $\mathcal {K}$ that maximise the unification score. This represents a computational bottleneck, since it is very costly to find the exact nearest neighbour in high-dimensional Euclidean spaces, due to the curse of dimensionality BIBREF22 . Exact methods are rarely more efficient than brute-force linear scan methods when the dimensionality is high BIBREF23 , BIBREF24 . A practical solution consists in ANNS algorithms, which relax the condition of the exact search by allowing a small number of mistakes. Several families of ANNS algorithms exist, such as LSH BIBREF25 , PQ BIBREF26 , and PG BIBREF27 . In this work we use HNSW BIBREF24 , BIBREF28 , a graph-based incremental ANNS structure which can offer much better logarithmic complexity scaling in comparison with other approaches.
+
+## Related Work
+
+Many machine learning methods rely on efficient nearest neighbour search for solving specific sub-problems. Given the computational complexity of nearest neighbour search, approximate methods, driven by advanced index structures, hash or even graph-based approaches are used to speed up the bottleneck of costly comparison. ANNS algorithms have been used to speed up various sorts of machine learning models, including mixture model clustering BIBREF29 , case-based reasoning BIBREF30 to Gaussian process regression BIBREF31 , among others. Similarly to this work, BIBREF32 also rely on approximate nearest neighbours to speed up Memory-Augmented neural networks. Similarly to our work, they apply ANNS to query the external memory (in our case the KB memory) for $k$ closest words. They present drastic savings in speed and memory usage. Though as of this moment, our speed savings are not as drastic, the memory savings we achieve are sufficient so that we can train on WordNet, a dataset previously considered out of reach of NTP.
+
+## Experiments
+
+We compared results obtained by our model, which we refer to as NTP 2.0, with those obtained by the original NTP proposed by BIBREF0 . Results on several smaller datasets – namely Countries, Nations, Kinship, and UMLS – are shown in tab:results. When unifying goals with facts in the KB, for each goal, we use ANNS for retrieving the $k$ most similar (in embedding space) facts, and use those for computing the final proof scores. We report results for $k = 1$ , as we did not notice sensible differences for $k \in \lbrace  2, 5, 10 \rbrace $ . However, we noticed sensible improvements in the case of Countries, and an overall decrease in performance in UMLS. A possible explanation is that ANNS (with $k = 1$ ), due to its inherently approximate nature, does not always retrieve the closest fact(s) exactly. This behaviour may be a problem in some datasets where exact nearest neighbour search is crucial for correctly answering queries. We also evaluated NTP 2.0 on WordNet BIBREF33 , a KB encoding lexical knowledge about the English language. In particular, we use the WordNet used by BIBREF34 for their experiments. This dataset is significantly larger than the other datasets used by BIBREF0 – it is composed by 38.696 entities, 11 relations, and the training set is composed by 112,581 facts. In WordNet, the accuracies on the validation and test sets were 65.29% and 65.72%, respectively – which is on par with the Distance Model, a Neural Link Predictor discussed by BIBREF34 , which achieves a test accuracy of 68.3%. However, we did not consider a full hyper-parameter sweep, and did not regularise the model using Neural Link Predictors, which sensibly improves NTP' predictive accuracy BIBREF0 . A subset of the induced rules is shown in tab:rules.
+
+## Conclusions
+
+We proposed a way to sensibly scale up NTP by reducing parts of their inference steps to ANNS problems, for which very efficient and scalable solutions exist in the literature.

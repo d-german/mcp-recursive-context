@@ -1,0 +1,45 @@
+# RelNet: End-to-End Modeling of Entities & Relations
+
+**Paper ID:** 1706.07179
+
+## Abstract
+
+We introduce RelNet: a new model for relational reasoning. RelNet is a memory augmented neural network which models entities as abstract memory slots and is equipped with an additional relational memory which models relations between all memory pairs. The model thus builds an abstract knowledge graph on the entities and relations present in a document which can then be used to answer questions about the document. It is trained end-to-end: only supervision to the model is in the form of correct answers to the questions. We test the model on the 20 bAbI question-answering tasks with 10k examples per task and find that it solves all the tasks with a mean error of 0.3%, achieving 0% error on 11 of the 20 tasks.
+
+## Introduction
+
+Reasoning about entities and their relations is an important problem for achieving general artificial intelligence. Often such problems are formulated as reasoning over graph-structured representation of knowledge. Knowledge graphs, for example, consist of entities and relations between them BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 . Representation learning BIBREF4 , BIBREF5 , BIBREF6 , BIBREF7 and reasoning BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 with such structured representations is an important and active area of research.
+
+Most previous work on knowledge representation and reasoning relies on a pipeline of natural language processing systems, often consisting of named entity extraction BIBREF12 , entity resolution and coreference BIBREF13 , relationship extraction BIBREF4 , and knowledge graph inference BIBREF14 . While this cascaded approach of using NLP systems can be effective at reasoning with knowledge bases at scale, it also leads to a problem of compounding of the error from each component sub-system. The importance of each of these sub-component on a particular downstream application is also not clear.
+
+For the task of question-answering, we instead make an attempt at an end-to-end approach which directly models the entities and relations in the text as memory slots. While incorporating existing knowledge (from curated knowledge bases) for the purpose of question-answering BIBREF11 , BIBREF8 , BIBREF15 is an important area of research, we consider the simpler setting where all the information is contained within the text itself – which is the approach taken by many recent memory based neural network models BIBREF16 , BIBREF17 , BIBREF18 , BIBREF19 .
+
+Recently, BIBREF17 proposed a dynamic memory based neural network for implicitly modeling the state of entities present in the text for question answering. However, this model lacks any module for relational reasoning. In response, we propose RelNet, which extends memory-augmented neural networks with a relational memory to reason about relationships between multiple entities present within the text. Our end-to-end method reads text, and writes to both memory slots and edges between them. Intuitively, the memory slots correspond to entities and the edges correspond to relationships between entities, each represented as a vector. The only supervision signal for our method comes from answering questions on the text.
+
+We demonstrate the utility of the model through experiments on the bAbI tasks BIBREF18 and find that the model achieves smaller mean error across the tasks than the best previously published result BIBREF17 in the 10k examples regime and achieves 0% error on 11 of the 20 tasks.
+
+## RelNet Model
+
+We describe the RelNet model in this section. Figure 1 provides a high-level view of the model. The model is sequential in nature, consisting of the following steps: read text, process it into a dynamic relational memory and then attention conditioned on the question generates the answer. We model the dynamic memory in a fashion similar to Recurrent Entity Networks BIBREF17 and then equip it with an additional relational memory.
+
+There are three main components to the model: 1) input encoder 2) dynamic memory, and 3) output module. We will describe these three modules in details. The input encoder and output module implementations are similar to the Entity Network BIBREF17 and main novelty lies in the dynamic memory. We describe the operations executed by the network for a single example consisting of a document with $T$ sentences, where each sentence consists of a sequence of words represented with $K$ -dimensional word embeddings $\lbrace e_1, \ldots , e_N\rbrace $ , a question on the document represented as another sequence of words and an answer to the question.
+
+## Related Work
+
+There is a long line of work in textual question-answering systems BIBREF21 , BIBREF22 . Recent successful approaches use memory based neural networks for question answering, for example BIBREF23 , BIBREF18 , BIBREF24 , BIBREF19 , BIBREF17 . Our model is also a memory network based model and is also related to the neural turing machine BIBREF25 . As described previously, the model is closely related to the Recurrent Entity Networks model BIBREF17 which describes an end-to-end approach to model entities in text but does not directly model relations. Other approaches to question answering use external knowledge, for instance external knowledge bases BIBREF26 , BIBREF11 , BIBREF27 , BIBREF28 , BIBREF9 or external text like Wikipedia BIBREF29 , BIBREF30 .
+
+Very recently, and in parallel to this work, a method for relational reasoning called relation networks BIBREF31 was proposed. They demonstrated that simple neural network modules are not as effective at relational reasoning and their proposed module is similar to our model. However, relation network is not a memory-based model and there is no mechanism to read and write relevant information for each pair. Moreover, while their approach scales as the square of the number of sentences, our approach scales as the square of the number of memory slots used per QA pair. The output module in our model can be seen as a type of relation network.
+
+Representation learning and reasoning over graph structured data is also relevant to this work. Graph based neural network models BIBREF32 , BIBREF33 , BIBREF34 have been proposed which take graph data as an input. The relational memory however does not rely on a specified graph structure and such models can potentially be used for multi-hop reasoning over the relational memory. BIBREF35 proposed a method for learning a graphical representation of the text data for question answering, however the model requires explicit supervision for the graph at every step whereas RelNet does not require explicit supervision for the graph.
+
+## Experiments
+
+We evaluate the model's performance on the bAbI tasks BIBREF18 , a collection of 20 question answering tasks which have become a benchmark for evaluating memory-augmented neural networks. We compare the performance with the Recurrent Entity Networks model (EntNet) BIBREF17 . Performance is measured in terms of mean percentage error on the tasks.
+
+Training Details: We used Adam and did a grid search for the learning rate in {0.01, 0.005, 0.001} and choose a fixed learning rate of 0.005 based on performance on the validation set, and clip the gradient norm at 2. We keep all other details similar to BIBREF17 for a fair comparison. embedding dimensions were fixed to be 100, models were trained for a maximum of 250 epochs with mini-batches size of 32 for all tasks except 3 for which the batch size was 16. The document sizes were limited to most recent 70 sentences for all tasks, except for task 3 for which it was limited to 130. The RelNet models were run for 5 times with random seed on each task and the model with best validation performance was chosen as the final model. The baseline EntNet model was run for 10 times for each task BIBREF17 .
+
+The results are shown in Table 1 . The RelNet model achieves a mean error of 0.285% across tasks which is better than the results of the EntNet model BIBREF17 . The RelNet model is able to achieve 0% test error on 11 of the tasks, whereas the EntNet model achieves 0% error on 7 of the tasks.
+
+## Conclusion
+
+We demonstrated an end-to-end trained neural network augmented with a structured memory representation which can reason about entities and relations for question answering. Future work will investigate the performance of these models on more real world datasets, interpreting what the models learn, and scaling these models to answer questions about entities and relations from reading massive text corpora.

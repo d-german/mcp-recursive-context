@@ -1,0 +1,117 @@
+# Inducing Interpretability in Knowledge Graph Embeddings
+
+**Paper ID:** 1712.03547
+
+## Abstract
+
+We study the problem of inducing interpretability in KG embeddings. Specifically, we explore the Universal Schema (Riedel et al., 2013) and propose a method to induce interpretability. There have been many vector space models proposed for the problem, however, most of these methods don't address the interpretability (semantics) of individual dimensions. In this work, we study this problem and propose a method for inducing interpretability in KG embeddings using entity co-occurrence statistics. The proposed method significantly improves the interpretability, while maintaining comparable performance in other KG tasks.
+
+## Introduction
+
+Knowledge Graphs such as Freebase, WordNet etc. have become important resources for supporting many AI applications like web search, Q&A etc. They store a collection of facts in the form of a graph. The nodes in the graph represent real world entities such as Roger Federer, Tennis, United States etc while the edges represent relationships between them.
+
+These KGs have grown huge, but they are still not complete BIBREF1 . Hence the task of inferring new facts becomes important. Many vector space models have been proposed which can perform reasoning over KGs efficiently BIBREF2 , BIBREF3 , BIBREF4 , BIBREF5 , BIBREF0 , BIBREF1 etc. These methods learn representations for entities and relations as vectors in a vector space, capturing global information about the KG. The task of KG inference is then defined as operations over these vectors. Some of these methods like BIBREF0 , BIBREF1 are capable of exploiting additional text data apart from the KG, resulting in better representations.
+
+Although these methods have shown good performance in applications, they don't address the problem of understanding semantics of individual dimensions of the KG embedding. A recent work BIBREF6 addressed the problem of learning semantic features for KGs. However, they don't directly use vector space modeling.
+
+In this work, we focus on incorporating interpretability in KG embeddings. Specifically, we aim to learn interpretable embeddings for KG entities by incorporating additional entity co-occurrence statistics from text data. This work is motivated by BIBREF7 who presented automated methods for evaluating topics learned via topic modelling methods. We adapt these measures for the vector space model and propose a method to directly maximize them while learning KG embedding. To the best of our knowledge, this work presents the first regularization term which induces interpretability in KG embeddings.
+
+## Related Work
+
+Several methods have been proposed for learning KG embeddings. They differ on the modeling of entities and relations, usage of text data and interpretability of the learned embeddings. We summarize some of these methods in following sections.
+
+## Vector-space models for KG Embeddings
+
+A very effective and powerful set of models are based on translation vectors. These models represent entities as vectors in $d$ -dimensional space, $\mathbb {R}^d$ and relations as translation vectors from head entity to tail entity, in either same or a projected space. TransE BIBREF2 is one of the initial works, which was later improved by many works [ BIBREF3 , BIBREF4 , BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 ]. Also, there are methods which are able to incorporate text data while learning KG embeddings. BIBREF0 is one such method, which assumes a combined universal schema of relations from KG as well as text. BIBREF1 further improves the performance by sharing parameters among similar textual relations.
+
+## Interpretability of Embedding
+
+While the vector space models perform well in many tasks, the semantics of learned representations are not directly clear. This problem for word embeddings was addressed by BIBREF12 where they proposed a set of constraints inducing interpretability. However, its adaptation for KG embeddings hasn't been addressed. A recent work BIBREF6 addressed a similar problem, where they learn coherent semantic features for entities and relations in KG. Our method differs from theirs in the following two aspects. Firstly, we use vector space modeling leading directly to KG embeddings while they need to infer KG embeddings from their probabilistic model. Second, we incorporate additional information about entities which helps in learning interpretable embeddings.
+
+## Proposed Method
+
+We are interested in inducing interpretability in KG embeddings and regularization is one good way to do it. So we want to look at novel regularizers in KG embeddings. Hence, we explore a measure of coherence proposed in BIBREF7 . This measure allows automated evaluation of the quality of topics learned by topic modeling methods by using additional Point-wise Mutual Information (PMI) for word pairs. It was also shown to have high correlation with human evaluation of topics.
+
+Based on this measure of coherence, we propose a regularization term. This term can be used with existing KG embedding methods (eg BIBREF0 ) for inducing interpretability. It is described in the following sections.
+
+## Coherence
+
+In topic models, coherence of a topic can be determined by semantic relatedness among top entities within the topic. This idea can also be used in vector space models by treating dimensions of the vector space as topics. With this assumption, we can use a measure of coherence defined in following section for evaluating interpretability of the embeddings.
+
+ $Coherence@k$ has been shown to have high correlation with human interpretability of topics learned via various topic modeling methods BIBREF7 . Hence, we can expect interpretable embeddings by maximizing it.
+
+Coherence for top $k$ entities along dimension $l$ is defined as follows: 
+
+$$Coherence@k^{(l)} = \sum _{i=2}^{k}\sum _{j=1}^{i-1}{p_{ij}}$$   (Eq. 5) 
+
+where $p_{ij}$ is PMI score between entities $e_i$ and $e_j$ extracted from text data. $Coherence@k$ for the entity embedding matrix $\theta _e$ is defined as the average over all dimensions. 
+
+$$Coherence@k = \frac{1}{d} \sum _{l=1}^{d} Coherence@k^{(l)}$$   (Eq. 6) 
+
+We want to learn an embedding matrix $\theta _e$ which has high coherence (i.e. which maximizes $Coherence@k$ ). Since $\theta _e$ changes during training, the set of top $k$ entities along each dimension varies over iterations. Hence, directly maximizing $Coherence@k$ seems to be tricky.
+
+An alternate approach could be to promote higher values for entity pairs having high PMI score $p_{ij}$ . This will result in an embedding matrix $\theta _e$ with a high value of $Coherence@k$ since high PMI entity pairs are more likely to be among top $k$ entities.
+
+This idea can be captured by following coherence term 
+
+$$\mathcal {C}(\theta _e, P) = \sum _{i=2}^{n}\sum _{j=1}^{i-1} \left\Vert  v(e_i)^\intercal v(e_j) - p_{ij} \right\Vert ^2$$   (Eq. 8) 
+
+where $P$ is entity-pair PMI matrix and $v(e)$ denote vector for entity $e$ . This term can be used in the objective function defined in Equation 13 
+
+## Entity Model (Model-E)
+
+We use the Entity Model proposed in BIBREF0 for learning KG embeddings. This model assumes a vector $v(e)$ for each entity and two vectors $v_s(r)$ and $v_o(r)$ for each relation of the KG. The score for the triple $(e_s, r, e_o)$ is given by, 
+
+$$f(e_s, r, e_o) = v(e_s)^\intercal v_s(r) + v(e_o)^\intercal v_o(r)$$   (Eq. 10) 
+
+Training these vectors requires incorrect triples. So, we use the closed world assumption. For each triple $t \in \mathcal {T}$ , we create two negative triples $t^-_o$ and $t^-_s$ by corrupting the object and subject of the triples respectively such that the corrupted triples don't appear in training, test or validation data. The loss for a triple pair is defined as $loss(t, t^-) = - \log (\sigma (f(t) - f(t^-)))$ . Then, the aggregate loss function is defined as 
+
+$$L(\theta _e, \theta _r, \mathcal {T}) = \frac{1}{|\mathcal {T}|}\sum _{t\in \mathcal {T}} \left(loss(t, t^-_o) + loss(t, t^-_s) \right)$$   (Eq. 11) 
+
+## Objective
+
+The overall loss function can be written as follows: 
+
+$$L(\theta _e, \theta _r, \mathcal {T}) + \lambda _c \mathcal {C}(\theta _e, P) + \lambda _r \mathcal {R}(\theta _e, \theta _r)$$   (Eq. 13) 
+
+Where $\mathcal {R}(\theta _e, \theta _r) = \frac{1}{2}\left(\left\Vert \theta _e\right\Vert ^2+\left\Vert \theta _r\right\Vert ^2\right)$ is the $L2$ regularization term and $\lambda _c$ and $\lambda _r$ are hyper-parameters controlling the trade-off among different terms in the objective function.
+
+## Datasets
+
+We use the FB15k-237 BIBREF13 dataset for experiments. It contains 14541 entities and 237 relations. The triples are split into training, validation and test set having 272115, 17535 and 20466 triples respectively. For extracting entity co-occurrences, we use the textual relations used in BIBREF1 . It contains around 3.7 millions textual triples, which we use for calculating PMI for entity pairs.
+
+## Experimental Setup
+
+We use the method proposed in BIBREF0 as the baseline. Please refer to Section "Entity Model (Model-E)" for more details. For evaluating the learned embeddings, we test them on different tasks. All the hyper-parameters are tuned using performance (MRR) on validation data. We use 100 dimensions after cross validating among 50, 100 and 200 dimensions. For regularization, we use $\lambda _r = 0.01$ (from $10,1,0.1,0.01$ ) and $\lambda _c = 0.01$ (from $10,1,0.1,0.01$ ) for $L2$ and coherence regularization respectively. We use multiple random initializations sampled from a Gaussian distribution. For optimization, we use gradient descent and stop optimization when gradient becomes 0 upto 3 decimal places. The final performance measures are reported for test data.
+
+## Results
+
+In following sections, we compare the performance of the proposed method with the baseline method in different tasks. Please refer to Table 1 for results.
+
+For evaluating the interpretability, we use $Coherence@k$ (Equation 6 ) , automated and manual word intrusion tests. In word intrusion test BIBREF14 , top $k(=5)$ entities along a dimension are mixed with the bottom most entity (the intruder) in that dimension and shuffled. Then multiple (3 in our case) human annotators are asked to find out the intruder. We use majority voting to finalize one intruder. Amazon Mechanical Turk was used for crowdsourcing the task and we used 25 randomly selected dimensions for evaluation. For automated word intrusion BIBREF7 , we calculate following score for all $k+1$ entities 
+
+$$\text{AutoWI}(e_i) = \sum _{j=1, j\ne i}^{k+1}{p_{ij}}$$   (Eq. 18) 
+
+where $p_{ij}$ are the PMI scores. The entity having least score is identified as the intruder. We report the fraction of dimensions for which we were able to identify the intruder correctly.
+
+As we can see in Table 1 , the proposed method achieves better values for $Coherence@5$ as a direct consequence of the regularization term, thereby maximizing coherence between appropriate entities. Performance on the word intrusion task also improves drastically as the intruder along each dimension is a lot easier to identify owing to the fact that the top entities for each dimension group together more conspicuously.
+
+In this experiment, we test the model's ability to predict the best object entity for a given subject entity and relation. For each of the triples, we fix the subject and the relation and rank all entities (within same category as true object entity) based on their score according to Equation 10 . We report Mean Rank (MR) and Mean Reciprocal rank (MRR) of the true object entity and Hits@10 (the number of times true object entity is ranked in top 10) as percentage.
+
+The objective of the coherence regularization term being tangential to that of the original loss function, is not expected to affect performance on the link prediction task. However, the results show a trivial drop of $1.2$ in MRR as the coherence term gives credibility to triples that are otherwise deemed incorrect by the closed world assumption.
+
+We have used abbreviations for BS (Bachelor of Science), MS (Master of Science), UK (United Kingdom) and USA (United States of America). They appear as full form in the data.
+
+In this experiment, we test the model on classifying correct and incorrect triples. For finding incorrect triples, we corrupt the object entity with a randomly selected entity within the same category. For classification, we use validation data to find the best threshold for each relation by training an SVM classifier and later use this threshold for classifying test triples. We report the mean accuracy and mean AUC over all relations.
+
+We observe that the proposed method achieves slightly better performance for triple classification improving the accuracy by $4.4$ . The PMI information adds more evidence to the correct triples which are related in text data, generating a better threshold that more accurately distinguishes correct and incorrect triples.
+
+## Qualitative Analysis of Results
+
+Since our aim is to induce interpretability in representations, in this section, we evaluate the embeddings learned by the baseline as well as the proposed method. For both methods, we select some dimensions randomly and present top 5 entities along those dimensions. The results are presented in Table 2 .
+
+As we can see from the results, the proposed method produces more coherent entities than the baseline method.
+
+## Conclusion and Future Works
+
+In this work, we proposed a method for inducing interpretability in KG embeddings using a coherence regularization term. We evaluated the proposed and the baseline method on the interpretability of the learned embeddings. We also evaluated the methods on different KG tasks and compared their performance. We found that the proposed method achieves better interpretability while maintaining comparable performance on KG tasks. As next steps, we plan to evaluate the generalizability of the method with more recent KG embeddings.

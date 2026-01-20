@@ -1,0 +1,95 @@
+# Gender Bias in Neural Natural Language Processing
+
+**Paper ID:** 1807.11714
+
+## Abstract
+
+We examine whether neural natural language processing (NLP) systems reflect historical biases in training data. We define a general benchmark to quantify gender bias in a variety of neural NLP tasks. Our empirical evaluation with state-of-the-art neural coreference resolution and textbook RNN-based language models trained on benchmark datasets finds significant gender bias in how models view occupations. We then mitigate bias with CDA: a generic methodology for corpus augmentation via causal interventions that breaks associations between gendered and gender-neutral words. We empirically show that CDA effectively decreases gender bias while preserving accuracy. We also explore the space of mitigation strategies with CDA, a prior approach to word embedding debiasing (WED), and their compositions. We show that CDA outperforms WED, drastically so when word embeddings are trained. For pre-trained embeddings, the two methods can be effectively composed. We also find that as training proceeds on the original data set with gradient descent the gender bias grows as the loss reduces, indicating that the optimization encourages bias; CDA mitigates this behavior.
+
+## Introduction
+
+Natural language processing (NLP) with neural networks has grown in importance over the last few years. They provide state-of-the-art models for tasks like coreference resolution, language modeling, and machine translation BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 . However, since these models are trained on human language texts, a natural question is whether they exhibit bias based on gender or other characteristics, and, if so, how should this bias be mitigated. This is the question that we address in this paper.
+
+Prior work provides evidence of bias in autocomplete suggestions BIBREF5 and differences in accuracy of speech recognition based on gender and dialect BIBREF6 on popular online platforms. Word embeddings, initial pre-processors in many NLP tasks, embed words of a natural language into a vector space of limited dimension to use as their semantic representation. BIBREF7 and BIBREF8 observed that popular word embeddings including word2vec BIBREF9 exhibit gender bias mirroring stereotypical gender associations such as the eponymous BIBREF7 "Man is to computer programmer as Woman is to homemaker".
+
+Yet the question of how to measure bias in a general way for neural NLP tasks has not been studied. Our first contribution is a general benchmark to quantify gender bias in a variety of neural NLP tasks. Our definition of bias loosely follows the idea of causal testing: matched pairs of individuals (instances) that differ in only a targeted concept (like gender) are evaluated by a model and the difference in outcomes (or scores) is interpreted as the causal influence of the concept in the scrutinized model. The definition is parametric in the scoring function and the target concept. Natural scoring functions exist for a number of neural natural language processing tasks.
+
+We instantiate the definition for two important tasks—coreference resolution and language modeling. Coreference resolution is the task of finding words and expressions referring to the same entity in a natural language text. The goal of language modeling is to model the distribution of word sequences. For neural coreference resolution models, we measure the gender coreference score disparity between gender-neutral words and gendered words like the disparity between “doctor” and “he” relative to “doctor” and “she” pictured as edge weights in Figure FIGREF2 . For language models, we measure the disparities of emission log-likelihood of gender-neutral words conditioned on gendered sentence prefixes as is shown in Figure FIGREF2 . Our empirical evaluation with state-of-the-art neural coreference resolution and textbook RNN-based language models BIBREF2 , BIBREF1 , BIBREF10 trained on benchmark datasets finds gender bias in these models .
+
+Next we turn our attention to mitigating the bias. BIBREF7 introduced a technique for debiasing word embeddings which has been shown to mitigate unwanted associations in analogy tasks while preserving the embedding's semantic properties. Given their widespread use, a natural question is whether this technique is sufficient to eliminate bias from downstream tasks like coreference resolution and language modeling. As our second contribution, we explore this question empirically. We find that while the technique does reduce bias, the residual bias is considerable. We further discover that debiasing models that make use of embeddings that are co-trained with their other parameters BIBREF1 , BIBREF10 exhibit a significant drop in accuracy.
+
+Our third contribution is counterfactual data augmentation (CDA): a generic methodology to mitigate bias in neural NLP tasks. For each training instance, the method adds a copy with an intervention on its targeted words, replacing each with its partner, while maintaining the same, non-intervened, ground truth. The method results in a dataset of matched pairs with ground truth independent of the target distinction (see Figure FIGREF2 and Figure FIGREF2 for examples). This encourages learning algorithms to not pick up on the distinction.
+
+Our empirical evaluation shows that CDA effectively decreases gender bias while preserving accuracy. We also explore the space of mitigation strategies with CDA, a prior approach to word embedding debiasing (WED), and their compositions. We show that CDA outperforms WED, drastically so when word embeddings are co-trained. For pre-trained embeddings, the two methods can be effectively composed. We also find that as training proceeds on the original data set with gradient descent the gender bias grows as the loss reduces, indicating that the optimization encourages bias; CDA mitigates this behavior.
+
+In the body of this paper we present necessary background (Section SECREF2 ), our methods (Sections SECREF3 and SECREF4 ), their evaluation (Section SECREF5 ), and speculate on future research (Section SECREF6 ).
+
+## Background
+
+In this section we briefly summarize requisite elements of neural coreference resolution and language modeling systems: scoring layers and loss evaluation, performance measures, and the use of word embeddings and their debiasing. The tasks and models we experiment with later in this paper and their properties are summarized in Table TABREF6 .
+
+## Measuring Bias
+
+Our definition of bias loosely follows the idea of causal testing: matched pairs of individuals (instances) that differ in only a targeted concept (like gender) are evaluated by a model and the difference in outcomes is interpreted as the causal influence of the concept in the scrutinized model.
+
+As an example, we can choose a test corpus of simple sentences relating the word “professor” to the male pronoun “he” as in sentence INLINEFORM0 of Figure FIGREF2 along with the matched pair INLINEFORM1 that swaps in “she” in place of “he”. With each element of the matched pair, we also indicate which mentions in each sentence, or context, should attain the same score. In this case, the complete matched pair is INLINEFORM2 and INLINEFORM3 . We measure the difference in scores assigned to the coreference of the pronoun with the occupation across the matched pair of sentences.
+
+We begin with the general definition and instantiate it for measuring gender bias in relation to occupations for both coreference resolution and language modeling.
+
+Definition 1 (Score Bias)
+
+Given a set of matched pairs INLINEFORM0 (or class of sets INLINEFORM1 ) and a scoring function INLINEFORM2 , the bias of INLINEFORM3 under the concept(s) tested by INLINEFORM4 (or INLINEFORM5 ), written INLINEFORM6 (or INLINEFORM7 ) is the expected difference in scores assigned to the matched pairs (or expected absolute bias across class members): INLINEFORM8 
+
+## Occupation-Gender Bias
+
+The principle concept we address in this paper is gender, and the biases we will focus on in the evaluation relate gender to gender-neutral occupations. To define the matched pairs to test this type of bias we employ interventions: transformations of instances to their matches. Interventions are a more convenient way to reason about the concepts being tested under a set of matched pairs.
+
+Definition 2 (Intervention Matches) Given an instance INLINEFORM0 , corpus INLINEFORM1 , or class INLINEFORM2 , and an intervention INLINEFORM3 , the intervention matching under INLINEFORM4 is the matched pair INLINEFORM5 or the set of matched pairs INLINEFORM6 , respectively, and is defined as follows. INLINEFORM7 
+
+The core intervention used throughout this paper is the naive intervention INLINEFORM0 that swaps every gendered word in its inputs with the corresponding word of the opposite gender. The complete list of swapped words can be found in Supplemental Materials. In Section SECREF4 we define more nuanced forms of intervention for the purpose of debiasing systems.
+
+We construct a set of sentences based on a collection of templates. In the case of coreference resolution, each sentence, or context, includes a placeholder for an occupation word and the male gendered pronoun “he” while the mentions to score are the occupation and the pronoun. An example of such a template is the sentence “The [OCCUPATION] ran because he is late.” where the underline words indicate the mentions for scoring. The complete list can be found in the Supplemental Materials.
+
+Definition 3 (Occupation Bias) Given the list of templates INLINEFORM0 , we construct the matched pair set for computing gender-occupation bias of score function INLINEFORM1 for an occupation INLINEFORM2 by instantiating all of the templates with INLINEFORM3 and producing a matched pair via the naive intervention INLINEFORM4 : INLINEFORM5 
+
+To measure the aggregate occupation bias over all occupations INLINEFORM0 we compute bias on the class INLINEFORM1 where INLINEFORM2 .
+
+The bias measures are then simply:
+
+ INLINEFORM0 
+
+For language modeling the template set differs. There we assume the scoring function is the one that assigns a likelihood of a given word being the next word in some initial sentence fragment. We place the pronoun in the initial fragment thereby making sure the score is conditioned on the presence of the male or female pronoun. We are thus able to control for the frequency disparities between the pronouns in a corpus, focusing on disparities with occupations and not disparities in general occurrence. An example of a test template for language modeling is the fragment “He is a | [OCCUPATION]” where the pipe delineates the sentence prefix from the test word. The rest can be seen in the Supplemental Materials.
+
+## Counterfactual Data Augmentation (CDA)
+
+In the previous section we have shown how to quantify gender bias in coreference resolution systems and language models using a naive intervention, or INLINEFORM0 . The disparities at the core of the bias definitions can be thought of as unwanted effects: the gender of the pronouns like he or she has influence on its coreference strength with an occupation word or the probability of emitting an occupation word though ideally it should not. Following the tradition of causal testing, we make use of matched pairs constructed via interventions to augment existing training datasets. By defining the interventions so as to express a particular concept such as gender, we produce datasets that encourage training algorithms to not capture that concept.
+
+Definition 4 (Counterfactual Data Augmentation) Given an intervention INLINEFORM0 , the dataset INLINEFORM1 of input instances INLINEFORM2 can be INLINEFORM3 c INLINEFORM4 , or INLINEFORM5 , to produce the dataset INLINEFORM6 .
+
+Note that the intervention above does not affect the ground truth. This highlights the core feature of the method: an unbiased model should not distinguish between matched pairs, that is, it should produce the same outcome. The intervention is another critical feature as it needs to represent a concept crisply, that is, it needs to produce matched pairs that differ only (or close to it) in the expression of that concept. The simplest augmentation we experiment on is the naive intervention INLINEFORM0 , which captures the distinction between genders on gendered words. The more nuanced intervention we discuss further in this paper relaxes this distinction in the presence of some grammatical structures.
+
+Given the use of INLINEFORM0 in the definition of bias in Section SECREF3 , it would be expected that debiasing via naive augmentation completely neutralizes gender bias. However, bias is not the only concern in a coreference resolution or language modeling systems; its performance is usually the primary goal. As we evaluate performance on the original corpora, the alterations necessarily reduce performance.
+
+To ensure the predictive power of models trained from augmented data, the generated sentences need to remain semantically and grammatically sound. We assume that if counterfactual sentences are generated properly, the ground truth coreference clustering labels should stay the same for the coreference resolution systems. Since language modeling is an unsupervised task, we do not need to assign labels for the counterfactual sentences.
+
+To define our gender intervention, we employ a bidirectional dictionary of gendered word pairs such as he:she, her:him/his and other definitionally gendered words such as actor:actress, queen:king. The complete list of gendered pairs can be found in the Supplemental Materials. We replace every occurrence (save for the exceptions noted below) of a gendered word in the original corpus with its dual as is the case with INLINEFORM0 .
+
+Flipping a gendered word when it refers to a proper noun such as Queen Elizabeth would result in semantically incorrect sentences. As a result, we do not flip gendered words if they are in a cluster with a proper noun. For coreference resolution, the clustering information is provided by labels in the coreference resolution dataset. Part-of-speech information, which indicates whether a word is a pronoun, is obtained through metadata within the training data.
+
+A final caveat for generating counterfactuals is the appropriate handing of her, he and him. Both he and him would be flipped to her, while her should be flipped to him if it is an objective pronoun and to his if it is a possessive pronoun. This information is also obtained from part-of-speech tags.
+
+The adjustments to the naive intervention for maintaining semantic or grammatical structures, produce the grammatical intervention, or INLINEFORM0 .
+
+## Evaluation
+
+In this section we evaluate CDA debiasing across three models from two NLP tasks in comparison/combination with the word embedding debiasing of BIBREF7 . For each configuration of methods we report aggregated occupation bias (marked AOB) (Definition SECREF14 ) and the resulting performance measured on original test sets (without augmentation). Most of the experimentation that follow employs grammatical augmentation though we investigate the naive intervention in Section SECREF25 .
+
+## Neural Coreference Resolution
+
+We use the English coreference resolution dataset from the CoNLL-2012 shared task BIBREF15 , the benchmark dataset for the training and evaluation of coreference resolution. The training dataset contains 2408 documents with 1.3 million words. We use two state-of-art neural coreference resolution models described by BIBREF2 and BIBREF1 . We report the average F1 value of standard MUC, B INLINEFORM0 and CEAF INLINEFORM1 metrics for the original test set.
+
+The model of BIBREF2 uses pretrained word embeddings, thus all features and mention representations are learned from these pretrained embeddings. As a result we can only apply debiasing of BIBREF7 to the pretrained embedding. We evaluate bias on four configurations: no debiasing, debiased embeddings (written INLINEFORM0 ), CDA only, and CDA with INLINEFORM1 . The configurations and resulting aggregate bias measures are shown in Table TABREF20 .
+
+In the aggregate measure, we see that the original model is biased (recall the scale of coreference scores shown in Figure FIGREF2 ). Further, each of the debiasing methods reduces bias to some extent, with the largest reduction when both methods are applied. Impact on performance is negligible in all cases.
+
+Figure FIGREF19 shows the per-occupation bias in Models 1.1 and 1.2. It aligns with the historical gender stereotypes: female-dominant occupations such as nurse, therapist and flight attendant have strong negative bias while male-dominant occupations such as banker, engineer and scientist have strong positive bias. This behaviour is reduced with the application of CDA.

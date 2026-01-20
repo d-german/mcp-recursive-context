@@ -1,0 +1,31 @@
+# Fine-grained Analysis of Sentence Embeddings Using Auxiliary Prediction Tasks
+
+**Paper ID:** 1608.04207
+
+## Abstract
+
+There is a lot of research interest in encoding variable length sentences into fixed length vectors, in a way that preserves the sentence meanings. Two common methods include representations based on averaging word vectors, and representations based on the hidden states of recurrent neural networks such as LSTMs. The sentence vectors are used as features for subsequent machine learning tasks or for pre-training in the context of deep learning. However, not much is known about the properties that are encoded in these sentence representations and about the language information they capture. We propose a framework that facilitates better understanding of the encoded representations. We define prediction tasks around isolated aspects of sentence structure (namely sentence length, word content, and word order), and score representations by the ability to train a classifier to solve each prediction task when using the representation as input. We demonstrate the potential contribution of the approach by analyzing different sentence representation mechanisms. The analysis sheds light on the relative strengths of different sentence embedding methods with respect to these low level prediction tasks, and on the effect of the encoded vector's dimensionality on the resulting representations.
+
+## Encoder Decoder
+
+Parameters of the encoder-decoder were tuned on a dedicated validation set. We experienced with different learning rates (0.1, 0.01, 0.001), dropout-rates (0.1, 0.2, 0.3, 0.5) BIBREF11 and optimization techniques (AdaGrad BIBREF6 , AdaDelta BIBREF30 , Adam BIBREF15 and RMSprop BIBREF29 ). We also experimented with different batch sizes (8, 16, 32), and found improvement in runtime but no significant improvement in performance.
+
+Based on the tuned parameters, we trained the encoder-decoder models on a single GPU (NVIDIA Tesla K40), with mini-batches of 32 sentences, learning rate of 0.01, dropout rate of 0.1, and the AdaGrad optimizer; training takes approximately 10 days and is stopped after 5 epochs with no loss improvement on a validation set.
+
+## Prediction Tasks
+
+Parameters for the predictions tasks as well as classifier architecture were tuned on a dedicated validation set. We experimented with one, two and three layer feed-forward networks using ReLU BIBREF23 , BIBREF8 , tanh and sigmoid activation functions. We tried different hidden layer sizes: the same as the input size, twice the input size and one and a half times the input size. We tried different learning rates (0.1, 0.01, 0.001), dropout rates (0.1, 0.3, 0.5, 0.8) and different optimization techniques (AdaGrad, AdaDelta and Adam).
+
+Our best tuned classifier, which we use for all experiments, is a feed-forward network with one hidden layer and a ReLU activation function. We set the size of the hidden layer to be the same size as the input vector. We place a softmax layer on top whose size varies according to the specific task, and apply dropout before the softmax layer. We optimize the log-likelihood using AdaGrad. We use a dropout rate of 0.8 and a learning rate of 0.01. Training is stopped after 5 epochs with no loss improvement on the development set. Training was done on a single GPU (NVIDIA Tesla K40).
+
+## Additional Experiments - Content Task
+
+How well do the models preserve content when we increase the sentence length? In Fig. FIGREF4 we plot content prediction accuracy vs. sentence length for different models.
+
+As expected, all models suffer a drop in content accuracy on longer sentences. The degradation is roughly linear in the sentence length. For the encoder-decoder, models with fewer dimensions seem to degrade slower.
+
+## Appendix III: Significance Tests
+
+In this section we report the significance tests we conduct in order to evaluate our findings. In order to do so, we use the paired t-test BIBREF25 .
+
+All the results reported in the summery of findings are highly significant (p-value INLINEFORM0 0.0001). The ones we found to be not significant (p-value INLINEFORM1 0.03) are the ones which their accuracy does not have much of a difference, i.e ED with size 500 and ED with size 750 tested on the word order task (p-value=0.11), or CBOW with dimensions 750 and 1000 (p-value=0.3).

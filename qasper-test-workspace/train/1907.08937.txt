@@ -1,0 +1,259 @@
+# Quantifying Similarity between Relations with Fact Distribution
+
+**Paper ID:** 1907.08937
+
+## Abstract
+
+We introduce a conceptually simple and effective method to quantify the similarity between relations in knowledge bases. Specifically, our approach is based on the divergence between the conditional probability distributions over entity pairs. In this paper, these distributions are parameterized by a very simple neural network. Although computing the exact similarity is in-tractable, we provide a sampling-based method to get a good approximation. We empirically show the outputs of our approach significantly correlate with human judgments. By applying our method to various tasks, we also find that (1) our approach could effectively detect redundant relations extracted by open information extraction (Open IE) models, that (2) even the most competitive models for relational classification still make mistakes among very similar relations, and that (3) our approach could be incorporated into negative sampling and softmax classification to alleviate these mistakes. The source code and experiment details of this paper can be obtained from https://github.com/thunlp/relation-similarity.
+
+## Introduction
+
+Author contributions: Hao Zhu designed the research; Weize Chen prepared the data, and organized data annotation; Hao Zhu and Xu Han designed the experiments; Weize Chen performed the experiments; Hao Zhu, Weize Chen and Xu Han wrote the paper; Zhiyuan Liu and Maosong Sun proofread the paper. Zhiyuan Liu is the corresponding author.
+
+Relations, representing various types of connections between entities or arguments, are the core of expressing relational facts in most general knowledge bases (KBs) BIBREF0 , BIBREF1 . Hence, identifying relations is a crucial problem for several information extraction tasks. Although considerable effort has been devoted to these tasks, some nuances between similar relations are still overlooked, (tab:similarityexample shows an example); on the other hand, some distinct surface forms carrying the same relational semantics are mistaken as different relations. These severe problems motivate us to quantify the similarity between relations in a more effective and robust method.
+
+In this paper, we introduce an adaptive and general framework for measuring similarity of the pairs of relations. Suppose for each relation INLINEFORM0 , we have obtained a conditional distribution, INLINEFORM1 ( INLINEFORM2 are head and tail entities, and INLINEFORM3 is a relation), over all head-tail entity pairs given INLINEFORM4 . We could quantify similarity between a pair of relations by the divergence between the conditional probability distributions given these relations. In this paper, this conditional probability is given by a simple feed-forward neural network, which can capture the dependencies between entities conditioned on specific relations. Despite its simplicity, the proposed network is expected to cover various facts, even if the facts are not used for training, owing to the good generalizability of neural networks. For example, our network will assign a fact a higher probability if it is “logical”: e.g., the network might prefer an athlete has the same nationality as same as his/her national team rather than other nations.
+
+Intuitively, two similar relations should have similar conditional distributions over head-tail entity pairs INLINEFORM0 , e.g., the entity pairs associated with be trade to and play for are most likely to be athletes and their clubs, whereas those associated with live in are often people and locations. In this paper, we evaluate the similarity between relations based on their conditional distributions over entity pairs. Specifically, we adopt Kullback–Leibler (KL) divergence of both directions as the metric. However, computing exact KL requires iterating over the whole entity pair space INLINEFORM1 , which is quite intractable. Therefore, we further provide a sampling-based method to approximate the similarity score over the entity pair space for computational efficiency.
+
+Besides developing a framework for assessing the similarity between relations, our second contribution is that we have done a survey of applications. We present experiments and analysis aimed at answering five questions:
+
+(1) How well does the computed similarity score correlate with human judgment about the similarity between relations? How does our approach compare to other possible approaches based on other kinds of relation embeddings to define a similarity? (sec:relationship and sec:human-judgment)
+
+(2) Open IE models inevitably extract many redundant relations. How can our approach help reduce such redundancy? (sec:openie)
+
+(3) To which extent, quantitatively, does best relational classification models make errors among similar relations? (sec:error-analysis)
+
+(4) Could similarity be used in a heuristic method to enhance negative sampling for relation prediction? (sec:training-guidance-relation-prediction)
+
+(5) Could similarity be used as an adaptive margin in softmax-margin training method for relation extraction? (sec:training-guidance-relation-extraction)
+
+Finally, we conclude with a discussion of valid extensions to our method and other possible applications.
+
+## Learning Head-Tail Distribution
+
+Just as introduced in sec:introduction, we quantify the similarity between relations by their corresponding head-tail entity pair distributions. Consider the typical case that we have got numbers of facts, but they are still sparse among all facts in the real world. How could we obtain a well-generalized distribution over the whole space of possible triples beyond the training facts? This section proposes a method to parameterize such a distribution.
+
+## Formal Definition of Fact Distribution
+
+A fact is a triple INLINEFORM0 , where INLINEFORM1 and INLINEFORM2 are called head and tail entities, INLINEFORM3 is the relation connecting them, INLINEFORM4 and INLINEFORM5 are the sets of entities and relations respectively. We consider a score function INLINEFORM6 maps all triples to a scalar value. As a special case, the function can be factorized into the sum of two parts: INLINEFORM7 . We use INLINEFORM8 to define the unnormalized probability. DISPLAYFORM0 
+
+for every triple INLINEFORM0 . The real parameter INLINEFORM1 can be adjusted to obtain difference distributions over facts.
+
+In this paper, we only consider locally normalized version of INLINEFORM0 : DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 are directly parameterized by feed-forward neural networks. Through local normalization, INLINEFORM2 is naturally a valid probability distribution, as the partition function INLINEFORM3 . Therefore, INLINEFORM4 .
+
+## Neural architecture design
+
+Here we introduce our special design of neural networks. For the first part and the second part, we implement the scoring functions introduced in eq:local-normalization as DISPLAYFORM0 
+
+where each INLINEFORM0 represents a multi-layer perceptron composed of layers like INLINEFORM1 , INLINEFORM2 , INLINEFORM3 are embeddings of INLINEFORM4 , INLINEFORM5 , and INLINEFORM6 includes weights and biases in all layers.
+
+## Training
+
+Now we discuss the method to perform training. In this paper, we consider joint training. By minimizing the loss function, we compute the model parameters INLINEFORM0 : DISPLAYFORM0 
+
+where INLINEFORM0 is a set of triples. The whole set of parameters, INLINEFORM1 . We train these parameters by Adam optimizer BIBREF2 . Training details are shown in sec:trainingdetail.
+
+## Quantifying Similarity
+
+So far, we have talked about how to use neural networks to approximate the natural distribution of facts. The center topic of our paper, quantifying similarity, will be discussed in detail in this section.
+
+## Relations as Distributions
+
+In this paper, we provide a probability view of relations by representing relation INLINEFORM0 as a probability distribution INLINEFORM1 . After training the neural network on a given set of triples, the model is expected to generalize well on the whole INLINEFORM2 space.
+
+Note that it is very easy to calculate INLINEFORM0 in our model thanks to local normalization (eq:local-normalization). Therefore, we can compute it by DISPLAYFORM0 
+
+## Defining Similarity
+
+As the basis of our definition, we hypothesize that the similarity between INLINEFORM0 reflects the similarity between relations. For example, if the conditional distributions of two relations put mass on similar entity pairs, the two relations should be quite similar. If they emphasize different ones, the two should have some differences in meaning.
+
+Formally, we define the similarity between two relations as a function of the divergence between the distributions of corresponding head-tail entity pairs: DISPLAYFORM0 
+
+where INLINEFORM0 denotes Kullback–Leibler divergence, DISPLAYFORM0 
+
+vice versa, and function INLINEFORM0 is a symmetrical function. To keep the coherence between semantic meaning of “similarity” and our definition, INLINEFORM1 should be a monotonically decreasing function. Through this paper, we choose to use an exponential family composed with max function, i.e., INLINEFORM2 . Note that by taking both sides of KL divergence into account, our definition incorporates both the entity pairs with high probability in INLINEFORM3 and INLINEFORM4 . Intuitively, if INLINEFORM5 mainly distributes on a proportion of entities pairs that INLINEFORM6 emphasizes, INLINEFORM7 is only hyponymy of INLINEFORM8 . Considering both sides of KL divergence could help model yield more comprehensive consideration. We will talk about the advantage of this method in detail in sec:relationship.
+
+## Calculating Similarity
+
+Just as introduced in sec:introduction, it is intractable to compute similarity exactly, as involving INLINEFORM0 computation. Hence, we consider the monte-carlo approximation: DISPLAYFORM0 
+
+where INLINEFORM0 is a list of entity pairs sampled from INLINEFORM1 . We use sequential sampling to gain INLINEFORM6 , which means we first sample INLINEFORM7 given INLINEFORM8 from INLINEFORM9 , and then sample INLINEFORM10 given INLINEFORM11 and INLINEFORM12 from INLINEFORM13 .
+
+## Relationship with other metrics
+
+Previous work proposed various methods for representing relations as vectors BIBREF3 , BIBREF4 , as matrices BIBREF5 , even as angles BIBREF6 , etc. Based on each of these representations, one could easily define various similarity quantification methods. We show in tab:other-similarity the best one of them in each category of relation presentation.
+
+Here we provide two intuitive reasons for using our proposed probability-based similarity: (1) the capacity of a single fixed-size representation is limited — some details about the fact distribution is lost during embedding; (2) directly comparing distributions yields a better interpretability — you can not know about how two relations are different given two relation embeddings, but our model helps you study the detailed differences between probabilities on every entity pair. fig:head-tail-distribution provides an example. Although the two relations talk about the same topic, they have different meanings. TransE embeds them as vectors the closest to each other, while our model can capture the distinction between the distributions corresponds to the two relations, which could be directly noticed from the figure.
+
+Embeddings used in this graph are from a trained TransE model.
+
+## Dataset Construction
+
+We show the statistics of the dataset we use in tab:statistics, and the construction procedures will be introduced in this section.
+
+## Wikidata
+
+In Wikidata BIBREF8 , facts can be described as (Head item/property, Property, Tail item/property). To construct a dataset suitable for our task, we only consider the facts whose head entity and tail entity are both items. We first choose the most common 202 relations and 120000 entities from Wikidata as our initial data. Considering that the facts containing the two most frequently appearing relations (P2860: cites, and P31: instance of) occupy half of the initial data, we drop the two relations to downsize the dataset and make the dataset more balanced. Finally, we keep the triples whose head and tail both come from the selected 120000 entities as well as its relation comes from the remaining 200 relations.
+
+## ReVerb Extractions
+
+ReVerb BIBREF9 is a program that automatically identifies and extracts binary relationships from English sentences. We use the extractions from running ReVerb on Wikipedia. We only keep the relations appear more than 10 times and their corresponding triples to construct our dataset.
+
+## FB15K and TACRED
+
+FB15K BIBREF3 is a subset of freebase. TACRED BIBREF10 is a large supervised relation extraction dataset obtained via crowdsourcing. We directly use these two dataset, no extra processing steps were applied.
+
+## Human Judgments
+
+Following BIBREF11 , BIBREF12 and the vast amount of previous work on semantic similarity, we ask nine undergraduate subjects to assess the similarity of 360 pairs of relations from a subset of Wikidata BIBREF8 that are chosen to cover from high to low levels of similarity. In our experiment, subjects were asked to rate an integer similarity score from 0 (no similarity) to 4 (perfectly the same) for each pair. The inter-subject correlation, estimated by leaving-one-out method BIBREF13 , is r = INLINEFORM0 , standard deviation = INLINEFORM1 . This important reference value (marked in fig:correlation) could be seen as the highest expected performance for machines BIBREF12 .
+
+To get baselines for comparison, we consider other possible methods to define similarity functions, as shown in tab:other-similarity. We compute the correlation between these methods and human judgment scores. As the models we have chosen are the ones work best in knowledge base completion, we do expect the similarity quantification approaches based on them could measure some degree of similarity. As shown in fig:correlation, the three baseline models could achieve moderate ( INLINEFORM0 ) positive correlation. On the other hand, our model shows a stronger correlation ( INLINEFORM1 ) with human judgment, indicating that considering the probability over whole entity pair space helps to gain a similarity closer to human judgments. These results provide evidence for our claim raised in sec:defining-similarity.
+
+## Redundant Relation Removal
+
+Open IE extracts concise token patterns from plain text to represent various relations between entities, e.g.,, (Mark Twain, was born in, Florida). As Open IE is significant for constructing KBs, many effective extractors have been proposed to extract triples, such as Text-Runner BIBREF14 , ReVerb BIBREF9 , and Standford Open IE BIBREF15 . However, these extractors only yield relation patterns between entities, without aggregating and clustering their results. Accordingly, there are a fair amount of redundant relation patterns after extracting those relation patterns. Furthermore, the redundant patterns lead to some redundant relations in KBs.
+
+Recently, some efforts are devoted to Open Relation Extraction (Open RE) BIBREF16 , BIBREF17 , BIBREF18 , BIBREF19 , aiming to cluster relation patterns into several relation types instead of redundant relation patterns. Whenas, these Open RE methods adopt distantly supervised labels as golden relation types, suffering from both false positive and false negative problems on the one hand. On the other hand, these methods still rely on the conventional similarity metrics mentioned above.
+
+In this section, we will show that our defined similarity quantification could help Open IE by identifying redundant relations. To be specific, we set a toy experiment to remove redundant relations in KBs for a preliminary comparison (sec:toy-experiment). Then, we evaluate our model and baselines on the real-world dataset extracted by Open IE methods (sec:real-experiment). Considering the existing evaluation metric for Open IE and Open RE rely on either labor-intensive annotations or distantly supervised annotations, we propose a metric approximating recall and precision evaluation based on operable human annotations for balancing both efficiency and accuracy.
+
+## Toy Experiment
+
+In this subsection, we propose a toy environment to verify our similarity-based method. Specifically, we construct a dataset from Wikidata and implement Chinese restaurant process to split every relation in the dataset into several sub-relations. Then, we filter out those sub-relations appearing less than 50 times to eventually get 1165 relations. All these split relations are regarded as different ones during training, and then different relation similarity metrics are adopted to merge those sub-relations into one relation. As Figure FIGREF26 shown that the matrices-based approach is less effective than other approaches, we leave this approach out of this experiment. The results are shown in Table TABREF37 .
+
+## Real World Experiment
+
+In this subsection, we evaluate various relation similarity metrics on the real-world Open IE patterns. The dataset are constructed by ReVerb. Different patterns will be regarded as different relations during training, and we also adopt various relation similarity metrics to merge similar relation patterns. Because it is nearly impossible to annotate all pattern pairs for their merging or not, meanwhile it is also inappropriate to take distantly supervised annotations as golden results. Hence, we propose a novel metric approximating recall and precision evaluation based on minimal human annotations for evaluation in this experiment.
+
+Recall is defined as the yielding fraction of true positive instances over the total amount of real positive instances. However, we do not have annotations about which pairs of relations are synonymous. Crowdsourcing is a method to obtain a large number of high-quality annotations. Nevertheless, applying crowdsourcing is not trivial in our settings, because it is intractable to enumerate all synonymous pairs in the large space of relation (pattern) pairs INLINEFORM0 in Open IE. A promising method is to use rejection sampling by uniform sampling from the whole space, and only keep the synonymous ones judged by crowdworkers. However, this is not practical either, as the synonymous pairs are sparse in the whole space, resulting in low efficiency. Fortunately, we could use normalized importance sampling as an alternative to get an unbiased estimation of recall.
+
+Theorem 1 Suppose every sample INLINEFORM0 has a label INLINEFORM1 , and the model to be evaluated also gives its prediction INLINEFORM2 . The recall can be written as DISPLAYFORM0 
+
+where INLINEFORM0 is the uniform distribution over all samples with INLINEFORM1 . If we have a proposal distribution INLINEFORM2 satisfying INLINEFORM3 , we get an unbiased estimation of recall: DISPLAYFORM0 
+
+where INLINEFORM0 is a normalized version of INLINEFORM1 , where INLINEFORM2 is the unnormalized version of q, and INLINEFORM3 are i.i.d. drawn from INLINEFORM4 .
+
+Similar to eq:recall-expectation, we can write the expectation form of precision: DISPLAYFORM0 
+
+where INLINEFORM0 is the uniform distribution over all samples with INLINEFORM1 . As these samples could be found out by performing models on it. We can simply approximate precision by Monte Carlo Sampling: DISPLAYFORM0 
+
+where INLINEFORM0 .
+
+In our setting, INLINEFORM0 , INLINEFORM1 means INLINEFORM2 and INLINEFORM3 are the same relations, INLINEFORM4 means INLINEFORM5 is larger than a threshold INLINEFORM6 .
+
+The results on the ReVerb Extractions dataset that we constructed are described in fig:precision-recall-openie. To approximate recall, we use the similarity scores as the proposal distribution INLINEFORM0 . 500 relation pairs are then drawn from INLINEFORM1 . To approximate precision, we set thresholds at equal intervals. At each threshold, we uniformly sample 50 to 100 relation pairs whose similarity score given by the model is larger than the threshold. We ask 15 undergraduates to judge whether two relations in a relation pair have the same meaning. A relation pair is viewed valid only if 8 of the annotators annotate it as valid. We use the annotations to approximate recall and precision with eq:recall and eq:precision. Apart from the confidential interval of precision shown in the figure, the largest INLINEFORM2 confidential interval among thresholds for recall is INLINEFORM3 . From the result, we could see that our model performs much better than other models' similarity by a very large margin.
+
+## Error Analysis for Relational Classification
+
+In this section, we consider two kinds of relational classification tasks: (1) relation prediction and (2) relation extraction. Relation prediction aims at predicting the relationship between entities with a given set of triples as training data; while relation extraction aims at extracting the relationship between two entities in a sentence.
+
+## Relation Prediction
+
+We hope to design a simple and clear experiment setup to conduct error analysis for relational prediction. Therefore, we consider a typical method TransE BIBREF3 as the subject as well as FB15K BIBREF3 as the dataset. TransE embeds entities and relations as vectors, and train these embeddings by minimizing DISPLAYFORM0 
+
+where INLINEFORM0 is the set of training triples, INLINEFORM1 is the distance function, INLINEFORM2 is a negative sample with one element different from INLINEFORM4 uniformly sampled from INLINEFORM5 , and INLINEFORM6 is the margin.
+
+During testing, for each entity pair INLINEFORM0 , TransE rank relations according to INLINEFORM1 . For each INLINEFORM2 in the test set, we call the relations with higher rank scores than INLINEFORM3 distracting relations. We then compare the similarity between the golden relation and distracting relations. Note that some entity pairs could correspond to more than one relations, in which case we just do not see them as distracting relations.
+
+## Relation Extraction
+
+For relation extraction, we consider the supervised relation extraction setting and TACRED dataset BIBREF10 . As for the subject model, we use the best model on TACRED dataset — position-aware neural sequence model. This method first passes the sentence into an LSTM and then calculate an attention sum of the hidden states in the LSTM by taking positional features into account. This simple and effective method achieves the best in TACRED dataset.
+
+## Results
+
+fig:averank shows the distribution of similarity ranks of distracting relations of the above mentioned models' outputs on both relation prediction and relation extraction tasks. From fig:averankrp,fig:averankre, we could observe the most distracting relations are the most similar ones, which corroborate our hypothesis that even the best models on these tasks still make mistakes among the most similar relations. This result also highlights the importance of a heuristic method for guiding models to pay more attention to the boundary between similar relations. We also try to do the negative sampling with relation type constraints, but we see no improvement compared with uniform sampling. The details of negative sampling with relation type constraints are presented in sec:relation-type-constraints.
+
+## Similarity and Negative Sampling
+
+Based on the observation presented in sec:erroranalysisresult, we find out that similar relations are often confusing for relation prediction models. Therefore, corrupted triples with similar relations can be used as high-quality negative samples.
+
+For a given valid triple INLINEFORM0 , we corrupt the triple by substituting INLINEFORM1 with INLINEFORM2 with the probability, DISPLAYFORM0 
+
+where INLINEFORM0 is the temperature of the exponential function, the bigger the INLINEFORM1 is, the flatter the probability distribution is. When the temperature approaches infinite, the sampling process reduces to uniform sampling.
+
+In training, we set the initial temperature to a high level and gradually reduce the temperature. Intuitively, it enables the model to distinguish among those obviously different relations in the early stage and gives more and more confusing negative triples as the training processes to help the model distinguish the similar relations. This can be also viewed as a process of curriculum learning BIBREF21 , the data fed to the model gradually changes from simple negative triples to hard ones.
+
+We perform relation prediction task on FB15K with TransE. Following BIBREF3 , we use the "Filtered" setting protocol, i.e., filtering out the corrupted triples that appear in the dataset. Our sampling method is shown to improve the model's performance, especially on Hit@1 (fig:relationprediction). Training details are described in sec:trainingdetail.
+
+## Similarity and Softmax-Margin Loss
+
+Similar to sec:training-guidance-relation-prediction, we find out that relation extraction models often make wrong preditions on similar relations. In this section, we use similarity as an adaptive margin in softmax-margin loss to improve the performance of relation extraction models.
+
+As shown in BIBREF22 , Softmax-Margin Loss can be expressed as DISPLAYFORM0 
+
+where INLINEFORM0 denotes a structured output space for INLINEFORM1 , and INLINEFORM2 is INLINEFORM3 example in training data.
+
+We can easily incorporate similarity into cost function INLINEFORM0 . In this task, we define the cost function as INLINEFORM1 , where INLINEFORM2 is a hyperparameter.
+
+Intuitively, we give a larger margin between similar relations, forcing the model to distinguish among them, and thus making the model perform better. We apply our method to Position-aware Attention LSTM (PA-LSTM) BIBREF10 , and tab:relationextraction shows our method improves the performance of PA-LSTM. Training details are described in sec:trainingdetail.
+
+## Related Works
+
+As many early works devoted to psychology and linguistics, especially those works exploring semantic similarity BIBREF11 , BIBREF12 , researchers have empirically found there are various different categorizations of semantic relations among words and contexts. For promoting research on these different semantic relations, bejar1991cognitive explicitly defining these relations and miller1995wordnet further systematically organize rich semantic relations between words via a database. For identifying correlation and distinction between different semantic relations so as to support learning semantic similarity, various methods have attempted to measure relational similarity BIBREF23 , BIBREF24 , BIBREF25 , BIBREF26 , BIBREF27 , BIBREF28 , BIBREF29 .
+
+With the ongoing development of information extraction and effective construction of KBs BIBREF0 , BIBREF1 , BIBREF30 , relations are further defined as various types of latent connections between objects more than semantic relations. These general relations play a core role in expressing relational facts in the real world. Hence, there are accordingly various methods proposed for discovering more relations and their facts, including open information extraction BIBREF31 , BIBREF32 , BIBREF33 , BIBREF34 , BIBREF35 , BIBREF36 , BIBREF37 and relation extraction BIBREF38 , BIBREF39 , BIBREF40 , BIBREF41 , BIBREF42 , BIBREF43 , and relation prediction BIBREF3 , BIBREF44 , BIBREF45 , BIBREF46 , BIBREF47 .
+
+For both semantic relations and general relations, identifying them is a crucial problem, requiring systems to provide a fine-grained relation similarity metric. However, the existing methods suffer from sparse data, which makes it difficult to achieve an effective and stable similarity metric. Motivated by this, we propose to measure relation similarity by leveraging their fact distribution so that we can identify nuances between similar relations, and merge those distant surface forms of the same relations, benefitting the tasks mentioned above.
+
+## Conclusion and Future Work
+
+In this paper, we introduce an effective method to quantify the relation similarity and provide analysis and a survey of applications. We note that there are a wide range of future directions: (1) human prior knowledge could be incorporated into the similarity quantification; (2) similarity between relations could also be considered in multi-modal settings, e.g., extracting relations from images, videos, or even from audios; (3) by analyzing the distributions corresponding to different relations, one can also find some “meta-relations” between relations, such as hypernymy and hyponymy.
+
+## Acknowledgements
+
+This work is supported by the National Natural Science Foundation of China (NSFC No. 61572273, 61532010), the National Key Research and Development Program of China (No. 2018YFB1004503). Chen and Zhu is supported by Tsinghua University Initiative Scientific Research Program, and Chen is also supported by DCST Student Academic Training Program. Han is also supported by 2018 Tencent Rhino-Bird Elite Training Program.
+
+## Proofs to theorems in the paper
+
+If we have a proposal distribution INLINEFORM0 satisfying INLINEFORM1 , then eq:proofrecallfirstpart can be further written as DISPLAYFORM0 
+
+Sometimes, it's hard for us to compute normalized probability INLINEFORM0 . To tackle this problem, consider self-normalized importance sampling as an unbiased estimation BIBREF50 , DISPLAYFORM0 
+
+where INLINEFORM0 is the normalized version of INLINEFORM1 .
+
+## Chinese Restaurant Process
+
+Specifically, for a relation INLINEFORM0 with currently INLINEFORM1 sub-relations, we turn it to a new sub-relation with probability DISPLAYFORM0 
+
+or to the INLINEFORM0 existing sub-relation with probability DISPLAYFORM0 
+
+where INLINEFORM0 is the size of INLINEFORM1 existing sub-relation, INLINEFORM2 is the sum of the number of all sub-relationships of INLINEFORM3 , and INLINEFORM4 is a hyperparameter, in which case we use INLINEFORM5 .
+
+## Training Details
+
+In Wikidata and ReVerb Extractions dataset, we manually split a validation set, assuring every entity and relation appears in validation set also appears in training set. While minimizing loss on the training set, we observe the loss on the validation set and stop training as validation loss stops to decrease. Before training our model on any dataset, we use the entity embeddings and relation embeddings produced by TransE on the dataset as the pretrained embeddings for our model.
+
+## Training Details on Negative Sampling
+
+The sampling is launched with an initial temperature of 8192. The temperature drops to half every 200 epochs and remains stable once it hits 16. Optimization is performed using SGD, with a learning rate of 1e-3.
+
+## Training Details on Softmax-Margin Loss
+
+The sampling is launching with an initial temperature of 64. The temperature drops by 20% per epoch, and remains stable once it hits 16. The alpha we use is 9. Optimization is performed using SGD, with a learning rate of 1.
+
+## Recall Standard Deviation
+
+As is shown in fig:recallstd, the max recall standard deviation for our model is 0.4, and 0.11 for TransE.
+
+## Negative Samplilng with Relation Type Constraints
+
+In FB15K, if two relations have same prefix, we regard them as belonging to a same type, e.g., both /film/film/starring./film/performance/actor and /film/actor/film./film/performance/film have prefix film, they belong to same type. Similar to what is mentioned in sec:training-guidance-relation-prediction, we expect the model first to learn to distinguish among obviously different relations, and gradually learn to distinguish similar relations. Therefore, we conduct negative sampling with relation type constraints in two ways.
+
+## Add Up Two Uniform Distribution
+
+For each triple INLINEFORM0 , we have two uniform distribution INLINEFORM1 and INLINEFORM2 . INLINEFORM3 is the uniform distribution over all the relations except for those appear with INLINEFORM4 in the knowledge base, and INLINEFORM5 is the uniform distribution over the relations of the same type as INLINEFORM6 . When corrupting the triple, we sample INLINEFORM7 from the distribution: DISPLAYFORM0 
+
+where INLINEFORM0 is a hyperparameter. We set INLINEFORM1 to 1 at the beginning of training, and every INLINEFORM2 epochs, INLINEFORM3 will be multiplied by decrease rate INLINEFORM4 . We do grid search for INLINEFORM5 and INLINEFORM6 , but no improvement is observed.
+
+## Add Weight
+
+We speculate that the unsatisfactory result produced by adding up two uniform distribution is because that for those types with few relations in it, a small change of INLINEFORM0 will result in a significant change in INLINEFORM1 . Therefore, when sampling a negative INLINEFORM2 , we add weights to relations that are of the same type as INLINEFORM3 instead. Concretely, we substitute INLINEFORM4 with INLINEFORM5 with probability INLINEFORM6 , which can be calculated as: DISPLAYFORM0 
+
+where INLINEFORM0 denotes all the relations that are the same type as INLINEFORM1 , INLINEFORM2 is a hyperparameter and INLINEFORM3 is a normalizing constant. We set INLINEFORM4 to 0 at the beginning of training, and every INLINEFORM5 epochs, INLINEFORM6 will increase by INLINEFORM7 . We do grid search for INLINEFORM8 and INLINEFORM9 , still no improvement is observed.
+
+## Wikidata annotation guidance
+
+We show the guidance provided for the annotators here.

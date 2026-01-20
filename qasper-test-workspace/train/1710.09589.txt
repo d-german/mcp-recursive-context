@@ -1,0 +1,121 @@
+# ALL-IN-1: Short Text Classification with One Model for All Languages
+
+**Paper ID:** 1710.09589
+
+## Abstract
+
+We present ALL-IN-1, a simple model for multilingual text classification that does not require any parallel data. It is based on a traditional Support Vector Machine classifier exploiting multilingual word embeddings and character n-grams. Our model is simple, easily extendable yet very effective, overall ranking 1st (out of 12 teams) in the IJCNLP 2017 shared task on customer feedback analysis in four languages: English, French, Japanese and Spanish.
+
+## Introduction
+
+Customer feedback analysis is the task of classifying short text messages into a set of predefined labels (e.g., bug, request). It is an important step towards effective customer support.
+
+However, a real bottleneck for successful classification of customer feedback in a multilingual environment is the limited transferability of such models, i.e., typically each time a new language is encountered a new model is built from scratch. This is clearly impractical, as maintaining separate models is cumbersome, besides the fact that existing annotations are simply not leveraged.
+
+In this paper we present our submission to the IJCNLP 2017 shared task on customer feedback analysis, in which data from four languages was available (English, French, Japanese and Spanish). Our goal was to build a single system for all four languages, and compare it to the traditional approach of creating separate systems for each language. We hypothesize that a single system is beneficial, as it can provide positive transfer, particularly for the languages for which less data is available. The contributions of this paper are:
+
+## All-In-1: One Model for All
+
+Motivated by the goal to evaluate how good a single model for multiple languages fares, we decided to build a very simple model that can handle any of the four languages. We aimed at an approach that does not require any language-specific processing (beyond tokenization) nor requires any parallel data. We set out to build a simple baseline, which turned out to be surprisingly effective. Our model is depicted in Figure FIGREF7 .
+
+Our key motivation is to provide a simple, general system as opposed to the usual ad-hoc setups one can expect in a multilingual shared task. So we rely on character n-grams, word embeddings, and a traditional classifier, motivated as follows.
+
+First, character n-grams and traditional machine learning algorithms have proven successful for a variety of classification tasks, e.g., native language identification and language detection. In recent shared tasks simple traditional models outperformed deep neural approaches like CNNs or RNNs, e.g., BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 . This motivated our choice of using a traditional model with character n-gram features.
+
+Second, we build upon the recent success of multilingual embeddings. These are embedding spaces in which word types of different languages are embedded into the same high-dimensional space. Early approaches focus mainly on bilingual approaches, while recent research aims at mapping several languages into a single space. The body of literature is huge, but an excellent recent overview is given in xlingsurvey. We chose a very simple and recently proposed method that does not rely on any parallel data BIBREF4 and extend it to the multilingual case. In particular, the method falls under the broad umbrella of monolingual mappings. These approaches first train monolingual embeddings on large unlabeled corpora for the single languages. They then learn linear mappings between the monolingual embeddings to map them to the same space. The approach we apply here is particularly interesting as it does not require parallel data (parallel sentences/documents or dictionaries) and is readily applicable to off-the-shelf embeddings. In brief, the approach aims at learning a transformation in which word vector spaces are orthogonal (by applying SVD) and it leverages so-called “pseudo-dictionaries”. That is, the method first finds the common word types in two embedding spaces, and uses those as pivots to learn to align the two spaces (cf. further details in smith2017offline).
+
+## Experimental Setup
+
+In this section we first describe the IJCNLP 2017 shared task 4 including the data, the features, model and evaluation metrics.
+
+## Task Description
+
+The customer feedback analysis task BIBREF5 is a short text classification task. Given a customer feedback message, the goal is to detect the type of customer feedback. For each message, the organizers provided one or more labels. To give a more concrete idea of the data, the following are examples of the English dataset:
+
+“Still calls keep dropping with the new update” (bug)
+
+“Room was grubby, mold on windows frames.” (complaint)
+
+“The new update is amazing.” (comment)
+
+“Needs more control s and tricks..” (request)
+
+“Enjoy the sunshine!!” (meaningless)
+
+## Data
+
+The data stems from a joint ADAPT-Microsoft project. An overview of the provided dataset is given in Table TABREF16 . Notice that the available amount of data differs per language.
+
+We treat the customer feedback analysis problem as a single-class classification task and actually ignore multi-label instances, as motivated next. The final label distribution for the data is given in Figure FIGREF17 .
+
+In initial investigations of the data we noticed that very few instances had multiple labels, e.g., “comment,complaint”. In the English training data this amounted to INLINEFORM0 4% of the data. We decided to ignore those additional labels (just picked the first in case of multiple labels) and treat the problem as a single-class classification problem. This was motivated by the fact that some labels were expected to be easily confused. Finally, there were some labels in the data that did not map to any of the labels in the task description (i.e., `undetermined', `undefined', `nonsense' and `noneless', they were presumably typos) so we mapped them all to the `meaningless' label. This frames the task as a 5-class classification problem with the following classes:
+
+bug,
+
+comment,
+
+complaint,
+
+meaningless and
+
+request.
+
+At test time the organizers additionally provided us with translations of the three language-specific test datasets back to English. These translations were obtained by Google translate. This allowed us to evaluate our English model on the translations, to gauge whether translation is a viable alternative to training a multilingual model.
+
+## Pre-processing
+
+We perform two simple preprocessing steps. First of all, we tokenize all data using off-the-shelf tokenizers. We use tinysegmenter for Japanese and the NLTK TweetTokenizer for all other languages. The Japanese segmenter was crucial to get sufficient coverage from the word embeddings later. No additional preprocessing is performed.
+
+## Multilingual Embeddings
+
+Word embeddings for single languages are readily available, for example the Polyglot or Facebook embeddings BIBREF6 , which were recently released.
+
+In this work we start from the monolingual embeddings provided by the Polyglot project BIBREF7 . We use the recently proposed approach based on SVD decomposition and a “pseudo-dictionary” BIBREF4 obtained from the monolingual embeddings to project embedding spaces. To extend their method from the bilingual to the multilingual case, we apply pair-wise projections by using English as pivot, similar in spirit to ammar2016massively. We took English as our development language. We also experimented with using larger embeddings (Facebook embeddings; larger in the sense of both trained on more data and having higher dimensionality), however, results were comparable while training time increased, therefore we decided to stick to the smaller 64-dimensional Polyglot embeddings.
+
+## Model and Features
+
+As classifier we use a traditional model, a Support Vector Machine (SVM) with linear kernel implemented in scikit-learn BIBREF8 . We tune the regularization parameter INLINEFORM0 on the English development set and keep the parameter fixed for the remaining experiments and all languages ( INLINEFORM1 ).
+
+We compared the SVM to fastText BIBREF9 . As we had expected fastText gave consistently lower performance, presumably because of the small amounts of training data. Therefore we did not further explore neural approaches.
+
+Our features are character n-grams (3-10 grams, with binary tf-idf) and word embeddings. For the latter we use a simple continuous bag-of-word representation BIBREF10 based on averaging and min-max scaling.
+
+Additionally, we experimented with adding Part-Of-Speech (POS) tags to our model. However, to keep in line with our goal to build a single system for all languages we trained a single multilingual POS tagger by exploiting the projected multilingual embeddings. In particular, we trained a state-of-the-art bidirectional LSTM tagger BIBREF11 that uses both word and character representations on the concatenation of language-specific data provided from the Universal Dependencies data (version 1.2 for En, Fr and Es and version 2.0 data for Japanese, as the latter was not available in free-form in the earlier version). The word embeddings module of the tagger is initialized with the multilingual embeddings. We investigated POS n-grams (1 to 3 grams) as additional features.
+
+## Evaluation
+
+We decided to evaluate our model using weighted F1-score, i.e., the per-class F1 score is calculated and averaged by weighting each label by its support. Notice, since our setup deviates from the shared task setup (single-label versus multi-label classification), the final evaluation metric is different. We will report on weighted F1-score for the development and test set (with simple macro averaging), but use Exact-Accuracy and Micro F1 over all labels when presenting official results on the test sets. The latter two metrics were part of the official evaluation metrics. For details we refer the reader to the shared task overview paper BIBREF5 .
+
+## Results
+
+We first present results on the provided development set, then on the official evaluation test set.
+
+## Results on Development
+
+First of all, we evaluated different feature representations. As shown in Table TABREF31 character n-grams alone prove very effective, outperforming word n-grams and word embeddings alone. Overall simple character n-grams (C) in isolation are often more beneficial than word and character n-grams together, albeit for some languages results are close. The best representation are character n-grams with word embeddings. This representation provides the basis for our multilingual model which relies on multilingual embeddings. The two officially submitted models both use character n-grams (3-10) and word embeddings. Our first official submission, Monolingual is the per-language trained model using this representation.
+
+Next we investigated adding more languages to the model, by relying on the multilingual embeddings as bridge. For instance in Table TABREF31 , the model indicated as En+Es is a character and word embedding-based SVM trained using bilingual embeddings created by mapping the two monolingual embeddings onto the same space and using both the English and Spanish training material. As the results show, using multiple languages can improve over the in-language development performance of the character+embedding model. However, the bilingual models are still only able to handle pairs of languages. We therefore mapped all embeddings to a common space and train a single multilingual All-in-1 model on the union of all training data. This is the second model that we submitted to the shared task. As we can see from the development data, on average the multilingual model shows promising, overall (macro average) outperforming the single language-specific models. However, the multilingual model does not consistently fare better than single models, for example on French a monolingual model would be more beneficial.
+
+Adding POS tags did not help (cf. Table TABREF31 ), actually dropped performance. We disregard this feature for the final official runs.
+
+## Test Performance
+
+We trained the final models on the concatenation of Train and Dev data. The results on the test set (using our internally used weighted F1 metric) are given in Table TABREF33 .
+
+There are two take-away points from the main results: First, we see a positive transfer for languages with little data, i.e., the single multilingual model outperforms the language-specific models on the two languages (Spanish and Japanese) which have the least amount of training data. Overall results between the monolingual and multilingual model are close, but the advantage of our multilingual All-in-1 approach is that it is a single model that can be applied to all four languages. Second, automatic translation harms, the performance of the EN model on the translated data is substantially lower than the respective in-language model. We could investigate this as the organizers provided us with translations of French, Spanish and Japanese back to English.
+
+Averaged over all languages our system ranked first, cf. Table TABREF34 for the results of the top 5 submissions. The multilingual model reaches the overall best exact accuracy, for two languages training a in-language model would be slightly more beneficial at the cost of maintaining a separate model. The similarity-based baseline provided by the organizers is considerably lower.
+
+Our system was outperformed on English by three teams, most of which focused only on English. Unfortunately at the time of writing there is no system description available for most other top systems, so that we cannot say whether they used more English-specific features. From the system names of other teams we may infer that most teams used neural approaches, and they score worse than our SVM-based system.
+
+The per-label breakdown of our systems on the official test data (using micro F1 as calculated by the organizers) is given in Table TABREF36 . Unsurprisingly less frequent labels are more difficult to predict.
+
+## Conclusions
+
+We presented a simple model that can effectively handle multiple languages in a single system. The model is based on a traditional SVM, character n-grams and multilingual embeddings. The model ranked first in the shared task of customer feedback analysis, outperforming other approaches that mostly relied on deep neural networks.
+
+There are two take-away messages of this work: 1) multilingual embeddings are very promising to build single multilingual models; and 2) it is important to compare deep learning methods to simple traditional baselines; while deep approaches are undoubtedly very attractive (and fun!), we always deem it important to compare deep neural to traditional approaches, as the latter often turn out to be surprisingly effective. Doing so will add to the literature and help to shed more light on understanding why and when this is the case.
+
+## Acknowledgments
+
+I would like to thank the organizers, in particular Chao-Hong Liu, for his quick replies. I also thank Rob van der Goot, Héctor Martínez Alonso and Malvina Nissim for valuable comments on earlier drafts of this paper.

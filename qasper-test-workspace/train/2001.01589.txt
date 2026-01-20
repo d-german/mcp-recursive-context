@@ -1,0 +1,111 @@
+# Morphological Word Segmentation on Agglutinative Languages for Neural Machine Translation
+
+**Paper ID:** 2001.01589
+
+## Abstract
+
+Neural machine translation (NMT) has achieved impressive performance on machine translation task in recent years. However, in consideration of efficiency, a limited-size vocabulary that only contains the top-N highest frequency words are employed for model training, which leads to many rare and unknown words. It is rather difficult when translating from the low-resource and morphologically-rich agglutinative languages, which have complex morphology and large vocabulary. In this paper, we propose a morphological word segmentation method on the source-side for NMT that incorporates morphology knowledge to preserve the linguistic and semantic information in the word structure while reducing the vocabulary size at training time. It can be utilized as a preprocessing tool to segment the words in agglutinative languages for other natural language processing (NLP) tasks. Experimental results show that our morphologically motivated word segmentation method is better suitable for the NMT model, which achieves significant improvements on Turkish-English and Uyghur-Chinese machine translation tasks on account of reducing data sparseness and language complexity.
+
+## Introduction
+
+Neural machine translation (NMT) has achieved impressive performance on machine translation task in recent years for many language pairs BIBREF0, BIBREF1, BIBREF2. However, in consideration of time cost and space capacity, the NMT model generally employs a limited-size vocabulary that only contains the top-N highest frequency words (commonly in the range of 30K to 80K) BIBREF3, which leads to the Out-of-Vocabulary (OOV) problem following with inaccurate and terrible translation results. Research indicated that sentences with too many unknown words tend to be translated much more poorly than sentences with mainly frequent words. For the low-resource and source-side morphologically-rich machine translation tasks, such as Turkish-English and Uyghur-Chinese, all the above issues are more serious due to the fact that the NMT model cannot effectively identify the complex morpheme structure or capture the linguistic and semantic information with too many rare and unknown words in the training corpus.
+
+Both the Turkish and Uyghur are agglutinative and highly-inflected languages in which the word is formed by suffixes attaching to a stem BIBREF4. The word consists of smaller morpheme units without any splitter between them and its structure can be denoted as “stem + suffix1 + suffix2 + ... + suffixN”. A stem is attached in the rear by zero to many suffixes that have many inflected and morphological variants depending on case, number, gender, and so on. The complex morpheme structure and relatively free constituent order can produce very large vocabulary because of the derivational morphology, so when translating from the agglutinative languages, many words are unseen at training time. Moreover, due to the semantic context, the same word generally has different segmentation forms in the training corpus.
+
+For the purpose of incorporating morphology knowledge of agglutinative languages into word segmentation for NMT, we propose a morphological word segmentation method on the source-side of Turkish-English and Uyghur-Chinese machine translation tasks, which segments the complex words into simple and effective morpheme units while reducing the vocabulary size for model training. In this paper, we investigate and compare the following segmentation strategies:
+
+Stem with combined suffix
+
+Stem with singular suffix
+
+Byte Pair Encoding (BPE)
+
+BPE on stem with combined suffix
+
+BPE on stem with singular suffix
+
+The latter two segmentation strategies are our newly proposed methods. Experimental results show that our morphologically motivated word segmentation method can achieve significant improvement of up to 1.2 and 2.5 BLEU points on Turkish-English and Uyghur-Chinese machine translation tasks over the strong baseline of pure BPE method respectively, indicating that it can provide better translation performance for the NMT model.
+
+## Approach
+
+We will elaborate two popular word segmentation methods and our newly proposed segmentation strategies in this section. The two popular segmentation methods are morpheme segmentation BIBREF4 and Byte Pair Encoding (BPE) BIBREF5. After word segmentation, we additionally add an specific symbol behind each separated subword unit, which aims to assist the NMT model to identify the morpheme boundaries and capture the semantic information effectively. The sentence examples with different segmentation strategies for Turkish-English machine translation task are shown in Table 1.
+
+## Approach ::: Morpheme Segmentation
+
+The words of Turkish and Uyghur are formed by a stem followed with unlimited number of suffixes. Both of the stem and suffix are called morphemes, and they are the smallest functional unit in agglutinative languages. Study indicated that modeling language based on the morpheme units can provide better performance BIBREF6. Morpheme segmentation can segment the complex word into morpheme units of stem and suffix. This representation maintains a full description of the morphological properties of subwords while minimizing the data sparseness caused by inflection and allomorphy phenomenon in highly-inflected languages.
+
+## Approach ::: Morpheme Segmentation ::: Stem with Combined Suffix
+
+In this segmentation strategy, each word is segmented into a stem unit and a combined suffix unit. We add “##” behind the stem unit and add “$$” behind the combined suffix unit. We denote this method as SCS. The segmented word can be denoted as two parts of “stem##” and “suffix1suffix2...suffixN$$”. If the original word has no suffix unit, the word is treated as its stem unit. All the following segmentation strategies will follow this rule.
+
+## Approach ::: Morpheme Segmentation ::: Stem with Singular Suffix
+
+In this segmentation strategy, each word is segmented into a stem unit and a sequence of suffix units. We add “##” behind the stem unit and add “$$” behind each singular suffix unit. We denote this method as SSS. The segmented word can be denoted as a sequence of “stem##”, “suffix1$$”, “suffix2$$” until “suffixN$$”.
+
+## Approach ::: Byte Pair Encoding (BPE)
+
+BPE BIBREF7 is originally a data compression technique and it is adapted by BIBREF5 for word segmentation and vocabulary reduction by encoding the rare and unknown words as a sequence of subword units, in which the most frequent character sequences are merged iteratively. Frequent character n-grams are eventually merged into a single symbol. This is based on the intuition that various word classes are translatable via smaller units than words. This method making the NMT model capable of open-vocabulary translation, which can generalize to translate and produce new words on the basis of these subword units. The BPE algorithm can be run on the dictionary extracted from a training text, with each word being weighted by its frequency. In this segmentation strategy, we add “@@” behind each no-final subword unit of the segmented word.
+
+## Approach ::: Morphologically Motivated Segmentation
+
+The problem with morpheme segmentation is that the vocabulary of stem units is still very large, which leads to many rare and unknown words at the training time. The problem with BPE is that it do not consider the morpheme boundaries inside words, which might cause a loss of morphological properties and semantic information. Hence, on the analyses of the above popular word segmentation methods, we propose the morphologically motivated segmentation strategy that combines the morpheme segmentation and BPE for further improving the translation performance of NMT.
+
+Compared with the sentence of word surface forms, the corresponding sentence of stem units only contains the structure information without considering morphological information, which can make better generalization over inflectional variants of the same word and reduce data sparseness BIBREF8. Therefore, we learn a BPE model on the stem units in the training corpus rather than the words, and then apply it on the stem unit of each word after morpheme segmentation.
+
+## Approach ::: Morphologically Motivated Segmentation ::: BPE on Stem with Combined Suffix
+
+In this segmentation strategy, firstly we segment each word into a stem unit and a combined suffix unit as SCS. Secondly, we apply BPE on the stem unit. Thirdly, we add “$$” behind the combined suffix unit. If the stem unit is not segmented, we add “##” behind itself. Otherwise, we add “@@” behind each no-final subword of the segmented stem unit. We denote this method as BPE-SCS.
+
+## Approach ::: Morphologically Motivated Segmentation ::: BPE on Stem with Singular Suffix
+
+In this segmentation strategy, firstly we segment each word into a stem unit and a sequence of suffix units as SSS. Secondly, we apply BPE on the stem unit. Thirdly, we add “$$” behind each singular suffix unit. If the stem unit is not segmented, we add “##” behind itself. Otherwise, we add “@@” behind each no-final subword of the segmented stem unit. We denote this method as BPE-SSS.
+
+## Experiments ::: Experimental Setup ::: Turkish-English Data :
+
+Following BIBREF9, we use the WIT corpus BIBREF10 and SETimes corpus BIBREF11 for model training, and use the newsdev2016 from Workshop on Machine Translation in 2016 (WMT2016) for validation. The test data are newstest2016 and newstest2017.
+
+## Experiments ::: Experimental Setup ::: Uyghur-Chinese Data :
+
+We use the news data from China Workshop on Machine Translation in 2017 (CWMT2017) for model training, validation and test.
+
+## Experiments ::: Experimental Setup ::: Data Preprocessing :
+
+We utilize the Zemberek with a morphological disambiguation tool to segment the Turkish words into morpheme units, and utilize the morphology analysis tool BIBREF12 to segment the Uyghur words into morpheme units. We employ the python toolkits of jieba for Chinese word segmentation. We apply BPE on the target-side words and we set the number of merge operations to 35K for Chinese and 30K for English and we set the maximum sentence length to 150 tokens. The training corpus statistics of Turkish-English and Uyghur-Chinese machine translation tasks are shown in Table 2 and Table 3 respectively.
+
+## Experiments ::: Experimental Setup ::: Number of Merge Operations :
+
+We set the number of merge operations on the stem units in the consideration of keeping the vocabulary size of BPE, BPE-SCS and BPE-SSS segmentation strategies on the same scale. We will elaborate the number settings for our proposed word segmentation strategies in this section.
+
+In the Turkish-English machine translation task, for the pure BPE strategy, we set the number of merge operations on the words to 35K, set the number of merge operations on the stem units for BPE-SCS strategy to 15K, and set the number of merge operations on the stem units for BPE-SSS strategy to 25K. In the Uyghur-Chinese machine translation task, for the pure BPE strategy, we set the number of merge operations on the words to 38K, set the number of merge operations on the stem units for BPE-SCS strategy to 10K, and set the number of merge operations on the stem units for BPE-SSS strategy to 35K. The detailed training corpus statistics with different segmentation strategies of Turkish and Uyghur are shown in Table 4 and Table 5 respectively.
+
+According to Table 4 and Table 5, we can find that both the Turkish and Uyghur have a very large vocabulary even in the low-resource training corpus. So we propose the morphological word segmentation strategies of BPE-SCS and BPE-SSS that additionally applying BPE on the stem units after morpheme segmentation, which not only consider the morphological properties but also eliminate the rare and unknown words.
+
+## Experiments ::: NMT Configuration
+
+We employ the Transformer model BIBREF13 with self-attention mechanism architecture implemented in Sockeye toolkit BIBREF14. Both the encoder and decoder have 6 layers. We set the number of hidden units to 512, the number of heads for self-attention to 8, the source and target word embedding size to 512, and the number of hidden units in feed-forward layers to 2048. We train the NMT model by using the Adam optimizer BIBREF15 with a batch size of 128 sentences, and we shuffle all the training data at each epoch. The label smoothing is set to 0.1. We report the result of averaging the parameters of the 4 best checkpoints on the validation perplexity. Decoding is performed by beam search with beam size of 5. To effectively evaluate the machine translation quality, we report case-sensitive BLEU score with standard tokenization and character n-gram ChrF3 score .
+
+## Results
+
+In this paper, we investigate and compare morpheme segmentation, BPE and our proposed morphological segmentation strategies on the low resource and morphologically-rich agglutinative languages. Experimental results of Turkish-English and Uyghur-Chinese machine translation tasks are shown in Table 6 and Table 7 respectively.
+
+## Discussion
+
+According to Table 6 and Table 7, we can find that both the BPE-SCS and BPE-SSS strategies outperform morpheme segmentation and the strong baseline of pure BPE method. Especially, the BPE-SSS strategy is better and it achieves significant improvement of up to 1.2 BLEU points on Turkish-English machine translation task and 2.5 BLEU points on Uyghur-Chinese machine translation task. Furthermore, we also find that the translation performance of our proposed segmentation strategy on Turkish-English machine translation task is not obvious than Uyghur-Chinese machine translation task, the probable reasons are: the training corpus of Turkish-English consists of talk and news data while most of the talk data are short informal sentences compared with the news data, which cannot provide more language information for the NMT model. Moreover, the test corpus consists of news data, so due to the data domain is different, the improvement of machine translation quality is limited.
+
+In addition, we estimate how the number of merge operations on the stem units for BPE-SSS strategy effects the machine translation quality. Experimental results are shown in Table 8 and Table 9. We find that the number of 25K for Turkish, 30K and 35K for Uyghur maximizes the translation performance. The probable reason is that these numbers of merge operations are able to generate a more appropriate vocabulary that containing effective morpheme units and moderate subword units, which makes better generalization over the morphologically-rich words.
+
+## Related Work
+
+The NMT system is typically trained with a limited vocabulary, which creates bottleneck on translation accuracy and generalization capability. Many word segmentation methods have been proposed to cope with the above problems, which consider the morphological properties of different languages.
+
+Bradbury and Socher BIBREF16 employed the modified Morfessor to provide morphology knowledge into word segmentation, but they neglected the morphological varieties between subword units, which might result in ambiguous translation results. Sanchez-Cartagena and Toral BIBREF17 proposed a rule-based morphological word segmentation for Finnish, which applies BPE on all the morpheme units uniformly without distinguishing their inner morphological roles. Huck BIBREF18 explored target-side segmentation method for German, which shows that the cascading of suffix splitting and compound splitting with BPE can achieve better translation results. Ataman et al. BIBREF19 presented a linguistically motivated vocabulary reduction approach for Turkish, which optimizes the segmentation complexity with constraint on the vocabulary based on a category-based hidden markov model (HMM). Our work is closely related to their idea while ours are more simple and realizable. Tawfik et al. BIBREF20 confirmed that there is some advantage from using a high accuracy dialectal segmenter jointly with a language independent word segmentation method like BPE. The main difference is that their approach needs sufficient monolingual data additionally to train a segmentation model while ours do not need any external resources, which is very convenient for word segmentation on the low-resource and morphologically-rich agglutinative languages.
+
+## Conclusion
+
+In this paper, we investigate morphological segmentation strategies on the low-resource and morphologically-rich languages of Turkish and Uyghur. Experimental results show that our proposed morphologically motivated word segmentation method is better suitable for NMT. And the BPE-SSS strategy achieves the best machine translation performance, as it can better preserve the syntactic and semantic information of the words with complex morphology as well as reduce the vocabulary size for model training. Moreover, we also estimate how the number of merge operations on the stem units for BPE-SSS strategy effects the translation quality, and we find that an appropriate vocabulary size is more useful for the NMT model.
+
+In future work, we are planning to incorporate more linguistic and morphology knowledge into the training process of NMT to enhance its capacity of capturing syntactic structure and semantic information on the low-resource and morphologically-rich languages.
+
+## Acknowledgments
+
+This work is supported by the National Natural Science Foundation of China, the Open Project of Key Laboratory of Xinjiang Uygur Autonomous Region, the Youth Innovation Promotion Association of the Chinese Academy of Sciences, and the High-level Talents Introduction Project of Xinjiang Uyghur Autonomous Region.

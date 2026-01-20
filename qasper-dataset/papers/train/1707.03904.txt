@@ -1,0 +1,131 @@
+# Quasar: Datasets for Question Answering by Search and Reading
+
+**Paper ID:** 1707.03904
+
+## Abstract
+
+We present two new large-scale datasets aimed at evaluating systems designed to comprehend a natural language query and extract its answer from a large corpus of text. The Quasar-S dataset consists of 37000 cloze-style (fill-in-the-gap) queries constructed from definitions of software entity tags on the popular website Stack Overflow. The posts and comments on the website serve as the background corpus for answering the cloze questions. The Quasar-T dataset consists of 43000 open-domain trivia questions and their answers obtained from various internet sources. ClueWeb09 serves as the background corpus for extracting these answers. We pose these datasets as a challenge for two related subtasks of factoid Question Answering: (1) searching for relevant pieces of text that include the correct answer to a query, and (2) reading the retrieved text to answer the query. We also describe a retrieval system for extracting relevant sentences and documents from the corpus given a query, and include these in the release for researchers wishing to only focus on (2). We evaluate several baselines on both datasets, ranging from simple heuristics to powerful neural models, and show that these lag behind human performance by 16.4% and 32.1% for Quasar-S and -T respectively. The datasets are available at https://github.com/bdhingra/quasar .
+
+## Introduction
+
+Factoid Question Answering (QA) aims to extract answers, from an underlying knowledge source, to information seeking questions posed in natural language. Depending on the knowledge source available there are two main approaches for factoid QA. Structured sources, including Knowledge Bases (KBs) such as Freebase BIBREF1 , are easier to process automatically since the information is organized according to a fixed schema. In this case the question is parsed into a logical form in order to query against the KB. However, even the largest KBs are often incomplete BIBREF2 , BIBREF3 , and hence can only answer a limited subset of all possible factoid questions.
+
+For this reason the focus is now shifting towards unstructured sources, such as Wikipedia articles, which hold a vast quantity of information in textual form and, in principle, can be used to answer a much larger collection of questions. Extracting the correct answer from unstructured text is, however, challenging, and typical QA pipelines consist of the following two components: (1) searching for the passages relevant to the given question, and (2) reading the retrieved text in order to select a span of text which best answers the question BIBREF4 , BIBREF5 .
+
+Like most other language technologies, the current research focus for both these steps is firmly on machine learning based approaches for which performance improves with the amount of data available. Machine reading performance, in particular, has been significantly boosted in the last few years with the introduction of large-scale reading comprehension datasets such as CNN / DailyMail BIBREF6 and Squad BIBREF7 . State-of-the-art systems for these datasets BIBREF8 , BIBREF9 focus solely on step (2) above, in effect assuming the relevant passage of text is already known.
+
+In this paper, we introduce two new datasets for QUestion Answering by Search And Reading – Quasar. The datasets each consist of factoid question-answer pairs and a corresponding large background corpus to facilitate research into the combined problem of retrieval and comprehension. Quasar-S consists of 37,362 cloze-style questions constructed from definitions of software entities available on the popular website Stack Overflow. The answer to each question is restricted to be another software entity, from an output vocabulary of 4874 entities. Quasar-T consists of 43,013 trivia questions collected from various internet sources by a trivia enthusiast. The answers to these questions are free-form spans of text, though most are noun phrases.
+
+While production quality QA systems may have access to the entire world wide web as a knowledge source, for Quasar we restrict our search to specific background corpora. This is necessary to avoid uninteresting solutions which directly extract answers from the sources from which the questions were constructed. For Quasar-S we construct the knowledge source by collecting top 50 threads tagged with each entity in the dataset on the Stack Overflow website. For Quasar-T we use ClueWeb09 BIBREF0 , which contains about 1 billion web pages collected between January and February 2009. Figure 1 shows some examples.
+
+Unlike existing reading comprehension tasks, the Quasar tasks go beyond the ability to only understand a given passage, and require the ability to answer questions given large corpora. Prior datasets (such as those used in BIBREF4 ) are constructed by first selecting a passage and then constructing questions about that passage. This design (intentionally) ignores some of the subproblems required to answer open-domain questions from corpora, namely searching for passages that may contain candidate answers, and aggregating information/resolving conflicts between candidates from many passages. The purpose of Quasar is to allow research into these subproblems, and in particular whether the search step can benefit from integration and joint training with downstream reading systems.
+
+Additionally, Quasar-S has the interesting feature of being a closed-domain dataset about computer programming, and successful approaches to it must develop domain-expertise and a deep understanding of the background corpus. To our knowledge it is one of the largest closed-domain QA datasets available. Quasar-T, on the other hand, consists of open-domain questions based on trivia, which refers to “bits of information, often of little importance". Unlike previous open-domain systems which rely heavily on the redundancy of information on the web to correctly answer questions, we hypothesize that Quasar-T requires a deeper reading of documents to answer correctly.
+
+We evaluate Quasar against human testers, as well as several baselines ranging from naïve heuristics to state-of-the-art machine readers. The best performing baselines achieve $33.6\%$ and $28.5\%$ on Quasar-S and Quasar-T, while human performance is $50\%$ and $60.6\%$ respectively. For the automatic systems, we see an interesting tension between searching and reading accuracies – retrieving more documents in the search phase leads to a higher coverage of answers, but makes the comprehension task more difficult. We also collect annotations on a subset of the development set questions to allow researchers to analyze the categories in which their system performs well or falls short. We plan to release these annotations along with the datasets, and our retrieved documents for each question.
+
+## Dataset Construction
+
+Each dataset consists of a collection of records with one QA problem per record. For each record, we include some question text, a context document relevant to the question, a set of candidate solutions, and the correct solution. In this section, we describe how each of these fields was generated for each Quasar variant.
+
+## Question sets
+
+The software question set was built from the definitional “excerpt” entry for each tag (entity) on StackOverflow. For example the excerpt for the “java“ tag is, “Java is a general-purpose object-oriented programming language designed to be used in conjunction with the Java Virtual Machine (JVM).” Not every excerpt includes the tag being defined (which we will call the “head tag”), so we prepend the head tag to the front of the string to guarantee relevant results later on in the pipeline. We then completed preprocessing of the software questions by downcasing and tokenizing the string using a custom tokenizer compatible with special characters in software terms (e.g. “.net”, “c++”). Each preprocessed excerpt was then converted to a series of cloze questions using a simple heuristic: first searching the string for mentions of other entities, then repleacing each mention in turn with a placeholder string (Figure 2 ).
+
+This heuristic is noisy, since the software domain often overloads existing English words (e.g. “can” may refer to a Controller Area Network bus; “swap” may refer to the temporary storage of inactive pages of memory on disk; “using” may refer to a namespacing keyword). To improve precision we scored each cloze based on the relative incidence of the term in an English corpus versus in our StackOverflow one, and discarded all clozes scoring below a threshold. This means our dataset does not include any cloze questions for terms which are common in English (such as “can” “swap” and “using”, but also “image” “service” and “packet”). A more sophisticated entity recognition system could make recall improvements here.
+
+The trivia question set was built from a collection of just under 54,000 trivia questions collected by Reddit user 007craft and released in December 2015. The raw dataset was noisy, having been scraped from multiple sources with variable attention to detail in formatting, spelling, and accuracy. We filtered the raw questions to remove unparseable entries as well as any True/False or multiple choice questions, for a total of 52,000 free-response style questions remaining. The questions range in difficulty, from straightforward (“Who recorded the song `Rocket Man”' “Elton John”) to difficult (“What was Robin Williams paid for Disney's Aladdin in 1982” “Scale $485 day + Picasso Painting”) to debatable (“According to Earth Medicine what's the birth totem for march” “The Falcon”)
+
+## Context Retrieval
+
+The context document for each record consists of a list of ranked and scored pseudodocuments relevant to the question.
+
+Context documents for each query were generated in a two-phase fashion, first collecting a large pool of semirelevant text, then filling a temporary index with short or long pseudodocuments from the pool, and finally selecting a set of $N$ top-ranking pseudodocuments (100 short or 20 long) from the temporary index.
+
+For Quasar-S, the pool of text for each question was composed of 50+ question-and-answer threads scraped from http://stackoverflow.com. StackOverflow keeps a running tally of the top-voted questions for each tag in their knowledge base; we used Scrapy to pull the top 50 question posts for each tag, along with any answer-post responses and metadata (tags, authorship, comments). From each thread we pulled all text not marked as code, and split it into sentences using the Stanford NLP sentence segmenter, truncating sentences to 2048 characters. Each sentence was marked with a thread identifier, a post identifier, and the tags for the thread. Long pseudodocuments were either the full post (in the case of question posts), or the full post and its head question (in the case of answer posts), comments included. Short pseudodocuments were individual sentences.
+
+To build the context documents for Quasar-S, the pseudodocuments for the entire corpus were loaded into a disk-based lucene index, each annotated with its thread ID and the tags for the thread. This index was queried for each cloze using the following lucene syntax:
+
+[noitemsep] 
+
+SHOULD(PHRASE(question text))
+
+SHOULD(BOOLEAN(question text))
+
+MUST(tags:$headtag)
+
+where “question text” refers to the sequence of tokens in the cloze question, with the placeholder removed. The first SHOULD term indicates that an exact phrase match to the question text should score highly. The second SHOULD term indicates that any partial match to tokens in the question text should also score highly, roughly in proportion to the number of terms matched. The MUST term indicates that only pseudodocuments annotated with the head tag of the cloze should be considered.
+
+The top $100N$ pseudodocuments were retrieved, and the top $N$ unique pseudodocuments were added to the context document along with their lucene retrieval score. Any questions showing zero results for this query were discarded.
+
+For Quasar-T, the pool of text for each question was composed of 100 HTML documents retrieved from ClueWeb09. Each question-answer pair was converted to a #combine query in the Indri query language to comply with the ClueWeb09 batch query service, using simple regular expression substitution rules to remove (s/[.(){}<>:*`_]+//g) or replace (s/[,?']+/ /g) illegal characters. Any questions generating syntax errors after this step were discarded. We then extracted the plaintext from each HTML document using Jericho. For long pseudodocuments we used the full page text, truncated to 2048 characters. For short pseudodocuments we used individual sentences as extracted by the Stanford NLP sentence segmenter, truncated to 200 characters.
+
+To build the context documents for the trivia set, the pseudodocuments from the pool were collected into an in-memory lucene index and queried using the question text only (the answer text was not included for this step). The structure of the query was identical to the query for Quasar-S, without the head tag filter:
+
+[noitemsep] 
+
+SHOULD(PHRASE(question text))
+
+SHOULD(BOOLEAN(question text))
+
+The top $100N$ pseudodocuments were retrieved, and the top $N$ unique pseudodocuments were added to the context document along with their lucene retrieval score. Any questions showing zero results for this query were discarded.
+
+## Candidate solutions
+
+The list of candidate solutions provided with each record is guaranteed to contain the correct answer to the question. Quasar-S used a closed vocabulary of 4874 tags as its candidate list. Since the questions in Quasar-T are in free-response format, we constructed a separate list of candidate solutions for each question. Since most of the correct answers were noun phrases, we took each sequence of NN* -tagged tokens in the context document, as identified by the Stanford NLP Maxent POS tagger, as the candidate list for each record. If this list did not include the correct answer, it was added to the list.
+
+## Postprocessing
+
+Once context documents had been built, we extracted the subset of questions where the answer string, excluded from the query for the two-phase search, was nonetheless present in the context document. This subset allows us to evaluate the performance of the reading system independently from the search system, while the full set allows us to evaluate the performance of Quasar as a whole. We also split the full set into training, validation and test sets. The final size of each data subset after all discards is listed in Table 1 .
+
+## Metrics
+
+Evaluation is straightforward on Quasar-S since each answer comes from a fixed output vocabulary of entities, and we report the average accuracy of predictions as the evaluation metric. For Quasar-T, the answers may be free form spans of text, and the same answer may be expressed in different terms, which makes evaluation difficult. Here we pick the two metrics from BIBREF7 , BIBREF19 . In preprocessing the answer we remove punctuation, white-space and definite and indefinite articles from the strings. Then, exact match measures whether the two strings, after preprocessing, are equal or not. For F1 match we first construct a bag of tokens for each string, followed be preprocessing of each token, and measure the F1 score of the overlap between the two bags of tokens. These metrics are far from perfect for Quasar-T; for example, our human testers were penalized for entering “0” as answer instead of “zero”. However, a comparison between systems may still be meaningful.
+
+## Human Evaluation
+
+To put the difficulty of the introduced datasets into perspective, we evaluated human performance on answering the questions. For each dataset, we recruited one domain expert (a developer with several years of programming experience for Quasar-S, and an avid trivia enthusiast for Quasar-T) and $1-3$ non-experts. Each volunteer was presented with randomly selected questions from the development set and asked to answer them via an online app. The experts were evaluated in a “closed-book” setting, i.e. they did not have access to any external resources. The non-experts were evaluated in an “open-book” setting, where they had access to a search engine over the short pseudo-documents extracted for each dataset (as described in Section "Context Retrieval" ). We decided to use short pseudo-documents for this exercise to reduce the burden of reading on the volunteers, though we note that the long pseudo-documents have greater coverage of answers.
+
+We also asked the volunteers to provide annotations to categorize the type of each question they were asked, and a label for whether the question was ambiguous. For Quasar-S the annotators were asked to mark the relation between the head entity (from whose definition the cloze was constructed) and the answer entity. For Quasar-T the annotators were asked to mark the genre of the question (e.g., Arts & Literature) and the entity type of the answer (e.g., Person). When multiple annotators marked the same question differently, we took the majority vote when possible and discarded ties. In total we collected 226 relation annotations for 136 questions in Quasar-S, out of which 27 were discarded due to conflicting ties, leaving a total of 109 annotated questions. For Quasar-T we collected annotations for a total of 144 questions, out of which 12 we marked as ambiguous. In the remaining 132, a total of 214 genres were annotated (a question could be annotated with multiple genres), while 10 questions had conflicting entity-type annotations which we discarded, leaving 122 total entity-type annotations. Figure 3 shows the distribution of these annotations.
+
+## Baseline Systems
+
+We evaluate several baselines on Quasar, ranging from simple heuristics to deep neural networks. Some predict a single token / entity as the answer, while others predict a span of tokens.
+
+MF-i (Maximum Frequency) counts the number of occurrences of each candidate answer in the retrieved context and returns the one with maximum frequency. MF-e is the same as MF-i except it excludes the candidates present in the query. WD (Word Distance) measures the sum of distances from a candidate to other non-stopword tokens in the passage which are also present in the query. For the cloze-style Quasar-S the distances are measured by first aligning the query placeholder to the candidate in the passage, and then measuring the offsets between other tokens in the query and their mentions in the passage. The maximum distance for any token is capped at a specified threshold, which is tuned on the validation set.
+
+For Quasar-T we also test the Sliding Window (SW) and Sliding Window + Distance (SW+D) baselines proposed in BIBREF13 . The scores were computed for the list of candidate solutions described in Section "Context Retrieval" .
+
+For Quasar-S, since the answers come from a fixed vocabulary of entities, we test language model baselines which predict the most likely entity to appear in a given context. We train three n-gram baselines using the SRILM toolkit BIBREF21 for $n=3,4,5$ on the entire corpus of all Stack Overflow posts. The output predictions are restricted to the output vocabulary of entities.
+
+We also train a bidirectional Recurrent Neural Network (RNN) language model (based on GRU units). This model encodes both the left and right context of an entity using forward and backward GRUs, and then concatenates the final states from both to predict the entity through a softmax layer. Training is performed on the entire corpus of Stack Overflow posts, with the loss computed only over mentions of entities in the output vocabulary. This approach benefits from looking at both sides of the cloze in a query to predict the entity, as compared to the single-sided n-gram baselines.
+
+Reading comprehension models are trained to extract the answer from the given passage. We test two recent architectures on Quasar using publicly available code from the authors .
+
+The GA Reader BIBREF8 is a multi-layer neural network which extracts a single token from the passage to answer a given query. At the time of writing it had state-of-the-art performance on several cloze-style datasets for QA. For Quasar-S we train and test GA on all instances for which the correct answer is found within the retrieved context. For Quasar-T we train and test GA on all instances where the answer is in the context and is a single token.
+
+The BiDAF model BIBREF9 is also a multi-layer neural network which predicts a span of text from the passage as the answer to a given query. At the time of writing it had state-of-the-art performance among published models on the Squad dataset. For Quasar-T we train and test BiDAF on all instances where the answer is in the retrieved context.
+
+## Results
+
+Several baselines rely on the retrieved context to extract the answer to a question. For these, we refer to the fraction of instances for which the correct answer is present in the context as Search Accuracy. The performance of the baseline among these instances is referred to as the Reading Accuracy, and the overall performance (which is a product of the two) is referred to as the Overall Accuracy. In Figure 4 we compare how these three vary as the number of context documents is varied. Naturally, the search accuracy increases as the context size increases, however at the same time reading performance decreases since the task of extracting the answer becomes harder for longer documents. Hence, simply retrieving more documents is not sufficient – finding the few most relevant ones will allow the reader to work best.
+
+In Tables 2 and 3 we compare all baselines when the context size is tuned to maximize the overall accuracy on the validation set. For Quasar-S the best performing baseline is the BiRNN language model, which achieves $33.6\%$ accuracy. The GA model achieves $48.3\%$ accuracy on the set of instances for which the answer is in context, however, a search accuracy of only $65\%$ means its overall performance is lower. This can improve with improved retrieval. For Quasar-T, both the neural models significantly outperform the heuristic models, with BiDAF getting the highest F1 score of $28.5\%$ .
+
+The best performing baselines, however, lag behind human performance by $16.4\%$ and $32.1\%$ for Quasar-S and Quasar-T respectively, indicating the strong potential for improvement. Interestingly, for human performance we observe that non-experts are able to match or beat the performance of experts when given access to the background corpus for searching the answers. We also emphasize that the human performance is limited by either the knowledge of the experts, or the usefulness of the search engine for non-experts; it should not be viewed as an upper bound for automatic systems which can potentially use the entire background corpus. Further analysis of the human and baseline performance in each category of annotated questions is provided in Appendix "Performance Analysis" .
+
+## Conclusion
+
+We have presented the Quasar datasets for promoting research into two related tasks for QA – searching a large corpus of text for relevant passages, and reading the passages to extract answers. We have also described baseline systems for the two tasks which perform reasonably but lag behind human performance. While the searching performance improves as we retrieve more context, the reading performance typically goes down. Hence, future work, in addition to improving these components individually, should also focus on joint approaches to optimizing the two on end-task performance. The datasets, including the documents retrieved by our system and the human annotations, are available at https://github.com/bdhingra/quasar.
+
+## Acknowledgments
+
+This work was funded by NSF under grants CCF-1414030 and IIS-1250956 and by grants from Google.
+
+## Quasar-S Relation Definitions
+
+Table 4 includes the definition of all the annotated relations for Quasar-S.
+
+## Performance Analysis
+
+Figure 5 shows a comparison of the human performance with the best performing baseline for each category of annotated questions. We see consistent differences between the two, except in the following cases. For Quasar-S, Bi-RNN performs comparably to humans for the developed-with and runs-on categories, but much worse in the has-component and is-a categories. For Quasar-T, BiDAF performs comparably to humans in the sports category, but much worse in history & religion and language, or when the answer type is a number or date/time.

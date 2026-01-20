@@ -1,0 +1,73 @@
+# Good-Enough Compositional Data Augmentation
+
+**Paper ID:** 1904.09545
+
+## Abstract
+
+We propose a simple data augmentation protocol aimed at providing a compositional inductive bias in conditional and unconditional sequence models. Under this protocol, synthetic training examples are constructed by taking real training examples and replacing (possibly discontinuous) fragments with other fragments that appear in at least one similar environment. The protocol is model-agnostic and useful for a variety of tasks. Applied to neural sequence-to-sequence models, it reduces relative error rate by up to 87% on problems from the diagnostic SCAN tasks and 16% on a semantic parsing task. Applied to n-gram language modeling, it reduces perplexity by roughly 1% on small datasets in several languages.
+
+## Introduction
+
+This paper proposes a data augmentation protocol for sequence modeling problems. Our approach aims to supply a simple and model-agnostic bias toward compositional reuse of previously observed sequence fragments in novel environments. Consider a language modeling task in which we wish to estimate a probability distribution over a family of sentences with the following finite sample as training data:
+
+In language processing problems, we often want models to analyze this dataset compositionally and infer that ( SECREF6 ) is also probable but ( UID7 ) is not:
+
+This generalization amounts to to an inference about syntactic categories BIBREF0 : because cat and wug are interchangeable in the environment the...sang, they are also likely interchangeable elsewhere. Human learners make judgments like ( SECREF5 ) about novel lexical items BIBREF1 and fragments of novel languages BIBREF2 . But we do not expect such judgments from unstructured sequence models trained to maximize the likelihood of the training data in ( SECREF1 ).
+
+A large body of work in natural language processing provides generalization to data like ( SECREF6 ) by adding structure to the learned predictor BIBREF3 , BIBREF4 , BIBREF5 . But on real-world datasets, such models are typically worse than “black-box” function approximators like neural networks even when the black-box models fail to place probability mass on either example in ( SECREF5 ) BIBREF6 . To the extent that we believe ( SECREF6 ) to capture an important inductive bias, we would like to find a way of softly encouraging it without tampering with the structure of predictors that work well at scale. In this paper, we introduce a procedure for generating synthetic training examples by recombining real ones, such that ( SECREF6 ) is assigned nontrivial probability because it already appears in the training dataset.
+
+The basic operation underlying our proposal (which we call geca, for “good-enough compositional augmentation”) is depicted in fig:teaser: if two (possibly discontinuous) fragments of training examples appear in some common environment, then any additional environment where the first fragment appears is also a valid environment for the second.
+
+geca is crude: as a linguistic principle, it is both limited and imprecise. As discussed in Sections UID17 and SECREF5 , it captures a narrow slice of the many phenomena studied under the heading of “compositionality”, while also making a number of incorrect predictions about real languages. Nevertheless, geca appears to be quite effective across a range of learning problems. In semantic parsing, it gives improvements comparable to the data augmentation approach of BIBREF7 on INLINEFORM0 -calculus expressions, better performance than that approach on a different split of the data designed to test generalization more rigorously, and better performance on a different meaning representation language. Outside of semantic parsing, it solves two representative problems from the scan dataset of BIBREF8 that are synthetic but precise in the notion of compositionality they test. Finally, it helps with some (unconditional) low-resource language modeling problems in a typologically diverse set of languages.
+
+## Background
+
+Recent years have seen tremendous success at natural language transduction and generation tasks using black-box function approximators, especially recurrent BIBREF9 and attentional BIBREF10 neural models. With enough training data, these models are often more accurate than than approaches built on traditional tools from the computational linguistics literature—formal models like regular transducers or context-free grammars BIBREF11 can be brittle and challenging to efficiently infer from large datasets.
+
+However, models equipped with an explicit (symbolic) generative process have at least one significant advantage over the aforementioned black-box approaches: given a grammar, it is straightforward to precisely characterize how that grammar will extrapolate beyond the examples in a given training set to out-of-distribution data. Indeed, it is often possible for researchers to design the form that this extrapolation will take: smoothed n-gram language models guarantee that no memorization is possible beyond a certain length BIBREF12 ; CCG-based semantic parsers can make immediate use of entity lexicons without having ever seen the lexicon entries used in real sentences BIBREF13 .
+
+It is not the case, as sometimes claimed BIBREF14 , that black-box neural models are fundamentally incapable of this kind of predictable generalization—the success of these models at capturing long-range structure in text BIBREF15 and controlled algorithmic data BIBREF16 indicate that some representation of hierarchical structure can be learned given enough data. But the precise point at which this transition occurs is not well-characterized; it is evidently beyond the scale available in many real-world problems.
+
+How can we improve the behavior of high-quality black-box models in these settings? There are many sophisticated tools available for improving the function approximators or loss functions themselves—regularization BIBREF17 , posterior regularization BIBREF18 , BIBREF19 , explicit stacks BIBREF20 and composition operators BIBREF21 ; these existing proposals tend to be task- and architecture-specific. But to the extent that the generalization problem can be addressed by increasing the scale of the training data, it is natural to ask whether we can address the problem by increasing this scale artificially—in other words, via data augmentation.
+
+Previous work BIBREF7 also studied data augmentation and compositionality in specific setting of learning language-to-logical-form mappings, beginning from the principle that data is compositional if it is generated by a synchronous grammar that relates strings to meanings. The specific approach proposed by BIBREF7 is effective but tailored for semantic parsing; it requires access to structured meaning representations with explicit types and bracketings, which are not available in most NLP applications.
+
+Here we aim at a notion of compositionality that is simpler and more general: a bias toward identifying recurring fragments seen at training time, and re-using them in environments distinct from the environments in which they were first observed. This view makes no assumptions about the availability of brackets and types, and is synchronous only to the extent that the notion of a fragment is permitted to include content from both the source and target sides. We will find that it is nearly as effective as the approach of BIBREF7 in the settings for which the latter was designed, but also effective on a variety of problems where it cannot be applied.
+
+## Approach
+
+Consider again the example in fig:teaser. Our data augmentation protocol aims to discover substitutable sentence fragments (highlighted), with the fact a pair of fragments appear in some common sub-sentential environment (underlined) taken as evidence that the fragments belong to a common category. To generate a new examples for the model, an occurrence of one fragment is removed from a sentence to produce a sentence template, which is then populated with the other fragment.
+
+Why should we expect this procedure to produce well-formed training examples? The existence of syntactic categories, and the expressibility of well-formedness rules in terms of these abstract categories, is one of the foundational principles of generative approaches to syntax BIBREF22 . The observation that sentence context provides a strong signal about a constitutent's category is in turn the foundation of distributional approaches to language processing BIBREF23 . Combining the two gives the outlines of the above procedure.
+
+This combination has a productive history in natural language processing: when fragments are single words, it yields class-based language models BIBREF24 ; when fragments are contiguous spans it yields unsupervised parsers BIBREF0 , BIBREF25 . The present data augmentation scenario is distinguished mainly by the fact that we are unconcerned with producing a complete generative model of data, or with recovering the latent structure implied by the presence of nested syntactic categories. We can still synthesize high-precision examples of well-formed sequences by identifying individual substitutions that are likely to be correct without understanding how they fit into the grammar as a whole.
+
+Indeed, if we are not concerned with recovering linguistically plausible analyses, we need not limit ourselves to words or contiguous sentence fragments. We can take
+
+as evidence that we can use picks...up wherever we can use puts...down. Indeed, given a translation dataset:
+
+we can apply the same principle to synthesize I dax. INLINEFORM0 Dajo. based on the common environment ...marvelously INLINEFORM1 ...maravillosamente. From the perspective of a generalized substitution principle, the alignment problem in machine translation is the same as the class induction problem in language modeling, but with sequences featuring large numbers of gappy fragments and a boundary symbol INLINEFORM2 .
+
+The only remaining question is what makes two environments similar enough to infer the existence of a common category. There is, again, a large literature on this question (including the aforementioned language modeling, unsupervised parsing, and alignment work), but in the current work we will make use of a very simple criterion: fragments are interchangeable if they occur in at least one lexical environment that is exactly the same. Given a window size INLINEFORM0 , a sequence of INLINEFORM1 words INLINEFORM2 , and a fragment consisting of a set of INLINEFORM3 spans INLINEFORM4 , the environment is given by INLINEFORM5 , i.e. a INLINEFORM6 -word window around each span of the fragment.
+
+The data augmentation operation that defines geca is formally stated as follows: let INLINEFORM0 denote the substitution of the fragment INLINEFORM1 into the template INLINEFORM2 , and INLINEFORM3 be a representation of the environment in which INLINEFORM4 occurs in INLINEFORM5 . Then,
+
+ If the training data contains sequences INLINEFORM0 , INLINEFORM1 , and INLINEFORM2 , and that INLINEFORM3 and INLINEFORM4 , synthesize a new training example INLINEFORM5 . 
+
+## Implementation
+
+Naïve implementation of the boxed operation takes INLINEFORM0 time (where INLINEFORM1 is the number of distinct templates in the dataset and INLINEFORM2 the number of distinct fragments). This can be improved to INLINEFORM3 (where INLINEFORM4 is the number of templates that map to the same environment) by building appropriate data structures:
+
+[h] 
+
+ python f2t = dict(default=set()) fragment -> template t2f = dict(default=set()) template -> fragment e2t = dict(default=set()) env -> template for sentence in dataset: for template, fragment in fragments(sentence): add(f2t[fragment], template) add(t2f[template], fragment) add(e2t[env(template)], template)
+
+t2t = dict(default=set()) for fragment in keys(f2t)): for template in f2t[fragment]: for template2 in f2t[fragment]: for newtemplate in e2t[env(template2)] add(t2t[template1], template2)
+
+for template1, template2 in t2t: for arg in t2a[template1] if arg not in t2a[template2]: yield fill(template2, arg) Sample geca implementation. 
+
+Space requirements might still be considerable (comparable to those used by n-gram language models), and similar tricks can be used to reduce memory usage BIBREF27 . The above pseudocode is agnostic with respect to the choice of fragmentation and environment functions; task-specific choices are described in more detail for each experiment below.
+
+## Discussion
+
+We introduced geca, a simple data augmentation scheme based on identifying local phrase substitutions that are licensed by common context, and demonstrated that extra training examples generated with geca lead to improvements on both diagnostic and natural datasets for semantic parsing and language modeling. While the approach is surprisingly effective in its current form, we view these results mostly as an invitation to consider more carefully the role played by representations of sentence fragments in larger questions about compositionality in black-box sequence models. The experiments in this paper all rely on exact string matching; future work might take advantage of learned representations of spans and their environments BIBREF32 , BIBREF33 . More generally, the present results underline the extent to which current models fail to learn simple, context-independent notions of reuse, but also how easy it is to make progress towards addressing this problem without fundamental changes in model architecture.

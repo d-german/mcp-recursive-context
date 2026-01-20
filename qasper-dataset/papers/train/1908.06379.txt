@@ -1,0 +1,99 @@
+# Concurrent Parsing of Constituency and Dependency
+
+**Paper ID:** 1908.06379
+
+## Abstract
+
+Constituent and dependency representation for syntactic structure share a lot of linguistic and computational characteristics, this paper thus makes the first attempt by introducing a new model that is capable of parsing constituent and dependency at the same time, so that lets either of the parsers enhance each other. Especially, we evaluate the effect of different shared network components and empirically verify that dependency parsing may be much more beneficial from constituent parsing structure. The proposed parser achieves new state-of-the-art performance for both parsing tasks, constituent and dependency on PTB and CTB benchmarks.
+
+## Introduction
+
+Constituent and dependency are two typical syntactic structure representation forms as shown in Figure FIGREF1, which have been well studied from both linguistic and computational perspective BIBREF0, BIBREF1. In earlier time, linguists and NLP researchers discussed how to encode lexical dependencies in phrase structures, like Tree-adjoining grammar (TAG) BIBREF2 and head-driven phrase structure grammar (HPSG) BIBREF3.
+
+Typical dependency treebanks are usually converted from constituent treebanks, though they may be independently annotated as well for the same languages. Meanwhile, constituent parsing can be accurately converted to dependencies (SD) representation by grammatical rules or machine learning methods BIBREF4, BIBREF5. Such mutual convertibility shows a close relation between constituent and dependency representation for the same sentence. Thus, it is a natural idea to study the relationship between constituent and dependency structures, and the joint learning of constituent and dependency parsing BIBREF6, BIBREF7, BIBREF8, BIBREF9, BIBREF10, BIBREF11, BIBREF12, BIBREF13, BIBREF14.
+
+For further exploit both strengths of the two representation forms for even better parsing, in this work, we propose a new model that is capable of synchronously parsing constituent and dependency.
+
+Multitask learning (MTL) is a natural solution in neural models for multiple inputs and multiple outputs, which is adopted in this work to decode constituent and dependency in a single model. BIBREF15 indicates that when tasks are sufficiently similar, especially with syntactic nature, MTL would be useful. In contrast to previous work on deep MTL BIBREF16, BIBREF17, our model focuses on more related tasks and benefits from the strong inherent relation. At last, our model is evaluated on two benchmark treebanks for both constituent and dependency parsing. The empirical results show that our parser reaches new state-of-the-art for all parsing tasks.
+
+## Our Model
+
+Using an encoder-decoder backbone, our model may be regarded as an extension of the constituent parsing model of BIBREF18 as shown in Figure FIGREF4. The difference is that in our model both constituent and dependency parsing share the same token representation and shared self-attention layers and each has its own individual Self-Attention Layers and subsequent processing layers. Our model includes four modules: token representation, self-attention encoder, constituent and dependency parsing decoder.
+
+## Our Model ::: Token Representation
+
+In our model, token representation $x_i$ is composed by character, word and part-of-speech (POS) embeddings. For character-level representation, we explore two types of encoders, CharCNNs BIBREF19, BIBREF20 and CharLSTM BIBREF18, as both types have been verified their effectiveness. For word-level representation, we concatenate randomly initialized and pre-trained word embeddings. We consider two ways to compose the final token representation, summing and concatenation, $x_i$=$x_{char}$+$x_{word}$+$x_{POS}$, $x_i$=[$x_{char}$;$x_{word}$;$x_{POS}$].
+
+## Our Model ::: Self-Attention Encoder
+
+The encoder in our model is adapted from BIBREF21 to factor explicit content and position information in the self-attention process BIBREF18. The input matrices $X = [x_1, x_2, \dots , x_n ]$ in which $x_i$ is concatenated with position embedding are transformed by a self-attention encoder. We factor the model between content and position information both in self-attention sub-layer and feed-forward network, whose setting details follow BIBREF18. We also try different numbers of shared self-attention layers in section SECREF15.
+
+## Our Model ::: Constituent Parsing Decoder
+
+The score $s(T)$ of the constituent parsing tree $T$ is to sum every scores of span ($i$, $j$) with label $l$,
+
+$ s(T) = \sum _{(i,j,\ell )\in T} s(i, j, \ell ). $
+
+The goal of constituent parser is to find the tree with the highest score: $ \hat{T} = \arg \max _T s(T). $ We use CKY-style algorithm to obtain the tree $\hat{T}$ in $O(n^3)$ time complexity BIBREF22, BIBREF23, BIBREF24, BIBREF25, BIBREF26.
+
+This structured prediction problem is handled with satisfying the margin constraint:
+
+$ s(T^*) \ge s(T) + \Delta (T,T^*), $
+
+where $T^*$ denote correct parse tree and $\Delta $ is the Hamming loss on labeled spans with a slight modification during the dynamic programming search. The objective function is the hinge loss,
+
+## Our Model ::: Dependency Parsing Decoder
+
+Similar to the constituent case, dependency parsing is to search over all possible trees to find the globally highest scoring tree. We follow BIBREF27 and BIBREF28 to predict a distribution over the possible head for each word and find the globally highest scoring tree conditional on the distribution of each word only during testing.
+
+We use the biaffine attention mechanism BIBREF27 between each word and the candidates of the parent node:
+
+$\alpha _{ij} = h_i^TWg_j + U^Th_i + V^T g_j + b,$
+
+where $h_i$ and $g_i$ are calculated by a distinct one-layer perceptron network.
+
+Dependency parser is to minimize the negative log likelihood of the golden tree $Y$, which is implemented as cross-entropy loss:
+
+$ J_2(\theta ) = - \left(logP_{\theta }(h_i|x_i) +logP_{\theta }(l_i|x_i,h_i)\right), $
+
+where $P_{\theta }(h_i|x_i)$ is the probability of correct parent node $h_i$ for $x_i$, and $P_{\theta }(l_i|x_i,h_i)$ is the probability of the correct dependency label $l_i$ for the child-parent pair $(x_i,h_i)$.
+
+During parsing, we use the first-order Eisner algorithm BIBREF29 to build projective trees.
+
+## Our Model ::: Joint training
+
+Our joint model synchronously predicts the dependency tree and the constituent tree over the same input sentence. The output of the self-attention encoder is sent to the different decoder to generate the different parse tree. Thus, the share components for two parsers include token representation layer and self-attention encoder.
+
+We jointly train the constituent and dependency parser for minimizing the overall loss:
+
+$J_{model}(\theta ) = J_1(\theta ) + \lambda J_2(\theta ),$
+
+where $\lambda $ is a hyper-parameter to control the overall loss. The best performance can be achieved when $\lambda $ is set to 1.0, which turns out that both sides are equally important.
+
+## Experiments
+
+We evaluate our model on two benchmark treebanks, English Penn Treebank (PTB) and Chinese Penn Treebank (CTB5.1) following standard data splitting BIBREF30, BIBREF31. POS tags are predicted by the Stanford Tagger BIBREF32. For constituent parsing, we use the standard evalb tool to evaluate the F1 score. For dependency parsing, we apply Stanford basic dependencies (SD) representation BIBREF4 converted by the Stanford parser. Following previous work BIBREF27, BIBREF33, we report the results without punctuations for both treebanks.
+
+## Experiments ::: Setup
+
+We use the same experimental settings as BIBREF18. For dependency parsing, we employ two 1024-dimensional multilayer perceptrons for learning specific representation and a 1024-dimensional parameter matrix for biaffine attention. We use 100D GloVe BIBREF34 for English and structured-skipgram BIBREF35 embeddings for Chinese.
+
+## Experiments ::: Ablation Studies
+
+All experiments in this subsection are running from token representation with summing setting.
+
+Token Representation Different token representation combinations are evaluated in Table TABREF13. We find that CharLSTM performs a little better than CharCNNs. Moreover, POS tags on parsing performance show that predicted POS tags decreases parsing accuracy, especially without word information. If POS tags are replaced by word embeddings, the performance increases. Finally, we apply word and CharLSTM as token representation setting for our full model.
+
+Shared Self-attention Layers As our model providing two outputs from one input, there is a bifurcation setting for how much shared part should be determined. Both constituent and dependency parsers share token representation and 8 self-attention layers at most. Assuming that either parser always takes input information flow through 8 self-attention layers as shown in Figure FIGREF4, then the number of shared self-attention layers varying from 0 to 8 may reflect the shared degree in the model. When the number is set to 0, it indicates only token representation is shared for both parsers trained for the joint loss through each own 8 self-attention layers. When the number is set to less than 8, for example, 6, then it means that both parsers first shared 6 layers from token representation then have individual 2 self-attention layers.
+
+For different numbers of shared layers, the results are in Table TABREF14. We respectively disable the constituent and the dependency parser to obtain a separate learning setting for both parsers in our model. The comparison in Table TABREF14 indicates that even though without any shared self-attention layers, joint training of our model may significantly outperform separate learning mode. At last, the best performance is still obtained from sharing full 8 self-attention layers.
+
+Besides, comparing UAS and LAS to F1 score, dependency parsing is shown more beneficial from our model which has more than 1% gain in UAS and LAS from parsing constituent together.
+
+## Experiments ::: Main Results
+
+Tables TABREF17, TABREF18 and TABREF19 compare our model to existing state-of-the-art, in which indicator Separate with our model shows the results of our model learning constituent or dependency parsing separately, (Sum) and (Concat) respectively represent the results with the indicated input token representation setting. On PTB, our model achieves 93.90 F1 score of constituent parsing and 95.91 UAS and 93.86 LAS of dependency parsing. On CTB, our model achieves a new state-of-the-art result on both constituent and dependency parsing. The comparison again suggests that learning jointly in our model is superior to learning separately. In addition, we also augment our model with ELMo BIBREF48 or a larger version of BERT BIBREF49 as the sole token representation to compare with other pre-training models. Since BERT is based on sub-word, we only take the last sub-word vector of the word in the last layer of BERT as our sole token representation $x_i$. Moreover, our single model of BERT achieves competitive performance with other ensemble models.
+
+## Conclusions
+
+This paper presents a joint model with the constituent and dependency parsing which achieves new state-of-the-art results on both Chinese and English benchmark treebanks. Our ablation studies show that joint learning of both constituent and dependency is indeed superior to separate learning mode. Also, experiments show that dependency parsing is much more beneficial from knowing the constituent structure. Our parser predicts phrase structure and head-word simultaneously which can be regarded as an effective HPSG BIBREF3 parser.

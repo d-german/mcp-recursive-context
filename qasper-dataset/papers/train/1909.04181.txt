@@ -1,0 +1,51 @@
+# BERT-Based Arabic Social Media Author Profiling
+
+**Paper ID:** 1909.04181
+
+## Abstract
+
+We report our models for detecting age, language variety, and gender from social media data in the context of the Arabic author profiling and deception detection shared task (APDA). We build simple models based on pre-trained bidirectional encoders from transformers (BERT). We first fine-tune the pre-trained BERT model on each of the three datasets with shared task released data. Then we augment shared task data with in-house data for gender and dialect, showing the utility of augmenting training data. Our best models on the shared task test data are acquired with a majority voting of various BERT models trained under different data conditions. We acquire 54.72% accuracy for age, 93.75% for dialect, 81.67% for gender, and 40.97% joint accuracy across the three tasks.
+
+## Introduction
+
+The proliferation of social media has made it possible to collect user data in unprecedented ways. These data can come in the form of usage and behavior (e.g., who likes what on Facebook), network (e.g., who follows a given user on Instagram), and content (e.g., what people post to Twitter). Availability of such data have made it possible to make discoveries about individuals and communities, mobilizing social and psychological research and employing natural language processing methods. In this work, we focus on predicting social media user age, dialect, and gender based on posted language. More specifically, we use the total of 100 tweets from each manually-labeled user to predict each of these attributes. Our dataset comes from the Arabic author profiling and deception detection shared task (APDA) BIBREF0. We focus on building simple models using pre-trained bidirectional encoders from transformers(BERT) BIBREF1 under various data conditions. Our results show (1) the utility of augmenting training data, and (2) the benefit of using majority votes from our simple classifiers.
+
+In the rest of the paper, we introduce the dataset, followed by our experimental conditions and results. We then provide a literature review and conclude.
+
+## Data
+
+For the purpose of our experiments, we use data released by the APDA shared task organizers. The dataset is divided into train and test by organizers. The training set is distributed with labels for the three tasks of age, dialect, and gender. Following the standard shared tasks set up, the test set is distributed without labels and participants were expected to submit their predictions on test. The shared task predictions are expected by organizers at the level of users. The distribution has 100 tweets for each user, and so each tweet is distributed with a corresponding user id. As such, in total, the distributed training data has 2,250 users, contributing a total of 225,000 tweets. The official task test set contains 720,00 tweets posted by 720 users. For our experiments, we split the training data released by organizers into 90% TRAIN set (202,500 tweets from 2,025 users) and 10% DEV set (22,500 tweets from 225 users). The age task labels come from the tagset {under-25, between-25 and 34, above-35}. For dialects, the data are labeled with 15 classes, from the set {Algeria, Egypt, Iraq, Kuwait, Lebanon-Syria, Lybia, Morocco, Oman, Palestine-Jordan, Qatar, Saudi Arabia, Sudan, Tunisia, UAE, Yemen}. The gender task involves binary labels from the set {male, female}.
+
+## Experiments
+
+As explained earlier, the shared task is set up at the user level where the age, dialect, and gender of each user are the required predictions. In our experiments, we first model the task at the tweet level and then port these predictions at the user level. For our core modelling, we fine-tune BERT on the shared task data. We also introduce an additional in-house dataset labeled with dialect and gender tags to the task as we will explain below. As a baseline, we use a small gated recurrent units (GRU) model. We now introduce our tweet-level models.
+
+## Experiments ::: Tweet-Level Models ::: Baseline GRU.
+
+Our baseline is a GRU network for each of the three tasks. We use the same network architecture across the 3 tasks. For each network, the network contains a layer unidirectional GRU, with 500 units and an output linear layer. The network is trained end-to-end. Our input embedding layer is initialized with a standard normal distribution, with $\mu =0$, and $\sigma =1$, i.e., $W \sim N(0,1)$. We use a maximum sequence length of 50 tokens, and choose an arbitrary vocabulary size of 100,000 types, where we use the 100,000 most frequent words in TRAIN. To avoid over-fitting, we use dropout BIBREF2 with a rate of 0.5 on the hidden layer. For the training, we use the Adam BIBREF3 optimizer with a fixed learning rate of $1e-3$. We employ batch training with a batch size of 32 for this model. We train the network for 15 epochs and save the model at the end of each epoch, choosing the model that performs highest accuracy on DEV as our best model. We present our best result on DEV in Table TABREF7. We report all our results using accuracy. Our best model obtains 42.48% for age, 37.50% for dialect, and 57.81% for gender. All models obtains best results with 2 epochs.
+
+## Experiments ::: Tweet-Level Models ::: BERT.
+
+For each task, we fine-tune on the BERT-Base Muultilingual Cased model relesed by the authors BIBREF1 . The model was pre-trained on Wikipedia of 104 languages (including Arabic) with 12 layer, 768 hidden units each, 12 attention heads, and has 110M parameters in entire model. The vocabulary of the model is 119,547 shared WordPices. We fine-tune the model with maximum sequence length of 50 tokens and a batch size of 32. We set the learning rate to $2e-5$ and train for 15 epochs. We use the same network architecture and parameters across the 3 tasks. As Table TABREF7 shows, comparing with GRU, BERT is 3.16% better for age, 4.85% better for dialect, and 2.45% higher for gender.
+
+## Experiments ::: Tweet-Level Models ::: Data Augmentation.
+
+To further improve the performance of our models, we introduce in-house labeled data that we use to fine-tune BERT. For the gender classification task, we manually label an in-house dataset of 1,100 users with gender tags, including 550 female users, 550 male users. We obtain 162,829 tweets by crawling the 1,100 users' timelines. We combine this new gender dataset with the gender TRAIN data (from shared task) to obtain an extended dataset, to which we refer as EXTENDED_Gender. For the dialect identification task, we randomly sample 20,000 tweets for each class from an in-house dataset gold labeled with the same 15 classes as the shared task. In this way, we obtain 298,929 tweets (Sudan only has 18,929 tweets). We combine this new dialect data with the shared task dialect TRAIN data to form EXTENDED_Dialect. For both the dialect and gender tasks, we fine-tune BERT on EXTENDED_Dialect and EXTENDED_Gender independently and report performance on DEV. We refer to this iteration of experiments as BERT_EXT. As Table TABREF7 shows, BERT_EXT is 2.18% better than BERT for dialect and 0.75% better than BERT for gender.
+
+## Experiments ::: User-Level Models
+
+Our afore-mentioned models identify user's profiling on the tweet-level, rather than directly detecting the labels of a user. Hence, we follow the work of Zhang & Abdul-Mageed BIBREF4 to identify user-level labels. For each of the three tasks, we use tweet-level predicted labels (and associated softmax values) as a proxy for user-level labels. For each predicted label, we use the softmax value as a threshold for including only highest confidently predicted tweets. Since in some cases softmax values can be low, we try all values between 0.00 and 0.99 to take a softmax-based majority class as the user-level predicted label, fine-tuning on our DEV set. Using this method, we acquire the following results at the user level: BERT models obtain an accuracy of 55.56% for age, 96.00% for dialect, and 80.00% for gender. BERT_EXT models achieve 95.56% accuracy for dialect and 84.00% accuracy for gender.
+
+## Experiments ::: APDA@FIRE2019 submission
+
+First submission. For the shared task submission, we use the predictions of BERT_EXT as out first submission for gender and dialect, but only BERT for age (since we have no BERT_EXT models for age, as explained earlier). In each case, we acquire results at tweet-level first, then port the labels at the user-level as explained in the previous section. For our second and third submitted models, we also follow this method of going from tweet to user level. Second submission. We combine our DEV data with our EXTENDED_Dialect and EXTENDED_Gender data, for dialect and gender respectively, and train our second submssions for the two tasks. For age second submsision, we concatenate DEV data to TRAIN and fine-tune the BERT model. We refer to the settings for our second submission models collectively as BERT_EXT+DEV.
+
+Third submission. Finally, for our third submission, we use a majority vote of (1) first submission, (2) second submission, and (3) predictions from our user-level BERT model. These majority class models (i.e., our third submission) achieve best results on the official test data. We acquire 54.72% accuracy for age, 81.67% accuracy for gender, 93.75% accuracy for dialect, and 40.97% joint accuracy.
+
+## Conclusion
+
+In this work, we described our submitted models to the Arabic author profiling and deception detection shared task (APDA) BIBREF0. We focused on detecting age, dialect, and gender using BERT models under various data conditions, showing the utility of additional, in-house data on the task. We also showed that a majority vote of our models trained under different conditions outperforms single models on the official evaluation. In the future, we will investigate automatically extending training data for these tasks as well as better representation learning methods.
+
+## Acknowledgement
+
+We acknowledge the support of the Natural Sciences and Engineering Research Council of Canada (NSERC), the Social Sciences Research Council of Canada (SSHRC), and Compute Canada (www.computecanada.ca).

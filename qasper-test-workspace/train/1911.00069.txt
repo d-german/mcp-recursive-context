@@ -1,0 +1,241 @@
+# Neural Cross-Lingual Relation Extraction Based on Bilingual Word Embedding Mapping
+
+**Paper ID:** 1911.00069
+
+## Abstract
+
+Relation extraction (RE) seeks to detect and classify semantic relationships between entities, which provides useful information for many NLP applications. Since the state-of-the-art RE models require large amounts of manually annotated data and language-specific resources to achieve high accuracy, it is very challenging to transfer an RE model of a resource-rich language to a resource-poor language. In this paper, we propose a new approach for cross-lingual RE model transfer based on bilingual word embedding mapping. It projects word embeddings from a target language to a source language, so that a well-trained source-language neural network RE model can be directly applied to the target language. Experiment results show that the proposed approach achieves very good performance for a number of target languages on both in-house and open datasets, using a small bilingual dictionary with only 1K word pairs.
+
+## Introduction
+
+Relation extraction (RE) is an important information extraction task that seeks to detect and classify semantic relationships between entities like persons, organizations, geo-political entities, locations, and events. It provides useful information for many NLP applications such as knowledge base construction, text mining and question answering. For example, the entity Washington, D.C. and the entity United States have a CapitalOf relationship, and extraction of such relationships can help answer questions like “What is the capital city of the United States?"
+
+Traditional RE models (e.g., BIBREF0, BIBREF1, BIBREF2) require careful feature engineering to derive and combine various lexical, syntactic and semantic features. Recently, neural network RE models (e.g., BIBREF3, BIBREF4, BIBREF5, BIBREF6) have become very successful. These models employ a certain level of automatic feature learning by using word embeddings, which significantly simplifies the feature engineering task while considerably improving the accuracy, achieving the state-of-the-art performance for relation extraction.
+
+All the above RE models are supervised machine learning models that need to be trained with large amounts of manually annotated RE data to achieve high accuracy. However, annotating RE data by human is expensive and time-consuming, and can be quite difficult for a new language. Moreover, most RE models require language-specific resources such as dependency parsers and part-of-speech (POS) taggers, which also makes it very challenging to transfer an RE model of a resource-rich language to a resource-poor language.
+
+There are a few existing weakly supervised cross-lingual RE approaches that require no human annotation in the target languages, e.g., BIBREF7, BIBREF8, BIBREF9, BIBREF10. However, the existing approaches require aligned parallel corpora or machine translation systems, which may not be readily available in practice.
+
+In this paper, we make the following contributions to cross-lingual RE:
+
+We propose a new approach for direct cross-lingual RE model transfer based on bilingual word embedding mapping. It projects word embeddings from a target language to a source language (e.g., English), so that a well-trained source-language RE model can be directly applied to the target language, with no manually annotated RE data needed for the target language.
+
+We design a deep neural network architecture for the source-language (English) RE model that uses word embeddings and generic language-independent features as the input. The English RE model achieves the-state-of-the-art performance without using language-specific resources.
+
+We conduct extensive experiments which show that the proposed approach achieves very good performance (up to $79\%$ of the accuracy of the supervised target-language RE model) for a number of target languages on both in-house and the ACE05 datasets BIBREF11, using a small bilingual dictionary with only 1K word pairs. To the best of our knowledge, this is the first work that includes empirical studies for cross-lingual RE on several languages across a variety of language families, without using aligned parallel corpora or machine translation systems.
+
+We organize the paper as follows. In Section 2 we provide an overview of our approach. In Section 3 we describe how to build monolingual word embeddings and learn a linear mapping between two languages. In Section 4 we present a neural network architecture for the source-language (English). In Section 5 we evaluate the performance of the proposed approach for a number of target languages. We discuss related work in Section 6 and conclude the paper in Section 7.
+
+## Overview of the Approach
+
+We summarize the main steps of our neural cross-lingual RE model transfer approach as follows.
+
+Build word embeddings for the source language and the target language separately using monolingual data.
+
+Learn a linear mapping that projects the target-language word embeddings into the source-language embedding space using a small bilingual dictionary.
+
+Build a neural network source-language RE model that uses word embeddings and generic language-independent features as the input.
+
+For a target-language sentence and any two entities in it, project the word embeddings of the words in the sentence to the source-language word embeddings using the linear mapping, and then apply the source-language RE model on the projected word embeddings to classify the relationship between the two entities. An example is shown in Figure FIGREF4, where the target language is Portuguese and the source language is English.
+
+We will describe each component of our approach in the subsequent sections.
+
+## Cross-Lingual Word Embeddings
+
+In recent years, vector representations of words, known as word embeddings, become ubiquitous for many NLP applications BIBREF12, BIBREF13, BIBREF14.
+
+A monolingual word embedding model maps words in the vocabulary $\mathcal {V}$ of a language to real-valued vectors in $\mathbb {R}^{d\times 1}$. The dimension of the vector space $d$ is normally much smaller than the size of the vocabulary $V=|\mathcal {V}|$ for efficient representation. It also aims to capture semantic similarities between the words based on their distributional properties in large samples of monolingual data.
+
+Cross-lingual word embedding models try to build word embeddings across multiple languages BIBREF15, BIBREF16. One approach builds monolingual word embeddings separately and then maps them to the same vector space using a bilingual dictionary BIBREF17, BIBREF18. Another approach builds multilingual word embeddings in a shared vector space simultaneously, by generating mixed language corpora using aligned sentences BIBREF19, BIBREF20.
+
+In this paper, we adopt the technique in BIBREF17 because it only requires a small bilingual dictionary of aligned word pairs, and does not require parallel corpora of aligned sentences which could be more difficult to obtain.
+
+## Cross-Lingual Word Embeddings ::: Monolingual Word Embeddings
+
+To build monolingual word embeddings for the source and target languages, we use a variant of the Continuous Bag-of-Words (CBOW) word2vec model BIBREF13.
+
+The standard CBOW model has two matrices, the input word matrix $\tilde{\mathbf {X}} \in \mathbb {R}^{d\times V}$ and the output word matrix $\mathbf {X} \in \mathbb {R}^{d\times V}$. For the $i$th word $w_i$ in $\mathcal {V}$, let $\mathbf {e}(w_i) \in \mathbb {R}^{V \times 1}$ be a one-hot vector with 1 at index $i$ and 0s at other indexes, so that $\tilde{\mathbf {x}}_i = \tilde{\mathbf {X}}\mathbf {e}(w_i)$ (the $i$th column of $\tilde{\mathbf {X}}$) is the input vector representation of word $w_i$, and $\mathbf {x}_i = \mathbf {X}\mathbf {e}(w_i)$ (the $i$th column of $\mathbf {X}$) is the output vector representation (i.e., word embedding) of word $w_i$.
+
+Given a sequence of training words $w_1, w_2, ..., w_N$, the CBOW model seeks to predict a target word $w_t$ using a window of $2c$ context words surrounding $w_t$, by maximizing the following objective function:
+
+The conditional probability is calculated using a softmax function:
+
+where $\mathbf {x}_t=\mathbf {X}\mathbf {e}(w_t)$ is the output vector representation of word $w_t$, and
+
+is the sum of the input vector representations of the context words.
+
+In our variant of the CBOW model, we use a separate input word matrix $\tilde{\mathbf {X}}_j$ for a context word at position $j, -c \le j \le c, j\ne 0$. In addition, we employ weights that decay with the distances of the context words to the target word. Under these modifications, we have
+
+We use the variant to build monolingual word embeddings because experiments on named entity recognition and word similarity tasks showed this variant leads to small improvements over the standard CBOW model BIBREF21.
+
+## Cross-Lingual Word Embeddings ::: Bilingual Word Embedding Mapping
+
+BIBREF17 observed that word embeddings of different languages often have similar geometric arrangements, and suggested to learn a linear mapping between the vector spaces.
+
+Let $\mathcal {D}$ be a bilingual dictionary with aligned word pairs ($w_i, v_i)_{i=1,...,D}$ between a source language $s$ and a target language $t$, where $w_i$ is a source-language word and $v_i$ is the translation of $w_i$ in the target language. Let $\mathbf {x}_i \in \mathbb {R}^{d \times 1}$ be the word embedding of the source-language word $w_i$, $\mathbf {y}_i \in \mathbb {R}^{d \times 1}$ be the word embedding of the target-language word $v_i$.
+
+We find a linear mapping (matrix) $\mathbf {M}_{t\rightarrow s}$ such that $\mathbf {M}_{t\rightarrow s}\mathbf {y}_i$ approximates $\mathbf {x}_i$, by solving the following least squares problem using the dictionary as the training set:
+
+Using $\mathbf {M}_{t\rightarrow s}$, for any target-language word $v$ with word embedding $\mathbf {y}$, we can project it into the source-language embedding space as $\mathbf {M}_{t\rightarrow s}\mathbf {y}$.
+
+## Cross-Lingual Word Embeddings ::: Bilingual Word Embedding Mapping ::: Length Normalization and Orthogonal Transformation
+
+To ensure that all the training instances in the dictionary $\mathcal {D}$ contribute equally to the optimization objective in (DISPLAY_FORM14) and to preserve vector norms after projection, we have tried length normalization and orthogonal transformation for learning the bilingual mapping as in BIBREF22, BIBREF23, BIBREF24.
+
+First, we normalize the source-language and target-language word embeddings to be unit vectors: $\mathbf {x}^{\prime }=\frac{\mathbf {x}}{||\mathbf {x}||}$ for each source-language word embedding $\mathbf {x}$, and $\mathbf {y}^{\prime }= \frac{\mathbf {y}}{||\mathbf {y}||}$ for each target-language word embedding $\mathbf {y}$.
+
+Next, we add an orthogonality constraint to (DISPLAY_FORM14) such that $\mathbf {M}$ is an orthogonal matrix, i.e., $\mathbf {M}^\mathrm {T}\mathbf {M} = \mathbf {I}$ where $\mathbf {I}$ denotes the identity matrix:
+
+$\mathbf {M}^{O} _{t\rightarrow s}$ can be computed using singular-value decomposition (SVD).
+
+## Cross-Lingual Word Embeddings ::: Bilingual Word Embedding Mapping ::: Semi-Supervised and Unsupervised Mappings
+
+The mapping learned in (DISPLAY_FORM14) or (DISPLAY_FORM16) requires a seed dictionary. To relax this requirement, BIBREF25 proposed a self-learning procedure that can be combined with a dictionary-based mapping technique. Starting with a small seed dictionary, the procedure iteratively 1) learns a mapping using the current dictionary; and 2) computes a new dictionary using the learned mapping.
+
+BIBREF26 proposed an unsupervised method to learn the bilingual mapping without using a seed dictionary. The method first uses a heuristic to build an initial dictionary that aligns the vocabularies of two languages, and then applies a robust self-learning procedure to iteratively improve the mapping. Another unsupervised method based on adversarial training was proposed in BIBREF27.
+
+We compare the performance of different mappings for cross-lingual RE model transfer in Section SECREF45.
+
+## Neural Network RE Models
+
+For any two entities in a sentence, an RE model determines whether these two entities have a relationship, and if yes, classifies the relationship into one of the pre-defined relation types. We focus on neural network RE models since these models achieve the state-of-the-art performance for relation extraction. Most importantly, neural network RE models use word embeddings as the input, which are amenable to cross-lingual model transfer via cross-lingual word embeddings. In this paper, we use English as the source language.
+
+Our neural network architecture has four layers. The first layer is the embedding layer which maps input words in a sentence to word embeddings. The second layer is a context layer which transforms the word embeddings to context-aware vector representations using a recurrent or convolutional neural network layer. The third layer is a summarization layer which summarizes the vectors in a sentence by grouping and pooling. The final layer is the output layer which returns the classification label for the relation type.
+
+## Neural Network RE Models ::: Embedding Layer
+
+For an English sentence with $n$ words $\mathbf {s}=(w_1,w_2,...,w_n)$, the embedding layer maps each word $w_t$ to a real-valued vector (word embedding) $\mathbf {x}_t\in \mathbb {R}^{d \times 1}$ using the English word embedding model (Section SECREF9). In addition, for each entity $m$ in the sentence, the embedding layer maps its entity type to a real-valued vector (entity label embedding) $\mathbf {l}_m \in \mathbb {R}^{d_m \times 1}$ (initialized randomly). In our experiments we use $d=300$ and $d_m = 50$.
+
+## Neural Network RE Models ::: Context Layer
+
+Given the word embeddings $\mathbf {x}_t$'s of the words in the sentence, the context layer tries to build a sentence-context-aware vector representation for each word. We consider two types of neural network layers that aim to achieve this.
+
+## Neural Network RE Models ::: Context Layer ::: Bi-LSTM Context Layer
+
+The first type of context layer is based on Long Short-Term Memory (LSTM) type recurrent neural networks BIBREF28, BIBREF29. Recurrent neural networks (RNNs) are a class of neural networks that operate on sequential data such as sequences of words. LSTM networks are a type of RNNs that have been invented to better capture long-range dependencies in sequential data.
+
+We pass the word embeddings $\mathbf {x}_t$'s to a forward and a backward LSTM layer. A forward or backward LSTM layer consists of a set of recurrently connected blocks known as memory blocks. The memory block at the $t$-th word in the forward LSTM layer contains a memory cell $\overrightarrow{\mathbf {c}}_t$ and three gates: an input gate $\overrightarrow{\mathbf {i}}_t$, a forget gate $\overrightarrow{\mathbf {f}}_t$ and an output gate $\overrightarrow{\mathbf {o}}_t$ ($\overrightarrow{\cdot }$ indicates the forward direction), which are updated as follows:
+
+where $\sigma $ is the element-wise sigmoid function and $\odot $ is the element-wise multiplication.
+
+The hidden state vector $\overrightarrow{\mathbf {h}}_t$ in the forward LSTM layer incorporates information from the left (past) tokens of $w_t$ in the sentence. Similarly, we can compute the hidden state vector $\overleftarrow{\mathbf {h}}_t$ in the backward LSTM layer, which incorporates information from the right (future) tokens of $w_t$ in the sentence. The concatenation of the two vectors $\mathbf {h}_t = [\overrightarrow{\mathbf {h}}_t, \overleftarrow{\mathbf {h}}_t]$ is a good representation of the word $w_t$ with both left and right contextual information in the sentence.
+
+## Neural Network RE Models ::: Context Layer ::: CNN Context Layer
+
+The second type of context layer is based on Convolutional Neural Networks (CNNs) BIBREF3, BIBREF4, which applies convolution-like operation on successive windows of size $k$ around each word in the sentence. Let $\mathbf {z}_t = [\mathbf {x}_{t-(k-1)/2},...,\mathbf {x}_{t+(k-1)/2}]$ be the concatenation of $k$ word embeddings around $w_t$. The convolutional layer computes a hidden state vector
+
+for each word $w_t$, where $\mathbf {W}$ is a weight matrix and $\mathbf {b}$ is a bias vector, and $\tanh (\cdot )$ is the element-wise hyperbolic tangent function.
+
+## Neural Network RE Models ::: Summarization Layer
+
+After the context layer, the sentence $(w_1,w_2,...,w_n)$ is represented by $(\mathbf {h}_1,....,\mathbf {h}_n)$. Suppose $m_1=(w_{b_1},..,w_{e_1})$ and $m_2=(w_{b_2},..,w_{e_2})$ are two entities in the sentence where $m_1$ is on the left of $m_2$ (i.e., $e_1 < b_2$). As different sentences and entities may have various lengths, the summarization layer tries to build a fixed-length vector that best summarizes the representations of the sentence and the two entities for relation type classification.
+
+We divide the hidden state vectors $\mathbf {h}_t$'s into 5 groups:
+
+$G_1=\lbrace \mathbf {h}_{1},..,\mathbf {h}_{b_1-1}\rbrace $ includes vectors that are left to the first entity $m_1$.
+
+$G_2=\lbrace \mathbf {h}_{b_1},..,\mathbf {h}_{e_1}\rbrace $ includes vectors that are in the first entity $m_1$.
+
+$G_3=\lbrace \mathbf {h}_{e_1+1},..,\mathbf {h}_{b_2-1}\rbrace $ includes vectors that are between the two entities.
+
+$G_4=\lbrace \mathbf {h}_{b_2},..,\mathbf {h}_{e_2}\rbrace $ includes vectors that are in the second entity $m_2$.
+
+$G_5=\lbrace \mathbf {h}_{e_2+1},..,\mathbf {h}_{n}\rbrace $ includes vectors that are right to the second entity $m_2$.
+
+We perform element-wise max pooling among the vectors in each group:
+
+where $d_h$ is the dimension of the hidden state vectors. Concatenating the $\mathbf {h}_{G_i}$'s we get a fixed-length vector $\mathbf {h}_s=[\mathbf {h}_{G_1},...,\mathbf {h}_{G_5}]$.
+
+## Neural Network RE Models ::: Output Layer
+
+The output layer receives inputs from the previous layers (the summarization vector $\mathbf {h}_s$, the entity label embeddings $\mathbf {l}_{m_1}$ and $\mathbf {l}_{m_2}$ for the two entities under consideration) and returns a probability distribution over the relation type labels:
+
+## Neural Network RE Models ::: Cross-Lingual RE Model Transfer
+
+Given the word embeddings of a sequence of words in a target language $t$, $(\mathbf {y}_1,...,\mathbf {y}_n)$, we project them into the English embedding space by applying the linear mapping $\mathbf {M}_{t\rightarrow s}$ learned in Section SECREF13: $(\mathbf {M}_{t\rightarrow s}\mathbf {y}_1, \mathbf {M}_{t\rightarrow s}\mathbf {y}_2,...,\mathbf {M}_{t\rightarrow s}\mathbf {y}_n)$. The neural network English RE model is then applied on the projected word embeddings and the entity label embeddings (which are language independent) to perform relationship classification.
+
+Note that our models do not use language-specific resources such as dependency parsers or POS taggers because these resources might not be readily available for a target language. Also our models do not use precise word position features since word positions in sentences can vary a lot across languages.
+
+## Experiments
+
+In this section, we evaluate the performance of the proposed cross-lingual RE approach on both in-house dataset and the ACE (Automatic Content Extraction) 2005 multilingual dataset BIBREF11.
+
+## Experiments ::: Datasets
+
+Our in-house dataset includes manually annotated RE data for 6 languages: English, German, Spanish, Italian, Japanese and Portuguese. It defines 56 entity types (e.g., Person, Organization, Geo-Political Entity, Location, Facility, Time, Event_Violence, etc.) and 53 relation types between the entities (e.g., AgentOf, LocatedAt, PartOf, TimeOf, AffectedBy, etc.).
+
+The ACE05 dataset includes manually annotated RE data for 3 languages: English, Arabic and Chinese. It defines 7 entity types (Person, Organization, Geo-Political Entity, Location, Facility, Weapon, Vehicle) and 6 relation types between the entities (Agent-Artifact, General-Affiliation, ORG-Affiliation, Part-Whole, Personal-Social, Physical).
+
+For both datasets, we create a class label “O" to denote that the two entities under consideration do not have a relationship belonging to one of the relation types of interest.
+
+## Experiments ::: Source (English) RE Model Performance
+
+We build 3 neural network English RE models under the architecture described in Section SECREF4:
+
+The first neural network RE model does not have a context layer and the word embeddings are directly passed to the summarization layer. We call it Pass-Through for short.
+
+The second neural network RE model has a Bi-LSTM context layer. We call it Bi-LSTM for short.
+
+The third neural network model has a CNN context layer with a window size 3. We call it CNN for short.
+
+First we compare our neural network English RE models with the state-of-the-art RE models on the ACE05 English data. The ACE05 English data can be divided to 6 different domains: broadcast conversation (bc), broadcast news (bn), telephone conversation (cts), newswire (nw), usenet (un) and webblogs (wl). We apply the same data split in BIBREF31, BIBREF30, BIBREF6, which uses news (the union of bn and nw) as the training set, a half of bc as the development set and the remaining data as the test set.
+
+We learn the model parameters using Adam BIBREF32. We apply dropout BIBREF33 to the hidden layers to reduce overfitting. The development set is used for tuning the model hyperparameters and for early stopping.
+
+In Table TABREF40 we compare our models with the best models in BIBREF30 and BIBREF6. Our Bi-LSTM model outperforms the best model (single or ensemble) in BIBREF30 and the best single model in BIBREF6, without using any language-specific resources such as dependency parsers.
+
+While the data split in the previous works was motivated by domain adaptation, the focus of this paper is on cross-lingual model transfer, and hence we apply a random data split as follows. For the source language English and each target language, we randomly select $80\%$ of the data as the training set, $10\%$ as the development set, and keep the remaining $10\%$ as the test set. The sizes of the sets are summarized in Table TABREF41.
+
+We report the Precision, Recall and $F_1$ score of the 3 neural network English RE models in Table TABREF42. Note that adding an additional context layer with either Bi-LSTM or CNN significantly improves the performance of our English RE model, compared with the simple Pass-Through model. Therefore, we will focus on the Bi-LSTM model and the CNN model in the subsequent experiments.
+
+## Experiments ::: Cross-Lingual RE Performance
+
+We apply the English RE models to the 7 target languages across a variety of language families.
+
+## Experiments ::: Cross-Lingual RE Performance ::: Dictionary Size
+
+The bilingual dictionary includes the most frequent target-language words and their translations in English. To determine how many word pairs are needed to learn an effective bilingual word embedding mapping for cross-lingual RE, we first evaluate the performance ($F_1$ score) of our cross-lingual RE approach on the target-language development sets with an increasing dictionary size, as plotted in Figure FIGREF35.
+
+We found that for most target languages, once the dictionary size reaches 1K, further increasing the dictionary size may not improve the transfer performance. Therefore, we select the dictionary size to be 1K.
+
+## Experiments ::: Cross-Lingual RE Performance ::: Comparison of Different Mappings
+
+We compare the performance of cross-lingual RE model transfer under the following bilingual word embedding mappings:
+
+Regular-1K: the regular mapping learned in (DISPLAY_FORM14) using 1K word pairs;
+
+Orthogonal-1K: the orthogonal mapping with length normalization learned in (DISPLAY_FORM16) using 1K word pairs (in this case we train the English RE models with the normalized English word embeddings);
+
+Semi-Supervised-1K: the mapping learned with 1K word pairs and improved by the self-learning method in BIBREF25;
+
+Unsupervised: the mapping learned by the unsupervised method in BIBREF26.
+
+The results are summarized in Table TABREF46. The regular mapping outperforms the orthogonal mapping consistently across the target languages. While the orthogonal mapping was shown to work better than the regular mapping for the word translation task BIBREF22, BIBREF23, BIBREF24, our cross-lingual RE approach directly maps target-language word embeddings to the English embedding space without conducting word translations. Moreover, the orthogonal mapping requires length normalization, but we observed that length normalization adversely affects the performance of the English RE models (about 2.0 $F_1$ points drop).
+
+We apply the vecmap toolkit to obtain the semi-supervised and unsupervised mappings. The unsupervised mapping has the lowest average accuracy over the target languages, but it does not require a seed dictionary. Among all the mappings, the regular mapping achieves the best average accuracy over the target languages using a dictionary with only 1K word pairs, and hence we adopt it for the cross-lingual RE task.
+
+## Experiments ::: Cross-Lingual RE Performance ::: Performance on Test Data
+
+The cross-lingual RE model transfer results for the in-house test data are summarized in Table TABREF52 and the results for the ACE05 test data are summarized in Table TABREF53, using the regular mapping learned with a bilingual dictionary of size 1K. In the tables, we also provide the performance of the supervised RE model (Bi-LSTM) for each target language, which is trained with a few hundred thousand tokens of manually annotated RE data in the target-language, and may serve as an upper bound for the cross-lingual model transfer performance.
+
+Among the 2 neural network models, the Bi-LSTM model achieves a better cross-lingual RE performance than the CNN model for 6 out of the 7 target languages. In terms of absolute performance, the Bi-LSTM model achieves over $40.0$ $F_1$ scores for German, Spanish, Portuguese and Chinese. In terms of relative performance, it reaches over $75\%$ of the accuracy of the supervised target-language RE model for German, Spanish, Italian and Portuguese. While Japanese and Arabic appear to be more difficult to transfer, it still achieves $55\%$ and $52\%$ of the accuracy of the supervised Japanese and Arabic RE model, respectively, without using any manually annotated RE data in Japanese/Arabic.
+
+We apply model ensemble to further improve the accuracy of the Bi-LSTM model. We train 5 Bi-LSTM English RE models initiated with different random seeds, apply the 5 models on the target languages, and combine the outputs by selecting the relation type labels with the highest probabilities among the 5 models. This Ensemble approach improves the single model by 0.6-1.9 $F_1$ points, except for Arabic.
+
+## Experiments ::: Cross-Lingual RE Performance ::: Discussion
+
+Since our approach projects the target-language word embeddings to the source-language embedding space preserving the word order, it is expected to work better for a target language that has more similar word order as the source language. This has been verified by our experiments. The source language, English, belongs to the SVO (Subject, Verb, Object) language family where in a sentence the subject comes first, the verb second, and the object third. Spanish, Italian, Portuguese, German (in conventional typology) and Chinese also belong to the SVO language family, and our approach achieves over $70\%$ relative accuracy for these languages. On the other hand, Japanese belongs to the SOV (Subject, Object, Verb) language family and Arabic belongs to the VSO (Verb, Subject, Object) language family, and our approach achieves lower relative accuracy for these two languages.
+
+## Related Work
+
+There are a few weakly supervised cross-lingual RE approaches. BIBREF7 and BIBREF8 project annotated English RE data to Korean to create weakly labeled training data via aligned parallel corpora. BIBREF9 translates a target-language sentence into English, performs RE in English, and then projects the relation phrases back to the target-language sentence. BIBREF10 proposes an adversarial feature adaptation approach for cross-lingual relation classification, which uses a machine translation system to translate source-language sentences into target-language sentences. Unlike the existing approaches, our approach does not require aligned parallel corpora or machine translation systems. There are also several multilingual RE approaches, e.g., BIBREF34, BIBREF35, BIBREF36, where the focus is to improve monolingual RE by jointly modeling texts in multiple languages.
+
+Many cross-lingual word embedding models have been developed recently BIBREF15, BIBREF16. An important application of cross-lingual word embeddings is to enable cross-lingual model transfer. In this paper, we apply the bilingual word embedding mapping technique in BIBREF17 to cross-lingual RE model transfer. Similar approaches have been applied to other NLP tasks such as dependency parsing BIBREF37, POS tagging BIBREF38 and named entity recognition BIBREF21, BIBREF39.
+
+## Conclusion
+
+In this paper, we developed a simple yet effective neural cross-lingual RE model transfer approach, which has very low resource requirements (a small bilingual dictionary with 1K word pairs) and can be easily extended to a new language. Extensive experiments for 7 target languages across a variety of language families on both in-house and open datasets show that the proposed approach achieves very good performance (up to $79\%$ of the accuracy of the supervised target-language RE model), which provides a strong baseline for building cross-lingual RE models with minimal resources.
+
+## Acknowledgments
+
+We thank Mo Yu for sharing their ACE05 English data split and the anonymous reviewers for their valuable comments.

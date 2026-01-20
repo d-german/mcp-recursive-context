@@ -1,0 +1,147 @@
+# Generating Classical Chinese Poems from Vernacular Chinese
+
+**Paper ID:** 1909.00279
+
+## Abstract
+
+Classical Chinese poetry is a jewel in the treasure house of Chinese culture. Previous poem generation models only allow users to employ keywords to interfere the meaning of generated poems, leaving the dominion of generation to the model. In this paper, we propose a novel task of generating classical Chinese poems from vernacular, which allows users to have more control over the semantic of generated poems. We adapt the approach of unsupervised machine translation (UMT) to our task. We use segmentation-based padding and reinforcement learning to address under-translation and over-translation respectively. According to experiments, our approach significantly improve the perplexity and BLEU compared with typical UMT models. Furthermore, we explored guidelines on how to write the input vernacular to generate better poems. Human evaluation showed our approach can generate high-quality poems which are comparable to amateur poems.
+
+## Introduction
+
+During thousands of years, millions of classical Chinese poems have been written. They contain ancient poets' emotions such as their appreciation for nature, desiring for freedom and concerns for their countries. Among various types of classical poetry, quatrain poems stand out. On the one hand, their aestheticism and terseness exhibit unique elegance. On the other hand, composing such poems is extremely challenging due to their phonological, tonal and structural restrictions.
+
+Most previous models for generating classical Chinese poems BIBREF0, BIBREF1 are based on limited keywords or characters at fixed positions (e.g., acrostic poems). Since users could only interfere with the semantic of generated poems using a few input words, models control the procedure of poem generation. In this paper, we proposed a novel model for classical Chinese poem generation. As illustrated in Figure FIGREF1, our model generates a classical Chinese poem based on a vernacular Chinese paragraph. Our objective is not only to make the model generate aesthetic and terse poems, but also keep rich semantic of the original vernacular paragraph. Therefore, our model gives users more control power over the semantic of generated poems by carefully writing the vernacular paragraph.
+
+Although a great number of classical poems and vernacular paragraphs are easily available, there exist only limited human-annotated pairs of poems and their corresponding vernacular translations. Thus, it is unlikely to train such poem generation model using supervised approaches. Inspired by unsupervised machine translation (UMT) BIBREF2, we treated our task as a translation problem, namely translating vernacular paragraphs to classical poems.
+
+However, our work is not just a straight-forward application of UMT. In a training example for UMT, the length difference of source and target languages are usually not large, but this is not true in our task. Classical poems tend to be more concise and abstract, while vernacular text tends to be detailed and lengthy. Based on our observation on gold-standard annotations, vernacular paragraphs usually contain more than twice as many Chinese characters as their corresponding classical poems. Therefore, such discrepancy leads to two main problems during our preliminary experiments: (1) Under-translation: when summarizing vernacular paragraphs to poems, some vernacular sentences are not translated and ignored by our model. Take the last two vernacular sentences in Figure FIGREF1 as examples, they are not covered in the generated poem. (2) Over-translation: when expanding poems to vernacular paragraphs, certain words are unnecessarily translated for multiple times. For example, the last sentence in the generated poem of Figure FIGREF1, as green as sapphire, is back-translated as as green as as as sapphire.
+
+Inspired by the phrase segmentation schema in classical poems BIBREF3, we proposed the method of phrase-segmentation-based padding to handle with under-translation. By padding poems based on the phrase segmentation custom of classical poems, our model better aligns poems with their corresponding vernacular paragraphs and meanwhile lowers the risk of under-translation. Inspired by Paulus2018ADR, we designed a reinforcement learning policy to penalize the model if it generates vernacular paragraphs with too many repeated words. Experiments show our method can effectively decrease the possibility of over-translation.
+
+The contributions of our work are threefold:
+
+(1) We proposed a novel task for unsupervised Chinese poem generation from vernacular text.
+
+(2) We proposed using phrase-segmentation-based padding and reinforcement learning to address two important problems in this task, namely under-translation and over-translation.
+
+(3) Through extensive experiments, we proved the effectiveness of our models and explored how to write the input vernacular to inspire better poems. Human evaluation shows our models are able to generate high quality poems, which are comparable to amateur poems.
+
+## Related Works
+
+Classical Chinese Poem Generation Most previous works in classical Chinese poem generation focus on improving the semantic coherence of generated poems. Based on LSTM, Zhang and Lapata Zhang2014ChinesePG purposed generating poem lines incrementally by taking into account the history of what has been generated so far. Yan Yan2016iPA proposed a polishing generation schema, each poem line is generated incrementally and iteratively by refining each line one-by-one. Wang et al. Wang2016ChinesePG and Yi et al. Yi2018ChinesePG proposed models to keep the generated poems coherent and semantically consistent with the user's intent. There are also researches that focus on other aspects of poem generation. (Yang et al. Yang2018StylisticCP explored increasing the diversity of generated poems using an unsupervised approach. Xu et al. Xu2018HowII explored generating Chinese poems from images. While most previous works generate poems based on topic words, our work targets at a novel task: generating poems from vernacular Chinese paragraphs.
+
+Unsupervised Machine Translation Compared with supervised machine translation approaches BIBREF4, BIBREF5, unsupervised machine translation BIBREF6, BIBREF2 does not rely on human-labeled parallel corpora for training. This technique is proved to greatly improve the performance of low-resource languages translation systems. (e.g. English-Urdu translation). The unsupervised machine translation framework is also applied to various other tasks, e.g. image captioning BIBREF7, text style transfer BIBREF8, speech to text translation BIBREF9 and clinical text simplification BIBREF10. The UMT framework makes it possible to apply neural models to tasks where limited human labeled data is available. However, in previous tasks that adopt the UMT framework, the abstraction levels of source and target language are the same. This is not the case for our task.
+
+Under-Translation & Over-Translation Both are troublesome problems for neural sequence-to-sequence models. Most previous related researches adopt the coverage mechanism BIBREF11, BIBREF12, BIBREF13. However, as far as we know, there were no successful attempt applying coverage mechanism to transformer-based models BIBREF14.
+
+## Model ::: Main Architecture
+
+We transform our poem generation task as an unsupervised machine translation problem. As illustrated in Figure FIGREF1, based on the recently proposed UMT framework BIBREF2, our model is composed of the following components:
+
+Encoder $\textbf {E}_s$ and decoder $\textbf {D}_s$ for vernacular paragraph processing
+
+Encoder $\textbf {E}_t$ and decoder $\textbf {D}_t$ for classical poem processing
+
+where $\textbf {E}_s$ (or $\textbf {E}_t$) takes in a vernacular paragraph (or a classical poem) and converts it into a hidden representation, and $\textbf {D}_s$ (or $\textbf {D}_t$) takes in the hidden representation and converts it into a vernacular paragraph (or a poem). Our model relies on a vernacular texts corpus $\textbf {\emph {S}}$ and a poem corpus $\textbf {\emph {T}}$. We denote $S$ and $T$ as instances in $\textbf {\emph {S}}$ and $\textbf {\emph {T}}$ respectively.
+
+The training of our model relies on three procedures, namely parameter initialization, language modeling and back-translation. We will give detailed introduction to each procedure.
+
+Parameter initialization As both vernacular and classical poem use Chinese characters, we initialize the character embedding of both languages in one common space, the same character in two languages shares the same embedding. This initialization helps associate characters with their plausible translations in the other language.
+
+Language modeling It helps the model generate texts that conform to a certain language. A well-trained language model is able to detect and correct minor lexical and syntactic errors. We train the language models for both vernacular and classical poem by minimizing the following loss:
+
+where $S_N$ (or $T_N$) is generated by adding noise (drop, swap or blank a few words) in $S$ (or $T$).
+
+Back-translation Based on a vernacular paragraph $S$, we generate a poem $T_S$ using $\textbf {E}_s$ and $\textbf {D}_t$, we then translate $T_S$ back into a vernacular paragraph $S_{T_S} = \textbf {D}_s(\textbf {E}_t(T_S))$. Here, $S$ could be used as gold standard for the back-translated paragraph $S_{T_s}$. In this way, we could turn the unsupervised translation into a supervised task by maximizing the similarity between $S$ and $S_{T_S}$. The same also applies to using poem $T$ as gold standard for its corresponding back-translation $T_{S_T}$. We define the following loss:
+
+Note that $\mathcal {L}^{bt}$ does not back propagate through the generation of $T_S$ and $S_T$ as we observe no improvement in doing so. When training the model, we minimize the composite loss:
+
+where $\alpha _1$ and $\alpha _2$ are scaling factors.
+
+## Model ::: Addressing Under-Translation and Over-Translation
+
+During our early experiments, we realize that the naive UMT framework is not readily applied to our task. Classical Chinese poems are featured for its terseness and abstractness. They usually focus on depicting broad poetic images rather than details. We collected a dataset of classical Chinese poems and their corresponding vernacular translations, the average length of the poems is $32.0$ characters, while for vernacular translations, it is $73.3$. The huge gap in sequence length between source and target language would induce over-translation and under-translation when training UMT models. In the following sections, we explain the two problems and introduce our improvements.
+
+## Model ::: Addressing Under-Translation and Over-Translation ::: Under-Translation
+
+By nature, classical poems are more concise and abstract while vernaculars are more detailed and lengthy, to express the same meaning, a vernacular paragraph usually contains more characters than a classical poem. As a result, when summarizing a vernacular paragraph $S$ to a poem $T_S$, $T_S$ may not cover all information in $S$ due to its length limit. In real practice, we notice the generated poems usually only cover the information in the front part of the vernacular paragraph, while the latter part is unmentioned.
+
+To alleviate under-translation, we propose phrase segmentation-based padding. Specifically, we first segment each line in a classical poem into several sub-sequences, we then join these sub-sequences with the special padding tokens <p>. During training, the padded lines are used instead of the original poem lines. As illustrated in Figure FIGREF10, padding would create better alignments between a vernacular paragraph and a prolonged poem, making it more likely for the latter part of the vernacular paragraph to be covered in the poem. As we mentioned before, the length of the vernacular translation is about twice the length of its corresponding classical poem, so we pad each segmented line to twice its original length.
+
+According to Ye jia:1984, to present a stronger sense of rhythm, each type of poem has its unique phrase segmentation schema, for example, most seven-character quatrain poems adopt the 2-2-3 schema, i.e. each quatrain line contains 3 phrases, the first, second and third phrase contains 2, 2, 3 characters respectively. Inspired by this law, we segment lines in a poem according to the corresponding phrase segmentation schema. In this way, we could avoid characters within the scope of a phrase to be cut apart, thus best preserve the semantic of each phrase.BIBREF15
+
+## Model ::: Addressing Under-Translation and Over-Translation ::: Over-Translation
+
+In NMT, when decoding is complete, the decoder would generate an <EOS>token, indicating it has reached the end of the output sequence. However, when expending a poem $T$ into a vernacular Chinese paragraph $S_T$, due to the conciseness nature of poems, after finishing translating every source character in $T$, the output sequence $S_T$ may still be much shorter than the expected length of a poem‘s vernacular translation. As a result, the decoder would believe it has not finished decoding. Instead of generating the <EOS>token, the decoder would continue to generate new output characters from previously translated source characters. This would cause the decoder to repetitively output a piece of text many times.
+
+To remedy this issue, in addition to minimizing the original loss function $\mathcal {L}$, we propose to minimize a specific discrete metric, which is made possible with reinforcement learning.
+
+We define repetition ratio $RR(S)$ of a paragraph $S$ as:
+
+where $vocab(S)$ refers to the number of distinctive characters in $S$, $len(S)$ refers the number of all characters in $S$. Obviously, if a generated sequence contains many repeated characters, it would have high repetition ratio. Following the self-critical policy gradient training BIBREF16, we define the following loss function:
+
+where $\tau $ is a manually set threshold. Intuitively, minimizing $\mathcal {L}^{rl}$ is equivalent to maximizing the conditional likelihood of the sequence $S$ given $S_{T_S}$ if its repetition ratio is lower than the threshold $\tau $. Following BIBREF17, we revise the composite loss as:
+
+where $\alpha _1, \alpha _2, \alpha _3$ are scaling factors.
+
+## Experiment
+
+The objectives of our experiment are to explore the following questions: (1) How much do our models improve the generated poems? (Section SECREF23) (2) What are characteristics of the input vernacular paragraph that lead to a good generated poem? (Section SECREF26) (3) What are weaknesses of generated poems compared to human poems? (Section SECREF27) To this end, we built a dataset as described in Section SECREF18. Evaluation metrics and baselines are described in Section SECREF21 and SECREF22. For the implementation details of building the dataset and models, please refer to supplementary materials.
+
+## Experiment ::: Datasets
+
+Training and Validation Sets We collected a corpus of poems and a corpus of vernacular literature from online resources. The poem corpus contains 163K quatrain poems from Tang Poems and Song Poems, the vernacular literature corpus contains 337K short paragraphs from 281 famous books, the corpus covers various literary forms including prose, fiction and essay. Note that our poem corpus and a vernacular corpus are not aligned. We further split the two corpora into a training set and a validation set.
+
+Test Set From online resources, we collected 487 seven-character quatrain poems from Tang Poems and Song Poems, as well as their corresponding high quality vernacular translations. These poems could be used as gold standards for poems generated from their corresponding vernacular translations. Table TABREF11 shows the statistics of our training, validation and test set.
+
+## Experiment ::: Evaluation Metrics
+
+Perplexity Perplexity reflects the probability a model generates a certain poem. Intuitively, a better model would yield higher probability (lower perplexity) on the gold poem.
+
+BLEU As a standard evaluation metric for machine translation, BLEU BIBREF18 measures the intersection of n-grams between the generated poem and the gold poem. A better generated poem usually achieves higher BLEU score, as it shares more n-gram with the gold poem.
+
+Human evaluation While perplexity and BLEU are objective metrics that could be applied to large-volume test set, evaluating Chinese poems is after all a subjective task. We invited 30 human evaluators to join our human evaluation. The human evaluators were divided into two groups. The expert group contains 15 people who hold a bachelor degree in Chinese literature, and the amateur group contains 15 people who holds a bachelor degree in other fields. All 30 human evaluators are native Chinese speakers.
+
+We ask evaluators to grade each generated poem from four perspectives: 1) Fluency: Is the generated poem grammatically and rhythmically well formed, 2) Semantic coherence: Is the generated poem itself semantic coherent and meaningful, 3) Semantic preservability: Does the generated poem preserve the semantic of the modern Chinese translation, 4) Poeticness: Does the generated poem display the characteristic of a poem and does the poem build good poetic image. The grading scale for each perspective is from 1 to 5.
+
+## Experiment ::: Baselines
+
+We compare the performance of the following models: (1) LSTM BIBREF19; (2)Naive transformer BIBREF14; (3)Transformer + Anti OT (RL loss); (4)Transformer + Anti UT (phrase segmentation-based padding); (5)Transformer + Anti OT&UT.
+
+## Experiment ::: Reborn Poems: Generating Poems from Vernacular Translations
+
+As illustrated in Table TABREF12 (ID 1). Given the vernacular translation of each gold poem in test set, we generate five poems using our models. Intuitively, the more the generated poem resembles the gold poem, the better the model is. We report mean perplexity and BLEU scores in Table TABREF19 (Where +Anti OT refers to adding the reinforcement loss to mitigate over-fitting and +Anti UT refers to adding phrase segmentation-based padding to mitigate under-translation), human evaluation results in Table TABREF20.
+
+According to experiment results, perplexity, BLEU scores and total scores in human evaluation are consistent with each other. We observe all BLEU scores are fairly low, we believe it is reasonable as there could be multiple ways to compose a poem given a vernacular paragraph. Among transformer-based models, both +Anti OT and +Anti UT outperforms the naive transformer, while Anti OT&UT shows the best performance, this demonstrates alleviating under-translation and over-translation both helps generate better poems. Specifically, +Anti UT shows bigger improvement than +Anti OT. According to human evaluation, among the four perspectives, our Anti OT&UT brought most score improvement in Semantic preservability, this proves our improvement on semantic preservability was most obvious to human evaluators. All transformer-based models outperform LSTM. Note that the average length of the vernacular translation is over 70 characters, comparing with transformer-based models, LSTM may only keep the information in the beginning and end of the vernacular. We anticipated some score inconsistency between expert group and amateur group. However, after analyzing human evaluation results, we did not observed big divergence between two groups.
+
+## Experiment ::: Interpoetry: Generating Poems from Various Literature Forms
+
+Chinese literature is not only featured for classical poems, but also various other literature forms. Song lyricUTF8gbsn(宋词), or ci also gained tremendous popularity in its palmy days, standing out in classical Chinese literature. Modern prose, modern poems and pop song lyrics have won extensive praise among Chinese people in modern days. The goal of this experiment is to transfer texts of other literature forms into quatrain poems. We expect the generated poems to not only keep the semantic of the original text, but also demonstrate terseness, rhythm and other characteristics of ancient poems. Specifically, we chose 20 famous fragments from four types of Chinese literature (5 fragments for each of modern prose, modern poems, pop song lyrics and Song lyrics). We try to As no ground truth is available, we resorted to human evaluation with the same grading standard in Section SECREF23.
+
+Comparing the scores of different literature forms, we observe Song lyric achieves higher scores than the other three forms of modern literature. It is not surprising as both Song lyric and quatrain poems are written in classical Chinese, while the other three literature forms are all in vernacular.
+
+Comparing the scores within the same literature form, we observe the scores of poems generated from different paragraphs tends to vary. After carefully studying the generated poems as well as their scores, we have the following observation:
+
+1) In classical Chinese poems, poetic images UTF8gbsn(意象) were widely used to express emotions and to build artistic conception. A certain poetic image usually has some fixed implications. For example, autumn is usually used to imply sadness and loneliness. However, with the change of time, poetic images and their implications have also changed. According to our observation, if a vernacular paragraph contains more poetic images used in classical literature, its generated poem usually achieves higher score. As illustrated in Table TABREF12, both paragraph 2 and 3 are generated from pop song lyrics, paragraph 2 uses many poetic images from classical literature (e.g. pear flowers, makeup), while paragraph 3 uses modern poetic images (e.g. sparrows on the utility pole). Obviously, compared with poem 2, sentences in poem 3 seems more confusing, as the poetic images in modern times may not fit well into the language model of classical poems.
+
+2) We also observed that poems generated from descriptive paragraphs achieve higher scores than from logical or philosophical paragraphs. For example, in Table TABREF12, both paragraph 4 (more descriptive) and paragraph 5 (more philosophical) were selected from famous modern prose. However, compared with poem 4, poem 5 seems semantically more confusing. We offer two explanations to the above phenomenon: i. Limited by the 28-character restriction, it is hard for quatrain poems to cover complex logical or philosophical explanation. ii. As vernacular paragraphs are more detailed and lengthy, some information in a vernacular paragraph may be lost when it is summarized into a classical poem. While losing some information may not change the general meaning of a descriptive paragraph, it could make a big difference in a logical or philosophical paragraph.
+
+## Experiment ::: Human Discrimination Test
+
+We manually select 25 generated poems from vernacular Chinese translations and pair each one with its corresponding human written poem. We then present the 25 pairs to human evaluators and ask them to differentiate which poem is generated by human poet.
+
+As demonstrated in Table TABREF29, although the general meanings in human poems and generated poems seem to be the same, the wordings they employ are quite different. This explains the low BLEU scores in Section 4.3. According to the test results in Table TABREF30, human evaluators only achieved 65.8% in mean accuracy. This indicates the best generated poems are somewhat comparable to poems written by amateur poets.
+
+We interviewed evaluators who achieved higher than 80% accuracy on their differentiation strategies. Most interviewed evaluators state they realize the sentences in a human written poem are usually well organized to highlight a theme or to build a poetic image, while the correlation between sentences in a generated poem does not seem strong. As demonstrated in Table TABREF29, the last two sentences in both human poems (marked as red) echo each other well, while the sentences in machine-generated poems seem more independent. This gives us hints on the weakness of generated poems: While neural models may generate poems that resemble human poems lexically and syntactically, it's still hard for them to compete with human beings in building up good structures.
+
+## Discussion
+
+Addressing Under-Translation In this part, we wish to explore the effect of different phrase segmentation schemas on our phrase segmentation-based padding. According to Ye jia:1984, most seven-character quatrain poems adopt the 2-2-3 segmentation schema. As shown in examples in Figure FIGREF31, we compare our phrase segmentation-based padding (2-2-3 schema) to two less common schemas (i.e. 2-3-2 and 3-2-2 schema) we report our experiment results in Table TABREF32.
+
+The results show our 2-2-3 segmentation-schema greatly outperforms 2-3-2 and 3-2-2 schema in both perplexity and BLEU scores. Note that the BLEU scores of 2-3-2 and 3-2-2 schema remains almost the same as our naive baseline (Without padding). According to the observation, we have the following conclusions: 1) Although padding better aligns the vernacular paragraph to the poem, it may not improve the quality of the generated poem. 2) The padding tokens should be placed according to the phrase segmentation schema of the poem as it preserves the semantic within the scope of each phrase.
+
+Addressing Over-Translation To explore the effect of our reinforcement learning policy on alleviating over-translation, we calculate the repetition ratio of vernacular paragraphs generated from classical poems in our validation set. We found naive transformer achieves $40.8\%$ in repetition ratio, while our +Anti OT achieves $34.9\%$. Given the repetition ratio of vernacular paragraphs (written by human beings) in our validation set is $30.1\%$, the experiment results demonstrated our RL loss effectively alleviate over-translation, which in turn leads to better generated poems.
+
+## Conclusion
+
+In this paper, we proposed a novel task of generating classical Chinese poems from vernacular paragraphs. We adapted the unsupervised machine translation model to our task and meanwhile proposed two novel approaches to address the under-translation and over-translation problems. Experiments show that our task can give users more controllability in generating poems. In addition, our approaches are very effective to solve the problems when the UMT model is directly used in this task. In the future, we plan to explore: (1) Applying the UMT model in the tasks where the abstraction levels of source and target languages are different (e.g., unsupervised automatic summarization); (2) Improving the quality of generated poems via better structure organization approaches.

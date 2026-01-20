@@ -1,0 +1,57 @@
+# How do you correct run-on sentences it's not as easy as it seems
+
+**Paper ID:** 1809.08298
+
+## Abstract
+
+Run-on sentences are common grammatical mistakes but little research has tackled this problem to date. This work introduces two machine learning models to correct run-on sentences that outperform leading methods for related tasks, punctuation restoration and whole-sentence grammatical error correction. Due to the limited annotated data for this error, we experiment with artificially generating training data from clean newswire text. Our findings suggest artificial training data is viable for this task. We discuss implications for correcting run-ons and other types of mistakes that have low coverage in error-annotated corpora.
+
+## Introduction
+
+A run-on sentence is defined as having at least two main or independent clauses that lack either a conjunction to connect them or a punctuation mark to separate them. Run-ons are problematic because they not only make the sentence unfriendly to the reader but potentially also to the local discourse. Consider the example in Table TABREF1 .
+
+In the field of grammatical error correction (GEC), most work has typically focused on determiner, preposition, verb and other errors which non-native writers make more frequently. Run-ons have received little to no attention even though they are common errors for both native and non-native speakers. Among college students in the United States, run-on sentences are the 18th most frequent error and the 8th most frequent error made by students who are not native English speakers BIBREF0 .
+
+Correcting run-on sentences is challenging BIBREF1 for several reasons:
+
+In this paper, we analyze the task of automatically correcting run-on sentences. We develop two methods: a conditional random field model (roCRF) and a Seq2Seq attention model (roS2S) and show that they outperform models from the sister tasks of punctuation restoration and whole-sentence grammatical error correction. We also experiment with artificially generating training examples in clean, otherwise grammatical text, and show that models trained on this data do nearly as well predicting artificial and naturally occurring run-on sentences.
+
+## Related Work
+
+Early work in the field of GEC focused on correcting specific error types such as preposition and article errors BIBREF2 , BIBREF3 , BIBREF4 , but did not consider run-on sentences. The closest work to our own is BIBREF5 , who used Conditional Random Fields (CRFs) for correcting comma errors (excluding comma splices, a type of run-on sentence). BIBREF6 used a similar system based on CRFs but focused on comma splice correction. Recently, the field has focused on the task of whole-sentence correction, targeting all errors in a sentence in one pass. Whole-sentence correction methods borrow from advances in statistical machine translation BIBREF7 , BIBREF8 , BIBREF9 and, more recently, neural machine translation BIBREF10 , BIBREF11 , BIBREF12 , BIBREF13 .
+
+To date, GEC systems have been evaluated on corpora of non-native student writing such as NUCLE BIBREF14 and the Cambridge Learner Corpus First Certificate of English BIBREF15 . The 2013 and 2014 CoNLL Shared Tasks in GEC used NUCLE as their train and test sets BIBREF16 , BIBREF17 . There are few instances of run-on sentences annotated in both test sets, making it hard to assess system performance on that error type.
+
+A closely related task to run-on error correction is that of punctuation restoration in the automatic speech recognition (ASR) field. Here, a system takes as input a speech transcription and is tasked with inserting any type of punctuation where appropriate. Most work utilizes textual features with n-gram models BIBREF18 , CRFs BIBREF19 , convolutional neural networks or recurrent neural networks BIBREF20 , BIBREF21 . The Punctuator BIBREF22 is a leading punctuation restoration system based on a sequence-to-sequence model (Seq2Seq) trained on long slices of text which can span multiple sentences.
+
+## Model Descriptions
+
+We treat correcting run-ons as a sequence labeling task: given a sentence, the model reads each token and learns whether there is a SPACE or PERIOD following that token, as shown in Table TABREF5 . We apply two sequence models to this task, conditional random fields (roCRF) and Seq2Seq (roS2S).
+
+## Conditional Random Fields
+
+Our CRF model, roCRF, represents a sentence as a sequence of spaces between tokens, labeled to indicate whether a period should be inserted in that space. Each space is represented by contextual features (sequences of tokens, part-of-speech tags, and capitalization flags around each space), parse features (the highest uncommon ancestor of the word before and after the space, and binary indicators of whether the highest uncommon ancestors are preterminals), and a flag indicating whether the mean per-word perplexity of the text decreases when a period is inserted at the space according to a 5-gram language model.
+
+## Sequence to Sequence Model with Attention Mechanism
+
+Another approach is to treat it as a form of neural sequence generation. In this case, the input sentence is a single run-on sentence. During decoding we pass the binary label which determines if there is terminal punctuation following the token at the current position. We then combine the generated label and the input sequence to get the final output.
+
+Our model, roS2S, is a Seq2Seq attention model based on the neural machine translation model BIBREF23 . The encoder is a bidirectional LSTM, where a recurrent layer processes the input sequence in both forward and backward direction. The decoder is a uni-directional LSTM. An attention mechanism is used to obtain the context vector.
+
+## Results and Analysis
+
+Results are shown in Table TABREF11 . A correct judgment is where a run-on sentence is detected and a PERIOD is inserted in the right place. Across all datasets, roCRF has the highest precision. We speculate that roCRF consistently has the highest precision because it is the only model to use POS and syntactic features, which may restrict the occurrence of false positives by identifying longer distance, structural dependencies. roS2S is able to generalize better than roCRF, resulting in higher recall with only a moderate impact on precision. On all datasets except RealESL, roS2S consistently has the highest overall INLINEFORM0 score. In general, Punctuator has the highest recall, probably because it is trained for a more general purpose task and tries to predict punctuation at each possible position, resulting in lower precision than the other models.
+
+NUS18 predicts only a few false positives and no true positives, so INLINEFORM0 and we exclude it from the results table. Even though NUS18 is trained on NUCLE, which RealESL encompasses, its very poor performance is not too surprising given the infrequency of run-ons in NUCLE.
+
+## Conclusions
+
+Correcting run-on sentences is a challenging task that has not been individually targeted in earlier GEC models. We have developed two new models for run-on sentence correction: a syntax-aware CRF model, roCRF, and a Seq2Seq model, roS2S. Both of these outperform leading models for punctuation restoration and grammatical error correction on this task. In particular, roS2S has very strong performance, with INLINEFORM0 and INLINEFORM1 on run-ons generated from clean and noisy data, respectively. roCRF has very high precision ( INLINEFORM2 ) but low recall, meaning that it does not generalize as well as the leading system, roS2S.
+
+Run-on sentences have low frequency in annotated GEC data, so we experimented with artificially generated training data. We chose clean newswire text as the source for training data to ensure there were no unlabeled naturally occurring run-ons in the training data. Using ungrammatical text as a source of artificial data is an area of future work. The results of this study are inconclusive in terms of how much harder the task is on clean versus noisy text. However, our findings suggest that artificial run-ons are similar to naturally occurring run-ons in ungrammatical text because models trained on artificial data do just as well predicting real run-ons as artificial ones.
+
+In this work, we found that a leading GEC model BIBREF11 does not correct any run-on sentences, even though there was an overlap between the test and training data for that model. This supports the recent work of BIBREF29 , who found that GEC systems tend to ignore less frequent errors due to reference bias. Based on our work with run-on sentences, a common error type that is infrequent in annotated data, we strongly encourage future GEC work to address low-coverage errors.
+
+## Acknowledgments
+
+We thank the three anonymous reviewers for their helpful feedback.

@@ -1,0 +1,161 @@
+# Achieving Verified Robustness to Symbol Substitutions via Interval Bound Propagation
+
+**Paper ID:** 1909.01492
+
+## Abstract
+
+Neural networks are part of many contemporary NLP systems, yet their empirical successes come at the price of vulnerability to adversarial attacks. Previous work has used adversarial training and data augmentation to partially mitigate such brittleness, but these are unlikely to find worst-case adversaries due to the complexity of the search space arising from discrete text perturbations. In this work, we approach the problem from the opposite direction: to formally verify a system's robustness against a predefined class of adversarial attacks. We study text classification under synonym replacements or character flip perturbations. We propose modeling these input perturbations as a simplex and then using Interval Bound Propagation -- a formal model verification method. We modify the conventional log-likelihood training objective to train models that can be efficiently verified, which would otherwise come with exponential search complexity. The resulting models show only little difference in terms of nominal accuracy, but have much improved verified accuracy under perturbations and come with an efficiently computable formal guarantee on worst case adversaries.
+
+## Introduction
+
+Deep models have been shown to be vulnerable against adversarial input perturbations BIBREF0, BIBREF1. Small, semantically invariant input alterations can lead to drastic changes in predictions, leading to poor performance on adversarially chosen samples. Recent work BIBREF2, BIBREF3, BIBREF4 also exposed the vulnerabilities of neural NLP models, e.g. with small character perturbations BIBREF5 or paraphrases BIBREF6, BIBREF7. These adversarial attacks highlight often unintuitive model failure modes and present a challenge to deploying NLP models.
+
+Common attempts to mitigate the issue are adversarial training BIBREF5 and data augmentation BIBREF3, BIBREF8, which lead to improved accuracy on adversarial examples. However, this might cause a false sense of security, as there is generally no guarantee that stronger adversaries could not circumvent defenses to find other successful attacks BIBREF9, BIBREF10, BIBREF11. Rather than continuing the race with adversaries, formal verification BIBREF12, BIBREF13, BIBREF14 offers a different approach: it aims at providing provable guarantees to a given model specification. In the case of adversarial robustness, such a specification can be formulated as prediction consistency under any altered – but semantically invariant – input change.
+
+In this paper, we study verifiable robustness, i.e., providing a certificate that for a given network and test input, no attack or perturbation under the specification can change predictions, using the example of text classification tasks, Stanford Sentiment Treebank (SST) BIBREF15 and AG News BIBREF16. The specification against which we verify is that a text classification model should preserve its prediction under character (or synonym) substitutions in a character (or word) based model. We propose modeling these input perturbations as a simplex and then using Interval Bound Propagation (IBP) BIBREF17, BIBREF18, BIBREF19 to compute worst case bounds on specification satisfaction, as illustrated in Figure FIGREF1. Since these bounds can be computed efficiently, we can furthermore derive an auxiliary objective for models to become verifiable. The resulting classifiers are efficiently verifiable and improve robustness on adversarial examples, while maintaining comparable performance in terms of nominal test accuracy.
+
+The contributions of this paper are twofold:
+
+To the best of our knowledge, this paper is the first to introduce verification and verifiable training for neural networks in natural language processing (§SECREF3).
+
+Through a series of experiments (§SECREF4), we demonstrate (a) the effectiveness of modeling input perturbations as a simplex and using simplex bounds with IBP for training and testing, (b) the weakness of adversarial training under exhaustive verification, (c) the effects of perturbation space on the performance of different methods, and (d) the impact of using GloVe and counter-fitted embeddings on the IBP verification bounds.
+
+## Related Work ::: Adversarial Examples in NLP.
+
+Creating adversarial examples for NLP systems requires identifying semantically invariant text transformations to define an input perturbation space. In this paper, given our specification, we study word- and character-level HotFlip attacks BIBREF5 – which consist of character and synonym replacements – on text classification tasks. We compare our verifiable approach to other defenses including adversarial training BIBREF20 and data augmentation BIBREF8, BIBREF3. Note that some existing adversarial perturbations such as syntactically controlled paraphrasing BIBREF7, exploiting backtranslation systems BIBREF6, or using targeted keyword attack BIBREF21 are beyond the specification in this paper.
+
+## Related Work ::: Formal Verification of Neural Networks.
+
+Formal verification provides a provable guarantee that models are consistent with a specification for all possible model inputs. Previous work can be categorised into complete methods that use Mixed-Integer Programming (MIP) BIBREF22, BIBREF23 or Satisfiability Modulo Theory (SMT) BIBREF14, BIBREF24, and incomplete methods that solve a convex relaxation of the verification problem BIBREF25, BIBREF26, BIBREF27. Complete methods perform exhaustive enumeration to find the worst case. Hence, complete methods are expensive and difficult to scale, though they provide exact robustness bounds. Incomplete methods provide loose robustness bounds, but can be more scalable and used inside the training loop for training models to be robust and verifiable BIBREF28, BIBREF26, BIBREF19, BIBREF17. Our work is the first to extend incomplete verification to text classification, considering input perturbations on a simplex and minimising worst case bounds to adversarial attacks in text classification. We highlight that the verification of neural networks is an extremely challenging task, and that scaling complete and incomplete methods to large models remains an open challenge.
+
+## Related Work ::: Representations of Combinatorial Spaces.
+
+Word lattices and hypergraphs are data structures that have often been used to efficiently represent and process exponentially large numbers of sentences without exhaustively enumerating them. Applications include automatic speech recognition (ASR) output rescoring BIBREF29, machine translation of ASR outputs BIBREF30, paraphrase variants BIBREF31, and word segmentation alternatives BIBREF32. The specifications used to characterise the space of adversarial attacks are likewise a compact representation, and the algorithms discussed below operate on them without exhaustive enumeration.
+
+## Methodology
+
+We assume a fixed initial vector representation $\mathbf {z} _0$ of a given input sentence $z$ (e.g. the concatenation of pretrained word embeddings) and use a neural network model, i.e. a series of differentiable transformations $h_k$:
+
+where $\mathbf {z} _k$ is the vector of activations in the $k$-th layer and the final output $\mathbf {z} _K$ consists of the logits for each class. Typically each $h_k$ will be an affine transformation followed by an activation function (e.g. ReLU or sigmoid). The affine transformation can be a convolution (with the inputs and outputs having an implied 2D structure) of a vector of activations at each point in a sequence; in what follows these activations will be concatenated along the sequence to form a vector $\mathbf {z} _k$.
+
+## Methodology ::: Verification
+
+Verification is the process of examining whether the output of a model satisfies a given specification. Formally, this means establishing whether the following holds true for a given normal model input $\mathbf {x} _0$: $\forall \mathbf {z} _0 \in \mathcal {X}_\mathrm {in}(\mathbf {x} _0):~ \mathbf {z} _K \in \mathcal {X}_\mathrm {out}$, where $\mathcal {X}_\mathrm {out}$ characterizes a constraint on the outputs, and $\mathcal {X}_\mathrm {in}(\mathbf {x} _0)$ defines a neighbourhood of $\mathbf {x} _0$ throughout which the constraint should be satisfied.
+
+In our concrete use case, we consider a specification of robustness against adversarial attacks which are defined by bounded input perturbations (synonym flips up to $\delta $ words, or character flips up to $\delta $ characters) of the original sentence $x$. The attack space $\mathcal {X}_\mathrm {in} (\mathbf {x} _0)$ is the set of vector representations (embeddings) of all such perturbed sentences. Denoting by $z_{K,y}$ the logit of label $y$, we formulate the output constraint that for all classes $y: z_{K,y_\textrm {true}} \ge z_{K,y}$. This specification establishes that the prediction of all perturbed sentences $\mathbf {z} _0 \in \mathcal {X}_\mathrm {in}(\mathbf {x} _0)$ should correspond to the correct label $y_\textrm {true}$. This specification may equivalently be formulated as a set of half-space constraints on the logits: for each class $y$
+
+where $\mathbf {e}_{i}$ is a one-hot vector with 1 in the $i$-th position. In other words, the true class logit should be greater or equal than those for all other classes $y$, which means the prediction remains constant.
+
+## Methodology ::: Verification as Optimisation
+
+Verifying the specification in Eq. (DISPLAY_FORM10) can be done by solving the following constrained optimisation problem to find the input that would most strongly violate it:
+
+where $\mathbf {c} $ is a vector with entries $c_y = 1$, $c_{y_\textrm {true}} = -1$ and 0 everywhere else. If the optimal value of the above optimisation problem is smaller than 0, then the specification in Eq. (DISPLAY_FORM10) is satisfied, otherwise a counter-example has been found. In our case, this corresponds to a successful adversarial attack.
+
+## Methodology ::: Modeling Input Perturbations using Simplices
+
+In the interests of computational feasibility, we will actually attempt to verify the specification on a larger, but more tractable input perturbation space $\bar{\mathcal {X}}_\mathrm {in} \supseteq \mathcal {X}_\mathrm {in}$. Any data point that is verifiable on this larger input perturbation space is necessarily verifiable with respect to the original specification.
+
+In the domain of image classification, $\mathcal {X}_\mathrm {in}$ is often modeled as an $L_\infty $-ball, corresponding to input perturbations in which each pixel may be independently varied within a small interval. However, using such interval bounds is unsuitable for our situation of perturbations consisting of a small number $\delta $ of symbol substitutions. Although we could construct an axis-aligned bounding box $\bar{\mathcal {X}}_\mathrm {in}$ in embedding space that encompasses all of $\mathcal {X}_\mathrm {in}$, it would over-approximate the perturbation space to such an extent that it would contain perturbations where all symbols in the sentence have been substituted simultaneously. To remedy this, we propose a tighter over-approximation in the form of a `simplex' in embedding space. We first define this for the special case $\delta =1$, in which $\mathcal {X}_\mathrm {in} = \lbrace \mathbf {x} _0\rbrace \cup \lbrace \mathbf {p} ^{(m)}_0 : 1\le m\le M\rbrace $ consists of the representations of all $M$ sentences $p^{(m)}$ derived from $x$ by performing a single synonym (or character) substitution, together with the unperturbed sentence $x$ itself. In this case we define $\bar{\mathcal {X}}_\mathrm {in}$ to be the convex hull $\mathcal {S}_1$ of $\mathcal {X}_\mathrm {in}$. Note we are not considering contextual embeddings BIBREF33 here. Each `vertex' $\mathbf {p} ^{(m)}_0$ is a sequence of embedding vectors that differs from $\mathbf {x} _0$ at only one word (or character) position.
+
+For a larger perturbation radius $\delta >1$, the cardinality of $\mathcal {X}_\mathrm {in}$ grows exponentially, so manipulating its convex hull becomes infeasible. However, dilating $\mathcal {S}_1$ centered at $\mathbf {x} _0$, scaling it up by a factor of $\delta $, yields a simplex $\mathcal {S}_\delta $ with $M+1$ vertices that contains $\mathcal {X}_\mathrm {in}$.
+
+More formally, we define a region in the input embedding space based on the $M$ `elementary' perturbations $\lbrace \mathbf {p} ^{(m)}_0: m = 1 \ldots M\rbrace $ of $\mathbf {x} _0$ defined earlier for the $\delta =1$ case. For perturbations of up to $\delta $ substitutions, we define $\bar{\mathcal {X}}_\mathrm {in}(\mathbf {x} _0)$ as the convex hull of $\lbrace \mathbf {z} ^{(m)}_0: m = 0 \ldots M\rbrace $, where $\mathbf {z} ^{(0)}_0=\mathbf {x} _0$ denotes the original (unperturbed) sentence representation and, for $m\ge 1$, $\mathbf {z} ^{(m)}_0 = \mathbf {x} _0+\delta \cdot (\mathbf {p} ^{(m)}_0-\mathbf {x} _0)$. The convex hull is an over-approximation of $\mathcal {X}_\mathrm {in}(\mathbf {x} _0)$: it contains the representations of all sentences derived from $x$ by performing up to $\delta $ substitutions at distinct word (or character) positions.
+
+## Methodology ::: Interval Bound Propagation
+
+To estimate the optimal value of the problem (DISPLAY_FORM12), given an input $\mathbf {z} _0$, we can propagate the upper/lower bounds on the activations $\mathbf {z} _k$ of each layer using interval arithmetic BIBREF17.
+
+We begin by computing interval bounds on the first layer's activations. Recall that any input $\mathbf {z} _0 \in \mathcal {X}_\mathrm {in}$ will lie within the convex hull of certain vertices $\lbrace \mathbf {z} ^{(m)}_0: m = 0 \ldots M\rbrace $. Then, assuming that the first layer $h_1$ is an affine transformation (e.g. linear or convolutional) followed by a monotonic activation function, the lower and upper bounds on the components $z_{1,i}$ of the first layer's activations $\mathbf {z} _1$ are as follows:
+
+Note that these bounds are efficient to compute (by passing each perturbation $\mathbf {z} ^{(m)}_0$ through the first layer); in particular there is no need to compute the convex hull polytope.
+
+For subsequent layers $k>1$, the bounds on the components $z_{k,i}$ of $\mathbf {z} _k$ are:
+
+The above optimisation problems can be solved in closed form quickly for affine layers and monotonic activation functions, as illustrated in IBP. Finally, the lower and upper bounds of the output logits $\mathbf {z} _K$ can be used to construct an upper bound on the solution of (DISPLAY_FORM12):
+
+## Methodology ::: Interval Bound Propagation ::: Verifiable Training.
+
+The upper bound in (DISPLAY_FORM17) is fast to compute (only requires two forward passes for upper and lower bounds through the network). Hence, we can define a loss to optimise models such that the models are trained to be verifiable. Solving (DISPLAY_FORM17) is equivalent to finding the worst-case logit difference, and this is achieved when the logit of the true class is equal to its lower bound, and all other logits equal to their upper bounds. Concretely, for each class $y \ne y_\textrm {true} $: $\hat{\mathbf {z}}_{K,y}(\delta ) = \overline{\mathbf {z}}_{K,y} (\delta ) $, and $\hat{\mathbf {z}}_{K,y_\textrm {true}}(\delta ) = \underline{\mathbf {z}}_{K,y_\textrm {true}} (\delta ) $. The training loss can then be formulated as
+
+where $\ell $ is the cross-entropy loss, $\kappa $ a hyperparameter that controls the relative weights between the classification loss $L_\textrm {normal}$ and specification loss $L_\textrm {spec}$. If $\delta = 0$ then $\mathbf {z} _K = \hat{\mathbf {z}}_K(\delta )$, and thus $L$ reduces to a standard classification loss. Empirically, we found that a curriculum-based training, starting with $\kappa $=1 and linearly decreasing to 0.25, is effective for verifiable training.
+
+## Experiments
+
+We conduct verification experiments on two text classification datasets, Stanford Sentiment Treebank (SST) BIBREF15 and AG News corpus, processed in BIBREF16. We focus on word-level and character-level experiments on SST and character-level experiments on AG News. Our specification is that models should preserve their prediction against up to $\delta $ synonym substitutions or character typos, respectively.
+
+## Experiments ::: A Motivating Example
+
+We provide an example from Table TABREF29 to highlight different evaluation metrics and training methods. Given a sentence, “you ' ve seen them a million times .”, that is predicted correctly (called Nominal Accuracy) by a classification model, we want to further examine whether the model is robust against character typos (e.g., up to $\delta =3$ typos) to this example. One way is to use some heuristic to search for a valid example with up to 3 typos that can change the prediction the most (called adversarial example). We evaluate the model using this adversarial example and report the performance (called Adversarial Accuracy). However, even if the adversarial example is predicted correctly, one can still ask: is the model truly robust against any typos (up to 3) to this example? In order to have a certificate that the prediction will not change under any $\delta =3$ character typos (called verifiably robust), we could in theory exhaustively search over all possible cases and check whether any of the predictions is changed (called Oracle Accuracy). If we only allow a character to be replaced by another character nearby on the keyboard, already for this short sentence we need to exhaustively search over 2,951 possible perturbations. To avoid this combinatorial growth, we can instead model all possible perturbations using the proposed simplex bounds and propagate the bounds through IBP at the cost of two forward passes. Following Eq. (DISPLAY_FORM12), we can check whether this example can be verified to be robust against all perturbations (called IBP-Verified Accuracy).
+
+There are also a number of ways in which the training procedure can be enhanced to improve the verifiable robustness of a model against typos to the sentence. The baseline is to train the model with the original/normal sentence directly (called Normal Training). Another way is to randomly sample typo sentences among the 2,951 possible perturbations and add these sentences to the training data (called Data Augmentation Training). Yet another way is to find, at each training iteration, the adversarial example among the (subset of) 2,951 possible perturbations that can change the prediction the most; we then use the adversarial example alongside the training example (called Adversarial Training). Finally, as simplex bounds with IBP is efficient to run, we can train a model to be verifiable by minimising Eq. (DISPLAY_FORM19) (called Verifiable Training).
+
+## Experiments ::: Baselines
+
+In this section we detail our baseline models.
+
+## Experiments ::: Baselines ::: Adversarial Training.
+
+In adversarial training BIBREF34, BIBREF20, the goal is to optimise the following saddle point problem:
+
+where the inner maximisation problem is to find an adversarial perturbation $\mathbf {z} _0\in \mathcal {X}_\mathrm {in}(\mathbf {x} _0)$ that can maximise the loss. In the inner maximisation problem, we use HotFlip BIBREF5 with perturbation budget $\delta $ to find the adversarial example. The outer minimisation problem aims to update model parameters such that the adversarial risk of (DISPLAY_FORM24) is minimised. To balance between the adversarial robustness and nominal accuracy, we use an interpolation weight of 0.5 between the original cross-entropy loss and the adversarial risk.
+
+## Experiments ::: Baselines ::: Data Augmentation Training.
+
+In the data augmentation setup, we randomly sample a valid perturbation $z$ with perturbation budget $\delta $ from a normal input $x$, and minimise the cross-entropy loss given the perturbed sample $z$ (denoted as data augmentation loss). We also set the interpolation weight between the data augmentation loss and the original normal cross-entropy loss to 0.5.
+
+## Experiments ::: Baselines ::: Normal Training.
+
+In normal training, we use the likelihood-based training using the normal training input $x$.
+
+## Experiments ::: Setup
+
+We use a shallow convolutional network with a small number of fully-connected layers for SST and AG News experiments. The detailed model architectures and hyperparameter details are introduced in the supplementary material. Although we use shallow models for ease of verifiable training, our nominal accuracy is on par with previous work such as BIBREF15 (85.4%) and BIBREF35 (84.3%) in SST and BIBREF16 (87.18%) in AG News. During training, we set the maximum number of perturbations to $\delta =3$, and evaluate performance with the maximum number of perturbations from $\delta =1$ to 6 at test time.
+
+For word-level experiments, we construct the synonym pairs using the PPDB database BIBREF36 and filter the synonyms with fine-grained part-of-speech tags using Spacy BIBREF37. For character-level experiments, we use synthetic keyboard typos from BIBREF3, and allow one possible alteration per character that is adjacent to it on an American keyboard. The allowable input perturbation space is much larger than for word-level synonym substitutions, as shown in Table TABREF48.
+
+## Experiments ::: Evaluation Metrics
+
+We use the following four metrics to evaluate our models: i) test set accuracy (called Acc.), ii) adversarial test accuracy (called Adv. Acc.), which uses samples generated by HotFlip attacks on the original test examples, iii) verifiable accuracy under IBP verification (called IBP-verified), that is, the ratio of test samples for which IBP can verify that the specification is not violated, and iv) exhaustively verified accuracy (called Oracle), computed by enumerating all possible perturbations given the perturbation budget $\delta $, where a sample is verifiably robust if the prediction is unchanged under all valid perturbations.
+
+## Experiments ::: Results
+
+Table TABREF28 shows the results of IBP training and baseline models under $\delta =3$ and $\delta =2$ perturbations on SST and AG News, respectively. Figures FIGREF31 and FIGREF36 show the character- and word-level results with $\delta $ between 1 and 6 under four metrics on the SST test set; similar figures for SST word-level (adversarial training, data augmentation) models and AG News dataset can be found in the supplementary material.
+
+## Experiments ::: Results ::: Oracle Accuracy and Adversarial Accuracy.
+
+In Table TABREF28, comparing adversarial accuracy with exhaustive verification accuracy (oracle), we observe that although adversarial training is effective at defending against HotFlip attacks (74.9 / 76.8 / 85.5%), the oracle adversarial accuracy under exhaustive testing (25.8 / 74.6 / 81.6%) is much lower in SST-character / SST-word / AG-character level, respectively. For illustration, we show some concrete adversarial examples from the HotFlip attack in Table TABREF29. For some samples, even though the model is robust with respect to HotFlip attacks, its predictions are incorrect for stronger adversarial examples obtained using the exhaustive verification oracle. This underscores the need for verification, as robustness with respect to suboptimal adversarial attacks alone might give a false sense of security.
+
+## Experiments ::: Results ::: Effectiveness of Simplex Bounds with IBP.
+
+Rather than sampling individual points from the perturbation space, IBP training covers the full space at once. The resulting models achieve the highest exhaustively verified accuracy at the cost of only moderate deterioration in nominal accuracy (Table TABREF28). At test time, IBP allows for constant-time verification with arbitrary $\delta $, whereas exhaustive verification requires evaluation over an exponentially growing search space.
+
+## Experiments ::: Results ::: Perturbation Space Size.
+
+In Table TABREF28, when the perturbation space is larger (SST character-level vs. SST word-level), (a) across models, there is a larger gap in adversarial accuracy and true robustness (oracle); (b) the difference in oracle robustness between IBP and adversarial training is even larger (73.1% vs. 25.8% and 76.5% vs. 74.6%).
+
+## Experiments ::: Results ::: Perturbation Budget.
+
+In Figures FIGREF31 and FIGREF36, we compare normal training, adversarial training, data augmentation, and verifiable training models with four metrics under various perturbation budgets on the SST dataset. Overall, as the perturbation budget increases, the adversarial accuracy, oracle accuracy, and IBP-verified accuracy decrease. We can observe that even for large perturbation budgets, verifiably trained models are still able to verify a sizable number of samples. Again, although adversarial accuracy flattens for larger perturbation budgets in the word level experiments, oracle verification can further find counterexamples to change the prediction. Note that exhaustive verification becomes intractable with large perturbation sizes.
+
+## Experiments ::: Results ::: Computational Cost of Exhaustive Verification.
+
+The perturbation space in NLP problems is discrete and finite, and a valid option to verify the specification is to exhaustively generate predictions for all $\mathbf {z} _0 \in \mathcal {X}_\mathrm {in} (\mathbf {x} _0)$, and then check if at least one does not match the correct label. Conversely, such an exhaustive (oracle) approach can also identify the strongest possible attack. But the size of $\mathcal {X}_\mathrm {in}$ grows exponentially with $\delta $, and exhaustive verification quickly becomes prohibitively expensive.
+
+In Table TABREF48, we show the maximum perturbation space size in the SST and AG News test set for different perturbation radii $\delta $. This number grows exponentially as $\delta $ increases. To further illustrate this, Figure FIGREF49 shows the number of forward passes required to verify a given proportion of the SST test set for an IBP-trained model using exhaustive verification and IBP verification. IBP reaches verification levels comparable to an exhaustive verification oracle, but requires only two forward passes to verify any sample – one pass for computing the upper, and one for the lower bounds. Exhaustive verification, on the other hand, requires several orders of magnitude more forward passes, and there is a tail of samples with extremely large attack spaces.
+
+## Experiments ::: Counter-Fitted Embeddings
+
+As shown in Figures FIGREF31 and FIGREF36, although IBP can verify arbitrary networks in theory, the verification bound is very loose except for models trained to be IBP-verifiable. One possible reason is the potentially large volume of the perturbation simplex. Since representations of substitution words/characters are not necessarily close to those of synonyms/typos in embedding space, the vertices of the simplex could be far apart, and thus cover a large area in representation space. Therefore, when propagating the interval bounds through the network, the interval bounds become too loose and fail to verify most of the examples if the models are not specifically trained. To test this hypothesis, we follow BIBREF38 and use fine-tuned GloVe embeddings trained to respect linguistic constraints; these representations (called counter-fitted embeddings) force synonyms to be closer and antonyms to be farther apart using word pairs from the PPDB database BIBREF36 and WordNet BIBREF39. We repeat the word level experiments with these counter-fitted embeddings, Figures FIGREF36 and FIGREF36 show the experimental results. We observe that IBP verified accuracy is now substantially higher across models, especially for $\delta =1, 2, 3$. The examples which IBP can verify increase by up to 33.2% when using the counter-fitted embeddings (normal training, $\delta =1$). Moreover, adversarial and exhaustively verified accuracy are also improved, at the cost of a mild deterioration in nominal test accuracy. The IBP-trained model also further improves both its oracle accuracy and IBP verified accuracy. These results validate our hypothesis that reducing the simplex volume via soft linguistic constraints can provide even tighter bounds for IBP, resulting in larger proportions of verifiable samples.
+
+## Discussion
+
+Our experiments indicate that adversarial attacks are not always the worst adversarial inputs, which can only be revealed via verification. On the other hand, exhaustive verification is computationally very expensive. Our results show that using the proposed simplex bounds with IBP can verify a sizable amount of test samples, and can be considered a potent verification method in an NLP context. We note however two limitations within the scope of this work: i) limited model depth: we only investigated models with few layers. IBP bounds are likely to become looser as the number of layers increases. ii) limited model types: we only studied models with CNN and fully connected layers.
+
+We focused on the HotFlip attack to showcase specification verification in the NLP context, with the goal of understanding factors that impact its effectiveness (e.g. the perturbation space volume, see Section SECREF50). It is worth noting that symbol substitution is general enough to encompass other threat models such as lexical entailment perturbations BIBREF40, and could potentially be extended to the addition of pre/postfixes BIBREF2, BIBREF41.
+
+Interesting directions of future work include: tightening IBP bounds to allow applicability to deeper models, investigating bound propagation in other types of neural architectures (e.g. those based on recurrent networks or self-attention), and exploring other forms of specifications in NLP.
+
+## Conclusion
+
+We introduced formal verification of text classification models against synonym and character flip perturbations. Through experiments, we demonstrated the effectiveness of the proposed simplex bounds with IBP both during training and testing, and found weaknesses of adversarial training compared with exhaustive verification. Verifiably trained models achieve the highest exhaustive verification accuracy on SST and AG News. IBP verifies models in constant time, which is exponentially more efficient than naive verification via exhaustive search.

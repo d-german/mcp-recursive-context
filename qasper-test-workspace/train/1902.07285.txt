@@ -1,0 +1,299 @@
+# Towards a Robust Deep Neural Network in Text Domain A Survey
+
+**Paper ID:** 1902.07285
+
+## Abstract
+
+Deep neural networks (DNNs) have shown an inherent vulnerability to adversarial examples which are maliciously crafted on real examples by attackers, aiming at making target DNNs misbehave. The threats of adversarial examples are widely existed in image, voice, speech, and text recognition and classification. Inspired by the previous work, researches on adversarial attacks and defenses in text domain develop rapidly. In order to make people have a general understanding about the field, this article presents a comprehensive review on adversarial examples in text. We analyze the advantages and shortcomings of recent adversarial examples generation methods and elaborate the efficiency and limitations on countermeasures. Finally, we discuss the challenges in adversarial texts and provide a research direction of this aspect.
+
+## Introduction
+
+Nowadays, DNNs have solved masses of significant practical problems in various areas like computer vision BIBREF0 , BIBREF1 , audio BIBREF2 , BIBREF3 , natural language processing (NLP) BIBREF4 , BIBREF5 etc. Due to the great success, systems based on DNN are widely deployed in physical world, including some sensitive security tasks. However, Szegedy et al. BIBREF6 found an interesting fact that a crafted input with small perturbations could easily fool DNN models. This kind of inputs is called adversarial examples. Certainly, with the development of theory and practice, the definitions of adversarial examples BIBREF6 , BIBREF7 , BIBREF8 , BIBREF9 are varied. But these definitions have two cores in common. One is that the perturbations are small and the ability of fooling DNN models is the other. It naturally raises a question why adversarial examples exist in DNNs. The reason why they are vulnerable to adversarial examples is probably because of DNNs’ linear nature. Goodfellow et al. BIBREF7 then gave this explanation after adversarial examples arose. Researchers therefore treat adversarial examples as a security problem and pay much attention to works of adversarial attacks and defenses BIBREF10 , BIBREF11 .
+
+In recent years, category of adversarial examples becomes diverse, varying from image to audio and others. That means almost all deployed systems based on DNN are under the potential threat of adversarial attacks. For example, sign recognition system BIBREF12 , object recognition system BIBREF13 , audio recognition or control system BIBREF14 , BIBREF15 , BIBREF16 and malware detection system BIBREF17 , BIBREF18 are all hard to defend against this kind of attack. Of course, systems for NLP tasks are also under the threat of adversarial examples, like text classification, sentiment analysis, question answering system, recommendation system and so on.
+
+In real life, people are increasingly inclined to search for related comments before shopping, eating or watching film and the corresponding items with recommendation score will be given at the same time. The higher the score is, the more likely it is to be accepted by humans. These recommendation apps mainly take advantage of sentiment analysis with others’ previous comments BIBREF19 . Thus attackers could generate adversarial examples based on natural comments to smear competitors (see Fig.1 for instance) or do malicious recommendations for shoddy goods with the purpose of profit or other malicious intents. Apart from mentioned above, adversarial examples can also poison network environment and hinder detection of malicious information BIBREF20 , BIBREF21 , BIBREF22 . Hence, it is significant to know how adversarial attacks conduct and what measures can defend against them to make DNNs more robust.
+
+This paper presents a comprehensive survey on adversarial attacks and defenses in text domain to make interested readers have a better understanding of this concept. It presents the following contributions:
+
+The remainder of this paper is organized as follows: we first give some background about adversarial examples in section "Background" . In section "Adversarial Attacks in Text" , we review the adversarial attacks for text classification and other real-world NLP tasks. The researches with the central topic of defense are introduced in section "Defenses against Adversarial Attacks in text" and "Testing and verification as the important defenses against adversarial attacks" . One of them is on existing defense methods in text and the other is about how to improve the robustness of DNNs from another point of view. The discussion and conclusion of the article is in section "Discussion of Challenges and Future Direction" and "Conclusion" .
+
+## Background
+
+In this section, we describe some research background on the textual adversarial examples, including representation of symbol and attack types and scenarios.
+
+## Adversarial Example Formulation
+
+The function of a pre-trained text classification model $\textbf {\emph {F}}$ is mapping from input set to the label set. For a clean text example $\emph {x}$ , it is correctly classified by $\textbf {\emph {F}}$ to ground truth label $\emph {y} \in \textbf {\emph {Y}}$ , where $\textbf {\emph {Y}}$ including $\lbrace 1, 2, \ldots , k\rbrace $ is a label set of k classes. An attacker aims at adding small perturbations in $\emph {x}$ to generate adversarial example $\emph {x}^{^{\prime }}$ , so that $\textbf {\emph {F}}(\emph {x}^{’}) = \emph {y}^{’}(\emph {y} \ne  \emph {y}^{’})$ . Generally speaking, a good $\emph {x}^{^{\prime }}$ should not only be misclassified by $\emph {x}$0 , but also imperceptible to humans, robust to transformations as well as resilient to existing defenses depending on the adversarial goals BIBREF24 . Hence, constraint conditions (e.g. semantic similarity, distance metric, etc.) are appended to make $\emph {x}$1 be indistinguishable from $\emph {x}$2 in some works and exploit it to cause classification errors like Fig. 1 .
+
+## Types of Adversarial Attack
+
+Why adversarial examples pose greater concern may be due to the fact that adversarial attacks can be easily conducted on DNNs, even though attackers have no knowledge of target model. Accordingly, attacks can be categorized by the level of authorization about the model.
+
+Black-box. A more detailed division can be done in black-box attack, resulting in black-box attack with or without probing. In the former scenario, adversaries can probe target model by observing outputs, even if they do not know much about the model. This case can also be called a gray-box attack. In the latter scenario, adversaries have little or no knowledge on target model and they can not probe it. Under this condition, adversaries generally train their own models and utilize the transferability BIBREF7 , BIBREF25 of adversarial examples to carry out an attack.
+
+White-box. In white-box attack, adversaries have full access to target model and they can know all about architectures, parameters and weights of the model. Certainly, both white-box and black-box attacks can not change the model and training data.
+
+According to the purpose of the adversary, adversarial attacks can be categorized as targeted attack and non-targeted attack.
+
+Targeted attack. In this case, the generated adversarial example $\emph {x}^{^{\prime }}$ is purposeful classified as class t which is the target of an adversary.
+
+Non-targeted attack. In this case, the adversary only wants to fool the model and the result $\emph {y}^{^{\prime }}$ can be any class except for ground truth $\emph {y}$ .
+
+## Metric
+
+There exists an important issue that the generated adversarial texts should not only be able to fool target models, but also need to keep the perturbations imperceptible. In other words, good adversarial examples should convey the same semantic meaning with the original ones so that metric measures are required to ensure this case. We describe different kinds of measures to evaluate the utility of adversarial examples in image and text. Then we analyze the reasons why metric measures in image are not suitable in text.
+
+In image, almost all recent studies on adversarial attacks adopt $L_{p}$ distance as a distance metric to quantify the imperceptibility and similarity of adversarial examples. The generalized term for $L_{p}$ distance is as follows: 
+
+$$\Vert \triangle x \Vert _{p}=\@root p \of {\sum _{i=1}^{n} |x^{^{\prime }}-x|^{p}}$$   (Eq. 9) 
+
+where $\triangle x$ represents the perturbations. This equation is a definition of a set of distances where p could be 0, 1, $\infty $ and so on. Specially, $L_{0}$ BIBREF26 , BIBREF27 , BIBREF28 , $L_{2}$ BIBREF29 , BIBREF28 , BIBREF30 , BIBREF31 and $L_{\infty }$ BIBREF6 , BIBREF7 , BIBREF31 , BIBREF32 , BIBREF33 , BIBREF34 are the three most frequently used norms in adversarial images.
+
+ $L_{0}$ distance evaluates the number of changed pixels before and after modifications. It seems like edit distance, but it may not directly work in text. Because results of altered words in text are varied. Some of them are similar to original words and the others may be contrary, even though the $L_{0}$ distance of them is same.
+
+ $L_{2}$ distance is the Euclidean distance. The original Euclidean distance is the beeline from one point to another in Euclidean space. As the mapping of image, text or others to it, Euclidean space becomes a metric space to calculate the similarity between two objects represented as the vector.
+
+ $L_{\infty }$ distance measures the maximum change as follows: 
+
+$$\Vert \triangle x \Vert _{\infty }=\max (|x_{1}^{^{\prime }}-x_{1}|,\ldots ,|x_{n}^{^{\prime }}-x_{n}|)$$   (Eq. 13) 
+
+Although $L_{\infty }$ distance is thought to be the optimal distance metric to use in some work, but it may fail in text. The altered words may not exist in pre-trained dictionary so that they are considered to be unknown words and their word vectors are also unknown. As a result, $L_{\infty }$ distance is hard to calculate.
+
+There are also other metric measures(e.g. structural similarity BIBREF35 , perturbation sensitivity BIBREF36 ) which are typical methods for image. Some of them are considered to be more effective than $L_{p}$ distance, but they con not directly used too.
+
+In order to overcome the metric problem in adversarial texts, some measures are presented and we describe five of them which have been demonstrated in the pertinent literature.
+
+Euclidean Distance. In text, for two given word vectors $\vec{m}=(m_1, m_2, \ldots , m_k)$ and $\vec{n}=(n_1, n_2, \ldots , n_k)$ , the Euclidean distance is: 
+
+$$D\left(\vec{m},\vec{n}\right)\!=\!\sqrt{(m_1\!-\!n_1)^2\!+\!\ldots \!+\!(m_k\!-\!n_k)^2}$$   (Eq. 15) 
+
+Euclidean distance is more used for the metric of adversarial images BIBREF29 , BIBREF28 , BIBREF30 , BIBREF31 than texts with a generalized term called $L_{2}$ norm or $L_{2}$ distance.
+
+Cosine Similarity. Cosine similarity is also a computational method for semantic similarity based on word vector by the cosine value of the angle between two vectors. Compared with Euclidean distance, the cosine distance pays more attention to the difference in direction between two vectors. The more consistent the directions of two vectors are, the greater the similarity is. For two given word vectors $\vec{m}$ and $\vec{n}$ , the cosine similarity is: 
+
+$$D\left(\vec{m}, \vec{n}\right) = \frac{\vec{m} \cdot \vec{n}}{\Vert m \Vert \cdot \Vert n \Vert } = \frac{\sum \limits _{i=1}^k m_i \times n_i}{\sqrt{\sum \limits _{i=1}^k (m_i)^2} \times \sqrt{\sum \limits _{i=1}^k (n_i)^2}}$$   (Eq. 16) 
+
+But the limitation is that the dimensions of word vectors must be the same.
+
+Jaccard Similarity Coefficient. For two given sets A and B, their Jaccard similarity coefficient is: 
+
+$$J\left(A, B\right) = |A \cap B| / |A \cup B|$$   (Eq. 17) 
+
+where $0 \le J(A,B) \le 1$ . It means that the closer the value of $J(A,B)$ is to 1, the more similar they are. In the text, intersection $A \cap B$ refers to similar words in the examples and union $A \cup B$ is all words without duplication.
+
+Word Mover’s Distance (WMD). WMD BIBREF37 is a variation of Earth Mover's Distance (EMD) BIBREF38 . It can be used to measure the dissimilarity between two text documents, relying on the travelling distance from embedded words of one document to another. In other words, WMD can quantify the semantic similarity between texts. Meanwhile, Euclidean distance is also used in the calculation of WMD.
+
+Edit Distance. Edit distance is a way to measure the minimum modifications by turning a string to another. The higher it is, the more dissimilar the two strings are. It can be applied to computational biology and natural language processing. Levenshtein distance BIBREF39 is also referred to as edit distance with insertion, deletion, replacement operations used in work of BIBREF23 .
+
+## Datasets in Text
+
+In order to make data more accessible to those who need it, we collect some datasets which have been applied to NLP tasks in recent literatures and a brief introductions are given at the same time. These data sets can be downloaded via the corresponding link in the footnote.
+
+AG's News $\footnote {http://www.di.unipi.it/~gulli/AG\underline{ }corpus\underline{ }of\underline{ }news\underline{ }articles.html}$ : This is a news set with more than one million articles gathered from over 2000 news sources by an academic news search engine named ComeToMyHead. The provided db version and xml version can be downloaded for any non-commercial use.
+
+DBPedia Ontology $\footnote {https://wiki.dbpedia.org/services-resources/ontology}$ : It is a dataset with structured content from the information created in various Wikimedia projects. It has over 68 classes with 2795 different properties and now there are more than 4 million instances included in this dataset.
+
+Amazon Review $\footnote {http://snap.stanford.edu/data/web-Amazon.html}$ : The Amazon review dataset has nearly 35 million reviews spanning Jun 1995 to March 2013, including product and user information, ratings, and a plaintext review. It is collected by over 6 million users in more than 2 million products and categorized into 33 classes with the size ranging from KB to GB.
+
+Yahoo! Answers $\footnote { https://sourceforge.net/projects/yahoodataset/}$ : The corpus contains 4 million questions and their answers, which can be easily used in the question answer system. Besides that, a topic classification dataset is also able to be constructed with some main classes.
+
+Yelp Reviews $\footnote {https://www.yelp.com/dataset/download}$ : The provided data is made available by Yelp to enable researchers or students to develop academic projects. It contains 4.7 million user reviews with the type of json files and sql files.
+
+Movie Review (MR) $\footnote {http://www.cs.cornell.edu/people/pabo/movie-review-data/}$ : This is a labeled dataset with respect to sentiment polarity, subjective rating and sentences with subjectivity status or polarity. Probably because it is labeled by humans, the size of this dataset is smaller than others, with a maximum of dozens of MB.
+
+MPQA Opinion Corpus $\footnote {http://mpqa.cs.pitt.edu/}$ : The Multi-Perspective Question Answering (MPQA) Opinion Corpus is collected from a wide variety of news sources and annotated for opinions or other private states. Three different versions are available to people by the MITRE Corporation. The higher the version is, the richer the contents are.
+
+Internet Movie Database (IMDB) $\footnote {http://ai.stanford.edu/~amaas/data/sentiment/}$ : IMDBs is crawled from Internet including 50000 positive and negative reviews and average length of the review is nearly 200 words. It is usually used for binary sentiment classification including richer data than other similar datasets. IMDB also contains the additional unlabeled data, raw text and already processed data.
+
+SNLI Corpus $\footnote {https://nlp.stanford.edu/projects/snli/}$ : The Stanford Natural Language Inference (SNLI) Corpus is a collection with manually labeled data mainly for natural language inference (NLI) task. There are nearly five hundred thousand sentence pairs written by humans in a grounded context. More details about this corpus can be seen in the research of Samuel et al. BIBREF40 .
+
+## Adversarial Attacks in Text
+
+Because the purpose of adversarial attacks is to make DNNs misbehave, they can be seen as a classification problem in a broad sense. And majority of recent representative adversarial attacks in text is related to classification so that we categorize them with this feature. In this section, we introduce the majority of existing adversarial attacks in text. Technical details and corresponding comments of each attack method described below are given to make them more clearly to readers.
+
+## Non-target attacks for classification
+
+Adversarial attacks can be subdivided in many cases which are described in section "Discussion of Challenges and Future Direction" . With the purpose of more granular division of classification tasks, we introduce these attack methods group by group based on the desire of attackers. In this part, studies below are all non-target attacks that attackers do not care the category of misclassified results.
+
+Papernot et al. BIBREF41 might be the first to study the problem of adversarial example in text and contributed to producing adversarial input sequences on Recurrent Neural Network (RNN). They leveraged computational graph unfolding BIBREF42 to evaluate the forward derivative BIBREF26 , i.e. Jacobian, with respect to embedding inputs of the word sequences. Then for each word of the input, fast gradient sign method (FGSM) BIBREF7 was used on Jacobian tensor evaluated above to find the perturbations. Meanwhile, in order to solving the mapping problem of modified word embedding, they set a special dictionary and chose words to replace the original ones. The constraint of substitution operation was that the sign of the difference between replaced and original words was closest to the result by FGSM.
+
+Although adversarial input sequences can make long-short term memory (LSTM) BIBREF43 model misbehave, words of the input sequences were randomly chosen and there might be grammatical error.
+
+This was also a FGSM-based method like adversarial input sequence BIBREF41 . But difference was that three modification strategies of insertion, replacement and deletion were introduced by Samanta et al. BIBREF44 to generate adversarial examples by preserving the semantic meaning of inputs as much as possible. Premise of these modifications was to calculate the important or salient words which would highly affect classification results if they were removed. The authors utilized the concept of FGSM to evaluate the contribution of a word in a text and then targeted the words in the decreasing order of the contribution.
+
+Except for deletion, both insertion and replacement on high ranking words needed candidate pools including synonyms, typos and genre special keywords to assist. Thus, the author built a candidate pool for each word in the experiment. However, it would consume a great deal of time and the most important words in actual input text might not have candidate pools.
+
+Unlike previous white-box methods BIBREF41 , BIBREF44 , little attention was paid to generate adversarial examples for black-box attacks on text. Gao et al. BIBREF23 proposed a novel algorithm DeepWordBug in black-box scenario to make DNNs misbehave. The two-stage process they presented were determining which important tokens to change and creating imperceptible perturbations which could evade detection respectively. The calculation process for the first stage was as follows: 
+
+$$\begin{split}
+CS(x_i)=&[F(x_1,\ldots ,x_{i-1},x_i)-F(x_1,x_2,\ldots ,x_{i-1})]+\\&\lambda [F(x_i,x_{i+1},\ldots ,x_n)-F(x_{i+1},\ldots ,x_n)]
+\end{split}$$   (Eq. 23) 
+
+where $\emph {x}_i$ was the i-th word in the input and F was a function to evaluate the confidence score. Later similar modifications like swap, substitution, deletion and insertion were applied to manipulate the important tokens to make better adversarial examples. Meanwhile, in order to preserve the readability of these examples, edit distance was used by the authors.
+
+Different from other methods, Sato et al. BIBREF45 operated in input embedding space for text and reconstructed adversarial examples to misclassify the target model. The core idea of this method was that they searched for the weights of the direction vectors which maximized loss functions with overall parameters W as follows: 
+
+$$ 
+\alpha _{iAdvT} = \mathop {\arg \max }_{\alpha ,\Vert \alpha \Vert \le \epsilon } \lbrace \ell (\vec{w} + \sum _{k=1}^{|V|}a_kd_k, \hat{Y}, W)\rbrace $$   (Eq. 25) 
+
+where $\sum _{k=1}^{|V|}a_kd_k$ was the perturbation generated from each input on its word embedding vector $\vec{w}$ and $\vec{d}$ was the direction vector from one word to another in embedding space. Because $\aleph _{iAdvT}$ in Eq. ( 25 ) was hard to calculate, the authors used Eq. ( 26 ) instead: 
+
+$$ 
+\alpha _{iAdvT} = \frac{\epsilon g}{\Vert g \Vert _2}, g = \nabla _{\alpha }\ell (\vec{w} + \sum _{k=1}^{|V|}a_kd_k, \hat{Y}, W)$$   (Eq. 26) 
+
+The loss function of iAdvT was then defined based on $\aleph _{iAdvT}$ as an optimization problem by jointly minimizing objection functions on entire training dataset D as follows: 
+
+$$\begin{split}
+\hat{W} = &\frac{1}{|D|}\mathop {\arg \min }_{W}\lbrace \sum _{(\hat{X},\hat{Y})\in D}\ell (\hat{X},\hat{Y},W)+\\&\lambda \sum _{(\hat{X},\hat{Y})\in D}\ell (\hat{X}_{+\gamma (\alpha _{iAdvT})},\hat{Y},W)\rbrace 
+\end{split}$$   (Eq. 27) 
+
+Compared with Miyato et al. BIBREF46 , iAdv-Text restricted the direction of perturbations to find a substitute which was in the predefined vocabulary rather than an unknown word to replace the origin one. Thus, it improved the interpretability of adversarial examples by adversarial training. The authors also took advantage of cosine similarity to select a better perturbation at the same time.
+
+Similarly, Gong et al. BIBREF47 also searched for adversarial perturbations in embedding space, but their method was gradient-based. Even though WMD was used by the authors to measure the similarity of clean examples and adversarial examples, the readability of generated results seemed a little poor.
+
+Li et al. BIBREF48 proposed an attack framework TextBugger for generating adversarial examples to trigger the deep learning-based text understanding system in both black-box and white-box settings. They followed the general steps to capture important words which were significant to the classification and then crafted on them. In white-box setting, Jacobian matrix was used to calculate the importance of each word as follows: 
+
+$$C_{x_i} = J_{F(i,y)} = \frac{\partial F_y(x)}{\partial x_i}$$   (Eq. 29) 
+
+where $F_y(\cdot )$ represented the confidence value of class y. The slight changes of words were in character-level and word-level respectively by operations like insertion, deletion, swap and substitution. In black-box setting, the authors segmented documents into sequences and probed the target model to filter out sentences with different predicted labels from the original. The odd sequences were sorted in an inverse order by their confidence score. Then important words were calculated by removing method as follows: 
+
+$$\begin{split}
+C_{x_i} = &F_y\left(x_1,\ldots ,x_{i-1},x_i,x_{i+1},\ldots ,x_n\right) \\& - F_y\left(x_1,\ldots ,x_{i-1},x_{i+1},\ldots ,x_n\right)
+\end{split}$$   (Eq. 30) 
+
+The last modification process was same as that in white-box setting.
+
+## Target attacks for classification
+
+For target attack, attackers purposefully control the category of output to be what they want and the generated examples have similar semantic information with clean ones. This kind of attacks are described one by one in the following part.
+
+Different from works in BIBREF41 , BIBREF44 , Liang et al. BIBREF49 first demonstrated that FGSM could not be directly applied in text. Because input space of text is discrete, while image data is continuous. Continuous image has tolerance of tiny perturbations, but text does not have this kind of feature. Instead, the authors utilized FGSM to determine what, where and how to insert, remove and modify on text input. They conducted two kinds of attacks in different scenarios and used the natural language watermarking BIBREF50 technique to make generated adversarial examples compromise their utilities.
+
+In white-box scenario, the authors defined the conceptions of hot training phrases and hot sample phrases which were both obtained by leveraging the backpropagation algorithm to compute the cost gradients of samples. The former one shed light on what to insert and the later implied where to insert, remove and modify. In black-box scenario, authors used the idea of fuzzing technique BIBREF51 for reference to obtain hot training phrases and hot sample phrases. One assumption was that the target model could be probed. Samples were fed to target model and then isometric whitespace was used to substitute origin word each time. The difference between two classification results was each word's deviation. The larger it was, the more significant the corresponding word was to its classification. Hence, hot training phrases were the most frequent words in a set which consisted of the largest deviation word for each training sample. And hot sample phrases were the words with largest deviation for every test sample.
+
+Like one pixel attack BIBREF27 , a similar method named HotFlip was proposed by Ebrahimi et al. BIBREF52 . HotFlip was a white-box attack in text and it relied on an atomic flip operation to swap one token for another based on gradient computation. The authors represented samples as one-hot vectors in input space and a flip operation could be represented by: 
+
+$$ 
+\begin{split}
+\vec{v}_{ijb} = &(\vec{0},\ldots ;(\vec{0},\ldots (0,0,\ldots ,0,-1,0,\ldots ,1,0)_j,\\&\ldots ,\vec{0})_i;\vec{0},\ldots )
+\end{split}$$   (Eq. 34) 
+
+The eq. ( 34 ) means that the j-th character of i-th word in a sample was changed from a to b, which were both characters respectively at a-th and b-th places in the alphabet. The change from directional derivative along this vector was calculated to find the biggest increase in loss $\emph {J}(x, y)$ as follows: 
+
+$$\max \nabla _{x}J(x, y)^T\cdot \vec{v}_{ijb} = \mathop {\max }_{ijb}\frac{\partial J^{(b)}}{\partial x_{ij}} - \frac{\partial J^{(a)}}{\partial x_{ij}}$$   (Eq. 35) 
+
+where $x_{ij}^{(a)}=1$ . HotFlip could also be used on character-level insertion, deletion and word-level modification. Although HotFlip performed well on character-level models, only few successful adversarial examples could be generated with one or two flips under the strict constraints.
+
+Considering the limitation of gradient-based methods BIBREF41 , BIBREF44 , BIBREF22 , BIBREF52 in black-box case, Alzantot et al. BIBREF53 proposed a population-based optimization via genetic algorithm BIBREF54 , BIBREF55 to generated semantically similar adversarial examples. They randomly selected words in the input and computed their nearest neighbors by Euclidean Distance in GloVe embedding space BIBREF56 . These nearest neighbors which did not fit within the surrounding were filtered based on language model BIBREF57 scores and only high-ranking words with the highest scores were kept. The substitute which would maximize probability of the target label was picked from remaining words. At the same time, aforementioned operations were conducted several times to get a generation. If predicted label of modified samples in a generation were not the target label, the next generation was generated by randomly choosing two samples as parents each time and the same process was repeated on it. This optimization procedure was done to find successful attack by genetic algorithm. In this method, random selection words in the sequence to substitute were full of uncertainty and they might be meaningless for the target label when changed.
+
+These attacks above for classification are either popular or representative ones in recent studies. Some main attributes of them are summarized in table 1 and instances in these literatures are in appendix A.
+
+[10]https://iamtrask.github.io/2015/11/15/anyone-can-code-lstm/ [11]https://github.com/keras-team/keras/blob/master/examples/imdb_lstm.py [12]https://github.com/Smerity/keras_snli/blob/master/snli_rnn.py
+
+## Adversarial examples on other tasks
+
+We have reviewed adversarial attacks for classification task in the previous subsections. But what other kinds of tasks or applications can be attacked by adversarial examples? How are they generated in these cases and whether the crafted examples can be applied in another way except for attack? These questions naturally arise and the answers will be described below.
+
+In order to know whether reading comprehension systems could really understand language, Jia et al. BIBREF61 inserted adversarial perturbations into paragraphs to test the systems without changing the true answers or misleading humans. They extracted nouns and adjectives in the question and replaced them with antonyms. Meanwhile named entities and numbers were changed by the nearest word in GloVe embedding space BIBREF56 . The modified question was transformed into declarative sentence as the adversarial perturbation which was concatenated to the end of the original paragraph. This process was call ADDSENT by the authors.
+
+Another process ADDANY was also used to randomly choose any sequence of some words to craft. Compared with ADDSENT, ADDANY did not consider grammaticality and it needed query the model several times. Certainly, both two kinds of generated adversarial examples could fool reading comprehension systems well that gave out incorrect answers. Mainly because they tried to draw the model’s attention on the generated sequences. Mudrakarta et al. BIBREF62 also studied adversarial examples on answering question system and part of their work could strengthen attacks proposed by Jia et al. BIBREF61 .
+
+Besides reading comprehension systems BIBREF61 , Minervini et al. BIBREF63 cast the generation of adversarial examples which violated the given constraints of First-Order Logic (FOL) in NLI as an optimization problem. They maximized the proposed inconsistency loss to search for substitution sets S by using a language model as follows: 
+
+$$\begin{split}
+\mathop {maximise}\limits _{S} J_{I}(S) = &\left[p(S;body)-p(S;head)\right]_{+}, \\&s.t. \log p_{L}(S)\le \tau \end{split}$$   (Eq. 42) 
+
+where $[x]_{+}=\max (0,x)$ and $\tau $ was a threshold on the perplexity of generated sequences. $S={X_{1}\rightarrow s_{1},\ldots ,X_{n}\rightarrow s_{n}}$ denoted a mapping from ${X_{1},\ldots ,X_{n}}$ which was the set of universally quantified variables in a rule to sequences in S. $p(S; body)$ and $p(S; head)$ denoted the probability of the given rule, after replacing $X_{i}$ with the corresponding sentence $S_{i}$ . The generated sequences which were the adversarial examples helped the authors find weaknesses of NLI systems when faced with linguistic phenomena, i.e. negation and antonymy.
+
+NMT was another kind of system attacked by adversaries and Belinkov et al. BIBREF64 made this attempt. They devised black-box methods depending on natural and synthetic language errors to generate adversarial examples. The naturally occurring errors included typos, misspelling words or others and synthetic noise was modified by random or keyboard typo types. These experiments were done on three different NMT systems BIBREF65 , BIBREF66 and results showed that these examples could also effectively fool the target systems.
+
+The same work was also done by Ebrahimi et al. BIBREF67 to conduct an adversarial attack on character-level NMT by employing differentiable string-edit operations. The method of generating adversarial examples was same in their previous work BIBREF52 . Compared with Belinkov et al. BIBREF64 , the authors demonstrated that black-box adversarial examples were much weaker than black-box ones in most cases.
+
+Iyyer et al. BIBREF68 crafted adversarial examples by the use of SCPNS they proposed. They designed this model for generating syntactically adversarial examples without decreasing the quality of the input semantics. The general process mainly relied on the encoder-decoder architecture of SCPNS. Given a sequence and a corresponding target syntax structure, the authors encoded them by a bidirectional LSTM model and decoded by LSTM model augmented with soft attention over encoded states BIBREF69 and the copy mechanism BIBREF70 . They then modified the inputs to the decoder, aiming at incorporating the target syntax structure to generate adversarial examples. The syntactically adversarial sentences not only could fool pre-trained models, but also improved the robustness of them to syntactic variation. The authors also used crowdsourced experiment to demonstrate the validity of the generated.
+
+Apart from attacks, adversarial examples were used as a way to measure robustness of DNN models. Blohm et al. BIBREF71 generated adversarial examples to find out the limitations of a machine reading comprehension model they designed. The categories of adversarial examples included word-level and sentence-level attack in different scenarios BIBREF72 . By comparing with human performance, experiment results showed that some other attributions, e.g. answer by elimination via ranking plausibility BIBREF73 , should be added into this model to improve its performance.
+
+## Defenses against Adversarial Attacks in text
+
+The constant arms race between adversarial attacks and defenses invalidates conventional wisdom quickly BIBREF24 . In fact, defense is more difficult than attack and few works have been done on this aspect. There are two reasons for this situation. One is that a good theoretical model do not exist for complicated optimization problems like adversarial examples. The other is that tremendous amount of possible inputs may produce the target output with a very high possibility. Hence, a truly adaptive defense method is difficult. In this section, we describe some relatively effective methods of defenses against adversarial attacks in text.
+
+## Defenses by processing training or input data
+
+Adversarial examples are also a kind of data with a special purpose. The first thing to think about is whether data processing or detecting is useful against adversarial attacks. Researchers have done various attempts such as adversarial training and spelling check in text.
+
+Adversarial training BIBREF7 was a direct approach to defend adversarial images in some studies BIBREF7 BIBREF74 . They mixed the adversarial examples with corresponding original examples as training dataset to train the model. Adversarial examples could be detected to a certain degree in this way, but adversarial training method was not always work. In text, there were some effects against the attacks after adversarial training BIBREF52 , BIBREF23 , BIBREF48 . However, it failed in the work of BIBREF53 , mainly because the different ways of generating adversarial examples. The modifications of the former were insertion, substitution, deletion and replacement, while the later took use of genetic algorithm to search for adversarial examples.
+
+Overfitting may be another reason why adversarial training method is not always useful and may be only effective on its corresponding attack. This has been confirmed by Tram`er et al. BIBREF75 in image domain, but it remains to be demonstrated in text.
+
+Another strategy of defense against adversarial attacks is to detect whether input data is modified or not. Researchers think that there exists some different features between adversarial example and its clean example. For this view, a series of work BIBREF76 , BIBREF77 , BIBREF78 , BIBREF79 , BIBREF80 has been conducted to detect adversarial examples and performs relatively well in image. In text, the ways of modification strategy in some methods may produce misspelling words in generated adversarial examples. This is a distinct different feature which can be utilized. It naturally came up with an idea to detect adversarial examples by checking out the misspelling words. Gao et al. BIBREF23 used an autocorrector which was the Python autocorrect 0.3.0 package before the input. And Li et al. BIBREF48 took advantage of a context-aware spelling check service to do the same work. But experiment results showed that this approach was effective on character-level modifications and partly useful on word-level operations. Meanwhile, the availability of different modifications was also different no matter on character-level or word-level methods.
+
+## Re-defining function to improve robustness
+
+Except for adversarial training and spelling checking, improving robustness of the model is another way to resist adversarial examples. With the purpose of improving the ranking robustness to small perturbations of documents in the adversarial Web retrieval setting, Goren et al. BIBREF81 formally analyzed, defined and quantified the notions of robustness of linear learning-to-rank-based relevance ranking function. They adapted the notions of classification robustness BIBREF6 , BIBREF82 to ranking function and defined related concepts of pointwise robustness, pairwise robustness and a variance conjecture. To quantify the robustness of ranking functions, Kendall's- $\tau $ distance BIBREF83 and “top change” were used as normalized measures. Finally, the empirical findings supported the validity of the authors' analyses in two families of ranking functions BIBREF84 , BIBREF85 .
+
+## Testing and verification as the important defenses against adversarial attacks
+
+The current security situation in DNNs seems to fall into a loop that new adversarial attacks are identified and then followed by new countermeasures which will be subsequently broken BIBREF86 . Hence, the formal guarantees on DNNs behavior are badly needed. But it is a hard work and nobody can ensure that their methods or models are perfect. Recently, what we could do is to make the threat of adversarial attacks as little as possible. The technology of testing and verification helps us deal with the problems from another point of view. By the means of it, people can know well about the safety and reliability of systems based on DNNs and determine whether to take measures to address security issues or anything else.
+
+In this section, we introduce recent testing and verification methods for enhancing robustness of DNNs against adversarial attacks. Even though these methods reviewed below have not applied in text, we hope someone interested in this aspect can be inspired and comes up with a good defense method used in text or all areas.
+
+## Testing methods against adversarial examples
+
+As increasingly used of DNNs in security-critical domains, it is very significant to have a high degree of trust in the models’ accuracy, especially in the presence of adversarial examples. And the confidence to the correct behavior of the model is derived from the rigorous testing in a variety of possible scenarios. More importantly, testing can be helpful for understanding the internal behaviors of the network, contributing to the implementation of defense methods. This applies the traditional testing methodology used in DNNs.
+
+Pei et al. BIBREF87 designed a white-box framework DeepXplore to test real-world DNNs with the metric of neuron coverage and leveraged differential testing to catch the differences of corresponding output between multiple DNNs. In this way, DeepXplore could trigger the majority logic of the model to find out incorrect behaviors without manual efforts. It performed well in the advanced deep learning systems and found thousands of corner cases which would make the systems crash. However, the limitation of DeepXplore was that if all the DNNs made incorrect judgement, it was hard to know where was wrong and how to solve it.
+
+Different from single neuron coverage BIBREF87 , Ma et al. BIBREF88 proposed a multi-granularity testing coverage criteria to measure accuracy and detect erroneous behaviors. They took advantage of four methods BIBREF7 , BIBREF26 , BIBREF28 , BIBREF32 to generate adversarial test data to explore the new internal states of the model. The increasing coverage showed that the larger the coverage was, the more possible the defects were to be checked out. Similar work was done by Budnik et al. BIBREF89 to explore the output space of the model under test via an adversarial case generation approach.
+
+In order to solve the limitation of neuron coverage, Kim et al. BIBREF90 proposed a Surprise Adequacy for Deep Learning Systems(SADL) to test DNNs and developed Surprise Coverage(SC) to measure the coverage of the range of Surprise Adequacy(SA) values, which measured the different behaviors between inputs and training data. Experimental results showed that the SA values could be a metric to judge whether an input was adversarial example or not. In other hand, it could also improve the accuracy of DNNs against adversarial examples by retraining.
+
+There also exists other kinds of testing method against adversarial examples. Wicker et al. BIBREF91 presented a feature-guided approach to test the resilience of DNNs in black-box scenario against adversarial examples. They treated the process of generating adversarial cases as a two-player turn-based stochastic game with the asymptotic optimal strategy based on Monte Carlo tree search (MCTS) algorithm. In this strategy, there was an idea of reward for accumulating adversarial examples found over the process of game play and evaluated the robustness against adversarial examples by the use of it.
+
+Besides the feature-guided testing BIBREF91 , Sun et al. BIBREF92 presented DeepConcolic to evaluate the robustness of well-known DNNs, which was the first attempt to apply traditional concolic testing method for these networks. DeepConcolic iteratively used concrete execution and symbolic analysis to generate test suit to reach a high coverage and discovered adversarial examples by a robustness oracle. The authors also compared with other testing methods BIBREF87 , BIBREF88 , BIBREF93 , BIBREF94 . In terms of input data, DeepConcolic could start with a single input to achieve a better coverage or used coverage requirements as inputs. In terms of performance, DeepConcolic could achieve higher coverage than DeepXplore, but run slower than it.
+
+## Verification methods against adversarial examples
+
+Researchers think that testing is insufficient to guarantee the security of DNNs, especially with unusual inputs like adversarial examples. As Edsger W. Dijkstra once said, “testing shows the presence, not the absence of bugs”. Hence, verification techniques on DNNs are needed to study more effective defense methods in adversarial settings.
+
+Pulina et al. BIBREF95 might be the first to develop a small verification system for a neural network. Since then, related work appears one after another. But verification of machine learning models’ robustness to adversarial examples is still in its infancy BIBREF96 . There is only a few researches on related aspects. We will introduce these works in the following part.
+
+There are several researches to check security properties against adversarial attacks by diverse kinds of Satisfiability Modulo Theory (SMT) BIBREF97 solvers. Katz et al. BIBREF98 presented a novel system named Reluplex to verify DNNs by splitting the problem into the LP problems with Rectified Linear Unit (ReLU) BIBREF99 activation functions based on SMT solver. Reluplex could be used to find adversarial inputs with the local adversarial robustness feature on the ACAS Xu networks, but it failed on large networks on the global variant.
+
+Huang et al. BIBREF100 proposed a new verification framework which was also based on SMT to verify neural network structures. It relied on discretizing search space and analyzing output of each layer to search for adversarial perturbations, but the authors found that SMT theory could only suitable for small networks in practice. On the other hand, this framework was limited by many assumptions and some of functions in it were unclear.
+
+For ReLU networks, a part of researches regarded the verification as a Mixed Integer Linear Programming (MILP) problem such as Tjeng et al. BIBREF101 . They evaluated robustness to adversarial examples from two aspects of minimum adversarial distortion BIBREF102 and adversarial test accuracy BIBREF103 . Their work was faster than Reluplex with a high adversarial test accuracy, but the same limitation was that it remained a problem to scale it to large networks.
+
+Different from other works, Narodytska et al. BIBREF104 verify the secure properties on the binarized neural networks(BNNs) BIBREF105 . They were the first to utilize exact Boolean encoding on a network to study its robustness and equivalence. The inputs would be judged whether they were adversarial examples or not by two encoding structures Gen and Ver. It could easily find adversarial examples for up to 95 percent of considered images on the MNIST dataset and also worked on the middle-sized BNNs rather than large networks.
+
+There is a different point of view that the difficulty in proving properties about DNNs is caused by the presence of activation functions BIBREF98 . Some researchers pays more attention to them for exploring better verification methods.
+
+Gehr et al. BIBREF106 introduced abstract transformers which could get the outputs of layers in convolutional neural network with ReLU, including fully connected layer. The authors evaluated this approach on verifying robustness of DNNs such as pre-trained defense network BIBREF107 . Results showed that FGSM attack could be effectively prevented. They also did some comparisons with Reluplex on both small and large networks. The stare-of-the-art Reluplex performed worse than it in verification of properties and time consumption.
+
+Unlike existing solver-based methods (e.g. SMT), Wang et al. BIBREF108 presented ReluVal which leveraged interval arithmetic BIBREF109 to guarantee the correct operations of DNNs in the presence of adversarial examples. They repeatedly partitioned input intervals to find out whether the corresponding output intervals violated security property or not. By contrast, this method was more effective than Reluplex and performed well on finding adversarial inputs.
+
+Weng et al. BIBREF110 designed two kinds of algorithm to evaluate lower bounds of minimum adversarial distortion via linear approximations and bounding the local Lipschitz constant. Their methods could be applied into defended networks especially for adversarial training to evaluate the effectiveness of them.
+
+## Discussion of Challenges and Future Direction
+
+In the previous sections, a detailed description of adversarial examples on attack and defense was given to enable readers to have a faster and better understanding of this respect. Next, we present more general observations and discuss challenges on this direction based on the aforementioned contents.
+
+Judgement on the performance of attack methods: Generally, authors mainly evaluate their attacks on target models by accuracy rate or error rate. The lower the accuracy rate is, the more effective the adversarial examples are. And the use of error rate is the opposite. Certainly, some researchers prefer to utilize the difference in accuracy before and after attacks, because it can show the effect of attacks more intuitively. And these criterions can also used in defending of adversarial examples.
+
+Reasons by using misspelled words in some methods: The motivation by using misspelled words is similar to that in image, which aims at fooling target models with indiscernible perturbations. Some methods tend to conduct character-level modification operations which highly result in misspelled words. And humans are extremely robust against that case in written language BIBREF111 .
+
+Transferability in black-box scenario: When the adversaries have no access including probing to the target models, they train a substitute model and utilize the transferability of adversarial examples. Szegedy et al. BIBREF6 first found that adversarial examples generated from a neural network could also make another model misbehave by different datasets. This reflects the transferability of the adversarial eample. As a result, adversarial examples generated in the substitute model are used to attack the target models while models and datasets are all inaccessible. Apart from that, constructing adversarial examples with high transferability is a prerequisite to evaluate the effectiveness of black-box attacks and a key metric to evaluate generalized attacks BIBREF112 .
+
+The lack of a universal approach to generate adversarial examples: Because the application of adversarial examples in text rose as a frontier in recent years, the methods of adversarial attacks were relatively few, let alone defenses. The another reason why this kind of method do not exist is the language problem. Almost all recent methods use English dataset and the generated adversarial examples may be useless to the systems with Chinese or other language dataset. Thus, there is not a universal approach to generate adversarial examples. But in our observations, many methods mainly follow a two-step process to generate adversarial examples. The first step is to find important words which have significant impact on classification results and then homologous modifications are used to get adversarial examples.
+
+Difficulties on adversarial attacks and defenses:: There are many reasons for this question and one of the main reasons is that there is not a straightforward way to evaluate proposed works no matter attack or defense. Namely, the convincing benchmarks do not exist in recent works. One good performed attack method in a scenario may failed in another or new defense will soon be defeated in the way beyond defenders' anticipation. Even though some works are provably sound, but rigorous theoretical supports are still needed to deal with the problem of adversarial examples.
+
+Appropriate future directions on adversarial attacks and defenses: As an attacker, designing universal perturbations to catch better adversarial examples can be taken into consideration like it works in image BIBREF29 . A universal adversarial perturbation on any text is able to make a model misbehave with high probability. Moreover, more wonderful universal perturbations can fool multi-models or any model on any text. On the other hand, the work of enhancing the transferability of adversarial examples is meaningful in more practical back-box attacks. On the contrary, defenders prefer to completely revamp this vulnerability in DNNs, but it is no less difficult than redesigning a network and is also a long and arduous task with the common efforts of many people. At the moment defender can draw on methods from image area to text for improving the robustness of DNNs, e.g. adversarial training BIBREF107 , adding extra layer BIBREF113 , optimizing cross-entropy function BIBREF114 , BIBREF115 or weakening the transferability of adversarial examples.
+
+## Conclusion
+
+This article presents a survey about adversarial attacks and defenses on DNNs in text. Even though DNNs have the high performance on a wide variety of NLP, they are inherently vulnerable to adversarial examples, which lead to a high degree concern about it. This article integrates almost existing adversarial attacks and some defenses focusing on recent works in the literature. From these works, we can see that the threat of adversarial attacks is real and defense methods are few. Most existing works have their own limitations such as application scene, constraint condition and problems with the method itself. More attention should be paid on the problem of adversarial example which remains an open issue for designing considerably robust models against adversarial attacks.
+
+## Acknowledgment
+
+This work was partly supported by NSFC under No. 61876134, the National Key R&D Program of China under No. 2016YFB0801100, NSFC under U1536204 and U183610015.

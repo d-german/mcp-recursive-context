@@ -1,0 +1,175 @@
+# Style Transfer for Texts: to Err is Human, but Error Margins Matter
+
+**Paper ID:** 1908.06809
+
+## Abstract
+
+This paper shows that standard assessment methodology for style transfer has several significant problems. First, the standard metrics for style accuracy and semantics preservation vary significantly on different re-runs. Therefore one has to report error margins for the obtained results. Second, starting with certain values of bilingual evaluation understudy (BLEU) between input and output and accuracy of the sentiment transfer the optimization of these two standard metrics diverge from the intuitive goal of the style transfer task. Finally, due to the nature of the task itself, there is a specific dependence between these two metrics that could be easily manipulated. Under these circumstances, we suggest taking BLEU between input and human-written reformulations into consideration for benchmarks. We also propose three new architectures that outperform state of the art in terms of this metric.
+
+## Introduction
+
+Deep generative models attract a lot of attention in recent years BIBREF0. Such methods as variational autoencoders BIBREF1 or generative adversarial networks BIBREF2 are successfully applied to a variety of machine vision problems including image generation BIBREF3, learning interpretable image representations BIBREF4 and style transfer for images BIBREF5. However, natural language generation is more challenging due to many reasons, such as the discrete nature of textual information BIBREF6, the absence of local information continuity and non-smooth disentangled representations BIBREF7. Due to these difficulties, text generation is mostly limited to specific narrow applications and is usually working in supervised settings.
+
+Content and style are deeply fused in natural language, but style transfer for texts is often addressed in the context of disentangled latent representations BIBREF6, BIBREF8, BIBREF9, BIBREF10, BIBREF11, BIBREF12. Intuitive understanding of this problem is apparent: if an input text has some attribute $A$, a system generates new text similar to the input on a given set of attributes with only one attribute $A$ changed to the target attribute $\tilde{A}$. In the majority of previous works, style transfer is obtained through an encoder-decoder architecture with one or multiple style discriminators to learn disentangled representations. The encoder takes a sentence as an input and generates a style-independent content representation. The decoder then takes the content representation and the target style representation to generate the transformed sentence. In BIBREF13 authors question the quality and usability of the disentangled representations for texts and suggest an end-to-end approach to style transfer similar to an end-to-end machine translation.
+
+Contribution of this paper is three-fold: 1) we show that different style transfer architectures have varying results on test and that reporting error margins for various training re-runs of the same model is especially important for adequate assessment of the models accuracy, see Figure FIGREF1; 2) we show that BLEU BIBREF14 between input and output and accuracy of style transfer measured in terms of the accuracy of a pre-trained external style classifier can be manipulated and naturally diverge from the intuitive goal of the style transfer task starting from a certain threshold; 3) new architectures that perform style transfer using improved latent representations are shown to outperform state of the art in terms of BLEU between output and human-written reformulations.
+
+## Related Work
+
+Style of a text is a very general notion that is hard to define in rigorous terms BIBREF15. However, the style of a text can be characterized quantitatively BIBREF16; stylized texts could be generated if a system is trained on a dataset of stylistically similar texts BIBREF17; and author-style could be learned end-to-end BIBREF18, BIBREF19, BIBREF20. A majority of recent works on style transfer focus on the sentiment of text and use it as a target attribute. For example, in BIBREF21, BIBREF22, BIBREF23 estimate the quality of the style transfer with binary sentiment classifier trained on the corpora further used for the training of the style-transfer system. BIBREF24 and especially BIBREF9 generalize this ad-hoc approach defining a style as a set of arbitrary quantitively measurable categorial or continuous parameters. Such parameters could include the 'style of the time' BIBREF16, author-specific attributes (see BIBREF25 or BIBREF26 on 'shakespearization'), politeness BIBREF27, formality of speech BIBREF28, and gender or even political slant BIBREF29.
+
+A significant challenge associated with narrowly defined style-transfer problems is that finding a good solution for one aspect of a style does not guarantee that you can use the same solution for a different aspect of it. For example, BIBREF30 build a generative model for sentiment transfer with a retrieve-edit approach. In BIBREF21 a delete-retrieve model shows good results for sentiment transfer. However, it is hard to imagine that these retrieval approaches could be used, say, for the style of the time or formality, since in these cases the system is often expected to paraphrase a given sentence to achieve the target style.
+
+In BIBREF6 the authors propose a more general approach to the controlled text generation combining variational autoencoder (VAE) with an extended wake-sleep mechanism in which the sleep procedure updates both the generator and external classifier that assesses generated samples and feedbacks learning signals to the generator. Authors had concatenated labels for style with the text representation of the encoder and used this vector with "hard-coded" information about the sentiment of the output as the input of the decoder. This approach seems promising, and some other papers either extend it or use similar ideas. BIBREF8 applied a GAN to align the hidden representations of sentences from two corpora using an adversarial loss to decompose information about the form. In BIBREF31 model learns a smooth code space and can be used as a discrete GAN with the ability to generate coherent discrete outputs from continuous samples. Authors use two different generators for two different styles. In BIBREF9 an adversarial network is used to make sure that the output of the encoder does not have style representation. BIBREF6 also uses an adversarial component that ensures there is no stylistic information within the representation. BIBREF9 do not use a dedicated component that controls the semantic component of the latent representation. Such a component is proposed by BIBREF10 who demonstrate that decomposition of style and content could be improved with an auxiliary multi-task for label prediction and adversarial objective for bag-of-words prediction. BIBREF11 also introduces a dedicated component to control semantic aspects of latent representations and an adversarial-motivational training that includes a special motivational loss to encourage a better decomposition. Speaking about preservation of semantics one also has to mention works on paraphrase systems, see, for example BIBREF32, BIBREF33, BIBREF34. The methodology described in this paper could be extended to paraphrasing systems in terms of semantic preservation measurement, however, this is the matter of future work.
+
+BIBREF13 state that learning a latent representation, which is independent of the attributes specifying its style, is rarely attainable. There are other works on style transfer that are based on the ideas of neural machine translation with BIBREF35 and without parallel corpora BIBREF36 in line with BIBREF37 and BIBREF38.
+
+It is important to underline here that majority of the papers dedicated to style transfer for texts treat sentiment of a sentence as a stylistic rather than semantic attribute despite particular concerns BIBREF39. It is also crucial to mention that in line with BIBREF9 majority of the state of the art methods for style transfer use an external pre-trained classifier to measure the accuracy of the style transfer. BLEU computes the harmonic mean of precision of exact matching n-grams between a reference and a target sentence across the corpus. It is not sensitive to minute changes, but BLEU between input and output is often used as the coarse measure of the semantics preservation. For the corpora that have human written reformulations, BLEU between the output of the model and human text is used. These metrics are used alongside with a handful of others such as PINC (Paraphrase In N-gram Changes) score BIBREF35, POS distance BIBREF12, language fluency BIBREF10, etc. Figure FIGREF2 shows self-reported results of different models in terms of two most frequently measured performance metrics, namely, BLEU and Accuracy of the style transfer.
+
+This paper focuses on Yelp! reviews dataset that was lately enhanced with human written reformulations by BIBREF21. These are Yelp! reviews, where each short English review of a place is labeled as a negative or as a positive once. This paper studies three metrics that are most common in the field at the moment and questions to which extent can they be used for the performance assessment. These metrics are the accuracy of an external style classifier that is trained to measure the accuracy of the style transfer, BLEU between input and output of a system, and BLEU between output and human-written texts.
+
+## Style transfer
+
+In this work we experiment with extensions of a model, described in BIBREF6, using Texar BIBREF40 framework. To generate plausible sentences with specific semantic and stylistic features every sentence is conditioned on a representation vector $z$ which is concatenated with a particular code $c$ that specifies desired attribute, see Figure FIGREF8. Under notation introduced in BIBREF6 the base autoencoder (AE) includes a conditional probabilistic encoder $E$ defined with parameters $\theta _E$ to infer the latent representation $z$ given input $x$
+
+Generator $G$ defined with parameters $\theta _G$ is a GRU-RNN for generating and output $\hat{x}$ defined as a sequence of tokens $\hat{x} = {\hat{x}_1, ..., \hat{x}_T}$ conditioned on the latent representation $z$ and a stylistic component $c$ that are concatenated and give rise to a generative distribution
+
+These encoder and generator form an AE with the following loss
+
+This standard reconstruction loss that drives the generator to produce realistic sentences is combined with two additional losses. The first discriminator provides extra learning signals which enforce the generator to produce coherent attributes that match the structured code in $c$. Since it is impossible to propagate gradients from the discriminator through the discrete sample $\hat{x}$, we use a deterministic continuous approximation a "soft" generated sentence, denoted as $\tilde{G} = \tilde{G}_\tau (z, c)$ with "temperature" $\tau $ set to $\tau \rightarrow 0$ as training proceeds. The resulting “soft” generated sentence is fed into the discriminator to measure the fitness to the target attribute, leading to the following loss
+
+Finally, under the assumption that each structured attribute of generated sentences is controlled through the corresponding code in $c$ and is independent from $z$ one would like to control that other not explicitly modelled attributes do not entangle with $c$. This is addressed by the dedicated loss
+
+The training objective for the baseline, shown in Figure FIGREF8, is therefore a sum of the losses from Equations (DISPLAY_FORM4) – (DISPLAY_FORM6) defined as
+
+where $\lambda _c$ and $\lambda _z$ are balancing parameters.
+
+Let us propose two further extensions of this baseline architecture. To improve reproducibility of the research the code of the studied models is open. Both extensions aim to improve the quality of information decomposition within the latent representation. In the first one, shown in Figure FIGREF12, a special dedicated discriminator is added to the model to control that the latent representation does not contain stylistic information. The loss of this discriminator is defined as
+
+Here a discriminator denoted as $D_z$ is trying to predict code $c$ using representation $z$. Combining the loss defined by Equation (DISPLAY_FORM7) with the adversarial component defined in Equation (DISPLAY_FORM10) the following learning objective is formed
+
+where $\mathcal {L}_{baseline}$ is a sum defined in Equation (DISPLAY_FORM7), $\lambda _{D_z}$ is a balancing parameter.
+
+The second extension of the baseline architecture does not use an adversarial component $D_z$ that is trying to eradicate information on $c$ from component $z$. Instead, the system, shown in Figure FIGREF16 feeds the "soft" generated sentence $\tilde{G}$ into encoder $E$ and checks how close is the representation $E(\tilde{G} )$ to the original representation $z = E(x)$ in terms of the cosine distance. We further refer to it as shifted autoencoder or SAE. Ideally, both $E(\tilde{G} (E(x), c))$ and $E(\tilde{G} (E(x), \bar{c}))$, where $\bar{c}$ denotes an inverse style code, should be both equal to $E(x)$. The loss of the shifted autoencoder is
+
+where $\lambda _{cos}$ and $\lambda _{cos^{-}}$ are two balancing parameters, with two additional terms in the loss, namely, cosine distances between the softened output processed by the encoder and the encoded original input, defined as
+
+We also study a combination of both approaches described above, shown on Figure FIGREF17.
+
+In Section SECREF4 we describe a series of experiments that we have carried out for these architectures using Yelp! reviews dataset.
+
+## Experiments
+
+We have found that the baseline, as well as the proposed extensions, have noisy outcomes, when retrained from scratch, see Figure FIGREF1. Most of the papers mentioned in Section SECREF2 measure the performance of the methods proposed for the sentiment transfer with two metrics: accuracy of the external sentiment classifier measured on test data, and BLEU between the input and output that is regarded as a coarse metric for semantic similarity.
+
+In the first part of this section, we demonstrate that reporting error margins is essential for the performance assessment in terms that are prevalent in the field at the moment, i.e., BLEU between input and output and accuracy of the external sentiment classifier. In the second part, we also show that both of these two metrics after a certain threshold start to diverge from an intuitive goal of the style transfer and could be manipulated.
+
+## Experiments ::: Error margins matter
+
+On Figure FIGREF1 one can see that the outcomes for every single rerun differ significantly. Namely, accuracy can change up to 5 percentage points, whereas BLEU can vary up to 8 points. This variance can be partially explained with the stochasticity incurred due to sampling from the latent variables. However, we show that results for state of the art models sometimes end up within error margins from one another, so one has to report the margins to compare the results rigorously. More importantly, one can see that there is an inherent trade-off between these two performance metrics. This trade-off is not only visible across models but is also present for the same retrained architecture. Therefore, improving one of the two metrics is not enough to confidently state that one system solves the style-transfer problem better than the other. One has to report error margins after several consecutive retrains and instead of comparing one of the two metrics has to talk about Pareto-like optimization that would show confident improvement of both.
+
+To put obtained results into perspective, we have retrained every model from scratch five times in a row. We have also retrained the models of BIBREF12 five times since their code is published online. Figure FIGREF19 shows the results of all models with error margins. It is also enhanced with other self-reported results on the same Yelp! review dataset for which no code was published.
+
+One can see that error margins of the models, for which several reruns could be performed, overlap significantly. In the next subsection, we carefully study BLEU and accuracy of the external classifier and discuss their aptness to measure style transfer performance.
+
+## Experiments ::: Delete, duplicate and conquer
+
+One can argue that as there is an inevitable entanglement between semantics and stylistics in natural language, there is also an apparent entanglement between BLEU of input and output and accuracy estimation of the style. Indeed, the output that copies input gives maximal BLEU yet clearly fails in terms of the style transfer. On the other hand, a wholly rephrased sentence could provide a low BLEU between input and output but high accuracy. These two issues are not problematic when both BLEU between input and output and accuracy of the transfer are relatively low. However, since style transfer methods have significantly evolved in recent years, some state of the art methods are now sensitive to these issues. The trade-off between these two metrics can be seen in Figure FIGREF1 as well as in Figure FIGREF19.
+
+As we have mentioned above, the accuracy of an external classifier and BLEU between output and input are the most widely used methods to assess the performance of style transfer at this moment. However, both of these metrics can be manipulated in a relatively simple manner. One can extend the generative architecture with internal pre-trained classifier of style and then perform the following heuristic procedure:
+
+measure the style accuracy on the output for a given batch;
+
+choose the sentences that style classifier labels as incorrect;
+
+replace them with duplicates of sentences from the given batch that have correct style according to the internal classifier and show the highest BLEU with given inputs.
+
+This way One can replace all sentences that push measured accuracy down and boost reported accuracy to 100%. To see the effect that this manipulation has on the key performance metric we split all sentences with wrong style in 10 groups of equal size and replaces them with the best possible duplicates of the stylistically correct sentences group after group. The results of this process are shown in Figure FIGREF24.
+
+This result is disconcerting. Simply replacing part of the output with duplicates of the sentences that happen to have relatively high BLEU with given inputs allows to "boost" accuracy to 100% and "improve" BLEU. The change of BLEU during such manipulation stays within error margins of the architecture, but accuracy is significantly manipulated. What is even more disturbing is that BLEU between such manipulated output of the batch and human-written reformulations provided in BIBREF12 also grows. Figure FIGREF24 shows that for SAE but all four architectures described in Section SECREF3 demonstrate similar behavior.
+
+Our experiments show that though we can manipulate BLEU between output and human-written text, it tends to change monotonically. That might be because of the fact that this metric incorporates information on stylistics and semantics of the text at the same time, preserving inevitable entanglement that we have mentioned earlier. Despite being costly, human-written reformulations are needed for future experiments with style transfer. It seems that modern architectures have reached a certain level of complexity for which naive proxy metrics such as accuracy of an external classifier or BLEU between output and input are already not enough for performance estimation and should be combined with BLEU between output and human-written texts. As the quality of style transfer grows further one has to improve the human-written data sets: for example, one would like to have data sets similar to the ones used for machine translation with several reformulations of the same sentence.
+
+On Figure FIGREF25 one can see how new proposed architectures compare with another state of the art approaches in terms of BLEU between output and human-written reformulations.
+
+## Conclusion
+
+Style transfer is not a rigorously defined NLP problem. Starting from definitions of style and semantics and finishing with metrics that could be used to evaluate the performance of a proposed system. There is a surge of recent contributions that work on this problem. This paper highlights several issues connected with this lack of rigor. First, it shows that the state of the art algorithms are inherently noisy on the two most widely accepted metrics, namely, BLEU between input and output and accuracy of the external style classifier. This noise can be partially attributed to the adversarial components that are often used in the state of the art architectures and partly due to certain methodological inconsistencies in the assessment of the performance. Second, it shows that reporting error margins of several consecutive retrains for the same model is crucial for the comparison of different architectures, since error margins for some of the models overlap significantly. Finally, it demonstrates that even BLEU on human-written reformulations can be manipulated in a relatively simple way.
+
+## Supplemental Material
+
+Here are some examples characteristic for different systems. An output of a system follows the input. Here are some successful examples produced by the system with additional discriminator:
+
+it's not much like an actual irish pub, which is depressing. $\rightarrow $ it's definitely much like an actual irish pub, which is grateful.
+
+i got a bagel breakfast sandwich and it was delicious! $\rightarrow $ i got a bagel breakfast sandwich and it was disgusting!
+
+i love their flavored coffee. $\rightarrow $ i dumb their flavored coffee.
+
+i got a bagel breakfast sandwich and it was delicious! $\rightarrow $ i got a bagel breakfast sandwich and it was disgusting!
+
+i love their flavored coffee. $\rightarrow $ i dumb their flavored coffee.
+
+nice selection of games to play. $\rightarrow $ typical selection of games to play.
+
+i'm not a fan of huge chain restaurants. $\rightarrow $ i'm definitely a fan of huge chain restaurants.
+
+Here are some examples of typical faulty reformulations:
+
+only now i'm really hungry, and really pissed off. $\rightarrow $ kids now i'm really hungry, and really extraordinary off.
+
+what a waste of my time and theirs. $\rightarrow $ what a wow. of my time and theirs.
+
+cooked to perfection and very flavorful. $\rightarrow $ cooked to pain and very outdated.
+
+the beer was nice and cold! $\rightarrow $ the beer was nice and consistant!
+
+corn bread was also good! $\rightarrow $ corn bread was also unethical bagged
+
+Here are some successful examples produced by the SAE:
+
+our waitress was the best, very accommodating. $\rightarrow $ our waitress was the worst, very accommodating.
+
+great food and awesome service! $\rightarrow $ horrible food and nasty service!
+
+their sandwiches were really tasty. $\rightarrow $ their sandwiches were really bland.
+
+i highly recommend the ahi tuna. $\rightarrow $ i highly hated the ahi tuna.
+
+other than that, it's great! $\rightarrow $ other than that, it's horrible!
+
+Here are some examples of typical faulty reformulations by SAE:
+
+good drinks, and good company. $\rightarrow $ 9:30 drinks, and 9:30 company.
+
+like it's been in a fridge for a week. $\rightarrow $ like it's been in a fridge for a true.
+
+save your money & your patience. $\rightarrow $ save your smile & your patience.
+
+no call, no nothing. $\rightarrow $ deliciously call, deliciously community.
+
+sounds good doesn't it? $\rightarrow $ sounds good does keeps it talented
+
+Here are some successful examples produced by the SAE with additional discriminator:
+
+best green corn tamales around. $\rightarrow $ worst green corn tamales around.
+
+she did the most amazing job. $\rightarrow $ she did the most desperate job.
+
+very friendly staff and manager. $\rightarrow $ very inconsistent staff and manager.
+
+even the water tasted horrible. $\rightarrow $ even the water tasted great.
+
+go here, you will love it. $\rightarrow $ go here, you will avoid it.
+
+Here are some examples of typical faulty reformulations by the SAE with additional discriminator:
+
+_num_ - _num_ % capacity at most , i was the only one in the pool. $\rightarrow $ sweetness - stylish % fountains at most, i was the new one in the
+
+this is pretty darn good pizza! $\rightarrow $ this is pretty darn unsafe pizza misleading
+
+enjoyed the dolly a lot. $\rightarrow $ remove the shortage a lot.
+
+so, it went in the trash. $\rightarrow $ so, it improved in the hooked.
+
+they are so fresh and yummy. $\rightarrow $ they are so bland and yummy.

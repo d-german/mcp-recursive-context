@@ -1,0 +1,151 @@
+# A Deep Learning Architecture for De-identification of Patient Notes: Implementation and Evaluation
+
+**Paper ID:** 1810.01570
+
+## Abstract
+
+De-identification is the process of removing 18 protected health information (PHI) from clinical notes in order for the text to be considered not individually identifiable. Recent advances in natural language processing (NLP) has allowed for the use of deep learning techniques for the task of de-identification. In this paper, we present a deep learning architecture that builds on the latest NLP advances by incorporating deep contextualized word embeddings and variational drop out Bi-LSTMs. We test this architecture on two gold standard datasets and show that the architecture achieves state-of-the-art performance on both data sets while also converging faster than other systems without the use of dictionaries or other knowledge sources.
+
+## None
+
+[block] 1 5mm *
+
+2pt*22pt
+
+[block] 2.1 5mm
+
+[block] 2.1.1 5mm
+
+## Introduction
+
+ Electronic Health Records (EHR) have become ubiquitous in recent years in the United States, owing much to the The Health Information Technology for Economic and Clinical Health (HITECH) Act of 2009. BIBREF0 Their ubiquity have given researchers a treasure trove of new data, especially in the realm of unstructured textual data. However, this new data source comes with usage restrictions in order to preserve the privacy of individual patients as mandated by the Health Insurance Portability and Accountability Act (HIPAA). HIPAA demands any researcher using this sensitive data to first strip the medical records of any protected health information (PHI), a process known as de-identification.
+
+HIPAA allows for two methods for de-identifying PHIs: the “Expert Determination” method in which an expert certifies that the information is rendered not individually identifiable, and the “Safe Harbor” method in which 18 identifiers are removed or replaced with random data in order for the data to be considered not individually identifiable. Our research pertains to the second method (a list of the relevant identifiers can be seen in Table TABREF4 ).
+
+The process of de-identification has been largely a manual and labor intensive task due to both the sensitive nature of the data and the limited availability of software to automate the task. This has led to a relatively small number of open health data sets available for public use. Recently, there have been two well-known de-identification challenges organized by Informatics for Integrating Biology and the Bedside (i2b2) to encourage innovation in the field of de-identification.
+
+In this paper, we build on the recent advances in natural language processing, especially with regards to word embeddings, by incorporating deep contextualized word embeddings developed by Peters et al. BIBREF1 into a deep learning architecture. More precisely, we present a deep learning architecture that differs from current architectures in literature by using bi-directional long short-term memory networks (Bi-LSTMs) with variational dropouts and deep contextualized word embeddings while also using components already present in other systems such traditional word embeddings, character LSTM embeddings and conditional random fields. We test this architecture on two gold standard data sets, the 2014 i2b2 de-identification Track 1 data set BIBREF2 and the nursing notes corpus BIBREF3 . The architecture achieves state-of-the-art performance on both data sets while also achieving faster convergence without the use of dictionaries (or gazetteers) or other rule-based methods that are typically used in other de-identification systems.
+
+The paper is organized as follows: In Section SECREF4 , we review the latest literature around techniques for de-identification with an emphasis on related work using deep learning techniques. In Section SECREF5 , we detail our deep learning architecture and also describe how we use the deep contextualized word embeddings method to improve our results. Section SECREF6 describes the two data sets we will use to evaluate our method and our evaluation metrics. Section SECREF7 presents the performance of our architecture on the data sets. In Section SECREF8 , we discuss the results and provide an analysis of the errors. Finally, in Section SECREF9 , we summarize our contributions while also discussing possible future research.
+
+## Background and Related Work
+
+The task of automatic de-identification has been heavily studied recently, in part due to two main challenges organized by i2b2 in 2006 and in 2014. The task of de-identification can be classified as a named entity recognition (NER) problem which has been extensively studied in machine learning literature. Automated de-identification systems can be roughly broken down into four main categories:
+
+## Rule-based Systems
+
+Rule-based systems make heavy use of pattern matching such as dictionaries (or gazetteers), regular expressions and other patterns. BIBREF2 Systems such as the ones described in BIBREF5 , BIBREF6 do not require the use any labeled data. Hence, they are considered as unsupervised learning systems. Advantages of such systems include their ease of use, ease of adding new patterns and easy interpretability. However, these methods suffer from a lack of robustness with regards to the input. For example, different casings of the same word could be misinterpreted as an unknown word. Furthermore, typographical errors are almost always present in most documents and rule-based systems often cannot correctly handle these types of inaccuracies present in the data. Critically, these systems cannot handle context which could render a medical text unreadable. For example, a diagnosis of “Lou Gehring disease” could be misidentified by such a system as a PHI of type Name. The system might replace the tokens “Lou” and “Gehring” with randomized names rendering the text meaningless if enough of these tokens were replaced.
+
+## Machine Learning Systems
+
+The drawbacks of such rule-based systems led researchers to adopt a machine learning approach. A comprehensive review of such systems can be found in BIBREF7 , BIBREF8 . In machine learning systems, given a sequence of input vectors INLINEFORM0 , a machine learning algorithm outputs label predictions INLINEFORM1 . Since the task of de-identification is a classification task, traditional classification algorithms such as support vector machines, conditional random fields (CRFs) and decision trees BIBREF9 have been used for building de-identification systems.
+
+These machine learning-based systems have the advantage of being able to recognize complex patterns that are not as readily evident to the naked eye. However, the drawback of such ML-based systems is that since classification is a supervised learning task, most of the common classification algorithms require a large labeled data set for robust models. Furthermore, since most of the algorithms described in the last paragraph maximize the likelihood of a label INLINEFORM0 given an vector of inputs INLINEFORM1 , rare patterns that might not occur in the training data set would be misclassified as not being a PHI label. Furthermore, these models might not be generalizable to other text corpora that contain significantly different patterns such as sentence structures and uses of different abbreviated words found commonly in medical notes than the training data set.
+
+## Hybrid Systems
+
+With both the advantages and disadvantages of stand alone rule-based and ML-based systems well-documented, systems such as the ones detailed in BIBREF2 combined both ML and rule-based systems to achieve impressive results. Systems such as the ones presented for 2014 i2b2 challenge by Yang et al. BIBREF10 and Liu et al. BIBREF11 used dictionary look-ups, regular expressions and CRFs to achieve accuracies of well over 90% in identifying PHIs.
+
+It is important to note that such hybrid systems rely heavily on feature engineering, a process that manufactures new features from the data that are not present in the raw text. Most machine learning techniques, for example, cannot take text as an input. They require the text to be represented as a vector of numbers. An example of such features can be seen in the system that won the 2014 i2b2 de-identification challenge by Yang et al. BIBREF10 . Their system uses token features such as part-of-speech tagging and chunking, contextual features such as word lemma and POS tags of neighboring words, orthographic features such as capitalization and punctuation marks and task-specific features such as building a list that included all the full names, acronyms of US states and collecting TF-IDF-statistics. Although such hybrid systems achieve impressive results, the task of feature engineering is a time-intensive task that might not be generalizable to other text corpora.
+
+## Deep Learning Systems
+
+With the disadvantages of the past three approaches to building a de-identification system in mind, the current state-of-the-art systems employ deep learning techniques to achieve better results than the best hybrid systems while also not requiring the time-consuming process of feature engineering. Deep learning is a subset of machine learning that uses multiple layers of Artificial Neural Networks (ANNs), which has been very succesful at most Natural Language Processing (NLP) tasks. Recent advances in the field of deep learning and NLP especially in regards to named entity recognition have allowed systems such as the one by Dernoncourt et al. BIBREF9 to achieve better results on the 2014 i2b2 de-identification challenge data set than the winning hybrid system proposed by Yang et al. BIBREF10 . The advances in NLP and deep learning which have allowed for this performance are detailed below.
+
+ANNs cannot take words as inputs and require numeric inputs, therefore, past approaches to using ANNs for NLP have been to employ a bag-of-words (BoW) representation of words where a dictionary is built of all known words and each word in a sentence is assigned a unique vector that is inputted into the ANN. A drawback of such a technique is such that words that have similar meanings are represented completely different. As a solution to this problem, a technique called word embeddings have been used. Word embeddings gained popularity when Mikolov et al. BIBREF12 used ANNs to generate a distributed vector representation of a word based on the usage of the word in a text corpus. This way of representing words allowed for similar words to be represented using vectors of similar values while also allowing for complex operations such as the famous example: INLINEFORM0 , where INLINEFORM1 represents a vector for a particular word.
+
+While pre-trained word embeddings such as the widely used GloVe BIBREF12 embeddings are revolutionary and powerful, such representations only capture one context representation, namely the one of the training corpus they were derived from. This shortcoming has led to the very recent development of context-dependent representations such as the ones developed by BIBREF1 , BIBREF13 , which can capture different features of a word.
+
+The Embeddings from Language Models (ELMo) from the system by Peters et al. BIBREF1 are used by the architecture in this paper to achieve state-of-the-art results. The ELMo representations, learned by combining Bi-LSTMs with a language modeling objective, captures context-depended aspects at the higher-level LSTM while the lower-level LSTM captures aspects of syntax. Moreover, the outputs of the different layers of the system can be used independently or averaged to output embeddings that significantly improve some existing models for solving NLP problems. These results drive our motivation to include the ELMo representations in our architecture.
+
+The use of ANNs for many machine learning tasks has gained popularity in recent years. Recently, a variant of recurrent neural networks (RNN) called Bi-directional Long Short-Term Memory (Bi-LSTM) networks has been successfully employed especially in the realm of NER.
+
+In fact, several Bi-LSTM architectures have been proposed to tackle the problem of NER: LSTM-CRF, LSTM-CNNs-CRF and LSTM-CNNs BIBREF9 . The current best performing system on the i2b2 dataset is in fact a system based on LSTM-CRF BIBREF9 .
+
+## Method
+
+Our architecture incorporates most of the recent advances in NLP and NER while also differing from other architectures described in the previous section by use of deep contextualized word embeddings, Bi-LSTMs with a variational dropout and the use of the Adam optimizer. Our architecture can be broken down into four distinct layers: pre-processing, embeddings, Bi-LSTM and CRF classifier. A graphical illustration of the architecture can be seen in Figure FIGREF16 while a summary of the parameters for our architecture can be found in Table TABREF17 .
+
+## Pre-processing Layer
+
+For a given document INLINEFORM0 , we first break down the document into sentences INLINEFORM1 , tokens INLINEFORM2 and characters INLINEFORM3 where INLINEFORM4 represents the document number, INLINEFORM5 represents the sentence number, INLINEFORM6 represents the token number, and INLINEFORM7 represents the character number. For example, INLINEFORM8 Patient, where the token: “Patient” represents the 3rd token of the 2nd sentence of the 1st document.
+
+After parsing the tokens, we use a widely used and readily available Python toolkit called Natural Langauge ToolKit (NLTK) to generate a part-of-speech (POS) tag for each token. This generates a POS feature for each token which we will transform into a 20-dimensional one-hot-encoded input vector, INLINEFORM0 , then feed into the main LSTM layer.
+
+For the data labels, since the data labels can be made up of multiple tokens, we formatted the labels to the BIO scheme. The BIO scheme tags the beginning of a PHI with a B-, the rest of the same PHI tokens as I- and the rest of the tokens not associated with a PHI as O. For example, the sentence, “ INLINEFORM0 ”, would have the corresponding labels, “ INLINEFORM1 ”.
+
+## Embedding Layer
+
+For the embedding layer, we use three main types of embeddings to represent our input text: traditional word embeddings, ELMo embeddings and character-level LSTM embeddings.
+
+The traditional word embeddings use the latest GloVe 3 BIBREF12 pre-trained word vectors that were trained on the Common Crawl with about 840 billion tokens. For every token input, INLINEFORM0 , the GloVe system outputs INLINEFORM1 , a dense 300-dimensional word vector representation of that same token. We also experimented with other word embeddings by using the bio-medical corpus trained word embeddings BIBREF14 to see if having word embeddings trained on medical texts will have an impact on our results.
+
+As mentioned in previous sections, we also incorporate the powerful ELMo representations as a feature to our Bi-LSTMs. The specifics of the ELMo representations are detailed in BIBREF1 . In short, we compute an ELMo representation by passing a token input INLINEFORM0 to the ELMo network and averaging the the layers of the network to produce an 1024-dimensional ELMo vector, INLINEFORM1 .
+
+Character-level information can capture some information about the token itself while also mitigating issues such as unseen words and misspellings. While lemmatizing (i.e., the act of turning inflected forms of a word to their base or dictionary form) of a token can solve these issues, tokens such as the ones found in medical texts could have important distinctions between, for example, the grammar form of the token. As such, Ma et al. BIBREF15 have used Convolutional Neural Networks (CNN) while Lample et al. BIBREF16 have used Bi-LSTMs to produce character-enhanced representations of each unique token. We have utilized the latter approach of using Bi-LSTMs for produce a character-enhanced embedding for each unique word in our data set. Our parameters for the forward and backward LSTMs are 25 each and the maximum character length is 25, which results in an 50-dimensional embedding vector, INLINEFORM0 , for each token.
+
+After creating the three embeddings for each token, INLINEFORM0 , we concatenate the GloVe and ELMo representations to produce a single 1324-dimensional word input vector, INLINEFORM1 . The concatenated word vector is then further concatenated with the character embedding vector, INLINEFORM2 , POS one-hot-encoded vector, INLINEFORM3 , and the casing embedded vector, INLINEFORM4 , to produce a single 1394-dimensional input vector, INLINEFORM5 , that we feed into our Bi-LSTM layer.
+
+## Bi-LSTM Layer
+
+The Bi-LSTM layer is composed of two LSTM layers, which are a variant of the Bidirectional RNNs. In short, the Bi-LSTM layer contains two independent LSTMs in which one network is fed input in the normal time direction while the other network is fed input in the reverse time direction. The outputs of the two networks can then be combined using either summation, multiplication, concatenation or averaging. Our architecture uses simple concatenation to combine the outputs of the two networks.
+
+Our architecture for the Bi-LSTM layer is similar to the ones used by BIBREF16 , BIBREF17 , BIBREF18 with each LSTM containing 100 hidden units. To ensure that the neural networks do not overfit, we use a variant of the popular dropout technique called variational dropout BIBREF19 to regularize our neural networks. Variational dropout differs from the traditional naïve dropout technique by having the same dropout mask for the inputs, outputs and the recurrent layers BIBREF19 . This is in contrast to the traditional technique of applying a different dropout mask for each of the input and output layers. BIBREF20 shows that variational dropout applied to the output and recurrent units performs significantly better than naïve dropout or no dropout for the NER tasks. As such, we apply a dropout probability of 0.5 for both the output and the recurrent units in our architecture.
+
+## CRF layer
+
+As a final step, the outputs of the Bi-LSTM layer are inputted into a linear-chain CRF classifier, which maximizes the label probabilities of the entire input sentence. This approach is identical to the Bi-LSTM-CRF model by Huang et al. BIBREF21 CRFs have been incorporated in numerous state-of-the-art models BIBREF16 , BIBREF18 , BIBREF3 because of their ability to incorporate tag information at the sentence level.
+
+While the Bi-LSTM layer takes information from the context into account when generating its label predictions, each decision is independent from the other labels in the sentence. The CRF allows us to find the labeling sequence in a sentence with the highest probability. This way, both previous and subsequent label information is used in determining the label of a given token. As a sequence model, the CRF posits a probability model for the label sequence of the tokens in a sentence, conditional on the word sequence and the output scores from the Bi-LTSM model for the given sentence. In doing so, the CRF models the conditional distribution of the label sequence instead of a joint distribution with the words and output scores. Thus, it does not assume independent features, while at the same time not making strong distributional assumptions about the relationship between the features and sequence labels.
+
+## Data and Evaluation Metrics
+
+The two main data sets that we will use to evaluate our architecture are the 2014 i2b2 de-identification challenge data set BIBREF2 and the nursing notes corpus BIBREF3 .
+
+The i2b2 corpus was used by all tracks of the 2014 i2b2 challenge. It consists of 1,304 patient progress notes for 296 diabetic patients. All the PHIs were removed and replaced with random replacements. The PHIs in this data set were broken down first into the HIPAA categories and then into the i2b2-PHI categories as shown in Table TABREF23 . Overall, the data set contains 56,348 sentences with 984,723 separate tokens of which 41,355 are separate PHI tokens, which represent 28,867 separate PHI instances. For our test-train-valid split, we chose 10% of the training sentences to serve as our validation set, which represents 3,381 sentences while a separately held-out official test data set was specified by the competition. This test data set contains 22,541 sentences including 15,275 separate PHI tokens.
+
+The nursing notes were originally collected by Neamatullah et al. BIBREF3 . The data set contains 2,434 notes of which there are 1,724 separate PHI instances. A summary of the breakdown of the PHI categories of this nursing corpora can be seen in Table TABREF23 .
+
+## Evaluation Metrics
+
+For de-identification tasks, the three metrics we will use to evaluate the performance of our architecture are Precision, Recall and INLINEFORM0 score as defined below. We will compute both the binary INLINEFORM1 score and the three metrics for each PHI type for both data sets. Note that binary INLINEFORM2 score calculates whether or not a token was identified as a PHI as opposed to correctly predicting the right PHI type. For de-identification, we place more importance on identifying if a token was a PHI instance with correctly predicting the right PHI type as a secondary objective. INLINEFORM3 INLINEFORM4 
+
+Notice that a high recall is paramount given the risk of accidentally disclosing sensitive patient information if not all PHI are detected and removed from the document or replaced by fake data. A high precision is also desired to preserve the integrity of the documents, as a large number of false positives might obscure the meaning of the text or even distort it. As the harmonic mean of precision and recall, the INLINEFORM0 score gives an overall measure for model performance that is frequently employed in the NLP literature.
+
+As a benchmark, we will use the results of the systems by Burckhardt et al. BIBREF22 , Liu et al. BIBREF18 , Dernoncourt et al. BIBREF9 and Yang et al. BIBREF10 on the i2b2 dataset and the performance of Burckhardt et al. on the nursing corpus. Note that Burckhardt et al. used the entire data set for their results as it is an unsupervised learning system while we had to split our data set into 60% training data and 40% testing data.
+
+## Results
+
+We evaluated the architecture on both the i2b2-PHI categories and the HIPAA-PHI categories for the i2b2 data set based on token-level labels. Note that the HIPAA categories are a super set of the i2b2-PHI categories. We also ran the analysis 5+ times to give us a range of maximum scores for the different data sets.
+
+Table TABREF25 gives us a summary of how our architecture performed against other systems on the binary INLINEFORM0 score metrics while Table TABREF26 and Table TABREF27 summarizes the performance of our architecture against other systems on HIPAA-PHI categories and i2b2-PHI categories respectively. Table TABREF28 presents a summary of the performance on the nursing note corpus while also contrasting the performances achieved by the deidentify system.
+
+## Discussion and Error Analysis
+
+As we can see in Table TABREF26 , with the exception of ID, our architecture performs considerably better than systems by Liu et al. and Yang et al. Dernoncourt et al. did not provide exact figures for the HIPAA-PHI categories so we have excluded them from our analysis. Furthermore, Table TABREF25 shows that our architecture performs similarly to the best scores achieved by Dernoncourt et al., with our architecture slightly edging out Dernoncourt et al. on the precision metric. For the nursing corpus, our system, while not performing as well as the performances on i2b2 data set, managed to best the scores achieved by the deidentify system while also achieving a binary INLINEFORM0 score of over 0.812. It is important to note that deidentify was a unsupervised learning system, it did not require the use of a train-valid-test split and therefore, used the whole data set for their performance numbers. The results of our architecture is assessed using a 60%/40% train/test split.
+
+Our architecture noticeably converges faster than the NeuroNER, which was trained for 100 epochs and the system by Liu et al. BIBREF18 which was trained for 80 epochs. Different runs of training our architecture on the i2b2 dataset converge at around 23 INLINEFORM0 4 epochs. A possible explanation for this is due to our architecture using the Adam optimizer, whereas the NeuroNER system use the Stochastic Gradient Descent (SGD) optimizer. In fact, Reimers et al. BIBREF20 show that the SGD optimizer performed considerably worse than the Adam optimizer for different NLP tasks.
+
+Furthermore, we also do not see any noticeable improvements from using the PubMed database trained word embeddings BIBREF14 instead of the general text trained GloVe word embeddings. In fact, we consistently saw better INLINEFORM0 scores using the GloVe embeddings. This could be due to the fact that our use case was for identifying general labels such as Names, Phones, Locations etc. instead of bio-medical specific terms such as diseases which are far better represented in the PubMed corpus.
+
+## Error Analysis
+
+We will mainly focus on the two PHI categories: Profession and ID for our error analysis on the i2b2 data set. It is interesting to note that the best performing models on the i2b2 data set by Dernoncourt et al. BIBREF9 experienced similar lower performances on the same two categories. However, we note the performances by Dernoncourt et al. were achieved using a “combination of n-gram, morphological, orthographic and gazetteer features” BIBREF9 while our architecture uses only POS tagging as an external feature. Dernoncourt et al. posits that the lower performance on the Profession category might be due to the close embeddings of the Profession tokens to other PHI tokens which we can confirm on our architecture as well. Furthermore, our experiments show that the Profession PHI performs considerably better with the PubMed embedded model than GloVe embedded model. This could be due to the fact that PubMed embeddings were trained on the PubMed database, which is a database of medical literature. GloVe on the other hand was trained on a general database, which means the PubMed embeddings for Profession tokens might not be as close to other tokens as is the case for the GloVe embeddings.
+
+For the ID PHI, our analysis shows that some of the errors were due to tokenization errors. For example, a “:” was counted as PHI token which our architecture correctly predicted as not a PHI token. Since our architecture is not custom tailored to detect sophisticated ID patterns such as the systems in BIBREF9 , BIBREF10 , we have failed to detect some ID PHIs such as “265-01-73”, a medical record number, which our architecture predicted as a phone number due to the format of the number. Such errors could easily be mitigated by the use of simple regular expressions.
+
+We can see that our architecture outperforms the deidentify system by a considerable margin on most categories as measured by the INLINEFORM0 score. For example, the authors of deidentify note that Date PHIs have considerably low precision values while our architecture achieve a precision value of greater than 0.915% for the Date PHI. However, Burckhardt et al. BIBREF22 achieve an impressive precision of 0.899 and recall of 1.0 for the Phone PHI while our architecture only manages 0.778 and 0.583 respectively. Our analysis of this category shows that this is mainly due a difference in tokenization, stand alone number are being classified as not a PHI.
+
+We tried to use the model that we trained on the i2b2 data set to predict the categories of the nursing data set. However, due to difference in the text structure, the actual text and the format, we achieved less than random performance on the nursing data set. This brings up an important point about the transferability of such models.
+
+## Ablation Analysis
+
+Our ablation analysis shows us that the layers of our models adds to the overall performance. Figure FIGREF33 shows the binary INLINEFORM0 scores on the i2b2 data set with each bar being a feature toggled off. For example, the “No Char Embd” bar shows the performance of the model with no character embeddings and everything else the same as our best model.
+
+We can see a noticeable change in the performance if we do not include the ELMo embeddings versus no GloVe embeddings. The slight decrease in performance when we use no GloVe embeddings shows us that this is a feature we might choose to exclude if computation time is limited. Furthermore, we can see the impact of having no variational dropout and only using a naïve dropout, it shows that variational dropout is better at regularizing our neural network.
+
+## Conclusion
+
+In this study, we show that our deep learning architecture, which incorporates the latest developments in contextual word embeddings and NLP, achieves state-of-the-art performance on two widely available gold standard de-identification data sets while also achieving similar performance as the best system available in less epochs. Our architecture also significantly improves over the performance of the hybrid system deidentify on the nursing data set.
+
+This architecture could be integrated into a client-ready system such as the deidentify system. However, as mentioned in Section SECREF8 , the use of a dictionary (or gazetter) might help improve the model even further specially with regards to the Location and Profession PHI types. Such a hybrid system would be highly beneficial to practitioners that needs to de-identify patient data on a daily basis.

@@ -1,0 +1,39 @@
+# Bag of Tricks for Efficient Text Classification
+
+**Paper ID:** 1607.01759
+
+## Abstract
+
+This paper explores a simple and efficient baseline for text classification. Our experiments show that our fast text classifier fastText is often on par with deep learning classifiers in terms of accuracy, and many orders of magnitude faster for training and evaluation. We can train fastText on more than one billion words in less than ten minutes using a standard multicore~CPU, and classify half a million sentences among~312K classes in less than a minute.
+
+## Introduction
+
+Text classification is an important task in Natural Language Processing with many applications, such as web search, information retrieval, ranking and document classification BIBREF0 , BIBREF1 . Recently, models based on neural networks have become increasingly popular BIBREF2 , BIBREF3 , BIBREF4 . While these models achieve very good performance in practice, they tend to be relatively slow both at train and test time, limiting their use on very large datasets.
+
+Meanwhile, linear classifiers are often considered as strong baselines for text classification problems BIBREF5 , BIBREF6 , BIBREF7 . Despite their simplicity, they often obtain state-of-the-art performances if the right features are used BIBREF8 . They also have the potential to scale to very large corpus BIBREF9 .
+
+In this work, we explore ways to scale these baselines to very large corpus with a large output space, in the context of text classification. Inspired by the recent work in efficient word representation learning BIBREF10 , BIBREF11 , we show that linear models with a rank constraint and a fast loss approximation can train on a billion words within ten minutes, while achieving performance on par with the state-of-the-art. We evaluate the quality of our approach fastText on two different tasks, namely tag prediction and sentiment analysis.
+
+## Model architecture
+
+A simple and efficient baseline for sentence classification is to represent sentences as bag of words (BoW) and train a linear classifier, e.g., a logistic regression or an SVM BIBREF5 , BIBREF7 . However, linear classifiers do not share parameters among features and classes. This possibly limits their generalization in the context of large output space where some classes have very few examples. Common solutions to this problem are to factorize the linear classifier into low rank matrices BIBREF12 , BIBREF10 or to use multilayer neural networks BIBREF13 , BIBREF14 .
+
+Figure 1 shows a simple linear model with rank constraint. The first weight matrix $A$ is a look-up table over the words. The word representations are then averaged into a text representation, which is in turn fed to a linear classifier. The text representation is an hidden variable which can be potentially be reused. This architecture is similar to the cbow model of mikolov2013efficient, where the middle word is replaced by a label. We use the softmax function $f$ to compute the probability distribution over the predefined classes. For a set of $N$ documents, this leads to minimizing the negative log-likelihood over the classes: $
+-\frac{1}{N} \sum _{n=1}^N y_n \log ( f (BAx_n)),
+$ 
+
+where $x_n$ is the normalized bag of features of the $n$ -th document, $y_n$ the label, $A$ and $B$ the weight matrices. This model is trained asynchronously on multiple CPUs using stochastic gradient descent and a linearly decaying learning rate.
+
+## Hierarchical softmax
+
+When the number of classes is large, computing the linear classifier is computationally expensive. More precisely, the computational complexity is $O(kh)$ where $k$ is the number of classes and $h$ the dimension of the text representation. In order to improve our running time, we use a hierarchical softmax BIBREF15 based on the Huffman coding tree BIBREF10 . During training, the computational complexity drops to $O(h\log _2(k))$ .
+
+The hierarchical softmax is also advantageous at test time when searching for the most likely class. Each node is associated with a probability that is the probability of the path from the root to that node. If the node is at depth $l+1$ with parents $n_1,\dots ,n_{l}$ , its probability is $P(n_{l+1}) = \prod _{i=1}^l P(n_i). $ 
+
+This means that the probability of a node is always lower than the one of its parent. Exploring the tree with a depth first search and tracking the maximum probability among the leaves allows us to discard any branch associated with a small probability. In practice, we observe a reduction of the complexity to $O(h\log _2(k))$ at test time. This approach is further extended to compute the $T$ -top targets at the cost of $O(\log (T))$ , using a binary heap.
+
+## N-gram features
+
+Bag of words is invariant to word order but taking explicitly this order into account is often computationally very expensive. Instead, we use a bag of n-grams as additional features to capture some partial information about the local word order. This is very efficient in practice while achieving comparable results to methods that explicitly use the order BIBREF8 .
+
+We maintain a fast and memory efficient mapping of the n-grams by using the hashing trick BIBREF16 with the same hashing function as in mikolov2011strategies and 10M bins if we only used bigrams, and 100M otherwise.

@@ -1,0 +1,99 @@
+# wav2vec: Unsupervised Pre-training for Speech Recognition
+
+**Paper ID:** 1904.05862
+
+## Abstract
+
+We explore unsupervised pre-training for speech recognition by learning representations of raw audio. wav2vec is trained on large amounts of unlabeled audio data and the resulting representations are then used to improve acoustic model training. We pre-train a simple multi-layer convolutional neural network optimized via a noise contrastive binary classification task. Our experiments on WSJ reduce WER of a strong character-based log-mel filterbank baseline by up to 36% when only a few hours of transcribed data is available. Our approach achieves 2.43% WER on the nov92 test set. This outperforms Deep Speech 2, the best reported character-based system in the literature while using three orders of magnitude less labeled training data.
+
+## Introduction
+
+Current state of the art models for speech recognition require large amounts of transcribed audio data to attain good performance BIBREF1 . Recently, pre-training of neural networks has emerged as an effective technique for settings where labeled data is scarce. The key idea is to learn general representations in a setup where substantial amounts of labeled or unlabeled data is available and to leverage the learned representations to improve performance on a downstream task for which the amount of data is limited. This is particularly interesting for tasks where substantial effort is required to obtain labeled data, such as speech recognition.
+
+In computer vision, representations for ImageNet BIBREF2 and COCO BIBREF3 have proven to be useful to initialize models for tasks such as image captioning BIBREF4 or pose estimation BIBREF5 . Unsupervised pre-training for computer vision has also shown promise BIBREF6 . In natural language processing (NLP), unsupervised pre-training of language models BIBREF7 , BIBREF8 , BIBREF9 improved many tasks such as text classification, phrase structure parsing and machine translation BIBREF10 , BIBREF11 . In speech processing, pre-training has focused on emotion recogniton BIBREF12 , speaker identification BIBREF13 , phoneme discrimination BIBREF14 , BIBREF15 as well as transferring ASR representations from one language to another BIBREF16 . There has been work on unsupervised learning for speech but the resulting representations have not been applied to improve supervised speech recognition BIBREF17 , BIBREF18 , BIBREF19 , BIBREF20 , BIBREF21 .
+
+In this paper, we apply unsupervised pre-training to improve supervised speech recognition. This enables exploiting unlabeled audio data which is much easier to collect than labeled data. Our model, , is a convolutional neural network that takes raw audio as input and computes a general representation that can be input to a speech recognition system. The objective is a contrastive loss that requires distinguishing a true future audio sample from negatives BIBREF22 , BIBREF23 , BIBREF15 . Different to previous work BIBREF15 , we move beyond frame-wise phoneme classification and apply the learned representations to improve strong supervised ASR systems. relies on a fully convolutional architecture which can be easily parallelized over time on modern hardware compared to recurrent autoregressive models used in previous work (§ SECREF2 ).
+
+Our experimental results on the WSJ benchmark demonstrate that pre-trained representations estimated on about 1,000 hours of unlabeled speech can substantially improve a character-based ASR system and outperform the best character-based result in the literature, Deep Speech 2. On the TIMIT task, pre-training enables us to match the best reported result in the literature. In a simulated low-resource setup with only eight hours of transcriped audio data, reduces WER by up to 32% compared to a baseline model that relies on labeled data only (§ SECREF3 & § SECREF4 ).
+
+## Pre-training Approach
+
+Given an audio signal as input, we optimize our model (§ SECREF3 ) to predict future samples from a given signal context. A common problem with these approaches is the requirement to accurately model the data distribution INLINEFORM0 , which is challenging. We avoid this problem by first encoding raw speech samples INLINEFORM1 into a feature representation INLINEFORM2 at a lower temporal frequency and then implicitly model a density function INLINEFORM3 similar to BIBREF15 .
+
+## Model
+
+Our model takes raw audio signal as input and then applies two networks. The encoder network embeds the audio signal in latent space and the context network combines multiple time-steps of the encoder to obtain contextualized representations (Figure FIGREF2 ). Both networks are then used to compute the objective function (§ SECREF4 ).
+
+Given raw audio samples INLINEFORM0 , we apply the encoder network INLINEFORM1 which we parameterize as a five-layer convolutional network similar to BIBREF15 . Alternatively, one could use other architectures such as the trainable frontend of BIBREF24 amongst others. The encoder layers have kernel sizes INLINEFORM2 and strides INLINEFORM3 . The output of the encoder is a low frequency feature representation INLINEFORM4 which encodes about 30ms of 16KHz of audio and the striding results in representation INLINEFORM5 every 10ms.
+
+Next, we apply the context network INLINEFORM0 to the output of the encoder network to mix multiple latent representations INLINEFORM1 into a single contextualized tensor INLINEFORM2 for a receptive field size INLINEFORM3 . The context network has seven layers and each layer has kernel size three and stride one. The total receptive field of the context network is about 180ms.
+
+The layers of both networks consist of a causal convolution with 512 channels, a group normalization layer and a ReLU nonlinearity. We normalize both across the feature and temporal dimension for each sample which is equivalent to group normalization with a single normalization group BIBREF25 . We found it important to choose a normalization scheme that is invariant to the scaling and the offset of the input data. This choice resulted in representations that generalize well across datasets.
+
+## Objective
+
+We train the model to distinguish a sample INLINEFORM0 that is k steps in the future from distractor samples INLINEFORM1 drawn from a proposal distribution INLINEFORM2 , by minimizing the contrastive loss for each step INLINEFORM3 : DISPLAYFORM0 
+
+where we denote the sigmoid INLINEFORM0 , and where INLINEFORM1 is the probability of INLINEFORM2 being the true sample. We consider a step-specific affine transformation INLINEFORM3 for each step INLINEFORM4 , that is applied to INLINEFORM5 BIBREF15 . We optimize the loss INLINEFORM6 , summing ( EQREF5 ) over different step sizes. In practice, we approximate the expectation by sampling ten negatives examples by uniformly choosing distractors from each audio sequence, i.e., INLINEFORM7 , where INLINEFORM8 is the sequence length and we set INLINEFORM9 to the number of negatives.
+
+After training, we input the representations produced by the context network INLINEFORM0 to the acoustic model instead of log-mel filterbank features.
+
+## Data
+
+We consider the following corpora: For phoneme recognition on TIMIT BIBREF26 we use the standard train, dev and test split where the training data contains just over three hours of audio data. Wall Street Journal (WSJ; Woodland et al., 1994) comprises about 81 hours of transcribed audio data. We train on si284, validate on nov93dev and test on nov92. Librispeech BIBREF27 contains a total of 960 hours of clean and noisy speech for training. For pre-training, we use either the full 81 hours of the WSJ corpus, an 80 hour subset of clean Librispeech, the full 960 hour Librispeech training set, or a combination of all of them.
+
+To train the baseline acoustic model we compute 80 log-mel filterbank coefficients for a 25ms sliding window with stride 10ms. Final models are evaluated in terms of both word error rate (WER) and letter error rate (LER).
+
+## Acoustic Models
+
+We use the wav2letter++ toolkit for training and evaluation of acoustic models BIBREF28 . For the TIMIT task, we follow the character-based wav2letter++ setup of BIBREF24 which uses seven consecutive blocks of convolutions (kernel size 5 with 1,000 channels), followed by a PReLU nonlinearity and a dropout rate of 0.7. The final representation is projected to a 39-dimensional phoneme probability. The model is trained using the Auto Segmentation Criterion (ASG; Collobert et al., 2016)) using SGD with momentum.
+
+Our baseline for the WSJ benchmark is the wav2letter++ setup described in BIBREF29 which is a 17 layer model with gated convolutions BIBREF30 . The model predicts probabilities for 31 graphemes, including the standard English alphabet, the apostrophe and period, two repetition characters (e.g. the word ann is transcribed as an1), and a silence token (|) used as word boundary.
+
+All acoustic models are trained on 8 Nvidia V100 GPUs using the distributed training implementations of fairseq and wav2letter++. When training acoustic models on WSJ, we use plain SGD with learning rate 5.6 as well as gradient clipping BIBREF29 and train for 1,000 epochs with a total batch size of 64 audio sequences. We use early stopping and choose models based on validation WER after evaluating checkpoints with a 4-gram language model. For TIMIT we use learning rate 0.12, momentum of 0.9 and train for 1,000 epochs on 8 GPUs with a batch size of 16 audio sequences.
+
+## Decoding
+
+For decoding the emissions from the acoustic model we use a lexicon as well as a separate language model trained on the WSJ language modeling data only. We consider a 4-gram KenLM language model BIBREF31 , a word-based convolutional language model BIBREF29 , and a character based convolutional language model BIBREF32 . We decode the word sequence INLINEFORM0 from the output of the context network INLINEFORM1 or log-mel filterbanks using the beam search decoder of BIBREF29 by maximizing DISPLAYFORM0 
+
+where INLINEFORM0 is the acoustic model, INLINEFORM1 is the language model, INLINEFORM2 are the characters of INLINEFORM3 . Hyper-parameters INLINEFORM4 , INLINEFORM5 and INLINEFORM6 are weights for the language model, the word penalty, and the silence penalty.
+
+For decoding WSJ, we tune the hyperparameters INLINEFORM0 , INLINEFORM1 and INLINEFORM2 using a random search. Finally, we decode the emissions from the acoustic model with the best parameter setting for INLINEFORM3 , INLINEFORM4 and INLINEFORM5 , and a beam size of 4000 and beam score threshold of 250.
+
+## Pre-training Models
+
+The pre-training models are implemented in PyTorch in the fairseq toolkit BIBREF0 . We optimize them with Adam BIBREF33 and a cosine learning rate schedule BIBREF34 annealed over 40K update steps for both WSJ and the clean Librispeech training datasets. We start with a learning rate of 1e-7, and the gradually warm it up for 500 updates up to 0.005 and then decay it following the cosine curve up to 1e-6. We train for 400K steps for full Librispeech. To compute the objective, we sample ten negatives and we use INLINEFORM0 tasks.
+
+We train on 8 GPUs and put a variable number of audio sequences on each GPU, up to a pre-defined limit of 1.5M frames per GPU. Sequences are grouped by length and we crop them to a maximum size of 150K frames each, or the length of the shortest sequence in the batch, whichever is smaller. Cropping removes speech signal from either the beginning or end of the sequence and we randomly decide the cropping offsets for each sample; we re-sample every epoch. This is a form of data augmentation but also ensures equal length of all sequences on a GPU and removes on average 25% of the training data. After cropping the total effective batch size across GPUs is about 556 seconds of speech signal (for a variable number of audio sequences).
+
+## Results
+
+Different to BIBREF15 , we evaluate the pre-trained representations directly on downstream speech recognition tasks. We measure speech recognition performance on the WSJ benchmark and simulate various low resource setups (§ SECREF12 ). We also evaluate on the TIMIT phoneme recognition task (§ SECREF13 ) and ablate various modeling choices (§ SECREF14 ).
+
+## Pre-training for the WSJ benchmark
+
+We consider pre-training on the audio data (without labels) of WSJ, part of clean Librispeech (about 80h) and full Librispeech as well as a combination of all datasets (§ SECREF7 ). For the pre-training experiments we feed the output of the context network to the acoustic model, instead of log-mel filterbank features.
+
+Table shows that pre-training on more data leads to better accuracy on the WSJ benchmark. Pre-trained representations can substantially improve performance over our character-based baseline which is trained on log-mel filterbank features. This shows that pre-training on unlabeled audio data can improve over the best character-based approach, Deep Speech 2 BIBREF1 , by 0.3 WER on nov92. Our best pre-training model performs as well as the phoneme-based model of BIBREF35 . BIBREF36 is a phoneme-based approach that pre-trains on the transcribed Libirspeech data and then fine-tunes on WSJ. In comparison, our method requires only unlabeled audio data and BIBREF36 also rely on a stronger baseline model than our setup.
+
+What is the impact of pre-trained representations with less transcribed data? In order to get a better understanding of this, we train acoustic models with different amounts of labeled training data and measure accuracy with and without pre-trained representations (log-mel filterbanks). The pre-trained representations are trained on the full Librispeech corpus and we measure accuracy in terms of WER when decoding with a 4-gram language model. Figure shows that pre-training reduces WER by 32% on nov93dev when only about eight hours of transcribed data is available. Pre-training only on the audio data of WSJ ( WSJ) performs worse compared to the much larger Librispeech ( Libri). This further confirms that pre-training on more data is crucial to good performance.
+
+## Pre-training for TIMIT
+
+On the TIMIT task we use a 7-layer wav2letter++ model with high dropout (§ SECREF3 ; Synnaeve et al., 2016). Table shows that we can match the state of the art when we pre-train on Librispeech and WSJ audio data. Accuracy steadily increases with more data for pre-training and the best accuracy is achieved when we use the largest amount of data for pre-training.
+
+## Ablations
+
+In this section we analyze some of the design choices we made for . We pre-train on the 80 hour subset of clean Librispeech and evaluate on TIMIT. Table shows that increasing the number of negative samples only helps up to ten samples. Thereafter, performance plateaus while training time increases. We suspect that this is because the training signal from the positive samples decreases as the number of negative samples increases. In this experiment, everything is kept equal except for the number of negative samples.
+
+Next, we analyze the effect of data augmentation through cropping audio sequences (§ SECREF11 ). When creating batches we crop sequences to a pre-defined maximum length. Table shows that a crop size of 150K frames results in the best performance. Not restricting the maximum length (None) gives an average sequence length of about 207K frames and results in the worst accuracy. This is most likely because the setting provides the least amount of data augmentation.
+
+Table shows that predicting more than 12 steps ahead in the future does not result in better performance and increasing the number of steps increases training time.
+
+## Conclusions
+
+We introduce , the first application of unsupervised pre-training to speech recognition with a fully convolutional model. Our approach achieves 2.78 WER on the test set of WSJ, a result that outperforms the next best known character-based speech recognition model in the literature BIBREF1 while using three orders of magnitude less transcribed training data. We show that more data for pre-training improves performance and that this approach not only improves resource-poor setups, but also settings where all WSJ training data is used. In future work, we will investigate different architectures and fine-tuning which is likely to further improve performance.
+
+## Acknowledgements
+
+We thank the Speech team at FAIR, especially Jacob Kahn, Vineel Pratap and Qiantong Xu for help with wav2letter++ experiments, and Tatiana Likhomanenko for providing convolutional language models for our experiments.

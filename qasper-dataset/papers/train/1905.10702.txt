@@ -1,0 +1,156 @@
+# MDE: Multi Distance Embeddings for Link Prediction in Knowledge Graphs
+
+**Paper ID:** 1905.10702
+
+## Abstract
+
+Over the past decade, knowledge graphs became popular for capturing structured domain knowledge. Relational learning models enable the prediction of missing links inside knowledge graphs. More specifically, latent distance approaches model the relationships among entities via a distance between latent representations. Translating embedding models (e.g., TransE) are among the most popular latent distance approaches which use one distance function to learn multiple relation patterns. However, they are not capable of capturing symmetric relations. They also force relations with reflexive patterns to become symmetric and transitive. In order to improve distance based embedding, we propose multi-distance embeddings (MDE). Our solution is based on the idea that by learning independent embedding vectors for each entity and relation one can aggregate contrasting distance functions. Benefiting from MDE, we also develop supplementary distances resolving the above-mentioned limitations of TransE. We further propose an extended loss function for distance based embeddings and show that MDE and TransE are fully expressive using this loss function. Furthermore, we obtain a bound on the size of their embeddings for full expressivity. Our empirical results show that MDE significantly improves the translating embeddings and outperforms several state-of-the-art embedding models on benchmark datasets.
+
+## Introduction
+
+While machine learning methods conventionally model functions given sample inputs and outputs, a subset of statistical relational learning(SRL) BIBREF0 , BIBREF1 approaches specifically aim to model “things” (entities) and relations between them. These methods usually model human knowledge which is structured in the form of multi-relational Knowledge Graphs(KG). KGs allow semantically rich queries in search engines, natural language processing (NLP) and question answering. However, they usually miss a substantial portion of true relations, i.e. they are incomplete. Therefore, the prediction of missing links/relations in KGs is a crucial challenge for SRL approaches.
+
+A KG usually consists of a set of facts. A fact is a triple (head, relation, tail) where head and tail are called entities. Among the SRL models, distance based knowledge graph embeddings are popular because of their simplicity, their low number of parameters, and their efficiency on large scale datasets. Specifically, their simplicity allows integrating them into many models. Previous studies have integrated them with logical rule embeddings BIBREF2 , have adopted them to encode temporal information BIBREF3 and have applied them to find equivalent entities between multi-language datasets BIBREF4 . Since the introduction of the first multi-relational distance based method BIBREF5 many variations were published (e.g., TransH BIBREF6 , TransR BIBREF7 , TransD BIBREF8 , STransE BIBREF9 ) that – despite their improvement in the accuracy of the model – suffer from several inherent limitations of TransE that restrict their expressiveness. As BIBREF10 , BIBREF11 noted, within the family of distance based embeddings, usually reflexive relations are forced to be symmetric and transitive. In addition, those approaches are unable to learn symmetric relations. In this work, we put forward a distance based approach that addresses the limitations of these distance based models. Since our approach consists of several distances as objectives, we dubbed it multi-distance embeddings (MDE).
+
+We show that 1. TransE and MDE are fully expressive, 2. MDE is able to learn several relational patterns, 3. It is extendable, 4. It shows competitive performance in the empirical evaluations and 5. We also develop an algorithm to find the limits for the limit-based loss function to use in embedding models.
+
+## Background and Notation
+
+Given the set of all entities $\mathcal {E}$ and the set of all relations $\mathcal {R}$ , we define a fact as a triple of the form $(\mathbf {h}, \mathbf {r}, \mathbf {t})$ in which $\mathbf {\mathbf {h}}$ is the head and $\mathbf {t}$ is the tail, $\mathbf {h,t} \in \mathcal {E}$ and $\mathbf {r} \in \mathcal {R}$ is a relation. A knowledge graph $\mathcal {KG}$ is a subset of all true facts $\mathcal {KG} \in \zeta $ and is represented by a set of triples. An embedding is a function from an entity or a relation to their latent representation which is one or several vectors or tensors of numbers. A relational learning model is made of an embedding function and a prediction function that given a triple $(\mathbf {h}, \mathbf {r}, \mathbf {t})$ it determines if $\mathcal {R}$0 . We represent embedding representation of an entity $\mathcal {R}$1 , with a lowercase letter $\mathcal {R}$2 if it is a vector and with uppercase letters $\mathcal {R}$3 if it is a metric.
+
+A ground truth, in the closed world assumption, is the full assignment of truth values to all triples. A relational learning model is fully expressive if it can express any ground truth, i.e, there exists an assignment of values to the embeddings of the entities and relations that accurately separates the correct and incorrect triples. The ability to encode different patterns in the relations can show the generalization power of a model:
+
+Definition 1. A relation r is symmetric (anti-symmetric) if $\forall x, y \ r(x, y) \Rightarrow r(y, x) \wedge r(x, y) \Rightarrow \lnot r(y, x)$ . A clause with such a structure has a symmetry (antisymmetry) pattern.
+
+Definition 2. A relation $r_1$ is inverse to relation $r_2$ if $\forall x, y$ $r_2(x, y) \Rightarrow r_1(y, x)$ . A clause with such a form has an inversion pattern.
+
+Definition 3. A relation $r_1$ is composed of relation $r_2$ and relation $r_3$ if $\forall x, y, z \ \ r_2(x, y) \wedge r_3(y, z) \Rightarrow r_1(x, z)$ A clause with such a form has a composition pattern.
+
+## Related Work
+
+Tensor factorization and multiplicative models define the score of triples via pairwise multiplication of embeddings. Dismult BIBREF12 simply multiplies the embedding vectors of a triple element by element $\langle h,t,r \rangle $ as the score function. Since multiplication of real numbers is symmetric, Dismult can not distinguish displacement of head relation and tail entities and therefore it can not model anti-symmetric relations. To solve this limitation SimplE BIBREF10 collaborates the reverse of relations to Dismult and ties a relation and its inverse. ComplEx BIBREF13 solves the same issue of DistMult by the idea that multiplication of complex values is not symmetric. By introducing complex-valued embeddings instead of real-valued vectors to dismult, the score of a triple in ComplEx is $Re(h^\top diag(r)\bar{t})$ with $\bar{t}$ the conjugate of t and $Re(.)$ is the real part of a complex value. In RESCAL BIBREF14 instead of a vector, a matrix represents $r$ , and performs outer products of $h$ and $t$ vectors to this matrix so that its score function becomes $h^\top R t$ . A simplified version of RESCAL is HolE BIBREF15 that defines a vector for $r$ and performs circular correlation of $h$ and $Re(h^\top diag(r)\bar{t})$0 has been found equivalent BIBREF16 to ComplEx.
+
+In Latent distance approaches the score function is the distance between embedding vectors of entities and relations. In the view of social network analysis, BIBREF17 originally proposed distance of entities $-d(h, t)$ as the score function for modeling uni-relational graphs where $d(., .)$ means any arbitrary distance, such as Euclidean distance. SE BIBREF18 generalizes the distance for multi-relational data by incorporating a pair of relation matrices into it. TransE BIBREF5 represents relation and entities of a triple by a vector that has this relation 
+
+$$\parallel h+r-t \parallel _p$$   (Eq. 1) 
+
+with $\parallel . \parallel _p$ is the norm $p$ . To better distinguish entities with complex relations, TransH BIBREF19 projects the vector of head and tail to a relation-specific hyperplane. Similarly, TransR follows the idea with relation-specific spaces and extends the distance function to $\parallel M_r h+r- M_r t \parallel _p$ . RotatE BIBREF11 combines translation and rotation and defines the distance of a $t$ from tail $h$ which is rotated the amount $r$ as the score function of a triple $-d(h \circ r, t)$ with $\circ $ an Hadamard product.
+
+Neural network methods train a neural network to learn the interaction of the h, r and t. ER-MLP BIBREF20 is a two layer feedforward neural network considering $h$ , $r$ and $t$ vectors in the input.
+
+NTN BIBREF21 is neural tensor network that concatenates head $h$ and tail $t$ vectors and feeds them to the first layer that has $r$ as weight. In another layer, it combine $h$ and $t$ with a tensor $R$ that represents $\textbf {r}$ and finally, for each relation, it defines an output layer $r$ to represent relation embeddings. In SME BIBREF22 relation $r$ is once combined with the head $h$ to get $t$0 , and similarly once with the tail $t$1 to get $t$2 . SME defines a score function by the dot product of this two functions in the hidden layer. In the linear SME, $t$3 is equal to $t$4 , and in the bilinear version, it is $t$5 . Here, $t$6 refers to weight matrix and $t$7 is a bias vector.
+
+## MDE: Multi Distance Embedding Method
+
+A method to put together different views to the input samples is to incorporate the different formulations of samples from the different models as one learning model.
+
+In contrast to ensemble approaches that incorporate models by training independently and testing together, multi-objective optimization models (MOE) BIBREF23 join in the minimization step. The most common method of generating multi-objective optimization models is the weighted sum approach: $U = \sum _{i=1}^{k} w_i F_i (x).$ 
+
+Here, we propose this approach for distance (score) functions. This combination is usually practical for the objective functions, but adding contrasting score functions can diminish the scores. To tackle this challenge we represent the same entities with independent variables in different distance functions.
+
+The idea of using more than one vector representation is not new. In canonical Polyadic (CP) decomposition BIBREF24 , each entity $e$ is represented by two vectors $h_e$ , $t_e \in \mathbb {R}^d$ , and for each relation $r$ has a single embedding vector $ v_r \in \mathbb {R}^d $ . In CP, the two embedding vectors for entities are learned independent from each other, i.e., observing $(e_1 , r , e_2 )$ only updates $h_{e1}$ and $t_{e2}$ , not $t_{e1}$ and $h_{e2}$ .
+
+We observe that using independent vectors for entity and relations we are able to define independent score functions. Following the idea, we equip distance based embeddings with the exploration of more aspects of the data simply using more distance functions. This simple technique resolves some of its deficiencies and improve its generalization power. Symmetric Relations Learning It is possible to easily check that Formulation $\parallel h+r-t \parallel $ is anti-symmetric but as we show it in the next Section, it is not capable of learning symmetric relations. We add the distance function 2 to enable it to learn symmetric relations. 
+
+$$\parallel h+t-r \parallel _p$$   (Eq. 2) 
+
+Inverse Relation Learning Beside the symmetric relations, many relations in knowledge graphs are indicative of a bi-directional relation which is not necessarily symmetric. For example, let $IsAuthorOf(a,t)$ represent if an author $a$ is an author in a topic $t$ and $Likes(p, t)$ represents if a person likes a topic. A third relation $Knows(p, a)$ represents if a person $p$ knows an author $a$ . Observations about the $Likes(.,.)$ relation and the inverse of $IsAuthorOf(.,.)$ influence the third relation $Knows(p, a)$ , indicating that the inverse of a relation could be interesting to be learned.
+
+We take advantage of the independent vectors again this time to learn the inverse of relations. We define ( 3 ) as: 
+
+$$\parallel t + r - h\parallel _p$$   (Eq. 3) 
+
+While learning the symmetric relations is practiced in multiplicative learning models (e.g. in BIBREF25 ) and inverse of relations has been used in machine learning models (e.g. in BIBREF10 , BIBREF26 , providing a way to have them together in distance based embeddings is a novel contribution.
+
+Model Definition: MDE considers three vectors $e_i, e_j, e_k \in \mathbb {R}^d$ as the embedding vector of each entity $\textbf {e}$ (similar to CP and SimplE), and three vectors $r_i, r_j, r_k \in \mathbb {R}^d$ for each relation $\textbf {r}$ . The score function of MDE for a triple $(\textbf {h}$ $ \textbf {r}$ $\textbf {t})$ is defined as wighted sum of above scores: 
+
+$$Score_{MDE} = w_1 \parallel h_i + r_i - t_i \parallel _p~+~ w_2 \parallel h_j + t_j - r_j \parallel _p~+~ w_3 \parallel t_k + r_k - h_k \parallel _p - \psi $$   (Eq. 4) 
+
+where $n$ refers to $L_1$ or $L_2$ norm and $\psi \in \mathbb {R^+}$ is a positive constant. SimplE BIBREF10 also adds a second score function to Dismult to handle the antisymmetry pattern. However, in SimplE, the relation vectors of the two scores are tied together, in contrast to MDE that the entity and relation vectors in are independent( which allows the summation of contrasting scores.). MDE is simply proposing the weighted sum for distances and is not limited to the above distance functions. In our experiments, we consider a fourth score, which we explain it in Proposition 6.
+
+## Guided limit based Loss
+
+While Margin ranking loss minimizes the sum of error over all the training samples BIBREF27 noticed that, when applying the margin-based ranking loss to translation embeddings, it is possible that the score of correct a triplet is not small enough to hold the $h + r - t$ relation. In order to the scores of positive triples become lower than those of negative ones, they defined limited based loss which limits that the error in all the positive (negative) samples become less than a limit. BIBREF28 defines such limit for negative samples as well, so that their score stay greater than a limit.
+
+However the limit based loss resolves this issue of margin ranking loss, it does not provide a way to find the optimal limits. Therefore for each dataset and hyper-parameter change the fixed limits should be found by try and error. To address this issue, we define a moving-limit loss function denoted by $loss_{guided}$ . The aim of this approach is to find a balance between two goals. 1. To make the error of a correct triple zero (following the idea of the distance functions). 2. To increase the margin between the limits for positive and negative samples as match as possible (following Structural risk minimization principle BIBREF29 to maximize the margin between the positive and negative samples). We minimize the limit for objective of negative samples, with the condition that the error for the objective of positive samples stay a small value. Therefore we extend the limit based loss to 
+
+$$loss_{guided} = \lim _{\delta ^{\prime } \rightarrow \delta + \alpha } \lim _{\delta \rightarrow \gamma _1} \beta _1 \sum _{\tau \in {T}^+} [f(\tau )- (\gamma _1 - \delta )]_+ + \beta _2 \sum _{\tau ^{\prime }\in {T}^-} [(\gamma _2 - \delta ^{\prime }) - f(\tau ^{\prime })]_+$$   (Eq. 6) 
+
+where $[.]_+ = max(., 0). \gamma _1 , \gamma _2$ are small positive values and $\delta _0, \delta ^{\prime }_0 = 0$ . $\beta _1, \beta _2 >0$ represent constrains to represent the importance of the positive and negative samples. ${T}^+ ,{T}^-$ denote the set of positive and negative samples. $\alpha $ denotes a margin between $\gamma _1$ and $\gamma _2$ . In this formulation we tend to find a $\gamma _1$ is near to zero such that the positive samples gain zero error(the idea of distance based embeddings) and increase a $\gamma _2$ as large as possible to maximize the margin between positive and negative loss.
+
+To apply the limits, we first set the $\gamma _2, \gamma _1$ to positive values. After several iterations if the positive loss ( $loss^+$ ) does no decrease it shows the limit for positive samples is set too small. Therefore, we increase both $\gamma _1 , \gamma _2$ . Whenever during the iterations the $loss^+$ becomes zero we increase $\delta $ by a fixed amount $\xi $ so that $\delta = \delta + \xi $ . We apply the constraint $f(\tau ) - f(\tau ^{\prime }) \ge \gamma _2 - \gamma _1$ on the algorithm so that the proposed loss function would preserve the characteristic of the margin-based ranking loss. We perform a similar comparison for the loss of negative values ( $loss^-$ ) to decrease $\delta ^{\prime }$ . The details of the dynamic limit loss is explained in Algorithm 1. The loops in the Algorithm have become feasible provided that we select an optimizer with adaptive learning rate BIBREF30 which adapts the learning rate after each iteration.0 [t] Dynamic Limit Loss [1] Input: $loss^+$0 training iterations are not finished, for each iteration $loss^+$1 $loss^+$2 $loss^+$3 $loss^+$4 $loss^+$5 $loss^+$6 $loss^+$7 from Equation 6 
+
+## Fully Expressiveness
+
+To prove for fully expressiveness of TransE we define an upper bound $\alpha $ for dimension of entities and relations. Here we prove the expressiveness of TransE with the upper bound $\alpha $ with a small modification on its loss function. We later in Section "Relieving Limitations on Translation Embeddings" , further discuss previous published negative results on the full-expressiveness for TransE.
+
+Proposition 1. For any ground truth over entities $\mathcal {E}$ and relations $\mathcal {R}$ containing $\alpha $ true facts, there exists a TransE model using limit-based loss with the arbitrary limits $\gamma _1$ for positive samples, $\gamma _2$ for negative samples ( $\gamma _2 \ge \gamma _1$ ) and with embedding vectors of size $ \alpha + 1$ representing that ground truth.
+
+We prove the $\alpha + 1 $ bound with setting the arbitrary $\gamma _1$ and $\gamma _2$ . As the base of induction, let $\alpha $ be zero (empty set of triples). For every entity $e_i$ , $e_j$ and relation $r_j$ , to preserve the relations in p-norm: $
+\parallel h_{e_i} + v_{r_j} - t_{e_k}\parallel _p \,\ \ge \gamma _2 \text{~~~for negative samples and ~~~}$ $
+\parallel h_{e_i} + v_{r_j} - t_{e_k}\parallel _p \,\ \le \gamma _1 \text{~~~for positive samples. ~~~}$ 
+
+It is enough to set the value for entities and the relation to one and to set $ 2 \ge \gamma _1 \ge 1 $ and $\gamma _2 \ge 1$ and $\gamma _2 \ge \gamma _1$ . Therefore, there exist an assignment of values for to embedding vectors of size 1 that can represent the ground truth.
+
+In the induction step from $n$ to $n+1$ , where $\alpha = n \,(1 \le n \le |\mathcal {R}| |\mathcal {E}|^2)$ , we prove for any ground truth, there exist an assignment of values to embedding vectors of size $n + 1$ that represents this ground truth. Let $(e_i, r_j, e_k)$ is a fact that is not assigned true by the ground truth of step $n$ . Let $\parallel h_{e_i} + v_{r_j} - t_{e_k}\parallel _p = q $ , where $h_{e_i}$ , $v_{r_j}$ and $t_{e_k}$ are vectors that represent this fact. We add an element to the end of all embedding vectors and set it to 0. This increases the vector sizes to $n+1$0 but does not change any scores. For $n+1$1 , it is enough to set the last element of $n+1$2 to 1, $n+1$3 to 1 and $n+1$4 to be 1 and assign $n+1$5 and we arbitrary set $n+1$6 . This ensures that $n+1$7 for the new vectors, and no other score is affected.
+
+Corollary 1. MDE is fully expressive in the same way as TransE is fully expressiveness using the limit-based loss function. For the proof we only need to follow the proof of Proposition 1 and set the supplementary distances to zero.
+
+Corollary 2. The proof of Proposition 1 is extendable to the family of translation based embeddings with the score function $\parallel A_r h + r - B_r t \parallel _p$ , where $h,r,t \in \mathbb {R}^d$ , $A$ and $B$ are matrices $\in \mathbb {R}^{d^{\prime }\times d}$ given that they apply limit-based loss function, because they all can recreate the score of TransE in the induction.
+
+## Modeling Relational Patterns
+
+In this section, we show that the proposed model not only is capable of learning inverse and composition patterns it can also learn symmetric and antisymmetric relations. We prove the capability of one of the objectives of MDE in learning these patterns, and afterward, we show that in the following propositions (3,4,5) it is enough to prove that one of the distances learns a pattern.
+
+Let $r_1, r_2, r_3$ be relation vector representations and $e_i$ $e_j$ $e_k$ are entity representations. A relation $r_1$ between $(e_i, e_k)$ exists when a triple $(e_i , r_1 , e_k )$ exists and we show it by $r_1(e_i, e_k )$ . Formally, we have the following results: . Proposition 2. Entities with symmetry/antisymmetry pattern can encoded by MDE. If $r_1(e_i, e_j)$ and $r_1(e_j, e_i)$ hold, in equation 2 we have $e_i$0 $e_i$1 
+
+ Proposition 3. Entities with inversion pattern can encoded by MDE. If $r_1(e_i, e_j)$ and $r_2(e_j, e_i)$ hold, from equation 1 we have $
+e_i + r_1 = e_j \wedge e_j + r_2 = e_i \Rightarrow r_1 = - r_2
+$ 
+
+ Proposition 4. Entities with the composition pattern can be encoded by MDE. If $r_1(e_i, e_k)$ , $r_2(e_i, e_j)$ and, $r_3(e_j, e_k)$ hold, from equation 1 we have $
+e_i + r_1 = e_k \wedge e_i + r_2 = e_j \wedge e_j + r_3 = e_k \Rightarrow r_2 + r_3 = r_1 $ 
+
+We first constrain $\gamma _1, \gamma _2, w_1, w_2, w_3$ , such that learning a fact by one of the distances in 4 is enough to classify a fact correctly.
+
+Proposition 5. There exist $\psi $ and $\gamma _1, \gamma _2 \ge 0$ ( $\gamma _1 \ge \gamma _2$ ) that only if one of the three distances esitmates a fact is true based on the Proposition 3, 4, or 5 , the main distance(score) also predicts it as a true fact.
+
+It is enough to show there is at least one set of boundaries for the positive and negative samples that follows the constraints. It is easy to check that equation 3 can learn the same patterns that equation 1 can learn.Therefore the cases to prove are when two of the distance functions $s_1$ and $s_3$ from the equations 1 , 3 classify a fact negative $N$ and the third distance function $s_2$ from equation 3 classify it as positive $P$ , and the case that $s_1$ and $s_3$ classify a fact as positive and $s_2$ classify it as negative. We set $w_1 = w_3 = 1/4$ and $w_2 = 1/2$ and assume that $s_3$0 is the values estimated by the score function of MDE, we have: 
+
+$$a > N/2 \ge \gamma _2/2 \wedge \gamma _1/2 > P/2 \ge 0 \Rightarrow a + \gamma _1/2 > Sum + \psi \ge \gamma _2/2$$   (Eq. 9) 
+
+There exist $a= 2$ and $\gamma _1 = \gamma _2= 2$ and $\psi = 1$ that satisfy $\gamma _1 > Sum \ge 0 $ and the inequality 9 . It can be easily checked that without introduction of $\psi $ , there is no value of $Sum$ that can satisfy both $\gamma _1 > Sum \ge 0 $ and the inequality 9 and its value is calculated based on the values of $\gamma _1$ , $\gamma _2$ and $a$ . In case that future studies discover new interesting distances, this proposition shows how to basically integrate them into MDE.
+
+## Relieving Limitations on Translation Embeddings
+
+Several studies highlighted limited expressiveness for transitional embedding models. Here we show that not only some of their claims are not accurate, we prove that the MDE solves some of those limitations that apply on TransE. While BIBREF31 attempted to prove that RESCAL subsumes the TransE. Their proof is applied to a specific version of TransE, with the score function, $S_{T1}$ which only applies norm $L_2$ and its relation to the vector produced by the score function of TransE $S_{TransE}$ is $ S_{T1} = -\sqrt{S_{TransE}}$ . However, first, TransE can be used with norm $L_1$ and; second, the provided proof is made for $S_{T1}$ which is always less than $S_{TransE}$ . Therefore the declared theory does not relate TransE to RESCAL and does not limit the expressiveness of TransE. The comparison of empirical results of RESCAL and TransE also confirms the incorrectness of this deduction. Another study by BIBREF10 presents the existing restrictions over several translation models by showing that reflexive relations in TransE are also symmetric and transitive. We should remark that these limitations are on generalization power not the expressivity of the model. Nevertheless, here we present two of these restrictions and show how MDE removes them by inclusion of new distance functions over relations and entities. Proposition 6. Below restrictions of translation based embeddings approaches BIBREF10 do not apply to the MDE. These restrictions include: R1: if a relation $r$ is reflexive, on $\Delta \in \mathcal {E}$ , $r$ it will be also symmetric on $L_2$0 , R2: if $L_2$1 is reflexive on $L_2$2 , $L_2$3 it will be also be transitive on $L_2$4 .
+
+R1: For such reflexive $r_1$ , if $r_1(e_i, e_i)$ then $r_l(e_j, e_j)$ . Since definition of MDE is open to weighted sum with new scores. We add the score $\parallel h - r \circ t \parallel _p$ . (which is similar to $\parallel h \circ r - t \parallel _p$ the score of BIBREF11 ) In this equation we have: $e_i = r_1 e_i \wedge e_j = r_1 e_j \Rightarrow r_1 = U \lnot \Rightarrow e_i = r_1 e_j$ 
+
+where $U$ is unit tensor.
+
+R2: For such reflexive $r_1$ , if $r_1(e_i, e_j)$ and $r_l(e_j, e_k)$ then $r_1(e_j, e_i)$ and $r_l(e_k, e_j)$ . In equation above we have: $
+e_i = r_1 e_j \wedge e_j = r_1 e_k \Rightarrow e_i = r_1 r_1 e_j e_k \wedge r_i = U \Rightarrow e_i = e_j e_k \lnot \Rightarrow e_i + e_k = r_l
+$ 
+
+## Time Complexity and Parameter Growth
+
+Considering the ever growth of knowledge graphs and the expansion of the web, it is crucial that the time and memory complexity of a relational mode be minimal. Despite the limitations in expressivity, TransE is one of the popular models on large datasets due to its scalability. With $O(d)$ time complexity, where d is the size of embedding vectors, it is more efficient than RESCAL, NTN and the neural network models. Similar to TransE, the time complexity of MDE is $O(d)$ . Due to additive construction of MDE, inclusion of more distance functions keeps the time complexity linear in the size of vector embeddings.
+
+## Experiments
+
+Datasets: We experimented on four standard datasets: WN18 and FB15k are extracted by BIBREF5 from Wordnet BIBREF32 Freebase BIBREF33 . We used the same train/valid/test sets as in BIBREF5 . WN18 contains 40,943 entities, 18 relations and 141,442 train triples. FB15k contains 14,951 entities, 1,345 relations and 483,142 train triples. In order to test the expressiveness ability rather than relational pattern learning power of models, FB15k-237 BIBREF34 and WN18RR BIBREF35 exclude the triples with inverse relations from FB15k and WN18 which reduced the size of their training data to 56% and 61% respectively. Baselines: We compare MDE with several state-of-the-art relational learning approaches. Our baselines include, TransE, TransH, TransD, TransR, STransE, DistMult, NTN, RESCAL, ER-MLP, and ComplEx and SimplE. We report the results of TransE, DistMult, and ComplEx from BIBREF13 and the results of TransR and NTN from BIBREF36 , and ER-MLP from BIBREF15 . The results on the inverse relation excluded datasets are from BIBREF11 , Table 13 for TransE and RotatE and the rest are from BIBREF35 .
+
+Evaluation Settings: We evaluate the link prediction performance by ranking the score of each test triple against its versions with replaced head, and once for tail. Then we compute the hit at N (hit@N), mean rank(MR) and mean reciprocal rank (MRR) of these rankings. MR is a more robust measure than MRR since in MRR few very good results can influence the overall score.
+
+Implementation: We implemented MDE in PyTorch. Following BIBREF18 , we generated one negative example per positive example for all the datasets. We used Adadelta BIBREF30 as the optimizer and fine-tuned the hyperparameters on the validation dataset. The ranges of the hyperparameters are set as follows: embedding dimension 25, 50, 100, batch size 100, 150, iterations 1000, 1500, 2500, 3600. We set the initial learning rate on all datasets to 10. The best embedding size and $\gamma _1$ and $\gamma _2$ and $\beta _1$ and $\beta _2$ values on WN18 were 50 and 1.9, 1.9, 2 and 1 respectively and for FB15k were 100, 14, 14, 1, 1. The best found embedding size and $\gamma _1$ and $\gamma _2$ and $\beta _1$ and $\beta _2$ values on FB15k-237 were 100, 5.6, 5.6, 1 and 1 respectively and for WN18RR were 50, 2, 2, 5 and 1. In Algorithm 1, we defined $threshold =$ 0.05 and $\xi =$ 0.1. In the equation ( 4 ), we used $\gamma _2$0 = 1.2 for all the experiments.
+
+## Entity Prediction Results
+
+Table 1 and Table 2 show the result of our experiment. Due to the hard limit in the limit based loss, the mean rank of MDE is much lower than other methods. Comparison of MDE and TransE and other distance based models confirms the improved ability of MDE in learning different patterns.
+
+Negative Sampling and Data Augmentation Models: Currently, the training datasets for link prediction evaluation miss negative samples. Therefore, models generate their own negative samples while training. In consequence, the method of negative sample generation influences the result of the models. This problem is crucial because the ranking results of the models are close and the reported works make an unfair comparison of the dataset construction rather than the relational learning models. This is considerable when comparing results to ConvE that generates all possible combinations of object entities to generate samples(e.g., we observed in each iteration, it generates $\approx 26000$ negative samples per one positive sample when training on WN18RR). ComplEx and SimplE also generate 10 negative samples per one positive sample on FB15K. Here, we use 1 negative per positive, for MDE. To show the effect of dataset construction we compare this models with an experiment of TransE and RotatE on FB15k-237 that applies 256 negative samples per one positive sample BIBREF11 . Although these models perform better than the TransE on FB15K(Table1), they produce lower rankings on FB15k-237(Table2) in the more fair comparison conditions.
+
+## Conclusion
+
+In this study, we showed that not only some of the claimed limitations on the expressiveness of score based embeddings do not hold, but also demonstrated how MDE relieves the expressiveness restriction of TransE. Finally, we proved that with the proper loss function translation embedding methods are fully expressive. Besides MDE, BIBREF11 and BIBREF10 , most of the existing models are unable to model all the three relation patterns. Indeed, TransE cannot model the symmetry pattern, DisMult has a problem learning the antisymmetry, ComplEx cannot infer composition rules. Here, we showed a general method to override these limitations of the older models. We demonstrated and validated our contributions via both theoretical proofs and empirical results.

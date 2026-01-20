@@ -1,0 +1,85 @@
+# Luminoso at SemEval-2018 Task 10: Distinguishing Attributes Using Text Corpora and Relational Knowledge
+
+**Paper ID:** 1806.01733
+
+## Abstract
+
+Luminoso participated in the SemEval 2018 task on"Capturing Discriminative Attributes"with a system based on ConceptNet, an open knowledge graph focused on general knowledge. In this paper, we describe how we trained a linear classifier on a small number of semantically-informed features to achieve an $F_1$ score of 0.7368 on the task, close to the task's high score of 0.75.
+
+## Introduction
+
+Word embeddings are most effective when they learn from both unstructured text and a graph of general knowledge BIBREF0 . ConceptNet 5 BIBREF1 is an open-data knowledge graph that is well suited for this purpose. It is accompanied by a pre-built word embedding model known as ConceptNet Numberbatch, which combines skip-gram embeddings learned from unstructured text with the relational knowledge in ConceptNet.
+
+A straightforward application of the ConceptNet Numberbatch embeddings took first place in SemEval 2017 task 2, on semantic word similarity. For SemEval 2018, we built a system with these embeddings as a major component for a slightly more complex task.
+
+The Capturing Discriminative Attributes task BIBREF2 emphasizes the ability of a semantic model to recognize relevant differences between terms, not just their similarities. As the task description states, “If you can tell that americano is similar to capuccino and espresso but you can't tell the difference between them, you don't know what americano is.”
+
+The ConceptNet Numberbatch embeddings only measure the similarity of terms, and we hypothesized that we would need to represent more specific relationships. For example, the input triple “frog, snail, legs” asks us to determine whether “legs” is an attribute that distinguishes “frog” from “snail”. The answer is yes, because a frog has legs while a snail does not. The has relationship is one example of a specific relationship that is represented in ConceptNet.
+
+To capture this kind of specific relationship, we built a model that infers relations between ConceptNet nodes, trained on the existing edges in ConceptNet and random negative examples. There are many models designed for this purpose; the one we decided on is based on Semantic Matching Energy (SME) BIBREF3 .
+
+Our features consisted of direct similarity over ConceptNet Numberbatch embeddings, the relationships inferred over ConceptNet by SME, features that compose ConceptNet with other resources (WordNet and Wikipedia), and a purely corpus-based feature that looks up two-word phrases in the Google Books dataset.
+
+We combined these features based on ConceptNet with features extracted from a few other resources in a LinearSVC classifier, using liblinear BIBREF4 via scikit-learn BIBREF5 . The classifier used only 15 features, of which 12 ended up with non-zero weights, from the five sources described. We aimed to avoid complexity in the classifier in order to prevent overfitting to the validation set; the power of the classifier should be in its features.
+
+The classifier produced by this design (submitted late to the contest leaderboard) successfully avoided overfitting. It performed better on the test set than on the validation set, with a test INLINEFORM0 score of 0.7368, whose margin of error overlaps with the evaluation's reported high score of 0.75.
+
+At evaluation time, we accidentally submitted our results on the validation data, instead of the test data, to the SemEval leaderboard. Our code had truncated the results to the length of the test data, causing us to not notice the mismatch. This erroneous submission got a very low score, of course. This paper presents the corrected test results, which we submitted to the post-evaluation CodaLab leaderboard immediately after the results appeared. We did not change the classifier or data; the change was a one-line change to our code for outputting the classifier's predictions on the test set instead on the validation set.
+
+## Features
+
+In detail, these are the five sources of features we used:
+
+## The Relational Inference Model
+
+To infer truth values for ConceptNet relations, we use a variant of the Semantic Matching Energy model BIBREF3 , adapted to work well on ConceptNet's vocabulary of relations. Instead of embedding relations in the same space as the terms, this model assigns new 10-dimensional embeddings to ConceptNet relations, yielding a compact model for ConceptNet's relatively small set of relations.
+
+The model is trained to distinguish positive examples of ConceptNet edges from negative ones. The positive examples are edges directly contained in ConceptNet, or those that are entailed by changing the relation to a more general one or switching the directionality of a symmetric relation. The negative examples come from replacing one of the terms with a random other term, the relation with a random unentailed relation, or switching the directionality of an asymmetric relation.
+
+We trained this model for approximately 3 million iterations (about 4 days of computation on an nVidia Titan Xp) using PyTorch BIBREF9 . The code of the model is available at https://github.com/LuminosoInsight/conceptnet-sme.
+
+To extract features for the discriminative attribute task, we focus on a subset of ConceptNet relations that would plausibly be used as attributes: RelatedTo, IsA, HasA, PartOf, CapableOf, UsedFor, HasContext, HasProperty, and AtLocation.
+
+For most of these relations, the first argument is the term, and the second argument is the attribute. We use two additional features for PartOf and AtLocation with their arguments swapped, so that the attribute is the first argument. The generic relation RelatedTo, unlike the others, is intended to be symmetric, so we add its value to the value of its swapped version and use it as a single feature.
+
+## The Overfitting-Resistant Classifier
+
+The classifier that we use to make a decision based on these features is scikit-learn's LinearSVC, using the default parameters in scikit-learn 0.19.1. (In Section SECREF4 , we discuss other models and parameters that we tried.) This classifier makes effective use of the features while being simple enough to avoid some amount of overfitting.
+
+One aspect of the classifier that made a noticeable difference was the scaling of the features. We tried INLINEFORM0 and INLINEFORM1 -normalizing the columns of the input matrix, representing the values of each feature, and decided on INLINEFORM2 normalization.
+
+We took advantage of the design of our features and the asymmetry of the task as a way to further mitigate overfitting. All of the features were designed to identify a property that INLINEFORM0 has and INLINEFORM1 does not, as is the case for the discriminative examples, so they should all make a non-negative contribution to a feature being discriminative. We can inspect the coefficients of the features in the SVC's decision boundary. If any feature gets a negative weight, it is likely a spurious result from overfitting to the training data. So, after training the classifier, we clip the coefficients of the decision boundary, setting all negative coefficients to zero.
+
+If we were to remove these features and re-train, or require non-negative coefficients as a constraint on the classifier, then other features would inherently become responsible for overfitting. By neutralizing the features after training, we keep the features that are working well as they are, and remove a part of the model that appears to purely represent overfitting. Indeed, clipping the negative coefficients in this way increased our performance on the validation set.
+
+Table TABREF8 shows the coeffcients assigned to each feature based on the training data.
+
+## Other experiments
+
+There are other features that we tried and later discarded. We experimented with a feature similar to the Google Books 2-grams feature, based on the AOL query logs dataset BIBREF10 . It did not add to the performance, most likely because any information it could provide was also provided by Google Books 2-grams. Similiarly, we tried extending the Google Books 2-grams data to include the first and third words of a selection of 3-grams, but this, too, appeared redundant with the 2-grams.
+
+We also experimented with a feature based on bounding box annotations available in the OpenImages dataset BIBREF11 . We hoped it would help us capture attributes such as colors, materials, and shapes. While this feature did not improve the classifier's performance on the validation set, it did slightly improve the performance on the test set.
+
+Before deciding on scikit-learn's LinearSVC, we experimented with a number of other classifiers. This included random forests, differentiable models made of multiple ReLU and sigmoid layers, and SVM with an RBF kernel or a polynomial kernel.
+
+We also experimented with different parameters to LinearSVC, such as changing the default value of the penalty parameter INLINEFORM0 of the error term, changing the penalty from INLINEFORM1 to INLINEFORM2 , solving the primal optimization problem instead of the dual problem, and changing the loss from squared hinge to hinge. These changes either led to lower performance or had no significant effect, so in the end we used LinearSVC with the default parameters for scikit-learn version 0.19.1.
+
+## Results
+
+When trained on the training set, the classifier we describe achieved an INLINEFORM0 score of 0.7617 on the training set, 0.7281 on the validation set, and 0.7368 on the test set. Table TABREF9 shows these scores along with their standard error of the mean, supposing that these data sets were randomly sampled from larger sets.
+
+## Ablation Analysis
+
+We performed an ablation analysis to see what the contribution of each of our five sources of features was. We evaluated classifiers that used all non-empty subsets of these sources. Figure FIGREF11 plots the results of these 31 classifiers when evaluated on the validation set and the test set.
+
+It is likely that the classifier with all five sources (ABCDE) performed the best overall. It is in a statistical tie ( INLINEFORM0 ) with ABDE, the classifier that omits Wikipedia as a source.
+
+Most of the classifiers perfomed better on the test set than on the validation set, as shown by the dotted line. Some simple classifiers with very few features performed particularly well on the test set. One surprisingly high-performing classifier was A (ConceptNet vector similarity), which gets a test INLINEFORM0 score of 0.7355 INLINEFORM1 0.0091. This is simple enough to be called a heuristic instead of a classifier, and we can express it in closed form. It is equivalent to this expression over ConceptNet Numberbatch embeddings: INLINEFORM2 
+
+where INLINEFORM0 .
+
+It is interesting to note that source A (ConceptNet vector similarity) appears to dominate source B (ConceptNet SME) on the test data. SME led to improvements on the validation set, but on the test set, any classifier containing AB performs equal to or worse than the same classifier with B removed. This may indicate that the SME features were the most prone to overfitting, or that the validation set generally required making more difficult distinctions than the test set.
+
+## Reproducing These Results
+
+The code for our classifier is available on GitHub at https://github.com/LuminosoInsight/semeval-discriminatt, and its input data is downloadable from https://zenodo.org/record/1183358.

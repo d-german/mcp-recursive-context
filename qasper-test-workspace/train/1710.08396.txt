@@ -1,0 +1,58 @@
+# Deep Health Care Text Classification
+
+**Paper ID:** 1710.08396
+
+## Abstract
+
+Health related social media mining is a valuable apparatus for the early recognition of the diverse antagonistic medicinal conditions. Mostly, the existing methods are based on machine learning with knowledge-based learning. This working note presents the Recurrent neural network (RNN) and Long short-term memory (LSTM) based embedding for automatic health text classification in the social media mining. For each task, two systems are built and that classify the tweet at the tweet level. RNN and LSTM are used for extracting features and non-linear activation function at the last layer facilitates to distinguish the tweets of different categories. The experiments are conducted on 2nd Social Media Mining for Health Applications Shared Task at AMIA 2017. The experiment results are considerable; however the proposed method is appropriate for the health text classification. This is primarily due to the reason that, it doesn't rely on any feature engineering mechanisms.
+
+## Introduction
+
+With the expansion of micro blogging platforms such as Twitter, the Internet is progressively being utilized to spread health information instead of similarly as a wellspring of data BIBREF0 , BIBREF1 . Twitter allows users to share their status messages typically called as tweets, restricted to 140 characters. Most of the time, these tweets expresses the opinions about the topics. Thus analysis of tweets has been considered as a significant task in many of the applications, here for health related applications.
+
+Health text classification is taken into account a special case of text classification. The existing methods have used machine learning methods with feature engineering. Most commonly used features are n-grams, parts-of-speech tags, term frequency-inverse document frequency, semantic features such as mentions of chemical substance and disease, WordNet synsets, adverse drug reaction lexicon, etc BIBREF2 , BIBREF3 , BIBREF4 , BIBREF5 , BIBREF6 . In BIBREF5 , BIBREF7 proposed ensemble based approach for classifying the adverse drug reactions tweets.
+
+Recently, the deep learning methods have performed well BIBREF8 and used in many tasks mainly due to that it doesn't rely on any feature engineering mechanism. However, the performance of deep learning methods implicitly relies on the large amount of raw data sets. To make use of unlabeled data, BIBREF9 proposed semi-supervised approach based on Convolutional neural network for adverse drug event detection. Though the data sets of task 1 and task 2 are limited, this paper proposes RNN and LSTM based embedding method.
+
+## Background and hyper parameter selection
+
+This section discusses the concepts of tweet representation and deep learning algorithms particularly recurrent neural network (RNN) and long short-term memory (LSTM) in a mathematical way.
+
+## Tweet representation
+
+Representation of tweets typically called as tweet encoding. This contains two steps. The tweets are tokenized to words during the first step. Moreover, all words are transformed to lower-case. In second step, a dictionary is formed by assigning a unique key for each word in a tweet. The unknown words in a tweet are assigned to default key 0. To retain the word order in a tweet, each word is replaced by a unique number according to a dictionary. Each tweet vector sequence is made to same length by choosing the particular length. The tweet sequences that are too long than the particular length are discarded and too short are padded by zeros. This type of word vector representation is passed as input to the word embedding layer. For task 1, the maximum tweet sequence length is 35. Thus the train matrix of shape 6725*35, valid matrix of shape 3535*35 is passed as input to an embedding layer. For task 2, the maximum tweet sequence length is 34. Thus the train matrix of shape 1065*34, valid matrix of shape 712*34 is passed as input to an embedding layer. Word embedding layer transforms the word vector to the word embedding by using the following mathematical operation. 
+
+$$Input-shape * weights-of-word-embedding = (nb-words, word-embedding-dimension)$$   (Eq. 1) 
+
+where input-shape = (nb-words, vocabulary-size), nb-words denotes the number of top words, vocabulary-size denotes the number of unique words, weights-of-word-embedding = (vocabulary-size, word-embedding-dimension), word-embedding-dimension denotes the size of word embedding vector. This kind of mathematical operation transforms the discrete number to its vectors of continuous numbers. This word embedding layer captures the semantic meaning of the tweet sequence by mapping them in to a high dimensional geometric space. This high dimensional geometric space is called as an embedding space. If an embedding is properly learnt the semantics of the tweet by encoding as a real valued vectors, then the similar tweets appear in a same cluster with close to each other in a high dimensional geometric space. To select optimal parameter for the embedding size, two trails of experiments are run with embedding size 128, 256 and 512. For each experiment, learning rate is set to 0.01. An experiment with embedding size 512 performed well in both the RNN and LSTM networks. Thus for the rest of the experiments embedding size is set to 512. The embedding layer output vector is further passed to RNN and its variant LSTM layer. RNN and LSTM obtain the optimal feature representation and those feature representation are passed to the dropout layer. Dropout layer contains 0.1 which removes the neurons and its connections randomly. This acts as a regularization parameter. In task 1 the output layer contains $sigmoid$ activation function and $softmax$ activation function for task 2.
+
+## Recurrent neural network (RNN) and it’s variant
+
+Recurrent neural network (RNN) was an enhanced model of feed forward network (FFN) introduced in 1990 BIBREF10 . The input sequences ${x_T}$ of arbitrary length are passed to RNN and a transition function $tf$ maps them into hidden state vector $h{i_{t - 1}}$ recursively. The hidden state vector $h{i_{t - 1}}$ are calculated based on the transition function $tf$ of present input sequence ${x_T}$ and previous hidden state vector $h{i_{t - 1}}$ . This can be mathematically formulated as follows 
+
+$$h{i_t} = \,\left\lbrace  \begin{array}{l}
+0\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,\,t = 0\,\\
+tf(h{i_{t - 1}},{x_t})\,\,\,{\rm {otherwise}}
+\end{array} \right\rbrace $$   (Eq. 2) 
+
+This kind of transition function results in vanishing and exploding gradient issue while training BIBREF11 . To alleviate, LSTM was introduced BIBREF11 , BIBREF12 , BIBREF13 . LSTM network contains a special unit typically called as a memory block. A memory block composed of a memory cell $m$ and set of gating functions such as input gate $(ig)$ , forget gate $(fr)$ and output gate $(og)$ to control the states of a memory cell. The transition function $tf$ for each LSTM units is defined below 
+
+$$i{g_t} = \sigma ({w_{ig}}{x_t} + \,{P_{ig}}h{i_{t - 1}} + \,{Q_{ig}}{m_{t - 1}} + {b_{ig}})$$   (Eq. 3) 
+
+$$f{g_t} = \sigma ({w_{fg}}{x_t} + \,{P_{fg}}h{i_{t - 1}} + \,{Q_{fg}}{m_{t - 1}} + {b_{fg}})$$   (Eq. 4) 
+
+where ${x_t}$ is the input at time step $t$ , $P$ and $Q$ are weight parameters, $\sigma $ is sigmoid activation function, $\odot $ denotes element-wise multiplication.
+
+## Experiments
+
+This section discusses the data set details of task 1 and task 2 and followed by experiments related to parameter tuning.
+
+Task 1 is aims at classifying the twitter posts to either the existence of adverse drug reaction (ADR) or not. Task 2 aims at classifying the twitter posts to personal medication intake, possible medication intake or non-intake. The data sets for all two tasks are provided by shared task committee and the detailed statistics of them are reported in Table 1 and Table 2. Each task data set is composed of train, validation and test data sets.
+
+## Results
+
+All experiments are trained using backpropogation through time (BPTT) BIBREF14 on Graphics processing unit (GPU) enabled TensorFlow BIBREF6 computational framework in conjunction with Keras framework in Ubuntu 14.04. We have submitted one run based on LSTM for task 1 and two runs composed of one run based on RNN and other one based on LSTM for task 2. The evaluation results is given by shared task committee are reported in Table 3 and 4.
+
+## Conclusion
+
+Social media mining is considerably an important source of information in many of health applications. This working note presents RNN and LSTM based embedding system for social media health text classification. Due to limited number of tweets, the performance of the proposed method is very less. However, the obtained results are considerable and open the way in future to apply for the social media health text classification. Moreover, the performance of the LSTM based embedding for task 2 is good in comparison to the task 1. This is primarily due to the fact that the target classes of task 1 data set imbalanced. Hence, the proposed method can be applied on large number of tweets corpus in order to attain the best performance.

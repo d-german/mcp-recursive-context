@@ -9,10 +9,10 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class CountFilesTool
 {
     [McpServerTool(Name = "count_files")]
-    [Description("Count files matching a pattern. Use to check scope before enumerating files. IMPORTANT: Directory path is relative to workspace root (RLM_WORKSPACE_ROOT), not the current shell directory.")]
+    [Description("Count files matching a pattern. TIP: Use count_files first to scope your search before aggregating. Path is relative to workspace root.")]
     public static async Task<string> CountFiles(
         IAggregationService aggregationService,
-        [Description("Directory to search in, relative to workspace root. Example: 'src/data' or 'qasper-test-workspace/train'. Use '.' for workspace root.")] string directory,
+        [Description("Directory to search in, relative to workspace root. Use '.' for root.")] string directory,
         [Description("File pattern (e.g., *.cs, *.json, *.txt). Default: *")] string pattern = "*",
         [Description("Search subdirectories recursively. Default: true")] bool recursive = true,
         CancellationToken ct = default)

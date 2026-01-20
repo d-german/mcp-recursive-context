@@ -1,0 +1,91 @@
+# Character-Centric Storytelling
+
+**Paper ID:** 1909.07863
+
+## Abstract
+
+Sequential vision-to-language or visual storytelling has recently been one of the areas of focus in computer vision and language modeling domains. Though existing models generate narratives that read subjectively well, there could be cases when these models miss out on generating stories that account and address all prospective human and animal characters in the image sequences. Considering this scenario, we propose a model that implicitly learns relationships between provided characters and thereby generates stories with respective characters in scope. We use the VIST dataset for this purpose and report numerous statistics on the dataset. Eventually, we describe the model, explain the experiment and discuss our current status and future work.
+
+## Introduction
+
+Visual storytelling and album summarization tasks have recently been of focus in the domain of computer vision and natural language processing. With the advent of new architectures, solutions for problems like image captioning and language modeling are getting better. Therefore it is only natural to work towards storytelling; deeper visual context yielding a more expressive style language, as it could potentially improve various applications involving tasks using visual descriptions and visual question answering. BIBREF0.
+
+Since the release of the VIST visual storytelling dataset BIBREF1, there have been numerous approaches modeling the behavior of stories, leveraging and extending successful sequence-to-sequence based image captioning architectures. Some of them primarily addressed means of incorporating image-sequence feature information into a narrative generating network BIBREF2, BIBREF3, while others focused on model learning patterns and behavioral orientations with changes in back-propagation methods BIBREF4, BIBREF5. Motivated by these works we now want to understand the importance of characters and their relationships in visual storytelling.
+
+Specifically, we extract characters from the VIST dataset, analyze their influence across the dataset and exploit them for paying attention to relevant visual segments during story-generation. We report our findings, discuss the directions of our ongoing work and suggest recommendations for using characters as semantics in visual storytelling.
+
+## Related work
+
+BIBREF1 published the VIST dataset along with a baseline sequence-to-sequence learning model that generates stories for image sequences in the dataset. Gradually, as a result of the 2018 storytelling challenge, there have been other works on VIST. Most of them extended the encoder-decoder architecture introduced in the baseline publication by adding attention mechanisms BIBREF3, learning positionally dependent parameters BIBREF2 and using reinforcement learning based methods BIBREF4, BIBREF5.
+
+To our best knowledge, there are no prior works making use of characters for visual storytelling. The only work that uses any additional semantics for story generation is BIBREF5. They propose a hierarchical model structure which first generates a “semantic topic" for each image in the sequence and then uses that information during the generation phase. The core module of their hierarchical model is a Semantic Compositional Network (SCN) BIBREF6, a recurrent neural network variant generating text conditioned on the provided semantic concepts.
+
+Unlike traditional attention mechanisms, the SCN assembles the information on semantics directly into the neural network cell. It achieves this by extending the gate and state weight matrices to adhere to additional semantic information provided for the language generation phase. Inspired by the results SCN achieved for image and video captioning, we use it for storytelling. The semantic concepts we use are based on character frequencies and their co-occurrence information extracted from the stories of the VIST dataset.
+
+Our expectation is that the parameters of the language decoder network generating the story are dependent on the character semantics and would learn to capture linguistic patterns while simultaneously learning mappings to respective visual features of the image sequence.
+
+## Data
+
+We used the Visual storytelling (VIST) dataset comprising of image sequences obtained from Flickr albums and respective annotated descriptions collected through Amazon Mechanical Turk BIBREF1. Each sequence has 5 images with corresponding descriptions that together make up for a story. Furthermore, for each Flickr album there are 5 permutations of a selected set of its images. In the overall available data there are 40,071 training, 4,988 validation, and 5,050 usable testing stories.
+
+## Data ::: Character extraction
+
+We extracted characters out of the VIST dataset. To this end, we considered that a character is either “a person" or “an animal". We decided that the best way to do this would be by making use of the human-annotated text instead of images for the sake of being diverse (e.g.: detection on images would yield “person", as opposed to father).
+
+The extraction takes place as a two-step process:
+
+Identification of nouns: We first used a pretrained part-of-speech tagger BIBREF7 to identify all kinds of nouns in the annotations. Specifically, these noun categories are NN – common, singular or mass, NNS – noun, common, plural, NNP – noun, proper, singular, and NNPS – noun, proper, plural.
+
+Filtering for hypernyms: WordNet BIBREF8 is a lexical database over the English language containing various semantic relations and synonym sets. Hypernym is one such semantic relation constituting a category into which words with more specific meanings fall. From among the extracted nouns, we thereby filtered those words that have their lowest common hypernym as either “person" or “animal".
+
+## Data ::: Character analysis
+
+We analyzed the VIST dataset from the perspective of the extracted characters and observed that 20,405 training, 2,349 validation and 2,768 testing data samples have at least one character present among their stories. This is approximately 50% of the data samples in the entire dataset. To pursue the prominence of relationships between these characters, we analyzed these extractions for both individual and co-occurrence frequencies.
+
+We found a total of 1,470 distinct characters with 1,333 in training, 387 in validation and 466 in the testing splits. This can be considered as an indication to the limited size of the dataset because the number of distinct characters within each split is strongly dependent on the respective size of that split.
+
+Figure FIGREF3 plots the top 30 most frequent characters in the training split of the dataset. Apart from the character “friends" there is a gradual decrease in the occurrence frequencies of the other characters from “mom" to “grandmother". Similarly, in Figure FIGREF4, which plots the top 30 most co-occurring character pairs, (“dad", “mom"), (“friend", “friends") pairs occur drastically more number of times than other pairs in the stories. This can lead to an inclination bias of the story generator towards these characters owing to the data size limitations we discussed.
+
+In the process of detecting characters, we observed also that $\sim $5000 distinct words failed on WordNet due to their misspellings (“webxites"), for being proper nouns (“cathrine"), for being an abbreviation (“geez"), and simply because they were compound words (“sing-a-long"). Though most of the models ignore these words based on a vocabulary threshold value (typically 3), we would like to comment that language model creation without accounting for these words could adversely affect the behavior of narrative generation.
+
+## Model
+
+Our model in Figure FIGREF6 follows the encoder-decoder structure. The encoder module incorporates the image sequence features, obtained using a pretrained convolutional network, into a subject vector. The decoder module, a semantically compositional recurrent network (SCN) BIBREF6, uses the subject vector along with character probabilities and generates a relevant story.
+
+## Model ::: Character semantics
+
+The relevant characters with respect to each data-sample are obtained as a preprocessing step. We denote characters extracted from the human-annotated stories of respective image-sequences as active characters. We then use these active characters to obtain other characters which could potentially influence the narrative to be generated. We denote these as passive characters and they can be obtained using various methods. We describe some methods we tried in Section SECREF5. The individual frequencies of these relevant characters, active and passive are then normalized by the vocabulary size and constitute the character probabilities.
+
+## Model ::: Encoder
+
+Images of a sequence are initially passed through a pretrained ResNet network BIBREF9, for obtaining their features. The features extracted are then provided to the encoder module, which is a simple recurrent neural network employed to learn parameters for incorporating the subjects in the individual feature sets into a subject vector.
+
+## Model ::: Decoder
+
+We use the SCN-LSTM variant of the recurrent neural network for the decoder module as shown in Figure FIGREF10. The network extends each weight matrix of the conventional LSTM to be an ensemble of a set of tag-dependent weight matrices, subjective to the character probabilities. Subject vector from the encoder is fed into the LSTM to initialize the first step. The LSTM parameters utilized when decoding are weighted by the character probabilities, for generating a respective story.
+
+Gradients $\nabla $, propagated back to the network, nudge the parameters $W$ to learn while adhering to respective character probabilities $\vec{cp}$:
+
+Consequently, the encoder parameters move towards incorporating the image-sequence features better.
+
+## Experiments
+
+We report the current status of our work and the intended directions of progress we wish to make using the designed model. All experiments were performed on the VIST dataset.
+
+As mentioned in Section SECREF5, passive characters can be selected by conditioning their relationships on several factors. We explain two such methods:
+
+## Experiments ::: Method 1
+
+In the first method we naïvely select all the characters co-occurring with respective active characters. Subsequently, probabilities for these passive characters are co-occurrence counts normalized by the corpus vocabulary size. This method enables the model to learn parameters on the distribution of character relationships.
+
+## Experiments ::: Method 2
+
+In the second approach, we conditionally select a limited number of characters that collectively co-occur most with the respective active characters. This is visualized in Figure FIGREF13. The selected passive characters “girlfriend", “father" and “son" collectively co-occur in the most co-occurring characters of the active characters. $K$ in this case is a tunable hyperparameter.
+
+## Discussion
+
+Both methods we are experimenting with exhibit different initial traits. We are currently working towards analyzing the character relationships learned by the models and understanding the abstract concepts that get generated as a result of such learning. We do not report any generated stories and evaluations yet as we consider that to be premature without proper examination. However, we feel the training process metrics are encouraging and provide us with enough intuition for pursuing the proposed approach to its fullest scope.
+
+## Conclusion
+
+We have extracted, analyzed and exploited characters in the realm of storytelling using the VIST dataset. We have provided a model that can make use of the extracted characters to learn their relationships and thereby generate grounded and subjective narratives for respective image sequences. For future work we would like to make the encoder semantically compositional by extracting visual tags and also explore ways to improve learning of character relationships while avoiding overfitting.

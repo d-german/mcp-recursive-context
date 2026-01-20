@@ -1,0 +1,120 @@
+# Rotations and Interpretability of Word Embeddings: the Case of the Russian Language
+
+**Paper ID:** 1707.04662
+
+## Abstract
+
+Consider a continuous word embedding model. Usually, the cosines between word vectors are used as a measure of similarity of words. These cosines do not change under orthogonal transformations of the embedding space. We demonstrate that, using some canonical orthogonal transformations from SVD, it is possible both to increase the meaning of some components and to make the components more stable under re-learning. We study the interpretability of components for publicly available models for the Russian language (RusVectores, fastText, RDT).
+
+## Introduction
+
+Word embeddings are frequently used in NLP tasks. In vector space models every word from the source corpus is represented by a dense vector in $\mathbb {R}^d$ , where the typical dimension $d$ varies from tens to hundreds. Such embedding maps similar (in some sense) words to close vectors. These models are based on the so called distributional hypothesis: similar words tend to occur in similar contexts BIBREF0 . Some models also use letter trigrams or additional word properties such as morphological tags.
+
+There are two basic approaches to the construction of word embeddings. The first is count-based, or explicit BIBREF1 , BIBREF2 . For every word-context pair some measure of their proximity (such as frequency or PMI) is calculated. Thus, every word obtains a sparse vector of high dimension. Further, the dimension is reduced using singular value decomposition (SVD) or non-negative sparse embedding (NNSE). It was shown that truncated SVD or NNSE captures latent meaning in such models BIBREF3 , BIBREF4 . That is why the components of embeddings in such models are already in some sense canonical. The second approach is predict-based, or implicit. Here the embeddings are constructed by a neural network. Popular models of this kind include word2vec BIBREF5 , BIBREF6 and fastText BIBREF7 .
+
+Consider a predict-based word embedding model. Usually in such models two kinds of vectors, both for words and contexts, are constructed. Let $N$ be the vocabulary size and $d$ be the dimension of embeddings. Let $W$ and $C$ be $N \times d$ -matrices whose rows are word and context vectors. As a rule, the objectives of such models depend on the dot products of word and context vectors, i. e., on the elements of $WC^T$ . In some models the optimization can be directly rewritten as a matrix factorization problem BIBREF8 , BIBREF9 . This matrix remains unchanged under substitutions $W \mapsto W S, \quad C \mapsto C {S^{-1}}^T$ for any invertible $S$ . Thus, when no other constraints are specified, there are infinitely many equivalent solutions BIBREF10 .
+
+Choosing a good, not necessarily orthogonal, post-processing transformation $S$ that improves quality in applied problems is itself interesting enough BIBREF11 . However, only word vectors are typically used in practice, and context vectors are ignored. The cosine distance between word vectors is used as a similarity measure between words. These cosines will not change if and only if the transformation $S$ is orthogonal. Such transformations do not affect the quality of the model, but may elucidate the meaning of vectors' components. Thus, the following problem arises: what orthogonal transformation is the best one for describing the meaning of some (or all) components?
+
+It is believed that the meaning of the components of word vectors is hidden BIBREF12 . But even if we determine the “meaning” of some component, we may loose it after re-training because of random initialization, thread synchronization issues, etc. Many researchers BIBREF13 , BIBREF14 , BIBREF15 , BIBREF16 ignore this fact and, say, work with vector components directly, and only some of them take basis rotations into account BIBREF17 . We show that, generally, re-trained model differ from the source model by almost orthogonal transformation. This leads us to the following problem: how one can choose the canonical coordinates for embeddings that are (almost) invariant with respect to re-training?
+
+We suggest using well-known plain old technique, namely, the singular value decomposition of the word matrix $W$ . We study the principal components of different models for Russian language (RusVectōrēs, RDT, fastText, etc.), although the results are applicable for any language as well.
+
+## Related Work
+
+Interpretability of the components have been extensively studied for topic models. In BIBREF18 , BIBREF19 two methods for estimating the coherence of topic models with manual tagging have been proposed: namely, word intrusion and topic intrusion. Automatic measures of coherence based on different similarities of words were proposed in BIBREF20 , BIBREF21 . But unlike topic models, these methods cannot be applied directly to word vectors.
+
+There are lots of new models where interpretability is either taken into account by design BIBREF13 (modified skip-gram that produces non-negative entries), or is obtained automagically BIBREF15 (sparse autoencoding).
+
+Lots of authors try to extract some predefined significant properties from vectors: BIBREF16 (for non-negative sparse embeddings), BIBREF17 (using a CCA-based alignment between word vectors and manually-annotated linguistic resource), BIBREF22 (ultradense projections).
+
+Singular vector decomposition is the core of count-based models. To our knowledge, the only paper where SVD was applied to predict-based word embedding matrices is BIBREF11 . In BIBREF23 the first principal component is constructed for sentence embedding matrix (this component is excluded as the common one).
+
+Word embeddings for Russian language were studied in BIBREF24 , BIBREF25 , BIBREF26 , BIBREF27 .
+
+## Singular value decomposition
+
+Let $m \ge n$ . Recall BIBREF28 that a singular value decomposition (SVD) of an $m\times n$ -matrix $M$ is a decomposition $M = U \Sigma V^T$ , where $U$ is an an $m \times n$ matrix, $U^T U = I_{n}$ , $\Sigma $ is a diagonal $n \times n$ -matrix, and $V$ is an $m\times n$0 orthogonal matrix. Diagonal elements of $m\times n$1 are non-negative and are called singular values. Columns of $m\times n$2 are eigenvectors of $m\times n$3 , and columns of $m\times n$4 are eigenvectors of $m\times n$5 . Squares of singular values are eigenvalues of these matrices. If all singular values are different and positive, then SVD is unique up to permutation of singular values and choosing the direction of singular vectors. Buf if some singular values coincide or equal zero, new degrees of freedom arise.
+
+## Invariance under re-training
+
+Learning methods are usually not deterministic. The model re-trained with similar hyperparameters may have completely different components. Let $M_1$ and $M_2$ be the word matrices obtained after two separate trainings of the model. Let these embeddings be similar in the sense that cosine distances between words are almost the same, i. e., $M_1M_1^T \approx M_2M_2^T$ . Suppose also that singular values of each $M_i$ are different and non-zero. Then one can show that $M_1$ and $M_2$ differ only by the (almost) orthogonal factor. Indeed, left singular vectors in SVD of $M_i$ are eigenvectors of $M_iM_i^T$ . Hence, matrices $U$ and $\Sigma $ in SVD of $M_2$0 and $M_2$1 can be chosen the same. Thus, $M_2$2 , where $M_2$3 . Here $M_2$4 can be chosen as $M_2$5 where $M_2$6 are matrices of right singular vectors in SVD of $M_2$7 .
+
+## Interpretability measures
+
+One of traditional measures of interpretability in topic modeling looks as follows BIBREF29 , BIBREF19 . For each component, $n$ most probable words are selected. Then for each pair of selected words some co-occurrence measure such as PMI is calculated. These values are averaged over all pairs of selected words and all components. The other approaches use human markup. Such measures need additional data, and it is difficult to study them algebraically. Also, unlike topic modeling, word embeddings are not probabilistic: both positive and negative values of coordinates should be considered.
+
+Let all word vectors be normalized and $W$ be the word matrix. Inspired by BIBREF21 , where vector space models are used for evaluating topic coherence, we suggest to estimate the interpretability of $k$ th component as $
+\operatorname{interp}_k W = \sum _{i,j=1}^N W_{i,k} W_{j,k} \left(W_i \cdot W_j \right).
+$ 
+
+The factors $W_{i,k}$ and $W_{j,k}$ are the values of $k$ th components of $i$ th and $j$ th words. The dot product $\left(W_i \cdot W_j\right)$ reflects the similarity of words. Thus, this measure will be high if similar words have similar values of $k$ th coordinates.
+
+What orthogonal transformation $Q$ maximizes this interpretability (for some, or all components) of $WQ$ ? In matrix terms, $
+\operatorname{interp}_k W =(W^T W W^T W)_{k, k},
+$ 
+
+and $
+\operatorname{interp}_k WQ = \left(Q^T W^T W W^T W Q\right)_{k,k}
+$ 
+
+because $Q$ is orthogonal. The total interpretability over all components is $
+\sum _{k=1}^d \operatorname{interp}_k WQ = \sum _{k=1}^d \left(Q^T W^T W W^T W Q \right)_{k,k} = \\
+= \operatorname{tr}Q^T W^T W W^T W Q = \operatorname{tr}\left(W^T W W^T W\right) = \sum _{k=1}^d \operatorname{interp}_k W,
+$ 
+
+because $\operatorname{tr}Q^T X Q = \operatorname{tr}Q^{-1} X Q = \operatorname{tr}X$ . It turns out that in average the interpretability is constant under any orthogonal transformation. But it is possible to make the first components more interpretable due to the other components. For example, $
+(Q^T W^T W W^T W Q)_{1, 1} = \left(q^T W^T W q\right)^2
+$ 
+
+is maximized when $q$ is the eigenvector of $W^T W$ with the largest singular value, i. e., the first right singular vector of $W$ BIBREF28 . Let's fix this vector and choose other vectors to be orthogonal to the selected ones and to maximize the interpretability. We arrive at $Q = V$ , where $V$ is the right orthogonal factor in SVD $W = U \Sigma V^T$ .
+
+## Canonical basis for embeddings
+
+We train two fastText skipgram models on the Russian Wikipedia with default parameters. First, we normalize all word vectors. Then we build SVD decompositions of obtained word matrices and use $V$ as an orthogonal transformation. Thus, new “rotated” word vectors are described by the matrix $WV = U \Sigma $ . The corresponding singular values are shown in Figure 1, they almost coincide for both models (and thus are shown only for the one model). For each component both in the source and the rotated models we take top 50 words with maximal (positive) and bottom 50 words with minimal (negative) values of the component. Taking into account that principal components are determined up to the direction, we join these positive and negative sets together for each component.
+
+We measure the overlapping of these sets of words. Additionally, we use the following alignment of components: first, we look for the free indices $i$ and $j$ such that $i$ th set of words from the first model and $j$ th set of words from the second model have the maximal intersection, and so on. We call the difference $i - j$ the alignment shift for the $i$ th component. Results are presented in Figures 2 and 3. We see that at least for the first part of principal components (in the rotated models) the overlapping is big enough and is much larger that that for the source models. Moreover, these first components have almost zero alignment shifts. Other principal components have very similar singular values, and thus they cannot be determined uniquely with high confidence.
+
+Normalized interpretibility measures for different components (calculated for 50 top/bottom words) for the source and the rotated models are shown in Fig. 4.
+
+## Principal components of different models
+
+We took the following already published models:
+
+RusVectōrēs lemmatized models (actually, word2vec) trained on different Russian corpora BIBREF30 ;
+
+Russian Distributional Thesaurus (actually, word2vec skipgram) models trained on Russian books corpus BIBREF31 ;
+
+fastText model trained on Russian Wikipedia BIBREF7 .
+
+For each model we took $n = 10000$ or $n = 100000$ most frequent words. Each word vector was normalized in order to replace cosines with dot products. Then we perform SVD $W = U \Sigma V^T$ and take the matrix $W V = U \Sigma $ . For each of $d$ components we sort the words by its value and choose top $t$ “positive” and bottom $t$ “negative” words ( $t=15$ or 30). For clarity, every selection was clustered into buckets with the simplest greedy algorithm: list the selected words in decreasing order of frequency and either add the current word to some cluster if it is close enough to the word (say, the cosine is greater than $0.6$ ), or make a new cluster. The cluster's vector is the average vector of its words. Intuitively, the smaller the number of clusters, the more interpretable the component is. Similar approach was used in BIBREF32 .
+
+Tables in the Appendix show the top “negative” and “positive” words of the first principal components for different models. We underline that principal components are determined up to the direction, and thus the separation into “negative” and “positive” parts is random. The full results are available at https://alzobnin.github.io/. We cluster these words as described above; different clusters are separated by semicolons. We see the following interesting features in the components:
+
+stop words: prepositions, conjunctions, etc. (RDT 1, fastText 1; in RusVectōrēs models they are absent just because they were filtered out before training);
+
+foreign words with separation into languages (fastText 2, web 2), words with special orthography or tokens in broken encoding (not presented here);
+
+names and surnames (RDT 8, fastText 3, web 3), including foreing names (fastText 9, web 6);
+
+toponyms (not presented here) and toponym descriptors (web 7);
+
+fairy tale characters (fastText 6);
+
+parts of speech and morphological forms (cases and numbers of nouns and adjectives, tenses of verbs);
+
+capitalization (in fact, first positions in the sentences) and punctuation issues (e. g., non-breaking spaces);
+
+Wikipedia authors and words from Wikipedia discussion pages (fastText 5);
+
+other different semantic categories.
+
+We also made an attempt to describe obtained components automatically in terms of common contexts of common morphological and semantic tags using MyStem tagger and semantic markup from Russian National Corpus. Unfortunately, these descriptions are not as good as desired and thus they are not presented here.
+
+## Conclusion
+
+We study principal components of publicly available word embedding models for the Russian language. We see that the first principal components indeed are good interpretable. Also, we show that these components are almost invariant under re-learning. It will be interesting to explore the regularities in canonical components between different models (such as CBOW versus Skip-Gram, different train corpora and different languages BIBREF33 . It is also worth to compare our intrinsic interpretability measure with human judgements.
+
+## Acknowledgements
+
+The author is grateful to Mikhail Dektyarev, Mikhail Nokel, Anna Potapenko and Daniil Tararukhin for valuable and fruitful discussions.

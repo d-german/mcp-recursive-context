@@ -1,0 +1,43 @@
+# Discriminating between similar languages in Twitter using label propagation
+
+**Paper ID:** 1607.05408
+
+## Abstract
+
+Identifying the language of social media messages is an important first step in linguistic processing. Existing models for Twitter focus on content analysis, which is successful for dissimilar language pairs. We propose a label propagation approach that takes the social graph of tweet authors into account as well as content to better tease apart similar languages. This results in state-of-the-art shared task performance of $76.63\%$, $1.4\%$ higher than the top system.
+
+## Introduction
+
+Language identification is a crucial first step in textual data processing and is considered feasible over formal texts BIBREF0 . The task is harder for social media (e.g. Twitter) where text is less formal, noisier and can be written in wide range of languages. We focus on identifying similar languages, where surface-level content alone may not be sufficient. Our approach combines a content model with evidence propagated over the social network of the authors. For example, a user well-connected to users posting in a language is more likely to post in that language. Our system scores 76.63%, 1.4% higher than the top submission to the tweetLID workshop.
+
+## Background
+
+Traditional language identification compares a document with a language fingerprint built from n-gram bag-of-words (character or word level). Tweets carry additional metadata useful for identifying language, such as geolocation BIBREF1 , username BIBREF2 , BIBREF1 and urls mentioned in the tweet BIBREF2 . Other methods expand beyond the tweet itself to use a histogram of previously predicted languages, those of users @-mentioned and lexical content of other tweets in a discussion BIBREF1 . Discriminating between similar languages was the focus of the VarDial workshop BIBREF3 , and most submissions used content analysis. These methods make limited use of the social context in which the authors are tweeting – our research question is “Can we identify the language of a tweet using the social graph of the tweeter?”.
+
+Label propagation approaches BIBREF4 are powerful techniques for semi-supervised learning where the domain can naturally be described using an undirected graph. Each node contains a probability distribution over labels, which may be empty for unlabelled nodes, and these labels are propagated over the graph in an iterative fashion. Modified Adsorption (mad) BIBREF5 , is an extension that allows more control of the random walk through the graph. Applications of lp and mad are varied, including video recommendation BIBREF6 and sentiment analysis over Twitter BIBREF7 .
+
+## Method
+
+Our method predicts the language INLINEFORM0 for a tweet INLINEFORM1 by combining scores from a content model and a graph model that takes social context into account, as per Equation EQREF2 :
+
+ DISPLAYFORM0 
+
+Where INLINEFORM0 are the content model parameters, INLINEFORM1 the social model parameters.
+
+## Content model
+
+Our content model is a 1 vs. all INLINEFORM0 regularised logistic regression model with character 2- to 5-grams features, not spanning over word boundaries. The scores for a tweet are normalised to obtain a probability distribution.
+
+## Social model
+
+We use a graph to model the social media context, relating tweets to one another, authors to tweets and other authors. Figure FIGREF7 shows the graph, composed of three types of nodes: tweets (T), users (U) and the “world” (W). Edges are created between nodes and weighted as follows: T-T the unigram cosine similarity between tweets, T-U weighted 100 between a tweet and its author, U-U weighted 1 between two users in a “follows” relationship and U-W weighted 0.001 to ensure a connected graph for the mad algorithm.
+
+We create the graph using all data, and training set tweets have an initial language label distribution. A naïve approach to building the tweet-tweet subgraph requires O( INLINEFORM0 ) comparisons, measuring the similarity of each tweet with all others. Instead, we performed INLINEFORM1 -nearest-neighbour classification on all tweets, represented as a bag of unigrams, and compared each tweet and the top- INLINEFORM2 neighbours. We use Junto (mad) BIBREF5 to propagate labels from labelled to unlabelled nodes. Upon convergence, we renormalise label scores for initially unlabelled nodes to find the value of INLINEFORM4 .
+
+## Evaluation
+
+The tweetLID workshop shared task requires systems to identify the language of tweets written in Spanish (es), Portuguese (pt), Catalan (ca), English (en), Galician (gl) and Basque (eu). Some language pairs are similar (es and ca; pt and gl) and this poses a challenge to systems that rely on content features alone. We use the supplied evaluation corpus, which has been manually labelled with six languages and evenly split into training and test collections. We use the official evaluation script and report precision, recall and F-score, macro-averaged across languages. This handles ambiguous tweets by permitting systems to return any of the annotated languages. Table TABREF10 shows that using the content model alone is more effective for languages that are distinct in our set of languages (i.e. English and Basque). For similar languages, adding the social model helps discriminate them (i.e. Spanish, Portuguese, Catalan and Galician), particularly those where a less-resourced language is similar to a more popular one. Using the social graph almost doubles the F-score for undecided (und) languages, either not in the set above or hard-to-identify, from 18.85% to 34.95%. Macro-averaged, our system scores 76.63%, higher than the best score in the competition: 75.2%.
+
+## Conclusion
+
+Our approach uses social information to help identify the language of tweets. This shows state-of-the-art performance, especially when discriminating between similar languages. A by-product of our approach is that users are assigned a language distribution, which may be useful for other tasks.

@@ -1,0 +1,171 @@
+# Seeing Things from a Different Angle: Discovering Diverse Perspectives about Claims
+
+**Paper ID:** 1906.03538
+
+## Abstract
+
+One key consequence of the information revolution is a significant increase and a contamination of our information supply. The practice of fact checking won't suffice to eliminate the biases in text data we observe, as the degree of factuality alone does not determine whether biases exist in the spectrum of opinions visible to us. To better understand controversial issues, one needs to view them from a diverse yet comprehensive set of perspectives. For example, there are many ways to respond to a claim such as"animals should have lawful rights", and these responses form a spectrum of perspectives, each with a stance relative to this claim and, ideally, with evidence supporting it. Inherently, this is a natural language understanding task, and we propose to address it as such. Specifically, we propose the task of substantiated perspective discovery where, given a claim, a system is expected to discover a diverse set of well-corroborated perspectives that take a stance with respect to the claim. Each perspective should be substantiated by evidence paragraphs which summarize pertinent results and facts. We construct PERSPECTRUM, a dataset of claims, perspectives and evidence, making use of online debate websites to create the initial data collection, and augmenting it using search engines in order to expand and diversify our dataset. We use crowd-sourcing to filter out noise and ensure high-quality data. Our dataset contains 1k claims, accompanied with pools of 10k and 8k perspective sentences and evidence paragraphs, respectively. We provide a thorough analysis of the dataset to highlight key underlying language understanding challenges, and show that human baselines across multiple subtasks far outperform ma-chine baselines built upon state-of-the-art NLP techniques. This poses a challenge and opportunity for the NLP community to address.
+
+## Introduction
+
+Understanding most nontrivial claims requires insights from various perspectives. Today, we make use of search engines or recommendation systems to retrieve information relevant to a claim, but this process carries multiple forms of bias. In particular, they are optimized relative to the claim (query) presented, and the popularity of the relevant documents returned, rather than with respect to the diversity of the perspectives presented in them or whether they are supported by evidence.
+
+In this paper, we explore an approach to mitigating this selection bias BIBREF0 when studying (disputed) claims. Consider the claim shown in Figure FIGREF1 : “animals should have lawful rights.” One might compare the biological similarities/differences between humans and other animals to support/oppose the claim. Alternatively, one can base an argument on morality and rationality of animals, or lack thereof. Each of these arguments, which we refer to as perspectives throughout the paper, is an opinion, possibly conditional, in support of a given claim or against it. A perspective thus constitutes a particular attitude towards a given claim.
+
+Natural language understanding is at the heart of developing an ability to identify diverse perspectives for claims. In this work, we propose and study a setting that would facilitate discovering diverse perspectives and their supporting evidence with respect to a given claim. Our goal is to identify and formulate the key NLP challenges underlying this task, and develop a dataset that would allow a systematic study of these challenges. For example, for the claim in Figure FIGREF1 , multiple (non-redundant) perspectives should be retrieved from a pool of perspectives; one of them is “animals have no interest or rationality”, a perspective that should be identified as taking an opposing stance with respect to the claim. Each perspective should also be well-supported by evidence found in a pool of potential pieces of evidence. While it might be impractical to provide an exhaustive spectrum of ideas with respect to a claim, presenting a small but diverse set of perspectives could be an important step towards addressing the selection bias problem. Moreover, it would be impractical to develop an exhaustive pool of evidence for all perspectives, from a diverse set of credible sources. We are not attempting to do that. We aim at formulating the core NLP problems, and developing a dataset that will facilitate studying these problems from the NLP angle, realizing that using the outcomes of this research in practice requires addressing issues such as trustworthiness BIBREF1 , BIBREF2 and possibly others. Inherently, our objective requires understanding the relations between perspectives and claims, the nuances in the meaning of various perspectives in the context of claims, and relations between perspectives and evidence. This, we argue, can be done with a diverse enough, but not exhaustive, dataset. And it can be done without attending to the legitimacy and credibility of sources contributing evidence, an important problem but orthogonal to the one studied here.
+
+To facilitate the research towards developing solutions to such challenging issues, we propose [wave]390P[wave]415e[wave]440r[wave]465s[wave]485p[wave]525e[wave]535c[wave]595t[wave]610r[wave]635u[wave]660m, a dataset of claims, perspectives and evidence paragraphs. For a given claim and pools of perspectives and evidence paragraphs, a hypothetical system is expected to select the relevant perspectives and their supporting paragraphs.
+
+Our dataset contains 907 claims, 11,164 perspectives and 8,092 evidence paragraphs. In constructing it, we use online debate websites as our initial seed data, and augment it with search data and paraphrases to make it richer and more challenging. We make extensive use of crowdsourcing to increase the quality of the data and clean it from annotation noise.
+
+The contributions of this paper are as follows:
+
+## Design Principles and Challenges
+
+In this section we provide a closer look into the challenge and propose a collection of tasks that move us closer to substantiated perspective discovery. To clarify our description we use to following notation. Let INLINEFORM0 indicate a target claim of interest (for example, the claims INLINEFORM1 and INLINEFORM2 in Figure FIGREF6 ). Each claim INLINEFORM3 is addressed by a collection of perspectives INLINEFORM4 that are grouped into clusters of equivalent perspectives. Additionally, each perspective INLINEFORM5 is supported, relative to INLINEFORM6 , by at least one evidence paragraph INLINEFORM7 , denoted INLINEFORM8 .
+
+Creating systems that would address our challenge in its full glory requires solving the following interdependent tasks:
+
+Determination of argue-worthy claims: not every claim requires an in-depth discussion of perspectives. For a system to be practical, it needs to be equipped with understanding argumentative structures BIBREF3 in order to discern disputed claims from those with straightforward responses. We set aside this problem in this work and assume that all the inputs to the systems are discussion-worthy claims.
+
+Discovery of pertinent perspectives: a system is expected to recognize argumentative sentences BIBREF4 that directly address the points raised in the disputed claim. For example, while the perspectives in Figure FIGREF6 are topically related to the claims, INLINEFORM0 do not directly address the focus of claim INLINEFORM1 (i.e., “use of animals” in “entertainment”).
+
+Perspective equivalence: a system is expected to extract a minimal and diverse set of perspectives. This requires the ability to discover equivalent perspectives INLINEFORM0 , with respect to a claim INLINEFORM1 : INLINEFORM2 . For instance, INLINEFORM3 and INLINEFORM4 are equivalent in the context of INLINEFORM5 ; however, they might not be equivalent with respect to any other claim. The conditional nature of perspective equivalence differentiates it from the paraphrasing task BIBREF5 .
+
+Stance classification of perspectives: a system is supposed to assess the stances of the perspectives with respect to the given claim (supporting, opposing, etc.) BIBREF6 .
+
+Substantiating the perspectives: a system is expected to find valid evidence paragraph(s) in support of each perspective. Conceptually, this is similar to the well-studied problem of textual entailment BIBREF7 except that here the entailment decisions depend on the choice of claims.
+
+## Dataset construction
+
+In this section we describe a multi-step process, constructed with detailed analysis, substantial refinements and multiple pilots studies.
+
+We use crowdsourcing to annotate different aspects of the dataset. We used Amazon Mechanical Turk (AMT) for our annotations, restricting the task to workers in five English-speaking countries (USA, UK, Canada, New Zealand, and Australia), more than 1000 finished HITs and at least a 95% acceptance rate. To ensure the diversity of responses, we do not require additional qualifications or demographic information from our annotators.
+
+For any of the annotations steps described below, the users are guided to an external platform where they first read the instructions and try a verification step to make sure they have understood the instructions. Only after successful completion are they allowed to start the annotation tasks.
+
+Throughout our annotations, it is our aim to make sure that the workers are responding objectively to the tasks (as opposed to using their personal opinions or preferences). The screen-shots of the annotation interfaces for each step are included in the Appendix (Section SECREF56 ).
+
+In the steps outlined below, we filter out a subset of the data with low rater–rater agreement INLINEFORM0 (see Appendix SECREF47 ). In certain steps, we use an information retrieval (IR) system to generate the best candidates for the task at hand.
+
+We start by crawling the content of a few notable debating websites: idebate.com, debatewise.org, procon.org. This yields INLINEFORM0 claims, INLINEFORM1 perspectives and INLINEFORM2 evidence paragraphs (for complete statistics, see Table TABREF46 in the Appendix). This data is significantly noisy and lacks the structure we would like. In the following steps we explain how we denoise it and augment it with additional data.
+
+For each perspective we verify that it is a complete English sentence, with a clear stance with respect to the given claim. For a fixed pair of claim and perspective, we ask the crowd-workers to label the perspective with one of the five categories of support, oppose, mildly-support, mildly-oppose, or not a valid perspective. The reason that we ask for two levels of intensity is to distinguish mild or conditional arguments from those that express stronger positions.
+
+Every 10 claims (and their relevant perspectives) are bundled to form a HIT. Three independent annotators solve a HIT, and each gets paid $1.5-2 per HIT. To get rid of the ambiguous/noisy perspectives we measure rater-rater agreement on the resulting data and retain only the subset which has a significant agreement of INLINEFORM0 . To account for minor disagreements in the intensity of perspective stances, before measuring any notion of agreement, we collapse the five labels into three labels, by collapsing mildly-support and mildly-oppose into support and oppose, respectively.
+
+To assess the quality of these annotations, two of the authors independently annotate a random subset of instances in the previous step (328 perspectives for 10 claims). Afterwards, the differences were adjudicated. We measure the accuracy adjudicated results with AMT annotations to estimate the quality of our annotation. This results in an accuracy of 94%, which shows high-agreement with the crowdsourced annotations.
+
+To enrich the ways the perspectives are phrased, we crowdsource paraphrases of our perspectives. We ask annotators to generate two paraphrases for each of the 15 perspectives in each HIT, for a reward of $1.50.
+
+Subsequently, we perform another round of crowdsourcing to verify the generated paraphrases. We create HITs of 24 candidate paraphrases to be verified, with a reward of $1. Overall, this process gives us INLINEFORM0 paraphrased perspectives. The collected paraphrases form clusters of equivalent perspectives, which we refine further in the later steps.
+
+In order to ensure that our dataset contains more realistic sentences, we use web search to augment our pool of perspectives with additional sentences that are topically related to what we already have. Specifically, we use Bing search to extract sentences that are similar to our current pool of perspectives, by querying “claim+perspective”. We create a pool of relevant web sentences and use an IR system (introduced earlier) to retrieve the 10 most similar sentences. These candidate perspectives are annotated using (similar to step 2a) and only those that were agreed upon are retained.
+
+In a final round of annotation for perspectives, an expert annotator went over all the claims in order to verify that all the equivalent perspectives are clustered together. Subsequently, the expert annotator went over the most similar claim-pairs (and their perspectives), in order to annotate the missing perspectives shared between the two claims. To cut the space of claim pairs, the annotation was done on the top 350 most similar claim pairs retrieved by the IR system.
+
+The goal of this step is to decide whether a given evidence paragraph provides enough substantiations for a perspective or not. Performing these annotations exhaustively for any perspective-evidence pair is not possible. Instead, we make use of a retrieval system to annotate only the relevant pairs. In particular, we create an index of all the perspectives retained from step 2a. For a given evidence paragraph, we retrieve the top relevant perspectives. We ask the annotators to note whether a given evidence paragraph supports a given perspective or not. Each HIT contains a 20 evidence paragraphs and their top 8 relevant candidate perspectives. Each HIT is paid $1 and annotated by at least 4 independent annotators.
+
+In order to assess the quality of our annotations, a random subset of instances (4 evidence-perspective pairs) are annotated by two independent authors and the differences are adjudicated. We measure the accuracy of our adjudicated labels versus AMT labels, resulting in 87.7%. This indicates the high quality of the crowdsourced data.
+
+## Statistics on the dataset
+
+We now provide a brief summary of [wave]390P[wave]415e[wave]440r[wave]465s[wave]485p[wave]525e[wave]535c[wave]595t[wave]610r[wave]635u[wave]660m. The dataset contains about INLINEFORM0 claims with a significant length diversity (Table TABREF19 ). Additionally, the dataset comes with INLINEFORM1 perspectives, most of which were generated through paraphrasing (step 2b). The perspectives which convey the same point with respect to a claim are grouped into clusters. On average, each cluster has a size of INLINEFORM2 which shows that, on average, many perspectives have equivalents. More granular details are available in Table TABREF19 .
+
+To better understand the topical breakdown of claims in the dataset, we crowdsource the set of “topics” associated with each claim (e.g., Law, Ethics, etc.) We observe that, as expected, the three topics of Politics, World, and Society have the biggest portions (Figure FIGREF21 ). Additionally, the included claims touch upon 10+ different topics. Figure FIGREF22 depicts a few popular categories and sampled questions from each.
+
+## Required skills
+
+We perform a closer investigation of the abilities required to solve the stance classification task. One of the authors went through a random subset of claim-perspectives pairs and annotated each with the abilities required in determining their stances labels. We follow the common definitions used in prior work BIBREF37 , BIBREF38 . The result of this annotation is depicted in Figure FIGREF24 . As can be seen, the problem requires understanding of common-sense, i.e., an understanding that is commonly shared among humans and rarely gets explicitly mentioned in the text. Additionally, the task requires various types of coreference understanding, such as event coreference and entity coreference.
+
+## Empirical Analysis
+
+In this section we provide empirical analysis to address the tasks. We create a split of 60%/15%/25% of the data train/dev/test. In order to make sure our baselines are not overfitting to the keywords of each topic (the “topic” annotation from Section SECREF20 ), we make sure to have claims with the same topic fall into the same split.
+
+For simplicity, we define a notation which we will extensively use for the rest of this paper. The clusters of equivalent perspectives are denoted as INLINEFORM0 , given a representative member INLINEFORM1 . Let INLINEFORM2 denote the collection of relevant perspectives to a claim INLINEFORM3 , which is the union of all the equivalent perspectives participating in the claim: INLINEFORM4 . Let INLINEFORM5 denote the set of evidence documents lending support to a perspective INLINEFORM6 . Additionally, denote the two pools of perspectives and evidence with INLINEFORM7 and INLINEFORM8 , respectively.
+
+## Systems
+
+We make use of the following systems in our evaluation:
+
+(Information Retrieval). This baseline has been successfully used for related tasks like Question Answering BIBREF39 . We create two versions of this baseline: one with the pool of perspectives INLINEFORM0 and one with the pool of evidences INLINEFORM1 . We use this system to retrieve a ranked list of best matching perspective/evidence from the corresponding index.
+
+(Contextual representations). A recent state-of-the-art contextualized representation BIBREF40 . This system has been shown to be effective on a broad range of natural language understanding tasks.
+
+Human performance provides us with an estimate of the best achievable results on datasets. We use human annotators to measure human performance for each task. We randomly sample 10 claims from the test set, and instruct two expert annotators to solve each of T1 to T4.
+
+## Evaluation metrics.
+
+We perform evaluations on four different subtasks in our dataset. In all of the following evaluations, the systems are given the two pools of perspectives INLINEFORM0 and evidences INLINEFORM1 .
+
+A system is expected to return the collection of mutually disjoint perspectives with respect to a given claim. Let INLINEFORM0 be the set of output perspectives. Define the precision and recall as INLINEFORM1 and INLINEFORM2 respectively. To calculate dataset metrics, the aforementioned per-claim metrics are averaged across all the claims in the test set.
+
+Given a claim, a system is expected to label every perspective in INLINEFORM0 with one of two labels support or oppose. We use the well-established definitions of precision-recall for this binary classification task.
+
+A system is expected to decide whether two given perspectives are equivalent or not, with respect to a given claim. We evaluate this task in a way similar to a clustering problem. For a pair of perspectives INLINEFORM0 , a system predicts whether the two are in the same cluster or not. The ground-truth is whether there is a cluster which contains both of the perspectives or not: INLINEFORM1 . We use this pairwise definition for all the pairs in INLINEFORM2 , for any claim INLINEFORM3 in the test set.
+
+Given a perspective INLINEFORM0 , we expect a system to return all the evidence INLINEFORM1 from the pool of evidence INLINEFORM2 . Let INLINEFORM3 and INLINEFORM4 be the predicted and gold evidence for a perspective INLINEFORM5 . Define macro-precision and macro-recall as INLINEFORM6 and INLINEFORM7 , respectively. The metrics are averaged across all the perspectives INLINEFORM8 participating in the test set.
+
+The goal is to get estimates of the overall performance of the systems. Instead of creating a complex measure that would take all the aspects into account, we approximate the overall performance by multiplying the disjoint measures in INLINEFORM0 , INLINEFORM1 and INLINEFORM2 . While this gives an estimate on the overall quality, it ignores the pipeline structure of the task (e.g., the propagation of the errors throughout the pipeline). We note that the task of INLINEFORM3 (perspective equivalence) is indirectly being measured within INLINEFORM4 . Furthermore, since we do not report an IR performance on INLINEFORM5 , we use the “always supp” baseline instead to estimate an overall performance for IR.
+
+## Results
+
+Table TABREF40 shows a summary of the experimental results. To measure the performance of the IR system, we use the index containing INLINEFORM0 . Given each claim, we query the top INLINEFORM1 perspectives, ranked according to their retrieval scores. We tune INLINEFORM2 on our development set and report the results on the test section according to the tuned parameter. We use IR results as candidates for other solvers (including humans). For this task, IR with top-15 candidates yields INLINEFORM3 90% recall (for the PR-curve, see Figure FIGREF53 in the Appendix). In order to train BERT on this task, we use the IR candidates as the training instances. We then tune a threshold on the dev data to select the top relevant perspectives. In order to measure human performance, we create an interface where two human annotators see IR top- INLINEFORM4 and select a minimal set of perspectives (i.e., no two equivalent perspectives).
+
+We measure the quality of perspective stance classification, where the input is a claim-perspective pair, mapped to {support, oppose}. The candidate inputs are generated on the collection of perspectives INLINEFORM0 relevant to a claim INLINEFORM1 . To have an understanding of a lower bound for the metric, we measure the quality of an always-support baseline. We measure the performance of BERT on this task as well, which is about 20% below human performance. This might be because this task requires a deep understanding of commonsense knowledge/reasoning (as indicated earlier in Section SECREF5 ). Since a retrieval system is unlikely to distinguish perspectives with different stances, we do not report the IR performance for this task.
+
+We create instances in the form of INLINEFORM0 where INLINEFORM1 . The expected label is whether the two perspectives belong to the same equivalence class or not. In the experiments, we observe that BERT has a significant performance gain of INLINEFORM2 over the IR baseline. Meanwhile, this system is behind human performance by a margin of INLINEFORM3 .
+
+We evaluate the systems on the extraction of items from the pool of evidences INLINEFORM0 , given a claim-perspective pair. To measure the performance of the IR system working with the index containing INLINEFORM1 we issue a query containing the concatenation of a perspective-claim pair. Given the sorted results (according to their retrieval confidence score), we select the top candidates using a threshold parameter tuned on the dev set. We also use the IR system's candidates (top-60) for other baselines. This set of candidates yields a INLINEFORM2 85% recall (for the PR-curve, see Figure FIGREF53 in the Appendix). We train BERT system to map each (gold) claim-perspective pair to its corresponding evidence paragraph(s). Since each evidence paragraph could be long (hence hard to feed into BERT), we split each evidence paragraph into sliding windows of 3 sentences. For each claim-perspective pair, we use all 3-sentences windows of gold evidence paragraphs as positive examples, and rest of the IR candidates as negative examples. In the run-time, if a certain percentage (tuned on the dev set) of the sentences from a given evidence paragraph are predicted as positive by BERT, we consider the whole evidence as positive (i.e. it supports a given perspective).
+
+Overall, the performances on this task are lower, which could probably be expected, considering the length of the evidence paragraphs. Similar to the previous scenarios, the BERT solver has a significant gain over a trivial baseline, while standing behind human with a significant margin.
+
+## Discussion
+
+As one of the key consequences of the information revolution, information pollution and over-personalization have already had detrimental effects on our life. In this work, we attempt to facilitate the development of systems that aid in better organization and access to information, with the hope that the access to more diverse information can address over-personalization too BIBREF41 .
+
+The dataset presented here is not intended to be exhaustive, nor does it attempt to reflect a true distribution of the important claims and perspectives in the world, or to associate any of the perspective and identified evidence with levels of expertise and trustworthiness. Moreover, it is important to note that when we ask crowd-workers to evaluate the validity of perspectives and evidence, their judgement process can potentially be influenced by their prior beliefs BIBREF42 . To avoid additional biases introduced in the process of dataset construction, we try to take the least restrictive approach in filtering dataset content beyond the necessary quality assurances. For this reason, we choose not to explicitly ask annotators to filter contents based on the intention of their creators (e.g. offensive content).
+
+A few algorithmic components were not addressed in this work, although they are important to the complete perspective discovery and presentation pipeline. For instance, one has to first verify that the input to the system is a reasonably well-phrased and an argue-worthy claim. And, to construct the pool of perspectives, one has to extract relevant arguments BIBREF43 . In a similar vein, since our main focus is the study of the relations between claims, perspectives, and evidence, we leave out important issues such as their degree of factuality BIBREF8 or trustworthiness BIBREF44 , BIBREF1 as separate aspects of problem.
+
+We hope that some of these challenges and limitations will be addressed in future work.
+
+## Conclusion
+
+The importance of this work is three-fold; we define the problem of substantiated perspective discovery and characterize language understanding tasks necessary to address this problem. We combine online resources, web data and crowdsourcing and create a high-quality dataset, in order to drive research on this problem. Finally, we build and evaluate strong baseline supervised systems for this problem. Our hope is that this dataset would bring more attention to this important problem and would speed up the progress in this direction.
+
+There are two aspects that we defer to future work. First, the systems designed here assumed that the input are valid claim sentences. To make use of such systems, one needs to develop mechanisms to recognize valid argumentative structures. In addition, we ignore trustworthiness and credibility issues, important research issues that are addressed in other works.
+
+## Acknowledgments
+
+The authors would like to thank Jennifer Sheffield, Stephen Mayhew, Shyam Upadhyay, Nitish Gupta and the anonymous reviewers for insightful comments and suggestions. This work was supported in part by a gift from Google and by Contract HR0011-15-2-0025 with the US Defense Advanced Research Projects Agency (DARPA). The views expressed are those of the authors and do not reflect the official policy or position of the Department of Defense or the U.S. Government.
+
+## Statistics
+
+We provide brief statistics on the sources of different content in our dataset in Table TABREF46 . In particular, this table shows:
+
+the size of the data collected from online debate websites (step 1).
+
+the size of the data filtered out (step 2a).
+
+the size of the perspectives added by paraphrases (step 2b).
+
+the size of the perspective candidates added by web (step 2c).
+
+## Measure of agreement
+
+We use the following definition formula in calculation of our measure of agreement. For a fixed subject (problem instance), let INLINEFORM0 represent the number of raters who assigned the given subject to the INLINEFORM1 -th category. The measure of agreement is defined as INLINEFORM2 
+
+where for INLINEFORM0 . Intuitively, this function measure concentration of values the vector INLINEFORM1 . Take the edge cases:
+
+Values concentrated: INLINEFORM0 (in other words INLINEFORM1 ) INLINEFORM2 .
+
+Least concentration (uniformly distribution): INLINEFORM0 .
+
+This definition is used in calculation of more extensive agreement measures (e.g, Fleiss' kappa BIBREF49 ). There multiple ways of interpreting this formula:
+
+It indicates how many rater–rater pairs are in agreement, relative to the number of all possible rater–rater pairs.
+
+One can interpret this measure by a simple combinatorial notions. Suppose we have sets INLINEFORM0 which are pairwise disjunct and for each INLINEFORM1 let INLINEFORM2 . We choose randomly two elements from INLINEFORM3 . Then the probability that they are from the same set is the expressed by INLINEFORM4 .
+
+We can write INLINEFORM0 in terms of INLINEFORM1 which is the conventional Chi-Square statistic for testing if the vector of INLINEFORM2 values comes from the all-categories-equally-likely flat multinomial model.

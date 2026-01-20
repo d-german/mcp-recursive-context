@@ -1,0 +1,177 @@
+# Semantic Document Distance Measures and Unsupervised Document Revision Detection
+
+**Paper ID:** 1709.01256
+
+## Abstract
+
+In this paper, we model the document revision detection problem as a minimum cost branching problem that relies on computing document distances. Furthermore, we propose two new document distance measures, word vector-based Dynamic Time Warping (wDTW) and word vector-based Tree Edit Distance (wTED). Our revision detection system is designed for a large scale corpus and implemented in Apache Spark. We demonstrate that our system can more precisely detect revisions than state-of-the-art methods by utilizing the Wikipedia revision dumps https://snap.stanford.edu/data/wiki-meta.html and simulated data sets.
+
+## Introduction
+
+It is a common habit for people to keep several versions of documents, which creates duplicate data. A scholarly article is normally revised several times before being published. An academic paper may be listed on personal websites, digital conference libraries, Google Scholar, etc. In major corporations, a document typically goes through several revisions involving multiple editors and authors. Users would benefit from visualizing the entire history of a document. It is worthwhile to develop a system that is able to intelligently identify, manage and represent revisions. Given a collection of text documents, our study identifies revision relationships in a completely unsupervised way. For each document in a corpus we only use its content and the last modified timestamp. We assume that a document can be revised by many users, but that the documents are not merged together. We consider collaborative editing as revising documents one by one.
+
+The two research problems that are most relevant to document revision detection are plagiarism detection and revision provenance. In a plagiarism detection system, every incoming document is compared with all registered non-plagiarized documents BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 . The system returns true if an original copy is found in the database; otherwise, the system returns false and adds the document to the database. Thus, it is a 1-to-n problem. Revision provenance is a 1-to-1 problem as it keeps track of detailed updates of one document BIBREF4 , BIBREF5 . Real-world applications include GitHub, version control in Microsoft Word and Wikipedia version trees BIBREF6 . In contrast, our system solves an n-to-n problem on a large scale. Our potential target data sources, such as the entire web or internal corpora in corporations, contain numerous original documents and their revisions. The aim is to find all revision document pairs within a reasonable time.
+
+Document revision detection, plagiarism detection and revision provenance all rely on comparing the content of two documents and assessing a distance/similarity score. The classic document similarity measure, especially for plagiarism detection, is fingerprinting BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 , BIBREF12 . Fixed-length fingerprints are created using hash functions to represent document features and are then used to measure document similarities. However, the main purpose of fingerprinting is to reduce computation instead of improving accuracy, and it cannot capture word semantics. Another widely used approach is computing the sentence-to-sentence Levenshtein distance and assigning an overall score for every document pair BIBREF13 . Nevertheless, due to the large number of existing documents, as well as the large number of sentences in each document, the Levenshtein distance is not computation-friendly. Although alternatives such as the vector space model (VSM) can largely reduce the computation time, their effectiveness is low. More importantly, none of the above approaches can capture semantic meanings of words, which heavily limits the performances of these approaches. For instance, from a semantic perspective, “I went to the bank" is expected to be similar to “I withdrew some money" rather than “I went hiking." Our document distance measures are inspired by the weaknesses of current document distance/similarity measures and recently proposed models for word representations such as word2vec BIBREF14 and Paragraph Vector (PV) BIBREF15 . Replacing words with distributed vector embeddings makes it feasible to measure semantic distances using advanced algorithms, e.g., Dynamic Time Warping (DTW) BIBREF16 , BIBREF17 , BIBREF18 and Tree Edit Distance (TED) BIBREF19 , BIBREF20 , BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 , BIBREF25 , BIBREF26 . Although calculating text distance using DTW BIBREF27 , TED BIBREF28 or Word Mover's Distance (WMV) BIBREF29 has been attempted in the past, these measures are not ideal for large-scale document distance calculation. The first two algorithms were designed for sentence distances instead of document distances. The third measure computes the distance of two documents by solving a transshipment problem between words in the two documents and uses word2vec embeddings to calculate semantic distances of words. The biggest limitation of WMV is its long computation time. We show in Section SECREF54 that our wDTW and wTED measures yield more precise distance scores with much shorter running time than WMV.
+
+We recast the problem of detecting document revisions as a network optimization problem (see Section SECREF2 ) and consequently as a set of document distance problems (see Section SECREF4 ). We use trained word vectors to represent words, concatenate the word vectors to represent documents and combine word2vec with DTW or TED. Meanwhile, in order to guarantee reasonable computation time in large data sets, we calculate document distances at the paragraph level with Apache Spark. A distance score is computed by feeding paragraph representations to DTW or TED. Our code and data are publicly available. 
+
+The primary contributions of this work are as follows.
+
+The rest of this paper is organized in five parts. In Section 2, we clarify related terms and explain the methodology for document revision detection. In Section 3, we provide a brief background on existing document similarity measures and present our wDTW and wTED algorithms as well as the overall process flow. In Section 4, we demonstrate our revision detection results on Wikipedia revision dumps and six simulated data sets. Finally, in Section 5, we summarize some concluding remarks and discuss avenues for future work and improvements.
+
+## Revision Network
+
+The two requirements for a document INLINEFORM0 being a revision of another document INLINEFORM1 are that INLINEFORM2 has been created later than INLINEFORM3 and that the content of INLINEFORM4 is similar to (has been modified from) that of INLINEFORM5 . More specifically, given a corpus INLINEFORM6 , for any two documents INLINEFORM7 , we want to find out the yes/no revision relationship of INLINEFORM8 and INLINEFORM9 , and then output all such revision pairs.
+
+We assume that each document has a creation date (the last modified timestamp) which is readily available from the meta data of the document. In this section we also assume that we have a INLINEFORM0 method and a cut-off threshold INLINEFORM1 . We represent a corpus as network INLINEFORM2 , for example Figure FIGREF5 , in which a vertex corresponds to a document. There is an arc INLINEFORM3 if and only if INLINEFORM4 and the creation date of INLINEFORM5 is before the creation date of INLINEFORM6 . In other words, INLINEFORM7 is a revision candidate for INLINEFORM8 . By construction, INLINEFORM9 is acyclic. For instance, INLINEFORM10 is a revision candidate for INLINEFORM11 and INLINEFORM12 . Note that we allow one document to be the original document of several revised documents. As we only need to focus on revision candidates, we reduce INLINEFORM13 to INLINEFORM14 , shown in Figure FIGREF5 , by removing isolated vertices. We define the weight of an arc as the distance score between the two vertices. Recall the assumption that a document can be a revision of at most one document. In other words, documents cannot be merged. Due to this assumption, all revision pairs form a branching in INLINEFORM15 . (A branching is a subgraph where each vertex has an in-degree of at most 1.) The document revision problem is to find a minimum cost branching in INLINEFORM16 (see Fig FIGREF5 ).
+
+The minimum branching problem was earlier solved by BIBREF30 edmonds1967optimum and BIBREF31 velardi2013ontolearn. The details of his algorithm are as follows.
+
+In our case, INLINEFORM0 is acyclic and, therefore, the second step never occurs. For this reason, Algorithm SECREF2 solves the document revision problem.
+
+Find minimum branching INLINEFORM0 for network INLINEFORM1 
+
+[1]
+
+Input: INLINEFORM0 INLINEFORM1 
+
+every vertex INLINEFORM0 Set INLINEFORM1 to correspond to all arcs with head INLINEFORM2 Select INLINEFORM3 such that INLINEFORM4 is minimum INLINEFORM5 
+
+Output: INLINEFORM0 
+
+The essential part of determining the minimum branching INLINEFORM0 is extracting arcs with the lowest distance scores. This is equivalent to finding the most similar document from the revision candidates for every original document.
+
+## Distance/similarity Measures
+
+In this section, we first introduce the classic VSM model, the word2vec model, DTW and TED. We next demonstrate how to combine the above components to construct our semantic document distance measures: wDTW and wTED. We also discuss the implementation of our revision detection system.
+
+## Background
+
+VSM represents a set of documents as vectors of identifiers. The identifier of a word used in this work is the tf-idf weight. We represent documents as tf-idf vectors, and thus the similarity of two documents can be described by the cosine distance between their vectors. VSM has low algorithm complexity but cannot represent the semantics of words since it is based on the bag-of-words assumption.
+
+Word2vec produces semantic embeddings for words using a two-layer neural network. Specifically, word2vec relies on a skip-gram model that uses the current word to predict context words in a surrounding window to maximize the average log probability. Words with similar meanings tend to have similar embeddings.
+
+DTW was developed originally for speech recognition in time series analysis and has been widely used to measure the distance between two sequences of vectors.
+
+Given two sequences of feature vectors: INLINEFORM0 and INLINEFORM1 , DTW finds the optimal alignment for INLINEFORM2 and INLINEFORM3 by first constructing an INLINEFORM4 matrix in which the INLINEFORM5 element is the alignment cost of INLINEFORM6 and INLINEFORM7 , and then retrieving the path from one corner to the diagonal one through the matrix that has the minimal cumulative distance. This algorithm is described by the following formula. DISPLAYFORM0 
+
+TED was initially defined to calculate the minimal cost of node edit operations for transforming one labeled tree into another. The node edit operations are defined as follows.
+
+Deletion Delete a node and connect its children to its parent maintaining the order.
+
+Insertion Insert a node between an existing node and a subsequence of consecutive children of this node.
+
+Substitution Rename the label of a node.
+
+Let INLINEFORM0 and INLINEFORM1 be two labeled trees, and INLINEFORM2 be the INLINEFORM3 node in INLINEFORM4 . INLINEFORM5 corresponds to a mapping from INLINEFORM6 to INLINEFORM7 . TED finds mapping INLINEFORM8 with the minimal edit cost based on INLINEFORM9 
+
+where INLINEFORM0 means transferring INLINEFORM1 to INLINEFORM2 based on INLINEFORM3 , and INLINEFORM4 represents an empty node.
+
+## Semantic Distance between Paragraphs
+
+According to the description of DTW in Section UID14 , the distance between two documents can be calculated using DTW by replacing each element in the feature vectors INLINEFORM0 and INLINEFORM1 with a word vector. However, computing the DTW distance between two documents at the word level is basically as expensive as calculating the Levenshtein distance. Thus in this section we propose an improved algorithm that is more appropriate for document distance calculation.
+
+In order to receive semantic representations for documents and maintain a reasonable algorithm complexity, we use word2vec to train word vectors and represent each paragraph as a sequence of vectors. Note that in both wDTW and wTED we take document titles and section titles as paragraphs. Although a more recently proposed model PV can directly train vector representations for short texts such as movie reviews BIBREF15 , our experiments in Section SECREF54 show that PV is not appropriate for standard paragraphs in general documents. Therefore, we use word2vec in our work. Algorithm SECREF20 describes how we compute the distance between two paragraphs based on DTW and word vectors. The distance between one paragraph in a document and one paragraph in another document can be pre-calculated in parallel using Spark to provide faster computation for wDTW and wTED.
+
+DistPara
+
+[h] Replace the words in paragraphs INLINEFORM0 and INLINEFORM1 with word2vec embeddings: INLINEFORM2 and INLINEFORM3 Input: INLINEFORM4 and INLINEFORM5 Initialize the first row and the first column of INLINEFORM6 matrix INLINEFORM7 INLINEFORM8 INLINEFORM9 INLINEFORM10 in range INLINEFORM11 INLINEFORM12 in range INLINEFORM13 INLINEFORM14 calculate INLINEFORM15 Return: INLINEFORM16 
+
+## Word Vector-based Dynamic Time Warping
+
+As a document can be considered as a sequence of paragraphs, wDTW returns the distance between two documents by applying another DTW on top of paragraphs. The cost function is exactly the DistPara distance of two paragraphs given in Algorithm SECREF20 . Algorithm SECREF21 and Figure FIGREF22 describe our wDTW measure. wDTW observes semantic information from word vectors, which is fundamentally different from the word distance calculated from hierarchies among words in the algorithm proposed by BIBREF27 liu2007sentence. The shortcomings of their work are that it is difficult to learn semantic taxonomy of all words and that their DTW algorithm can only be applied to sentences not documents.
+
+wDTW
+
+[h] Represent documents INLINEFORM0 and INLINEFORM1 with vectors of paragraphs: INLINEFORM2 and INLINEFORM3 Input: INLINEFORM4 and INLINEFORM5 Initialize the first row and the first column of INLINEFORM6 matrix INLINEFORM7 INLINEFORM8 INLINEFORM9 INLINEFORM10 in range INLINEFORM11 INLINEFORM12 in range INLINEFORM13 INLINEFORM14 DistPara INLINEFORM15 calculate INLINEFORM16 Return: INLINEFORM17 
+
+## Word Vector-based Tree Edit Distance
+
+TED is reasonable for measuring document distances as documents can be easily transformed to tree structures visualized in Figure FIGREF24 . The document tree concept was originally proposed by BIBREF0 si1997check. A document can be viewed at multiple abstraction levels that include the document title, its sections, subsections, etc. Thus for each document we can build a tree-like structure with title INLINEFORM0 sections INLINEFORM1 subsections INLINEFORM2 ... INLINEFORM3 paragraphs being paths from the root to leaves. Child nodes are ordered from left to right as they appear in the document.
+
+We represent labels in a document tree as the vector sequences of titles, sections, subsections and paragraphs with word2vec embeddings. wTED converts documents to tree structures and then uses DistPara distances. More formally, the distance between two nodes is computed as follows.
+
+The cost of substitution is the DistPara value of the two nodes.
+
+The cost of insertion is the DistPara value of an empty sequence and the label of the inserted node. This essentially means that the cost is the sum of the L2-norms of the word vectors in that node.
+
+The cost of deletion is the same as the cost of insertion.
+
+Compared to the algorithm proposed by BIBREF28 sidorov2015computing, wTED provides different edit cost functions and uses document tree structures instead of syntactic n-grams, and thus wTED yields more meaningful distance scores for long documents. Algorithm SECREF23 and Figure FIGREF28 describe how we calculate the edit cost between two document trees.
+
+wTED
+
+[1] Convert documents INLINEFORM0 and INLINEFORM1 to trees INLINEFORM2 and INLINEFORM3 Input: INLINEFORM4 and INLINEFORM5 
+
+Initialize tree edit distance INLINEFORM0 node label INLINEFORM1 node label INLINEFORM2 Update TED mapping cost INLINEFORM3 using INLINEFORM4 DistPara INLINEFORM5 INLINEFORM6 DistPara INLINEFORM7 INLINEFORM8 DistPara INLINEFORM9 
+
+Return: INLINEFORM0 
+
+## Process Flow
+
+Our system is a boosting learner that is composed of four modules: weak filter, strong filter, revision network and optimal subnetwork. First of all, we sort all documents by timestamps and pair up documents so that we only compare each document with documents that have been created earlier. In the first module, we calculate the VSM similarity scores for all pairs and eliminate those with scores that are lower than an empirical threshold ( INLINEFORM0 ). This is what we call the weak filter. After that, we apply the strong filter wDTW or wTED on the available pairs and filter out document pairs having distances higher than a threshold INLINEFORM1 . For VSM in Section SECREF32 , we directly filter out document pairs having similarity scores lower than a threshold INLINEFORM2 . The cut-off threshold estimation is explained in Section SECREF30 . The remaining document pairs from the strong filter are then sent to the revision network module. In the end, we output the optimal revision pairs following the minimum branching strategy.
+
+## Estimating the Cut-off Threshold
+
+Hyperprameter INLINEFORM0 is calibrated by calculating the absolute extreme based on an initial set of documents, i.e., all processed documents since the moment the system was put in use. Based on this set, we calculate all distance/similarity scores and create a histogram, see Figure FIGREF31 . The figure shows the correlation between the number of document pairs and the similarity scores in the training process of one simulated corpus using VSM. The optimal INLINEFORM1 in this example is around 0.6 where the number of document pairs noticeably drops.
+
+As the system continues running, new documents become available and INLINEFORM0 can be periodically updated by using the same method.
+
+## Numerical Experiments
+
+This section reports the results of the experiments conducted on two data sets for evaluating the performances of wDTW and wTED against other baseline methods.
+
+## Distance/Similarity Measures
+
+We denote the following distance/similarity measures.
+
+wDTW: Our semantic distance measure explained in Section SECREF21 .
+
+wTED: Our semantic distance measure explained in Section SECREF23 .
+
+WMD: The Word Mover's Distance introduced in Section SECREF1 . WMD adapts the earth mover's distance to the space of documents.
+
+VSM: The similarity measure introduced in Section UID12 .
+
+PV-DTW: PV-DTW is the same as Algorithm SECREF21 except that the distance between two paragraphs is not based on Algorithm SECREF20 but rather computed as INLINEFORM0 where INLINEFORM1 is the PV embedding of paragraph INLINEFORM2 .
+
+PV-TED: PV-TED is the same as Algorithm SECREF23 except that the distance between two paragraphs is not based on Algorithm SECREF20 but rather computed as INLINEFORM0 .
+
+Our experiments were conducted on an Apache Spark cluster with 32 cores and 320 GB total memory. We implemented wDTW, wTED, WMD, VSM, PV-DTW and PV-TED in Java Spark. The paragraph vectors for PV-DTW and PV-TED were trained by gensim. 
+
+## Data Sets
+
+In this section, we introduce the two data sets we used for our revision detection experiments: Wikipedia revision dumps and a document revision data set generated by a computer simulation. The two data sets differ in that the Wikipedia revision dumps only contain linear revision chains, while the simulated data sets also contains tree-structured revision chains, which can be very common in real-world data.
+
+The Wikipedia revision dumps that were previously introduced by Leskovec et al. leskovec2010governance contain eight GB (compressed size) revision edits with meta data.
+
+We pre-processed the Wikipedia revision dumps using the JWPL Revision Machine BIBREF32 and produced a data set that contains 62,234 documents with 46,354 revisions. As we noticed that short documents just contributed to noise (graffiti) in the data, we eliminated documents that have fewer than three paragraphs and fewer than 300 words. We removed empty lines in the documents and trained word2vec embeddings on the entire corpus. We used the documents occurring in the first INLINEFORM0 of the revision period for INLINEFORM1 calibration, and the remaining documents for test.
+
+The generation process of the simulated data sets is designed to mimic the real world. Users open some existing documents in a file system, make some changes (e.g. addition, deletion or replacement), and save them as separate documents. These documents become revisions of the original documents. We started from an initial corpus that did not have revisions, and kept adding new documents and revising existing documents. Similar to a file system, at any moment new documents could be added and/or some of the current documents could be revised. The revision operations we used were deletion, addition and replacement of words, sentences, paragraphs, section names and document titles. The addition of words, ..., section names, and new documents were pulled from the Wikipedia abstracts. This corpus generation process had five time periods INLINEFORM0 . Figure FIGREF42 illustrates this simulation. We set a Poisson distribution with rate INLINEFORM1 (the number of documents in the initial corpus) to control the number of new documents added in each time period, and a Poisson distribution with rate INLINEFORM2 to control the number of documents revised in each time period.
+
+We generated six data sets using different random seeds, and each data set contained six corpora (Corpus 0 - 5). Table TABREF48 summarizes the first data set. In each data set, we name the initial corpus Corpus 0, and define INLINEFORM0 as the timestamp when we started this simulation process. We set INLINEFORM1 , INLINEFORM2 . Corpus INLINEFORM3 corresponds to documents generated before timestamp INLINEFORM4 . We extracted document revisions from Corpus INLINEFORM5 and compared the revisions generated in (Corpus INLINEFORM6 - Corpus INLINEFORM7 ) with the ground truths in Table TABREF48 . Hence, we ran four experiments on this data set in total. In every experiment, INLINEFORM8 is calibrated based on Corpus INLINEFORM9 . For instance, the training set of the first experiment was Corpus 1. We trained INLINEFORM10 from Corpus 1. We extracted all revisions in Corpus 2, and compared revisions generated in the test set (Corpus 2 - Corpus 1) with the ground truth: 258 revised documents. The word2vec model shared in the four experiments was trained on Corpus 5.
+
+## Results
+
+We use precision, recall and F-measure to evaluate the detected revisions. A true positive case is a correctly identified revision. A false positive case is an incorrectly identified revision. A false negative case is a missed revision record.
+
+We illustrate the performances of wDTW, wTED, WMD, VSM, PV-DTW and PV-TED on the Wikipedia revision dumps in Figure FIGREF43 . wDTW and wTED have the highest F-measure scores compared to the rest of four measures, and wDTW also have the highest precision and recall scores. Figure FIGREF49 shows the average evaluation results on the simulated data sets. From left to right, the corpus size increases and the revision chains become longer, thus it becomes more challenging to detect document revisions. Overall, wDTW consistently performs the best. WMD is slightly better than wTED. In particular, when the corpus size increases, the performances of WMD, VSM, PV-DTW and PV-TED drop faster than wDTW and wTED. Because the revision operations were randomly selected in each corpus, it is possible that there are non-monotone points in the series.
+
+wDTW and wTED perform better than WMD especially when the corpus is large, because they use dynamic programming to find the global optimal alignment for documents. In contrast, WMD relies on a greedy algorithm that sums up the minimal cost for every word. wDTW and wTED perform better than PV-DTW and PV-TED, which indicates that our DistPara distance in Algorithm SECREF20 is more accurate than the Euclidian distance between paragraph vectors trained by PV.
+
+We show in Table TABREF53 the average running time of the six distance/similarity measures. In all the experiments, VSM is the fastest, wTED is faster than wDTW, and WMD is the slowest. Running WMD is extremely expensive because WMD needs to solve an INLINEFORM0 sequential transshipment problem for every two documents where INLINEFORM1 is the average number of words in a document. In contrast, by splitting this heavy computation into several smaller problems (finding the distance between any two paragraphs), which can be run in parallel, wDTW and wTED scale much better.
+
+Combining Figure FIGREF43 , Figure FIGREF49 and Table TABREF53 we conclude that wDTW yields the most accurate results using marginally more time than VSM, PV-TED and PV-DTW, but much less running time than WMD. wTED returns satisfactory results using shorter time than wDTW.
+
+## Conclusion
+
+This paper has explored how DTW and TED can be extended with word2vec to construct semantic document distance measures: wDTW and wTED. By representing paragraphs with concatenations of word vectors, wDTW and wTED are able to capture the semantics of the words and thus give more accurate distance scores. In order to detect revisions, we have used minimum branching on an appropriately developed network with document distance scores serving as arc weights. We have also assessed the efficiency of the method of retrieving an optimal revision subnetwork by finding the minimum branching.
+
+Furthermore, we have compared wDTW and wTED with several distance measures for revision detection tasks. Our results demonstrate the effectiveness and robustness of wDTW and wTED in the Wikipedia revision dumps and our simulated data sets. In order to reduce the computation time, we have computed document distances at the paragraph level and implemented a boosting learning system using Apache Spark. Although we have demonstrated the superiority of our semantic measures only in the revision detection experiments, wDTW and wTED can also be used as semantic distance measures in many clustering, classification tasks.
+
+Our revision detection system can be enhanced with richer features such as author information and writing styles, and exact changes in revision pairs. Another interesting aspect we would like to explore in the future is reducing the complexities of calculating the distance between two paragraphs.
+
+## Acknowledgments
+
+This work was supported in part by Intel Corporation, Semiconductor Research Corporation (SRC).

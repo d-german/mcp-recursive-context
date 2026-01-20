@@ -1,0 +1,79 @@
+# Unsupervised Text Summarization via Mixed Model Back-Translation
+
+**Paper ID:** 1908.08566
+
+## Abstract
+
+Back-translation based approaches have recently lead to significant progress in unsupervised sequence-to-sequence tasks such as machine translation or style transfer. In this work, we extend the paradigm to the problem of learning a sentence summarization system from unaligned data. We present several initial models which rely on the asymmetrical nature of the task to perform the first back-translation step, and demonstrate the value of combining the data created by these diverse initialization methods. Our system outperforms the current state-of-the-art for unsupervised sentence summarization from fully unaligned data by over 2 ROUGE, and matches the performance of recent semi-supervised approaches.
+
+## Introduction
+
+Machine summarization systems have made significant progress in recent years, especially in the domain of news text. This has been made possible among other things by the popularization of the neural sequence-to-sequence (seq2seq) paradigm BIBREF0, BIBREF1, BIBREF2, the development of methods which combine the strengths of extractive and abstractive approaches to summarization BIBREF3, BIBREF4, and the availability of large training datasets for the task, such as Gigaword or the CNN-Daily Mail corpus which comprise of over 3.8M shorter and 300K longer articles and aligned summaries respectively. Unfortunately, the lack of datasets of similar scale for other text genres remains a limiting factor when attempting to take full advantage of these modeling advances using supervised training algorithms.
+
+In this work, we investigate the application of back-translation to training a summarization system in an unsupervised fashion from unaligned full text and summaries corpora. Back-translation has been successfully applied to unsupervised training for other sequence to sequence tasks such as machine translation BIBREF5 or style transfer BIBREF6. We outline the main differences between these settings and text summarization, devise initialization strategies which take advantage of the asymmetrical nature of the task, and demonstrate the advantage of combining varied initializers. Our approach outperforms the previous state-of-the-art on unsupervised text summarization while using less training data, and even matches the rouge scores of recent semi-supervised methods.
+
+## Related Work
+
+BIBREF7's work on applying neural seq2seq systems to the task of text summarization has been followed by a number of works improving upon the initial model architecture. These have included changing the base encoder structure BIBREF8, adding a pointer mechanism to directly re-use input words in the summary BIBREF9, BIBREF3, or explicitly pre-selecting parts of the full text to focus on BIBREF4. While there have been comparatively few attempts to train these models with less supervision, auto-encoding based approaches have met some success BIBREF10, BIBREF11.
+
+BIBREF10's work endeavors to use summaries as a discrete latent variable for a text auto-encoder. They train a system on a combination of the classical log-likelihood loss of the supervised setting and a reconstruction objective which requires the full text to be mostly recoverable from the produced summary. While their method is able to take advantage of unlabelled data, it relies on a good initialization of the encoder part of the system which still needs to be learned on a significant number of aligned pairs. BIBREF11 expand upon this approach by replacing the need for supervised data with adversarial objectives which encourage the summaries to be structured like natural language, allowing them to train a system in a fully unsupervised setting from unaligned corpora of full text and summary sequences. Finally, BIBREF12 uses a general purpose pre-trained text encoder to learn a summarization system from fewer examples. Their proposed MASS scheme is shown to be more efficient than BERT BIBREF13 or Denoising Auto-Encoders (DAE) BIBREF14, BIBREF15.
+
+This work proposes a different approach to unsupervised training based on back-translation. The idea of using an initial weak system to create and iteratively refine artificial training data for a supervised algorithm has been successfully applied to semi-supervised BIBREF16 and unsupervised machine translation BIBREF5 as well as style transfer BIBREF6. We investigate how the same general paradigm may be applied to the task of summarizing text.
+
+## Mixed Model Back-Translation
+
+Let us consider the task of transforming a sequence in domain $A$ into a corresponding sequence in domain $B$ (e.g. sentences in two languages for machine translation). Let $\mathcal {D}_A$ and $\mathcal {D}_B$ be corpora of sequences in $A$ and $B$, without any mapping between their respective elements. The back-translation approach starts with initial seq2seq models $f^0_{A \rightarrow B}$ and $f^0_{B \rightarrow A}$, which can be hand-crafted or learned without aligned pairs, and uses them to create artificial aligned training data:
+
+Let $\mathcal {S}$ denote a supervised learning algorithm, which takes a set of aligned sequence pairs and returns a mapping function. This artificial data can then be used to train the next iteration of seq2seq models, which in turn are used to create new artificial training sets ($A$ and $B$ can be switched here):
+
+The model is trained at each iteration on artificial inputs and real outputs, then used to create new training inputs. Thus, if the initial system isn't too far off, we can hope that training pairs get closer to the true data distribution with each step, allowing in turn to train better models.
+
+In the case of summarization, we consider the domains of full text sequences $\mathcal {D}^F$ and of summaries $\mathcal {D}^S$, and attempt to learn summarization ($f_{F\rightarrow S}$) and expansion ($f_{S\rightarrow F}$) functions. However, contrary to the translation case, $\mathcal {D}^F$ and $\mathcal {D}^S$ are not interchangeable. Considering that a summary typically has less information than the corresponding full text, we choose to only define initial ${F\rightarrow S}$ models. We can still follow the proposed procedure by alternating directions at each step.
+
+## Mixed Model Back-Translation ::: Initialization Models for Summarization
+
+To initiate their process for the case of machine translation, BIBREF5 use two different initialization models for their neural (NMT) and phrase-based (PBSMT) systems. The former relies on denoising auto-encoders in both languages with a shared latent space, while the latter uses the PBSMT system of BIBREF17 with a phrase table obtained through unsupervised vocabulary alignment as in BIBREF18.
+
+While both of these methods work well for machine translation, they rely on the input and output having similar lengths and information content. In particular, the statistical machine translation algorithm tries to align most input tokens to an output word. In the case of text summarization, however, there is an inherent asymmetry between the full text and the summaries, since the latter express only a subset of the former. Next, we propose three initialization systems which implicitly model this information loss. Full implementation details are provided in the Appendix.
+
+## Mixed Model Back-Translation ::: Initialization Models for Summarization ::: Procrustes Thresholded Alignment (Pr-Thr)
+
+The first initialization is similar to the one for PBSMT in that it relies on unsupervised vocabulary alignment. Specifically, we train two skipgram word embedding models using fasttext BIBREF19 on $\mathcal {D}^F$ and $\mathcal {D}^S$, then align them in a common space using the Wasserstein Procrustes method of BIBREF18. Then, we map each word of a full text sequence to its nearest neighbor in the aligned space if their distance is smaller than some threshold, or skip it otherwise. We also limit the output length, keeping only the first $N$ tokens. We refer to this function as $f_{F\rightarrow S}^{(\text{Pr-Thr}), 0}$.
+
+## Mixed Model Back-Translation ::: Initialization Models for Summarization ::: Denoising Bag-of-Word Auto-Encoder (DBAE)
+
+Similarly to both BIBREF5 and BIBREF11, we also devise a starting model based on a DAE. One major difference is that we use a simple Bag-of-Words (BoW) encoder with fixed pre-trained word embeddings, and a 2-layer GRU decoder. Indeed, we find that a BoW auto-encoder trained on the summaries reaches a reconstruction rouge-l f-score of nearly 70% on the test set, indicating that word presence information is mostly sufficient to model the summaries. As for the noise model, for each token in the input, we remove it with probability $p/2$ and add a word drawn uniformly from the summary vocabulary with probability $p$.
+
+The BoW encoder has two advantages. First, it lacks the other models' bias to keep the word order of the full text in the summary. Secondly, when using the DBAE to predict summaries from the full text, we can weight the input word embeddings by their corpus-level probability of appearing in a summary, forcing the model to pay less attention to words that only appear in $\mathcal {D}^F$. The Denoising Bag-of-Words Auto-Encoder with input re-weighting is referred to as $f_{F\rightarrow S}^{(\text{DBAE}), 0}$.
+
+## Mixed Model Back-Translation ::: Initialization Models for Summarization ::: First-Order Word Moments Matching (@!START@$\mathbf {\mu }$@!END@:1)
+
+We also propose an extractive initialization model. Given the same BoW representation as for the DBAE, function $f_\theta ^\mu (s, v)$ predicts the probability that each word $v$ in a full text sequence $s$ is present in the summary. We learn the parameters of $f_\theta ^\mu $ by marginalizing the output probability of each word over all full text sequences, and matching these first-order moments to the marginal probability of each word's presence in a summary. That is, let $\mathcal {V}^S$ denote the vocabulary of $\mathcal {D}^S$, then $\forall v \in \mathcal {V}^S$:
+
+We minimize the binary cross-entropy (BCE) between the output and summary moments:
+
+We then define an initial extractive summarization model by applying $f_{\theta ^*}^\mu (\cdot , \cdot )$ to all words of an input sentence, and keeping the ones whose output probability is greater than some threshold. We refer to this model as $f_{F\rightarrow S}^{(\mathbf {\mu }:1), 0}$.
+
+## Mixed Model Back-Translation ::: Artificial Training Data
+
+We apply the back-translation procedure outlined above in parallel for all three initialization models. For example, $f_{F\rightarrow S}^{(\mathbf {\mu }:1), 0}$ yields the following sequence of models and artificial aligned datasets:
+
+Finally, in order to take advantage of the various strengths of each of the initialization models, we also concatenate the artificial training dataset at each odd iteration to train a summarizer, e.g.:
+
+## Experiments ::: Data and Model Choices
+
+We validate our approach on the Gigaword corpus, which comprises of a training set of 3.8M article headlines (considered to be the full text) and titles (summaries), along with 200K validation pairs, and we report test performance on the same 2K set used in BIBREF7. Since we want to learn systems from fully unaligned data without giving the model an opportunity to learn an implicit mapping, we also further split the training set into 2M examples for which we only use titles, and 1.8M for headlines. All models after the initialization step are implemented as convolutional seq2seq architectures using Fairseq BIBREF20. Artificial data generation uses top-15 sampling, with a minimum length of 16 for full text and a maximum length of 12 for summaries. rouge scores are obtained with an output vocabulary of size 15K and a beam search of size 5 to match BIBREF11.
+
+## Experiments ::: Initializers
+
+Table TABREF9 compares test ROUGE for different initialization models, as well as the trivial Lead-8 baseline which simply copies the first 8 words of the article. We find that simply thresholding on distance during the word alignment step of (Pr-Thr) does slightly better then the full PBSMT system used by BIBREF5. Our BoW denoising auto-encoder with word re-weighting also performs significantly better than the full seq2seq DAE initialization used by BIBREF11 (Pre-DAE). The moments-based initial model ($\mathbf {\mu }$:1) scores higher than either of these, with scores already close to the full unsupervised system of BIBREF11.
+
+In order to investigate the effect of these three different strategies beyond their rouge statistics, we show generations of the three corresponding first iteration expanders for a given summary in Table TABREF1. The unsupervised vocabulary alignment in (Pr-Thr) handles vocabulary shift, especially changes in verb tenses (summaries tend to be in the present tense), but maintains the word order and adds very little information. Conversely, the ($\mathbf {\mu }$:1) expansion function, which is learned from purely extractive summaries, re-uses most words in the summary without any change and adds some new information. Finally, the auto-encoder based (DBAE) significantly increases the sequence length and variety, but also strays from the original meaning (more examples in the Appendix). The decoders also seem to learn facts about the world during their training on article text (EDF/GDF is France's public power company).
+
+## Experiments ::: Full Models
+
+Finally, Table TABREF13 compares the summarizers learned at various back-translation iterations to other unsupervised and semi-supervised approaches. Overall, our system outperforms the unsupervised Adversarial-reinforce of BIBREF11 after one back-translation loop, and most semi-supervised systems after the second one, including BIBREF12's MASS pre-trained sentence encoder and BIBREF10's Forced-attention Sentence Compression (FSC), which use 100K and 500K aligned pairs respectively. As far as back-translation approaches are concerned, we note that the model performances are correlated with the initializers' scores reported in Table TABREF9 (iterations 4 and 6 follow the same pattern). In addition, we find that combining data from all three initializers before training a summarizer system at each iteration as described in Section SECREF8 performs best, suggesting that the greater variety of artificial full text does help the model learn.
+
+## Experiments ::: Conclusion
+
+In this work, we use the back-translation paradigm for unsupervised training of a summarization system. We find that the model benefits from combining initializers, matching the performance of semi-supervised approaches.

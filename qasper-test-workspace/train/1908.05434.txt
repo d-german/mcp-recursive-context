@@ -1,0 +1,149 @@
+# Sex Trafficking Detection with Ordinal Regression Neural Networks
+
+**Paper ID:** 1908.05434
+
+## Abstract
+
+Sex trafficking is a global epidemic. Escort websites are a primary vehicle for selling the services of such trafficking victims and thus a major driver of trafficker revenue. Many law enforcement agencies do not have the resources to manually identify leads from the millions of escort ads posted across dozens of public websites. We propose an ordinal regression neural network to identify escort ads that are likely linked to sex trafficking. Our model uses a modified cost function to mitigate inconsistencies in predictions often associated with nonparametric ordinal regression and leverages recent advancements in deep learning to improve prediction accuracy. The proposed method significantly improves on the previous state-of-the-art on Trafficking-10K, an expert-annotated dataset of escort ads. Additionally, because traffickers use acronyms, deliberate typographical errors, and emojis to replace explicit keywords, we demonstrate how to expand the lexicon of trafficking flags through word embeddings and t-SNE.
+
+## Introduction
+
+Globally, human trafficking is one of the fastest growing crimes and, with annual profits estimated to be in excess of 150 billion USD, it is also among the most lucrative BIBREF0 . Sex trafficking is a form of human trafficking which involves sexual exploitation through coercion. Recent estimates suggest that nearly 4 million adults and 1 million children are being victimized globally on any given day; furthermore, it is estimated that 99 percent of victims are female BIBREF1 . Escort websites are an increasingly popular vehicle for selling the services of trafficking victims. According to a recent survivor survey BIBREF2 , 38% of underage trafficking victims who were enslaved prior to 2004 were advertised online, and that number rose to 75% for those enslaved after 2004. Prior to its shutdown in April 2018, the website Backpage was the most frequently used online advertising platform; other popular escort websites include Craigslist, Redbook, SugarDaddy, and Facebook BIBREF2 . Despite the seizure of Backpage, there were nearly 150,000 new online sex advertisements posted per day in the U.S. alone in late 2018 BIBREF3 ; even with many of these new ads being re-posts of existing ads and traffickers often posting multiple ads for the same victims BIBREF2 , this volume is staggering.
+
+Because of their ubiquity and public access, escort websites are a rich resource for anti-trafficking operations. However, many law enforcement agencies do not have the resources to sift through the volume of escort ads to identify those coming from potential traffickers. One scalable and efficient solution is to build a statistical model to predict the likelihood of an ad coming from a trafficker using a dataset annotated by anti-trafficking experts. We propose an ordinal regression neural network tailored for text input. This model comprises three components: (i) a Word2Vec model BIBREF4 that maps each word from the text input to a numeric vector, (ii) a gated-feedback recurrent neural network BIBREF5 that sequentially processes the word vectors, and (iii) an ordinal regression layer BIBREF6 that produces a predicted ordinal label. We use a modified cost function to mitigate inconsistencies in predictions associated with nonparametric ordinal regression. We also leverage several regularization techniques for deep neural networks to further improve model performance, such as residual connection BIBREF7 and batch normalization BIBREF8 . We conduct our experiments on Trafficking-10k BIBREF9 , a dataset of escort ads for which anti-trafficking experts assigned each sample one of seven ordered labels ranging from “1: Very Unlikely (to come from traffickers)” to “7: Very Likely”. Our proposed model significantly outperforms previously published models BIBREF9 on Trafficking-10k as well as a variety of baseline ordinal regression models. In addition, we analyze the emojis used in escort ads with Word2Vec and t-SNE BIBREF10 , and we show that the lexicon of trafficking-related emojis can be subsequently expanded.
+
+In Section SECREF2 , we discuss related work on human trafficking detection and ordinal regression. In Section SECREF3 , we present our proposed model and detail its components. In Section SECREF4 , we present the experimental results, including the Trafficking-10K benchmark, a qualitative analysis of the predictions on raw data, and the emoji analysis. In Section SECREF5 , we summarize our findings and discuss future work.
+
+## Related Work
+
+Trafficking detection: There have been several software products designed to aid anti-trafficking efforts. Examples include Memex which focuses on search functionalities in the dark web; Spotlight which flags suspicious ads and links images appearing in multiple ads; Traffic Jam which seeks to identify patterns that connect multiple ads to the same trafficking organization; and TraffickCam which aims to construct a crowd-sourced database of hotel room images to geo-locate victims. These research efforts have largely been isolated, and few research articles on machine learning for trafficking detection have been published. Closest to our work is the Human Trafficking Deep Network (HTDN) BIBREF9 . HTDN has three main components: a language network that uses pretrained word embeddings and a long short-term memory network (LSTM) to process text input; a vision network that uses a convolutional network to process image input; and another convolutional network to combine the output of the previous two networks and produce a binary classification. Compared to the language network in HTDN, our model replaces LSTM with a gated-feedback recurrent neural network, adopts certain regularizations, and uses an ordinal regression layer on top. It significantly improves HTDN's benchmark despite only using text input. As in the work of E. Tong et al. ( BIBREF9 ), we pre-train word embeddings using a skip-gram model BIBREF4 applied to unlabeled data from escort ads, however, we go further by analyzing the emojis' embeddings and thereby expand the trafficking lexicon.
+
+Ordinal regression: We briefly review ordinal regression before introducing the proposed methodology. We assume that the training data are INLINEFORM0 , where INLINEFORM1 are the features and INLINEFORM2 is the response; INLINEFORM3 is the set of INLINEFORM4 ordered labels INLINEFORM5 with INLINEFORM6 . Many ordinal regression methods learn a composite map INLINEFORM7 , where INLINEFORM8 and INLINEFORM9 have the interpretation that INLINEFORM10 is a latent “score” which is subsequently discretized into a category by INLINEFORM11 . INLINEFORM12 is often estimated by empirical risk minimization, i.e., by minimizing a loss function INLINEFORM13 averaged over the training data. Standard choices of INLINEFORM14 and INLINEFORM15 are reviewed by J. Rennie & N. Srebro ( BIBREF11 ).
+
+Another common approach to ordinal regression, which we adopt in our proposed method, is to transform the label prediction into a series of INLINEFORM0 binary classification sub-problems, wherein the INLINEFORM1 th sub-problem is to predict whether or not the true label exceeds INLINEFORM2 BIBREF12 , BIBREF13 . For example, one might use a series of logistic regression models to estimate the conditional probabilities INLINEFORM3 for each INLINEFORM4 . J. Cheng et al. ( BIBREF6 ) estimated these probabilities jointly using a neural network; this was later extended to image data BIBREF14 as well as text data BIBREF15 , BIBREF16 . However, as acknowledged by J. Cheng et al. ( BIBREF6 ), the estimated probabilities need not respect the ordering INLINEFORM5 for all INLINEFORM6 and INLINEFORM7 . We force our estimator to respect this ordering through a penalty on its violation.
+
+## Method
+
+Our proposed ordinal regression model consists of the following three components: Word embeddings pre-trained by a Skip-gram model, a gated-feedback recurrent neural network that constructs summary features from sentences, and a multi-labeled logistic regression layer tailored for ordinal regression. See Figure SECREF3 for a schematic. The details of its components and their respective alternatives are discussed below.
+
+ figure Overview of the ordinal regression neural network for text input. INLINEFORM0 represents a hidden state in a gated-feedback recurrent neural network.
+
+## Word Embeddings
+
+Vector representations of words, also known as word embeddings, can be obtained through unsupervised learning on a large text corpus so that certain linguistic regularities and patterns are encoded. Compared to Latent Semantic Analysis BIBREF17 , embedding algorithms using neural networks are particularly good at preserving linear regularities among words in addition to grouping similar words together BIBREF18 . Such embeddings can in turn help other algorithms achieve better performances in various natural language processing tasks BIBREF4 .
+
+Unfortunately, the escort ads contain a plethora of emojis, acronyms, and (sometimes deliberate) typographical errors that are not encountered in more standard text data, which suggests that it is likely better to learn word embeddings from scratch on a large collection of escort ads instead of using previously published embeddings BIBREF9 . We use 168,337 ads scraped from Backpage as our training corpus and the Skip-gram model with Negative sampling BIBREF4 as our model.
+
+## Gated-Feedback Recurrent Neural Network
+
+To process entire sentences and paragraphs after mapping the words to embeddings, we need a model to handle sequential data. Recurrent neural networks (RNNs) have recently seen great success at modeling sequential data, especially in natural language processing tasks BIBREF19 . On a high level, an RNN is a neural network that processes a sequence of inputs one at a time, taking the summary of the sequence seen so far from the previous time point as an additional input and producing a summary for the next time point. One of the most widely used variations of RNNs, a Long short-term memory network (LSTM), uses various gates to control the information flow and is able to better preserve long-term dependencies in the running summary compared to a basic RNN BIBREF20 . In our implementation, we use a further refinement of multi-layed LSTMs, Gated-feedback recurrent neural networks (GF-RNNs), which tend to capture dependencies across different timescales more easily BIBREF5 .
+
+Regularization techniques for neural networks including Dropout BIBREF21 , Residual connection BIBREF7 , and Batch normalization BIBREF8 are added to GF-RNN for further improvements.
+
+After GF-RNN processes an entire escort ad, the average of the hidden states of the last layer becomes the input for the multi-labeled logistic regression layer which we discuss next.
+
+## Multi-Labeled Logistic Regression Layer
+
+As noted previously, the ordinal regression problem can be cast into a series of binary classification problems and thereby utilize the large repository of available classification algorithms BIBREF12 , BIBREF13 , BIBREF14 . One formulation is as follows. Given INLINEFORM0 total ranks, the INLINEFORM1 -th binary classifier is trained to predict the probability that a sample INLINEFORM2 has rank larger than INLINEFORM3 . Then the predicted rank is INLINEFORM4 
+
+In a classification task, the final layer of a deep neural network is typically a softmax layer with dimension equal to the number of classes BIBREF20 . Using the ordinal-regression-to-binary-classifications formulation described above, J. Cheng et al. ( BIBREF6 ) replaced the softmax layer in their neural network with a INLINEFORM0 -dimensional sigmoid layer, where each neuron serves as a binary classifier (see Figure SECREF7 but without the order penalty to be discussed later).
+
+With the sigmoid activation function, the output of the INLINEFORM0 th neuron can be viewed as the predicted probability that the sample has rank greater than INLINEFORM5 . Alternatively, the entire sigmoid layer can be viewed as performing multi-labeled logistic regression, where the INLINEFORM6 th label is the indicator of the sample's rank being greater than INLINEFORM7 . The training data are thus re-formatted accordingly so that response variable for a sample with rank INLINEFORM8 becomes INLINEFORM9 k-1 INLINEFORM10 Y Y INLINEFORM11 Y - Y INLINEFORM12 J. Cheng et al.'s ( BIBREF6 ) final layer was preceded by a simple feed-forward network. In our case, word embeddings and GF-RNN allow us to construct a feature vector of fixed length from text input, so we can simply attach the multi-labeled logistic regression layer to the output of GF-RNN to complete an ordinal regression neural network for text input.
+
+The violation of the monotonicity in the estimated probabilities (e.g., INLINEFORM0 for some INLINEFORM1 and INLINEFORM2 ) has remained an open issue since the original ordinal regression neural network proposal of J. Cheng et al ( BIBREF6 ). This is perhaps owed in part to the belief that correcting this issue would significantly increase training complexity BIBREF14 . We propose an effective and computationally efficient solution to avoid the conflicting predictions as follows: penalize such conflicts in the training phase by adding INLINEFORM3 
+
+to the loss function for a sample INLINEFORM0 , where INLINEFORM1 is a penalty parameter (Figure SECREF7 ). For sufficiently large INLINEFORM2 the estimated probabilities will respect the monotonicity condition; respecting this condition improves the interpretability of the predictions, which is vital in applications like the one we consider here as stakeholders are given the estimated probabilities. We also hypothesize that the order penalty may serve as a regularizer to improve each binary classifier (see the ablation test in Section SECREF15 ).
+
+ figure Ordinal regression layer with order penalty.
+
+All three components of our model (word embeddings, GF-RNN, and multi-labeled logistic regression layer) can be trained jointly, with word embeddings optionally held fixed or given a smaller learning rate for fine-tuning. The hyperparameters for all components are given in the Appendix. They are selected according to either literature or grid-search.
+
+## Experiments
+
+We first describe the datasets we use to train and evaluate our models. Then we present a detailed comparison of our proposed model with commonly used ordinal regression models as well as the previous state-of-the-art classification model by E. Tong et al. ( BIBREF9 ). To assess the effect of each component in our model, we perform an ablation test where the components are swapped by their more standard alternatives one at a time. Next, we perform a qualitative analysis on the model predictions on the raw data, which are scraped from a different escort website than the one that provides the labeled training data. Finally, we conduct an emoji analysis using the word embeddings trained on raw escort ads.
+
+## Datasets
+
+We use raw texts scraped from Backpage and TNABoard to pre-train the word embeddings, and use the same labeled texts E. Tong et al. ( BIBREF9 ) used to conduct model comparisons. The raw text dataset consists of 44,105 ads from TNABoard and 124,220 ads from Backpage. Data cleaning/preprocessing includes joining the title and the body of an ad; adding white spaces around every emoji so that it can be tokenized properly; stripping tabs, line breaks, punctuations, and extra white spaces; removing phone numbers; and converting all letters to lower case. We have ensured that the raw dataset has no overlap with the labeled dataset to avoid bias in test accuracy. While it is possible to scrape more raw data, we did not observe significant improvements in model performances when the size of raw data increased from INLINEFORM0 70,000 to INLINEFORM1 170,000, hence we assume that the current raw dataset is sufficiently large.
+
+The labeled dataset is called Trafficking-10k. It consists of 12,350 ads from Backpage labeled by experts in human trafficking detection BIBREF9 . Each label is one of seven ordered levels of likelihood that the corresponding ad comes from a human trafficker. Descriptions and sample proportions of the labels are in Table TABREF11 . The original Trafficking-10K includes both texts and images, but as mentioned in Section SECREF1 , only the texts are used in our case. We apply the same preprocessing to Trafficking-10k as we do to raw data.
+
+## Comparison with Baselines
+
+We compare our proposed ordinal regression neural network (ORNN) to Immediate-Threshold ordinal logistic regression (IT) BIBREF11 , All-Threshold ordinal logistic regression (AT) BIBREF11 , Least Absolute Deviation (LAD) BIBREF22 , BIBREF23 , and multi-class logistic regression (MC) which ignores the ordering. The primary evaluation metrics are Mean Absolute Error (MAE) and macro-averaged Mean Absolute Error ( INLINEFORM0 ) BIBREF24 . To compare our model with the previous state-of-the-art classification model for escort ads, the Human Trafficking Deep Network (HTDN) BIBREF9 , we also polarize the true and predicted labels into two classes, “1-4: Unlikely” and “5-7: Likely”; then we compute the binary classification accuracy (Acc.) as well as the weighted binary classification accuracy (Wt. Acc.) given by INLINEFORM1 
+
+Note that for applications in human trafficking detection, MAE and Acc. are of primary interest. Whereas for a more general comparison among the models, the class imbalance robust metrics, INLINEFORM0 and Wt. Acc., might be more suitable. Bootstrapping or increasing the weight of samples in smaller classes can improve INLINEFORM1 and Wt. Acc. at the cost of MAE and Acc..
+
+The text data need to be vectorized before they can be fed into the baseline models (whereas vectorization is built into ORNN). The standard practice is to tokenize the texts using n-grams and then create weighted term frequency vectors using the term frequency (TF)-inverse document frequency (IDF) scheme BIBREF25 , BIBREF26 . The specific variation we use is the recommended unigram + sublinear TF + smooth IDF BIBREF26 , BIBREF27 . Dimension reduction techniques such as Latent Semantic Analysis BIBREF17 can be optionally applied to the frequency vectors, but B. Schuller et al. ( BIBREF28 ) concluded from their experiments that dimension reduction on frequency vectors actually hurts model performance, which our preliminary experiments agree with.
+
+All models are trained and evaluated using the same (w.r.t. data shuffle and split) 10-fold cross-validation (CV) on Trafficking-10k, except for HTDN, whose result is read from the original paper BIBREF9 . During each train-test split, INLINEFORM0 of the training set is further reserved as the validation set for tuning hyperparameters such as L2-penalty in IT, AT and LAD, and learning rate in ORNN. So the overall train-validation-test ratio is 70%-20%-10%. We report the mean metrics from the CV in Table TABREF14 . As previous research has pointed out that there is no unbiased estimator of the variance of CV BIBREF29 , we report the naive standard error treating metrics across CV as independent.
+
+We can see that ORNN has the best MAE, INLINEFORM0 and Acc. as well as a close 2nd best Wt. Acc. among all models. Its Wt. Acc. is a substantial improvement over HTDN despite the fact that the latter use both text and image data. It is important to note that HTDN is trained using binary labels, whereas the other models are trained using ordinal labels and then have their ordinal predictions converted to binary predictions. This is most likely the reason that even the baseline models except for LAD can yield better Wt. Acc. than HTDN, confirming our earlier claim that polarizing the ordinal labels during training may lead to information loss.
+
+## Ablation Test
+
+To ensure that we do not unnecessarily complicate our ORNN model, and to assess the impact of each component on the final model performance, we perform an ablation test. Using the same CV and evaluation metrics, we make the following replacements separately and re-evaluate the model: 1. Replace word embeddings pre-trained from skip-gram model with randomly initialized word embeddings; 2. replace gated-feedback recurrent neural network with long short-term memory network (LSTM); 3. disable batch normalization; 4. disable residual connection; 5. replace the multi-labeled logistic regression layer with a softmax layer (i.e., let the model perform classification, treating the ordinal response variable as a categorical variable with INLINEFORM0 classes); 6. replace the multi-labeled logistic regression layer with a 1-dimensional linear layer (i.e., let the model perform regression, treating the ordinal response variable as a continuous variable) and round the prediction to the nearest integer during testing; 7. set the order penalty to 0. The results are shown in Table TABREF16 .
+
+The proposed ORNN once again has all the best metrics except for Wt. Acc. which is the 2nd best. This suggests that each component indeed makes a contribution. Note that if we disregard the ordinal labels and perform classification or regression, MAE falls off by a large margin. Setting order penalty to 0 does not deteriorate the performance by much, however, the percent of conflicting binary predictions (see Section SECREF7 ) rises from 1.4% to 5.2%. So adding an order penalty helps produce more interpretable results.
+
+## Qualitative Analysis of Predictions
+
+To qualitatively evaluate how well our model predicts on raw data and observe potential patterns in the flagged samples, we obtain predictions on the 44,105 unlabelled ads from TNABoard with the ORNN model trained on Trafficking-10k, then we examine the samples with high predicted likelihood to come from traffickers. Below are the top three samples that the model considers likely:
+
+[itemsep=0pt]
+
+“amazing reviewed crystal only here till fri book now please check our site for the services the girls provide all updates specials photos rates reviews njfantasygirls ...look who s back amazing reviewed model samantha...brand new spinner jessica special rate today 250 hr 21 5 4 120 34b total gfe total anything goes no limits...”
+
+“2 hot toght 18y o spinners 4 amazing providers today specials...”
+
+“asian college girl is visiting bellevue service type escort hair color brown eyes brown age 23 height 5 4 body type slim cup size c cup ethnicity asian service type escort i am here for you settle men i am a tiny asian girl who is waiting for a gentlemen...”
+
+Some interesting patterns in the samples with high predicted likelihood (here we only showed three) include: mentioning of multiple names or INLINEFORM0 providers in a single ad; possibly intentional typos and abbreviations for the sensitive words such as “tight” INLINEFORM1 “toght” and “18 year old” INLINEFORM2 “18y o”; keywords that indicate traveling of the providers such as “till fri”, “look who s back”, and “visiting”; keywords that hint on the providers potentially being underage such as “18y o”, “college girl”, and “tiny”; and switching between third person and first person narratives.
+
+## Emoji Analysis
+
+The fight against human traffickers is adversarial and dynamic. Traffickers often avoid using explicit keywords when advertising victims, but instead use acronyms, intentional typos, and emojis BIBREF9 . Law enforcement maintains a lexicon of trafficking flags mapping certain emojis to their potential true meanings (e.g., the cherry emoji can indicate an underaged victim), but compiling such a lexicon manually is expensive, requires frequent updating, and relies on domain expertise that is hard to obtain (e.g., insider information from traffickers or their victims). To make matters worse, traffickers change their dictionaries over time and regularly switch to new emojis to replace certain keywords BIBREF9 . In such a dynamic and adversarial environment, the need for a data-driven approach in updating the existing lexicon is evident.
+
+As mentioned in Section SECREF5 , training a skip-gram model on a text corpus can map words (including emojis) used in similar contexts to similar numeric vectors. Besides using the vectors learned from the raw escort ads to train ORNN, we can directly visualize the vectors for the emojis to help identify their relationships, by mapping the vectors to a 2-dimensional space using t-SNE BIBREF10 (Figure FIGREF24 ).
+
+We can first empirically assess the quality of the emoji map by noting that similar emojis do seem clustered together: the smileys near the coordinate (2, 3), the flowers near (-6, -1), the heart shapes near (-8, 1), the phones near (-2, 4) and so on. It is worth emphasizing that the skip-gram model learns the vectors of these emojis based on their contexts in escort ads and not their visual representations, so the fact that the visually similar emojis are close to one another in the map suggests that the vectors have been learned as desired.
+
+The emoji map can assist anti-trafficking experts in expanding the existing lexicon of trafficking flags. For example, according to the lexicon we obtained from Global Emancipation Network, the cherry emoji and the lollipop emoji are both flags for underaged victims. Near (-3, -4) in the map, right next to these two emojis are the porcelain dolls emoji, the grapes emoji, the strawberry emoji, the candy emoji, the ice cream emojis, and maybe the 18-slash emoji, indicating that they are all used in similar contexts and perhaps should all be flags for underaged victims in the updated lexicon.
+
+If we re-train the skip-gram model and update the emoji map periodically on new escort ads, when traffickers switch to new emojis, the map can link the new emojis to the old ones, assisting anti-trafficking experts in expanding the lexicon of trafficking flags. This approach also works for acronyms and deliberate typos.
+
+## Discussion
+
+Human trafficking is a form of modern day slavery that victimizes millions of people. It has become the norm for sex traffickers to use escort websites to openly advertise their victims. We designed an ordinal regression neural network (ORNN) to predict the likelihood that an escort ad comes from a trafficker, which can drastically narrow down the set of possible leads for law enforcement. Our ORNN achieved the state-of-the-art performance on Trafficking-10K BIBREF9 , outperforming all baseline ordinal regression models as well as improving the classification accuracy over the Human Trafficking Deep Network BIBREF9 . We also conducted an emoji analysis and showed how to use word embeddings learned from raw text data to help expand the lexicon of trafficking flags.
+
+Since our experiments, there have been considerable advancements in language representation models, such as BERT BIBREF30 . The new language representation models can be combined with our ordinal regression layer, replacing the skip-gram model and GF-RNN, to potentially further improve our results. However, our contributions of improving the cost function for ordinal regression neural networks, qualitatively analyzing patterns in the predicted samples, and expanding the trafficking lexicon through a data-driven approach are not dependent on a particular choice of language representation model.
+
+As for future work in trafficking detection, we can design multi-modal ordinal regression networks that utilize both image and text data. But given the time and resources required to label escort ads, we may explore more unsupervised learning or transfer learning algorithms, such as using object detection BIBREF31 and matching algorithms to match hotel rooms in the images.
+
+## Acknowledgments
+
+We thank Cara Jones and Marinus Analytics LLC for sharing the Trafficking-10K dataset. We thank Praveen Bodigutla for his suggestions on Natural Language Processing literature.
+
+## Hyperparameters of the proposed ordinal regression neural network
+
+Word Embeddings: pretraining model type: Skip-gram; speedup method: negative sampling; number of negative samples: 100; noise distribution: unigram distribution raised to 3/4rd; batch size: 16; window size: 5; minimum word count: 5; number of epochs: 50; embedding size: 128; pretraining learning rate: 0.2; fine-tuning learning rate scale: 1.0.
+
+GF-RNN: hidden size: 128; dropout: 0.2; number of layers: 3; gradient clipping norm: 0.25; L2 penalty: 0.00001; learning rate decay factor: 2.0; learning rate decay patience: 3; early stop patience: 9; batch size: 200; batch normalization: true; residual connection: true; output layer type: mean-pooling; minimum word count: 5; maximum input length: 120.
+
+Multi-labeled logistic regression layer: task weight scheme: uniform; conflict penalty: 0.5.
+
+## Access to the source materials
+
+The fight against human trafficking is adversarial, hence the access to the source materials in anti-trafficking research is typically not available to the general public by choice, but granted to researchers and law enforcement individually upon request.
+
+Source code:
+
+https://gitlab.com/BlazingBlade/TrafficKill
+
+Trafficking-10k: Contact
+
+cara@marinusanalytics.com
+
+Trafficking lexicon: Contact
+
+sherrie@globalemancipation.ngo

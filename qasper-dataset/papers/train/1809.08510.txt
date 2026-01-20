@@ -1,0 +1,110 @@
+# Towards Language Agnostic Universal Representations
+
+**Paper ID:** 1809.08510
+
+## Abstract
+
+When a bilingual student learns to solve word problems in math, we expect the student to be able to solve these problem in both languages the student is fluent in,even if the math lessons were only taught in one language. However, current representations in machine learning are language dependent. In this work, we present a method to decouple the language from the problem by learning language agnostic representations and therefore allowing training a model in one language and applying to a different one in a zero shot fashion. We learn these representations by taking inspiration from linguistics and formalizing Universal Grammar as an optimization process (Chomsky, 2014; Montague, 1970). We demonstrate the capabilities of these representations by showing that the models trained on a single language using language agnostic representations achieve very similar accuracies in other languages.
+
+## Introduction
+
+Anecdotally speaking, fluent bilingual speakers rarely face trouble translating a task learned in one language to another. For example, a bilingual speaker who is taught a math problem in English will trivially generalize to other known languages. Furthermore there is a large collection of evidence in linguistics arguing that although separate lexicons exist in multilingual speakers the core representations of concepts and theories are shared in memory BIBREF2 , BIBREF3 , BIBREF4 . The fundamental question we're interested in answering is on the learnability of these shared representations within a statistical framework.
+
+We approached this problem from a linguistics perspective. Languages have vastly varying syntactic features and rules. Linguistic Relativity studies the impact of these syntactic variations on the formations of concepts and theories BIBREF5 . Within this framework of study, the two schools of thoughts are linguistic determinism and weak linguistic influence. Linguistic determinism argues that language entirely forms the range of cognitive processes, including the creation of various concepts, but is generally agreed to be false BIBREF6 , BIBREF5 . Although there exists some weak linguistic influence, it is by no means fundamental BIBREF7 . The superfluous nature of syntactic variations across languages brings forward the argument of principles and parameters (PnP) which hypothesizes the existence of a small distributed parameter representation that captures the syntactic variance between languages denoted by parameters (e.g. head-first or head-final syntax), as well as common principles shared across all languages BIBREF8 . Universal Grammar (UG) is the study of principles and the parameters that are universal across languages BIBREF1 .
+
+The ability to learn these universalities would allow us to learn representations of language that are fundamentally agnostic of the specific language itself. Doing so would allow us to learn a task in one language and reap the benefits of all other languages without needing multilingual datasets. Our attempt to learn these representations begins by taking inspiration from linguistics and formalizing UG as an optimization problem.
+
+We train downstream models using language agnostic universal representations on a set of tasks and show the ability for the downstream models to generalize to languages that we did not train on.
+
+## Related Work
+
+Our work attempts to unite universal (task agnostic) representations with multilingual (language agnostic) representations BIBREF9 , BIBREF10 . The recent trend in universal representations has been moving away from context-less unsupervised word embeddings to context-rich representations. Deep contextualized word representations (ELMo) trains an unsupervised language model on a large corpus of data and applies it to a large set of auxiliary tasks BIBREF9 . These unsupervised representations boosted the performance of models on a wide array of tasks. Along the same lines BIBREF10 showed the power of using latent representations of translation models as features across other non-translation tasks. In general, initializing models with pre-trained language models shows promise against the standard initialization with word embeddings. Even further, BIBREF11 show that an unsupervised language model trained on a large corpus will contain a neuron that strongly correlates with sentiment without ever training on a sentiment task implying that unsupervised language models maybe picking up informative and structured signals.
+
+In the field of multilingual representations, a fair bit of work has been done on multilingual word embeddings. BIBREF12 explored the possibility of training massive amounts of word embeddings utilizing either parallel data or bilingual dictionaries via the SkipGram paradigm. Later on an unsupervised approach to multilingual word representations was proposed by BIBREF13 which utilized an adversarial training regimen to place word embeddings into a shared latent space. Although word embeddings show great utility, they fall behind methods which exploit sentence structure as well as words. Less work has been done on multilingual sentence representations. Most notably both BIBREF14 and BIBREF15 propose a way to learn multilingual sentence representation through a translation task.
+
+We propose learning language agnostic representations through constrained language modeling to capture the power of both multilingual and universal representations. By decoupling language from our representations we can train downstream models on monolingual data and automatically apply the models to other languages.
+
+## Universal Grammar as an Optimization Problem
+
+Statistical language models approximate the probability distribution of a series of words by predicting the next word given a sequence of previous words. $
+p(w_0,...,w_n) = \prod _{i=1}^n p(w_i \mid w_0,...,w_{i-1})
+$ 
+
+where $w_i$ are indices representing words in an arbitrary vocabulary.
+
+Learning grammar is equivalent to language modeling, as the support of $p$ will represent the set of all grammatically correct sentences. Furthermore, let $p_j(\cdot )$ represent the language model for the jth language and $w^j$ represents a word from the jth language. Let $k_j$ represent a distributed representation of a specific language along the lines of the PnP argument BIBREF8 . UG, through the lens of statistical language modeling, hypothesizes the existence of a factorization of $p_j(\cdot )$ containing a language agnostic segment. The factorization used throughout this paper is the following:
+
+b = u ej(wj0,...,wji)
+
+pj(wi w0,...,wi-1) = ej-1(h(b,kj))
+
+s.t. d(p(bj) p(bj))
+
+The distribution matching constraint $d$ , insures that the representations across languages are common as hypothesized by the UG argument.
+
+Function $e_j: \mathbb {N}^i \rightarrow \mathbb {R}^{i \times d}$ is a language specific function which takes an ordered set of integers representing tokens and outputs a vector of size $d$ per token. Function $u: \mathbb {R}^{i \times d} \rightarrow \mathbb {R}^{i \times d}$ takes the language specific representation and attempts to embed into a language agnostic representation. Function $h: (\mathbb {R}^{i \times d}, \mathbb {R}^{f}) \rightarrow \mathbb {R}^{i \times d}$ takes the universal representation as well as a distributed representation of the language of size $f$ and returns a language specific decoded representation. $e^{-1}$ maps our decoded representation back to the token space.
+
+For the purposes of distribution matching we utilize the GAN framework. Following recent successes we use Wasserstein-1 as our distance function $d$ BIBREF16 .
+
+Given two languages $j_\alpha $ and $j_\beta $ the distribution of the universal representations should be within $\epsilon $ with respect to the $W_1$ of each other. Using the Kantarovich-Rubenstein duality we define 
+
+$$d(\mathbf {p}(b\mid j_\alpha ) \mid \mid \mathbf {p}(b\mid j_\beta )) =
+\sup _{||f_{\alpha ,\beta }||_L \le 1} \mathbb {E}_{x\sim \mathbf {p}(b\mid j_\alpha )}\left[f_{\alpha ,\beta }(x)\right] - \mathbb {E}_{x\sim \mathbf {p}(b\mid j_\beta )}\left[f_{\alpha ,\beta }(x)\right]$$   (Eq. 2) 
+
+where $L$ is the Lipschitz constant of $f$ . Throughout this paper we satisfy the Lipschitz constraint by clamping the parameters to a compact space, as done in the original WGAN paper BIBREF16 . Therefore the complete loss function for $m$ languages each containing $N$ documents becomes: 
+
+$$\max _{\theta } \sum _{\alpha =0}^m \sum _{i=0}^N \log p_{j_\alpha }(w_{i,0}^\alpha ,...,w_{i,n}^\alpha ; \theta )\nonumber - \frac{\lambda }{m^2}\sum _{\alpha =0}^m \sum _{\beta =0}^m d(\mathbf {p}(b\mid j_\alpha ) \mid \mid \mathbf {p}(b\mid j_\beta ))$$   (Eq. 3) 
+
+ $\lambda $ is a scaling factor for the distribution constraint loss.
+
+## UG-WGAN
+
+Our specific implementation of this optimization problem we denote as UG-WGAN. Each function described in the previous section we implement using neural networks. For $e_j$ in equation "Universal Grammar as an Optimization Problem" we use a language specific embedding table followed by a LSTM BIBREF17 . Function $u$ in equation "Universal Grammar as an Optimization Problem" is simply stacked LSTM's. Function $h$ in equation "Universal Grammar as an Optimization Problem" takes input from $u$ as well as a PnP representation of the language via an embedding table. Calculating the real inverse of $e^{-1}$ is non trivial therefore we use another language specific LSTM whose outputs we multiply by the transpose of the embedding table of $e$ to obtain token probabilities. For regularization we utilized dropout and locked dropout where appropriate BIBREF18 .
+
+The critic, adopting the terminology from BIBREF16 , takes the input from $u$ , feeds it through a stacked LSTM, aggregates the hidden states using linear sequence attention as described in DrQA BIBREF19 . Once we have the aggregated state we map to a $m \times m$ matrix from where we can compute the total Wasserstein loss. A Batch Normalization layer is appended to the end of the critic BIBREF20 . The $\alpha , \beta $ th index in the matrix correspond to the function output of $f$ in calculating $W_1(\mathbf {p}(b\mid j_\alpha ) \mid \mid \mathbf {p}(b\mid j_\beta ))$ .
+
+We trained UG-WGAN with a variety of languages depending on the downstream task. For each language we utilized the respective Wikipedia dump. From the wikipedia dump we extract all pages using the wiki2text utility and build language specific vocabularies consisting of 16k BPE tokens BIBREF21 . During each batch we sample documents from our set of languages which are approximately the same length. We train our language model via BPTT where the truncation length progressively grows from 15 to 50 throughout training. The critic is updated 10 times for every update of the language model. We trained each language model for 14 days on a NVidia Titan X. For each language model we would do a sweep over $\lambda $ , but in general we have found that $\lambda =0.1$ works sufficiently well for minimizing both perplexity and Wasserstein distance.
+
+## Exploration
+
+A couple of interesting questions arise from the described training procedure. Is the distribution matching constraint necessary or will simple joint language model training exhibit the properties we're interested in? Can this optimization process fundamentally learn individual languages grammar while being constrained by a universal channel? What commonalities between languages can we learn and are they informative enough to be exploited?
+
+We can test out the usefulness of the distribution matching constraint by running an ablation study on the $\lambda $ hyper-parameter. We trained UG-WGAN on English, Spanish and Arabic wikidumps following the procedure described above. We kept all the hyper-parameters consistent apart for augmenting $\lambda $ from 0 to 10. The results are shown in Figure 2 . Without any weight on the distribution matching term the critic trivially learns to separate the various languages and no further training reduces the wasserstein distance. The joint language model internally learns individual language models who are partitioned in the latent space. We can see this by running a t-SNE plot on the universal ( $u(\cdot )$ ) representation of our model and seeing existence of clusters of the same language as we did in Figure 3 BIBREF22 . An universal model satisfying the distribution matching constrain would mix all languages uniformly within it's latent space.
+
+To test the universality of UG-WGAN representations we will apply them to a set of orthogonal NLP tasks. We will leave the discussion on the learnability of grammar to the Discussion section of this paper.
+
+## Experiments
+
+By introducing a universal channel in our language model we reduced a representations dependence on a single language. Therefore we can utilize an arbitrary set of languages in training an auxiliary task over UG encodings. For example we can train a downstream model only on one languages data and transfer the model trivially to any other language that UG-WGAN was trained on.
+
+## Sentiment Analysis
+
+To test this hypothesis we first trained UG-WGAN in English, Chinese and German following the procedure described in Section "UG-WGAN" . The embedding size of the table was 300 and the internal LSTM hidden size was 512. A dropout rate of $0.1$ was used and trained with the ADAM optimization method BIBREF23 . Since we are interested in the zero-shot capabilities of our representation, we trained our sentiment analysis model only on the english IMDB Large Movie Review dataset and tested it on the chinese ChnSentiCorp dataset and german SB-10K BIBREF24 , BIBREF25 . We binarize the label's for all the datasets.
+
+Our sentiment analysis model ran a bi-directional LSTM on top of fixed UG representations from where we took the last hidden state and computed a logistic regression. This was trained using standard SGD with momentum.
+
+We also compare against encodings learned as a by-product of multi-encoder and decoder neural machine translation as a baseline BIBREF28 . We see that UG representations are useful in situations when there is a lack of data in an specific language. The language agnostics properties of UG embeddings allows us to do successful zero-shot learning without needing any parallel corpus, furthermore the ability to generalize from language modeling to sentiment attests for the universal properties of these representations. Although we aren't able to improve over the state of the art in a single language we are able to learn a model that does surprisingly well on a set of languages without multilingual data.
+
+## NLI
+
+A natural language inference task consists of two sentences; a premise and a hypothesis which are either contradictions, entailments or neutral. Learning a NLI task takes a certain nuanced understanding of language. Therefore it is of interest whether or not UG-WGAN captures the necessary linguistic features. For this task we use the Stanford NLI (sNLI) dataset as our training data in english BIBREF29 . To test the zero-shot learning capabilities we created a russian sNLI test set by random sampling 400 sNLI test samples and having a native russian speaker translate both premise and hypothesis to russian. The label was kept the same.
+
+For this experiment we trained UG-WGAN on the English and Russian language following the procedure described in Section "UG-WGAN" . We kept the hyper-parameters equivalent to the Sentiment Analysis experiment. All of the NLI model tested were run over the fixed UG embeddings. We trained two different models from literature, Densely-Connected Recurrent and Co-Attentive Network by BIBREF30 and Multiway Attention Network by BIBREF31 . Please refer to this papers for further implementation details.
+
+UG representations contain enough information to non-trivially generalize the NLI task to unseen languages. That being said, we do see a relatively large drop in performance moving across languages which hints that either our calculation of the Wasserstein distance may not be sufficiently accurate or the universal representations are biased toward specific languages or tasks.
+
+One hypothesis might be that as we increase $\lambda $ the cross lingual generalization gap (difference in test error on a task across languages) will vanish. To test this hypothesis we conducted the same experiment where UG-WGAN was trained with a $\lambda $ ranging from 0 to 10. From each of the experiments we picked the model epoch which showed the best perplexity. The NLI specific model was the Densely-Connected Recurrent and Co-Attentive Network.
+
+Increasing $\lambda $ doesn't seem to have a significant impact on the generalization gap but has a large impact on test error. Our hypothesis is that a large $\lambda $ doesn't provide the model with enough freedom to learn useful representations since the optimizations focus would largely be on minimizing the Wasserstein distance, while a small $\lambda $ permits this freedom. One reason we might be seeing this generalization gap might be due to the way we satisfy the Lipschitz constraint. It's been shown that there are better constraints than clipping parameters to a compact space such as a gradient penalty BIBREF32 . This is a future direction that can be explored.
+
+## Discussion
+
+Universal Grammar also comments on the learnability of grammar, stating that statistical information alone is not enough to learn grammar and some form of native language faculty must exist, sometimes titled the poverty of stimulus (POS) argument BIBREF33 , BIBREF34 . From a machine learning perspective, we're interested in extracting informative features and not necessarily a completely grammatical language model. That being said it is of interest to what extent language models capture grammar and furthermore the extent to which models trained toward the universal grammar objective learn grammar.
+
+One way to measure universality is by studying perplexity of our multi-lingual language model as we increase the number of languages. To do so we trained 6 UG-WGAN models on the following languages: English, Russian, Arabic, Chinese, German, Spanish, French. We maintain the same procedure as described above. The hidden size of the language model was increased to 1024 with 16K BPE tokens being used. The first model was trained on English Russian, second was trained on English Russian Arabic and so on. For arabic we still trained from left to right even though naturally the language is read from right to left. We report the results in Figure 5 . As the number of languages increases the gap between a UG-WGAN without any distribution matching and one with diminishes. This implies that the efficiency and representative power of UG-WGAN grows as we increase the number of languages it has to model.
+
+We see from Figure 2 that perplexity worsens proportional to $\lambda $ . We explore the differences by sampling sentences from an unconstrained language model and $\lambda =0.1$ language model trained towards English and Spanish in Table 3 . In general there is a very small difference between a language model trained with a Universal Grammar objective and one without. The Universal Grammar model tends to make more gender mistakes and mistakes due to Plural-Singular Form in Spanish. In English we saw virtually no fundamental differences between the language models. This seems to hint the existence of an universal set of representations for languages, as hypothesized by Universal Grammar. And although completely learning grammar from statistical signals might be improbable, we can still extract useful information.
+
+## Conclusion
+
+In this paper we introduced an unsupervised approach toward learning language agnostic universal representations by formalizing Universal Grammar as an optimization problem. We showed that we can use these representations to learn tasks in one language and automatically transfer them to others with no additional training. Furthermore we studied the importance of the Wasserstein constraint through the $\lambda $ hyper-parameter. And lastly we explored the difference between a standard multi-lingual language model and UG-WGAN by studying the generated outputs of the respective language models as well as the perplexity gap growth with respect to the number of languages.

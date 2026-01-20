@@ -1,0 +1,179 @@
+# Weakly-supervised Neural Semantic Parsing with a Generative Ranker
+
+**Paper ID:** 1808.07625
+
+## Abstract
+
+Weakly-supervised semantic parsers are trained on utterance-denotation pairs, treating logical forms as latent. The task is challenging due to the large search space and spuriousness of logical forms. In this paper we introduce a neural parser-ranker system for weakly-supervised semantic parsing. The parser generates candidate tree-structured logical forms from utterances using clues of denotations. These candidates are then ranked based on two criterion: their likelihood of executing to the correct denotation, and their agreement with the utterance semantics. We present a scheduled training procedure to balance the contribution of the two objectives. Furthermore, we propose to use a neurally encoded lexicon to inject prior domain knowledge to the model. Experiments on three Freebase datasets demonstrate the effectiveness of our semantic parser, achieving results within the state-of-the-art range.
+
+## Introduction
+
+Semantic parsing is the task of converting natural language utterances into machine-understandable meaning representations or logical forms. The task has attracted much attention in the literature due to a wide range of applications ranging from question answering BIBREF0 , BIBREF1 to relation extraction BIBREF2 , goal-oriented dialog BIBREF3 , and instruction understanding BIBREF4 , BIBREF5 , BIBREF6 .
+
+In a typical semantic parsing scenario, a logical form is executed against a knowledge base to produce an outcome (e.g., an answer) known as denotation. Conventional semantic parsers are trained on collections of utterances paired with annotated logical forms BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 . However, the labeling of logical forms is labor-intensive and challenging to elicit at a large scale. As a result, alternative forms of supervision have been proposed to alleviate the annotation bottleneck faced by semantic parsing systems. One direction is to train a semantic parser in a weakly-supervised setting based on utterance-denotation pairs BIBREF11 , BIBREF12 , BIBREF2 , BIBREF13 , since such data are relatively easy to obtain via crowdsourcing BIBREF14 .
+
+However, the unavailability of logical forms in the weakly-supervised setting, renders model training more difficult. A fundamental challenge in learning semantic parsers from denotations is finding consistent logical forms, i.e., those which execute to the correct denotation. This search space can be very large, growing exponentially as compositionality increases. Moreover, consistent logical forms unavoidably introduce a certain degree of spuriousness — some of them will accidentally execute to the correct denotation without reflecting the meaning of the utterance. These spurious logical forms are misleading supervision signals for the semantic parser.
+
+In this work we introduce a weakly-supervised neural semantic parsing system which aims to handle both challenges. Our system, shown in Figure 1 , mainly consists of a sequence-to-tree parser which generates candidate logical forms for a given utterance. These logical forms are subsequently ranked by two components: a log-linear model scores the likelihood of each logical form executing to the correct denotation, and an inverse neural parser measures the degree to which the logical form represents the meaning of the utterance. We present a scheduled training scheme which balances the contribution of the two components and objectives. To further boost performance, we propose to neurally encode a lexicon, as a means of injecting prior domain knowledge to the neural parameters.
+
+We evaluate our system on three Freebase datasets which consist of utterance denotation pairs: WebQuestions BIBREF14 , GraphQuestions BIBREF15 , and Spades BIBREF16 . Experimental results across datasets show that our weakly-supervised semantic parser achieves state-of-the-art performance.
+
+## The Neural Parser-Ranker
+
+Conventional weakly-supervised semantic parsers BIBREF17 consist of two major components: a parser, which is chart-based and non-parameterized, recursively builds derivations for each utterance span using dynamic programming. A learner, which is a log-linear model, defines features useful for scoring and ranking the set of candidate derivations, based on the correctness of execution results. As mentioned in liang2016learning, the chart-based parser brings a disadvantage since it does not support incremental contextual interpretation. The dynamic programming algorithm requires that features of a span are defined over sub-derivations in that span.
+
+In contrast to a chart-based parser, a parameterized neural semantic parser decodes logical forms with global utterance features. However, training a weakly-supervised neural parser is challenging since there is no access to gold-standard logical forms for backpropagation. Besides, it should be noted that a neural decoder is conditionally generative: decoding is performed greedily conditioned on the utterance and the generation history—it makes no use of global logical form features. In this section, we introduce a parser-ranker framework which combines the best of conventional and neural approaches in the context of weakly-supervised semantic parsing.
+
+## Parser 
+
+Our work follows cheng2017learning,cheng2017learning2 in using LISP-style functional queries as the logical formulation. Advantageously, functional queries are recursive, tree-structured and can naturally encode logical form derivations (i.e., functions and their application order). For example, the utterance “who is obama's eldest daughter” is simply represented with the function-argument structure argmax(daughterOf(Obama), ageOf). Table 1 displays the functions we use in this work; a more detailed specifications can be found in the appendix.
+
+To generate logical forms, our system adopts a variant of the neural sequence-to-tree model proposed in cheng2017learning. During generation, the prediction space is restricted by the grammar of the logical language (e.g., the type and the number of arguments required by a function) in order to ensure that output logical forms are well-formed and executable. The parser consists of a bidirectional LSTM BIBREF18 encoder and a stack-LSTM BIBREF19 decoder, introduced as follows.
+
+The bidirectional LSTM encodes a variable-length utterance $x=(x_1, \cdots , x_n)$ into a list of token representations $[h_1, \cdots , h_n]$ , where each representation is the concatenation of the corresponding forward and backward LSTM states.
+
+After the utterance is encoded, the logical form is generated with a stack-LSTM decoder. The output of the decoder consists of functions which generate the logical form as a derivation tree in depth-first order. There are three classes of functions:
+
+Class-1 functions generate non-terminal tree nodes. In our formulation, non-terminal nodes include language-dependent functions such as count and argmax, as described in the first four rows of Table 1 . A special non-terminal node is the relation placeholder relation.
+
+Class-2 functions generate terminal tree nodes. In our formulation, terminal nodes include the relation placeholder relation and the entity placeholder entity.
+
+Class-3 function reduce completes a subtree. Since generation is performed in depth-first order, the parser needs to identify when the generation of a subtree completes, i.e., when a function has seen all its required arguments.
+
+The functions used to generate the example logical form argmax(daughterOf(Obama), ageOf) are shown in Figure 2 . The stack-LSTM makes two types of updates based on the functions it predicts:
+
+Update-1: when a Class-1 or Class-2 function is called, a non-terminal or terminal token $l_t$ will be generated, At this point, the stack-LSTM state, denoted by $g_t$ , is updated from its older state $g_{t-1}$ as in an ordinary LSTM: 
+
+$$g_t = \textnormal {LSTM} (l_t, g_{t-1})$$   (Eq. 11) 
+
+The new state is additionally pushed onto the stack marking whether it corresponds to a non-terminal or terminal.
+
+Update-2: when the reduce function is called (Class-3), the states of the stack-LSTM are recursively popped from the stack until a non-terminal is encountered. This non-terminal state is popped as well, after which the stack-LSTM reaches an intermediate state denoted by $g_{t-1:t}$ . At this point, we compute the representation of the completed subtree $z_t$ as: 
+
+$$z_t = W_z \cdot [p_z : c_z]$$   (Eq. 13) 
+
+where $p_z$ denotes the parent (non-terminal) embedding of the subtree, and $c_z$ denotes the average embedding of the children (terminals or already-completed subtrees). $W_z $ is the weight matrix. Finally, $z_t$ serves as input for updating $g_{t-1:t}$ to $g_t$ : 
+
+$$g_t = \textnormal {LSTM} (z_t, g_{t-1:t})$$   (Eq. 14) 
+
+At each time step of the decoding, the parser first predicts a subsequent function $f_{t+1}$ conditioned on the decoder state $g_t$ and the encoder states $h_1 \cdots h_n$ . We apply standard soft attention BIBREF20 between $g_t$ and the encoder states $h_1 \cdots h_n$ to compute a feature representation $\bar{h}_t $ : 
+
+$$u_t^i = V \tanh (W_h h_i + W_g g_t)$$   (Eq. 16) 
+
+$$a_t^i = \textnormal {softmax} (u_t^i )$$   (Eq. 17) 
+
+where $V$ , $W_h$ , and $W_g$ are all weight parameters. The prediction of the function $f_{t+1}$ is computed with a softmax classifier, which takes the concatenated features $\bar{h}_t $ and $g_t$ as input: 
+
+$$f_{t+1} \sim \textnormal {softmax} ( W_{y} \tanh ( W_f [\bar{h}_t, g_t] ) )$$   (Eq. 19) 
+
+where $W_y$ and $W_f$ are weight parameters. When $f_{t+1}$ is a language-dependent function (first four rows in Table 1 , e.g., argmax), it is directly used as a non-terminal token $l_{t+1}$ to construct the logical form. However, when $f_{t+1}$ is a relation or entity placeholder, we further predict the specific relation or entity $l_{t+1}$ with another set of neural parameters: 
+
+$$l_{t+1} \sim \textnormal {softmax} ( W_{y^{\prime }} \tanh ( W_{l} [\bar{h}_t, g_t] ) )$$   (Eq. 20) 
+
+where $W_{y^{\prime }}$ and $W_{l^{\prime }}$ are weight matrices.
+
+Note that in the weakly supervised setting, the parser decodes a list of candidate logical forms $Y$ with beam search, instead of outputting the most likely logical form $y$ . During training, candidate logical forms are executed against a knowledge base to find those which are consistent (denoted by $Y_c(x)$ ) and lead to the correct denotation. Then, the parser is trained to maximize the total log likelihood of these consistent logical forms: 
+
+$$\begin{split}
+& \sum _{y \in Y_c(x)} \log p(y|x) = \\
+& \sum _{y \in Y_c(x)} \log p(f_1,\cdots , f_k, l_1, \cdots , l_o|x)
+\end{split}$$   (Eq. 21) 
+
+where $k$ denotes the number of functions used to generate the logical form, and $o$ (smaller than $k$ ) denotes the number of tree nodes in the logical form.
+
+## Ranker
+
+It is impractical to rely solely on a neural decoder to find the most likely logical form at run time in the weakly-supervised setting. One reason is that although the decoder utilizes global utterance features for generation, it cannot leverage global features of the logical form since a logical form is conditionally generated following a specific tree-traversal order. To this end, we follow previous work BIBREF21 and introduce a ranker to the system. The role of the ranker is to score the candidate logical forms generated by the parser; at test time, the logical form receiving the highest score will be used for execution. The ranker is a discriminative log-linear model over logical form $y$ given utterance $x$ : 
+
+$$\log _\theta p(y|x) = \frac{\exp (\phi (x, y)^T \theta )}{\sum _{y^{\prime } \in Y(x)} \exp (\phi (x, y^{\prime })^T \theta )}$$   (Eq. 23) 
+
+where $Y(x)$ is the set of candidate logical forms; $\phi $ is the feature function that maps an utterance-logical form pair onto a feature vector; and $\theta $ denotes the weight parameters of the model.
+
+Since the training data consists only of utterance-denotation pairs, the ranker is trained to maximize the log-likelihood of the correct answer $z$ by treating logical forms as a latent variable: 
+
+$$\log p(z|x) = \log \sum _{y \in Y_c(x)} p(y|x) p(z|x,y)$$   (Eq. 24) 
+
+where $Y_c(x)$ denotes the subset of candidate logical forms which execute to the correct answer; and $p(z|x,y)$ equates to 1 in this case.
+
+Training of the neural parser-ranker system involves the following steps. Given an input utterance, the parser first generates a list of candidate logical forms via beam search. The logical forms are then executed and those which yield the correct denotation are marked as consistent. The parser is trained to optimize the total likelihood of consistent logical forms (Equation ( 21 )), while the ranker is trained to optimize the marginal likelihood of denotations (Equation ( 24 )). The search space can be further reduced by performing entity linking which restricts the number of logical forms to those containing only a small set of entities.
+
+## Handling Spurious Logical Forms
+
+The neural parser-ranker system relies on beam search to find consistent logical forms that execute to the correct answer. These logical forms are then used as surrogate annotations and provide supervision to update the parser's parameters. However, some of these logical forms will be misleading training signals for the neural semantic parser on account of being spurious: they coincidentally execute to the correct answer without matching the utterance semantics.
+
+In this section we propose a method of removing spurious logical forms by validating how well they match the utterance meaning. The intuition is that a meaning-preserving logical form should be able to reconstruct the original utterance with high likelihood. However, since spurious logical forms are not annotated either, a direct maximum likelihood solution does not exist. To this end, we propose a generative model for measuring the reconstruction likelihood.
+
+The model assumes utterance $x$ is generated from the corresponding logical form $y$ , and only the utterance is observable. The objective is therefore to maximize the log marginal likelihood of $x$ : 
+
+$$\log p(x) = \log \sum _y p(x, y)$$   (Eq. 25) 
+
+We adopt neural variational inference BIBREF22 to solve the above objective, which is equivalent to maximizing an evidence lower bound: 
+
+$$\begin{split}
+\log p(x) & = \log \frac{q(y|x) p(x|y) p(y)}{q(y|x)} \\
+& \ge \mathbb {E}_{q(y|x)} \log p(x|y) + \mathbb {E}_{q(y|x)} \log \frac{p(y)}{q(y|x)} \\
+\end{split}$$   (Eq. ) $
+\vspace*{-22.76228pt}
+$ 
+
+Since our semantic parser always outputs well-formed logical forms, we assume a uniform constant prior $p(y)$ . The above objective can be thus reduced to: 
+
+$$\hspace*{-9.38945pt}\mathbb {E}_{q(y|x)} \log p(x|y) - \mathbb {E}_{q(y|x)} \log q(y|x) = \mathcal {L}(x)$$   (Eq. 27) 
+
+where the first term computes the reconstruction likelihood $p(x|y)$ ; and the second term is the entropy of the approximated posterior $q(y|x) $ for regularization. Specifically, we use the semantic parser to compute the approximated posterior $q(y|x)$ . The reconstruction likelihood $p(x|y)$ is computed with an inverse parser which recovers utterance $x$ from its logical form $y$ . We use $p(x|y)$ to measure how well the logical form reflects the utterance meaning; details of the inverse parser are described as follows.
+
+## Scheduled Training
+
+Together with the inverse parser for removing spurious logical forms, the proposed system consists of three components: a parser which generates logical forms from an utterance, a ranker which measures the likelihood of a logical form executing to the correct denotation, and an inverse parser which measures the degree to which logical forms are meaning-preserving using reconstruction likelihood. Our semantic parser is trained following a scheduled training procedure, balancing the two objectives.
+
+## Neural Lexicon Encoding
+
+In this section we further discuss how the semantic parser presented so far can be enhanced with a lexicon. A lexicon is essentially a coarse mapping between natural language phrases and knowledge base relations and entities, and has been widely used in conventional chart-based parsers BIBREF14 , BIBREF23 . Here, we show how a lexicon (either hard-coded or statistically-learned BIBREF24 ) can be used to benefit a neural semantic parser.
+
+The central idea is that relations or entities can be viewed as a single-node tree-structured logical form. For example, based on the lexicon, the natural language phrase “is influenced by” can be parsed to the logical form influence.influence_node.influenced_by. We can therefore pretrain the semantic parser (and the inverse parser) with these basic utterance-logical form pairs which act as important prior knowledge for initializing the distributions $q(y|x)$ and $p(x|y)$ . With pre-trained word embeddings capturing linguistic regularities on the natural language side, we also expect the approach to help the neural model generalize to unseen natural language phrases quickly. For example, by encoding the mapping between the natural language phrase “locate in” and the Freebase predicate fb:location.location.containedby, the parser can potentially link the new phrase “located at” to the same predicate. We experimentally assess whether the neural lexicon enhances the performance of our semantic parser.
+
+## Experiments
+
+In this section we evaluate the performance our semantic parser. We introduce the various datasets used in our experiments, training settings, model variants used for comparison, and finally present and analyze our results.
+
+## Datasets
+
+We evaluated our model on three Freebase datasets: WebQuestions BIBREF14 , GraphQuestions BIBREF15 and Spades BIBREF16 . WebQuestions contains 5,810 real questions asked by people on the web paired by answers. GraphQuestions contains 5,166 question-answer pairs which were created by showing 500 Freebase graph queries to Amazon Mechanical Turk workers and asking them to paraphrase them into natural language. Spades contains 93,319 question-answer pairs which were created by randomly replacing entities in declarative sentences with a blank symbol.
+
+## Training
+
+Across training regimes, the dimensions of word vector, logical form token vector, and LSTM hidden states (for the semantic parser and the inverse parser) are 50, 50, and 150, respectively. Word embeddings were initialized with Glove embeddings BIBREF25 . All other embeddings were randomly initialized. We used one LSTM layer in the forward and backward directions. Dropout was used before the softmax activation (Equations ( 19 ), ( 20 ), and ( 34 )). The dropout rate was set to 0.5. Momentum SGD BIBREF26 was used as the optimization method to update the parameters of the model.
+
+As mentioned earlier, we use entity linking to reduce the beam search space. Entity mentions in Spades are automatically annotated with Freebase entities BIBREF27 . For WebQuestions and GraphQuestions we perform entity linking following the procedure described in BIBREF28 . We identify potential entity spans using seven handcrafted part-of-speech patterns and associate them with Freebase entities obtained from the Freebase/KG API. We use a structured perceptron trained on the entities found in WebQuestions and GraphQuestions to select the top 10 non-overlapping entity disambiguation possibilities. We treat each possibility as a candidate entity and construct candidate utterances with a beam search of size 300.
+
+Key features of the log-linear ranker introduced in Section "Parser " include the entity score returned by the entity linking system, the likelihood score of the relation in the logical form predicted by the parser, the likelihood score of the the logical form predicted by the parser, the embedding similarity between the relation in the logical form and the utterance, the similarity between the relation and the question words in the utterance, and the answer type as indicated by the last word in the Freebase relation BIBREF29 . All features are normalized across candidate logical forms. For all datasets we use average F1 BIBREF14 as our evaluation metric.
+
+## Model Variants
+
+We experiment with three variants of our model. We primarily consider the neural parser-ranker system (denoted by npr) described in Section "Parser " which is trained to maximize the likelihood of consistent logical forms. We then compare it to a system augmented with a generative ranker (denoted by granker), introducing the second objective of maximizing the reconstruction likelihood. Finally, we examine the impact of neural lexicon encoding when it is used for the generative ranker, and also when it is used for the entire system.
+
+## Results
+
+Experimental results on WebQuestions are shown in Table 2 . We compare the performance of npr with previous work, including conventional chart-based semantic parsing models (e.g., berant-EtAl:2013:EMNLP; first block in Table 2 ), information extraction models (e.g., yao2014information; second block in Table 2 ), and more recent neural question-answering models (e.g., dong2015question; third block in Table 2 ). Most neural models do not generate logical forms but instead build a differentiable network to solve a specific task such as question-answering. An exception is the neural sequence-to-tree model of cheng2017learning, which we extend to build the vanilla npr model. A key difference of npr is that it employs soft attention instead of hard attention, which is cheng2017learning use to rationalize predictions.
+
+As shown in Table 2 , the basic npr system outperforms most previous chart-based semantic parsers. Our results suggest that neural networks are powerful tools for generating candidate logical forms in a weakly-supervised setting, due to their ability of encoding and utilizing sentential context and generation history. Compared to cheng2017learning, our system also performs better. We believe the reason is that it employs soft attention instead of hard attention. Soft attention makes the parser fully differentiable and optimization easier. The addition of the inverse parser ( $+$ granker) to the basic npr model yields marginal gains while the addition of the neural lexicon encoding to the inverse parser brings performance improvements over npr and granker. We hypothesize that this is because the inverse parser adopts an unsupervised training objective, which benefits substantially from prior domain-specific knowledge used to initialize its parameters. When neural lexicon encoding is incorporated in the semantic parser as well, system performance can be further improved. In fact, our final system (last row in Table 2 ) outperforms all previous models except that of xu2016question, which uses external Wikipedia resources to prune out erroneous candidate answers.
+
+Tables 3 and 4 present our results on GraphQuestions and Spades, respectively. Comparison systems for GraphQuestions include two chart-based semantic parsers BIBREF14 , BIBREF30 , an information extraction model BIBREF31 , a neural sequence-to-tree model with hard attention BIBREF32 and a model based on universal dependency to logical form conversion BIBREF33 . On Spades we compare with the method of bisk2016evaluating which parses an utterance into a syntactic representation which is subsequently grounded to Freebase; and also with das2017question who employ memory networks and external text resources. Results on both datasets follow similar trends as in WebQuestions. The best performing npr variant achieves state-of-the-art results on GraphQuestions and it comes close to the best model on Spades without using any external resources.
+
+One of the claims put forward in this paper is that the extended npr model reduces the impact of spurious logical forms during training. Table 5 highlights examples of spurious logical forms which are not semantically correct but are nevertheless assigned higher scores in the vanilla npr (red colour). These logical forms become less likely in the extended npr, while the scores of more semantically faithful representations (blue colour) are boosted.
+
+## Discussion
+
+The vanilla npr model is optimized with consistent logical forms which lead to correct denotations. Although it achieves competitive results compared to chart-based parsers, the training of this model can be misled by spurious logical forms. The introduction of the inverse parser aims to alleviate the problem by scoring how a logical form reflects the utterance semantics. Although the inverse parser is not directly used to rank logical forms at test time, the training objective it adopts encourages the parser to generate meaning-preserving logical forms with higher likelihood. These probabilities are used as features in the log-linear ranker, and therefore the inverse parser affects the ranking results, albeit implicitly.
+
+However, we should point out that the unsupervised training objective is relatively difficult to optimize, since there are no constraints to regularize the latent logical forms. This motivates us to develop a scheduled training procedure; as our results show, when trained properly the inverse parser and the unsupervised objective bring performance gains. Moreover, the neural lexicon encoding method we applied essentially produces synthetic data to further regularize the latent space.
+
+## Related Work
+
+Various types of supervision have been explored to train semantic parsers. Early semantic parsers have used annotated training data consisting of sentences and their corresponding logical forms BIBREF35 , BIBREF36 , BIBREF37 , BIBREF10 . In order to scale semantic parsing to open-domain problems, weakly-supervised semantic parsers are trained on utterance-denotation pairs BIBREF1 , BIBREF2 , BIBREF21 , BIBREF38 , BIBREF39 , BIBREF40 , BIBREF41 , BIBREF33 . Most previous work employs a chart-based parser to produce logical forms from a grammar which combines domain-general aspects with lexicons.
+
+Recently, neural semantic parsing has attracted a great deal of attention. Previous work has mostly adopted fully-supervised, sequence-to-sequence models to generate logical form strings from natural language utterances BIBREF42 , BIBREF43 , BIBREF44 . Other work explores the use of reinforcement learning to train neural semantic parsers from question-answer pairs BIBREF45 or from user feedback BIBREF46 . More closely related to our work, goldman2018weakly adopt a neural semantic parser and a discriminative ranker to solve a visual reasoning challenge. They attempt to alleviate the search space and spuriousness challenges with abstractive examples. yin2018structvae adopt a tree-based variational autoencoder for semi-supervised semantic parsing. Neural variational inference has also been used in other NLP tasks including relation discovery BIBREF47 , sentence compression BIBREF48 , and parsing BIBREF49 .
+
+## Conclusions
+
+In this work we proposed a weakly-supervised neural semantic parsing system trained on utterance-denotation pairs. The system employs a neural sequence-to-tree parser to generate logical forms for a natural language utterance. The logical forms are subsequently ranked with two components and objectives: a log-linear model which scores the likelihood of correct execution, and a generative neural inverse parser which measures whether logical forms are meaning preserving. We proposed a scheduled training procedure to balance the two objectives, and a neural lexicon encoding method to initialize model parameters with prior knowledge. Experiments on three semantic parsing datasets demonstrate the effectiveness of our system. In the future, we would like to train our parser with other forms of supervision such as feedback from users BIBREF50 , BIBREF46 or textual evidence BIBREF51 .

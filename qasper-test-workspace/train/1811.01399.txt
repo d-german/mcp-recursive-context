@@ -1,0 +1,183 @@
+# Logic Attention Based Neighborhood Aggregation for Inductive Knowledge Graph Embedding
+
+**Paper ID:** 1811.01399
+
+## Abstract
+
+Knowledge graph embedding aims at modeling entities and relations with low-dimensional vectors. Most previous methods require that all entities should be seen during training, which is unpractical for real-world knowledge graphs with new entities emerging on a daily basis. Recent efforts on this issue suggest training a neighborhood aggregator in conjunction with the conventional entity and relation embeddings, which may help embed new entities inductively via their existing neighbors. However, their neighborhood aggregators neglect the unordered and unequal natures of an entity's neighbors. To this end, we summarize the desired properties that may lead to effective neighborhood aggregators. We also introduce a novel aggregator, namely, Logic Attention Network (LAN), which addresses the properties by aggregating neighbors with both rules- and network-based attention weights. By comparing with conventional aggregators on two knowledge graph completion tasks, we experimentally validate LAN's superiority in terms of the desired properties.
+
+## Introduction
+
+Knowledge graphs (KGs) such as Freebase BIBREF0 , DBpedia BIBREF1 , and YAGO BIBREF2 play a critical role in various NLP tasks, including question answering BIBREF3 , information retrieval BIBREF4 , and personalized recommendation BIBREF5 . A typical KG consists of numerous facts about a predefined set of entities. Each fact is in the form of a triplet INLINEFORM0 (or INLINEFORM1 for short), where INLINEFORM2 and INLINEFORM3 are two entities and INLINEFORM4 is a relation the fact describes. Due to the discrete and incomplete natures of KGs, various KG embedding models are proposed to facilitate KG completion tasks, e.g., link prediction and triplet classification. After vectorizing entities and relations in a low-dimensional space, those models predict missing facts by manipulating the involved entity and relation embeddings.
+
+Although proving successful in previous studies, traditional KG embedding models simply ignore the evolving nature of KGs. They require all entities to be present when training the embeddings. However, BIBREF6 shi2018open suggest that, on DBpedia, 200 new entities emerge on a daily basis between late 2015 and early 2016. Given the infeasibility of retraining embeddings from scratch whenever new entities come, missing facts about emerging entities are, unfortunately, not guaranteed to be inferred in time.
+
+By transforming realistic networks, e.g., citation graphs, social networks, and protein interaction graphs, to simple graphs with single-typed and undirected edges, recent explorations BIBREF7 shed light on the evolution issue for homogeneous graphs. While learning embeddings for existing nodes, they inductively learn a neighborhood aggregator that represents a node by aggregating its neighbors' embeddings. The embeddings of unseen nodes can then be obtained by applying the aggregator on their existing neighbors.
+
+It is well received that KGs differ from homogeneous graphs by their multi-relational structure BIBREF8 . Despite the difference, it seems promising to generalize the neighborhood aggregating scheme to embed emerging KG entities in an inductive manner. For example, in Figure FIGREF1 , a news article may describe an emerging entity (marked gray) as well as some facts involving existing entities. By generalizing structural information in the underlying KG, e.g., other entities residing in a similar neighborhood or involving similar relations, to the current entity's neighborhood, we can infer that it may probably live in Chicago.
+
+Inspired by the above example, the inductive KG embedding problem boils down to designing a KG-specific neighborhood aggregator to capture essential neighborhood information. Intuitively, an ideal aggregator should have the following desired properties:
+
+This paper concentrates on KG-specific neighborhood aggregators, which is of practical importance but only received limited focus BIBREF9 . To the best of our knowledge, neither conventional aggregators for homogeneous graphs nor those for KGs satisfy all the above three properties. In this regard, we employ the attention mechanism BIBREF10 and propose an aggregator called Logic Attention Network (LAN). Aggregating neighbors by a weighted combination of their transformed embeddings, LAN is inherently permutation invariant. To estimate the attention weights in LAN, we adopt two mechanisms to model relation- and neighbor-level information in a coarse-to-fine manner, At both levels, LAN is made aware of both neighborhood redundancy and query relation.
+
+To summarize, our contributions are: (1) We propose three desired properties that decent neighborhood aggregators for KGs should possess. (2) We propose a novel aggregator, i.e., Logic Attention Network, to facilitate inductive KG embedding. (3) We conduct extensive comparisons with conventional aggregators on two KG completions tasks. The results validate the superiority of LAN w.r.t. the three properties.
+
+## Transductive Embedding Models
+
+In recent years, representation learning problems on KGs have received much attention due to the wide applications of the resultant entity and relation embeddings. Typical KG embedding models include TransE BIBREF11 , Distmult BIBREF12 , Complex BIBREF13 , Analogy BIBREF14 , to name a few. For more explorations, we refer readers to an extensive survey BIBREF15 . However, conventional approaches on KG embedding work in a transductive manner. They require that all entities should be seen during training. Such limitation hinders them from efficiently generalizing to emerging entities.
+
+## Inductive Embedding Models
+
+To relieve the issue of emerging entities, several inductive KG embedding models are proposed, including BIBREF16 xie2016representation, BIBREF6 shi2018open and BIBREF17 xie2016image which use description text or images as inputs. Although the resultant embeddings may be utilized for KG completion, it is not clear whether the embeddings are powerful enough to infer implicit or new facts beyond those expressed in the text/image. Moreover, when domain experts are recruited to introduce new entities via partial facts rather than text or images, those approaches may not help much.
+
+In light of the above scenario, existing neighbors of an emerging entity are considered as another type of input for inductive models. In BIBREF9 ijcai2017-250, the authors propose applying Graph Neural Network (GNN) on the KG, which generates the embedding of a new entity by aggregating all its known neighbors. However, their model aggregates the neighbors via simple pooling functions, which neglects the difference among the neighbors. Other works like BIBREF18 fu2017hin2vec and BIBREF19 tang2015pte aim at embedding nodes for node classification given the entire graph and thus are inapplicable for inductive KG-specific tasks. BIBREF20 schlichtkrull2017modeling and BIBREF21 xiong2018one also rely on neighborhood structures to embed entities, but they either work transductively or focus on emerging relations.
+
+Finally, we note another related line of studies on node representation learning for homogeneous graphs. Similar to text- or image-based inductive models for KGs, BIBREF22 duran2017learning, BIBREF23 yang2016revisiting, BIBREF24 velivckovic2017graph and BIBREF25 rossi2018deep exploit additional node attributes to embed unseen nodes. Another work more related to ours is BIBREF26 hamilton2017inductive. They tackle inductive node embedding by the neighborhood aggregation scheme. Their aggregators either trivially treat neighbors equally or unnecessarily require them to be ordered. Moreover, like all embedding models for homogeneous graphs, their model cannot be directly applied to KGs with multi-relational edges.
+
+## Notations
+
+Let INLINEFORM0 and INLINEFORM1 be two sets of entities and relations of size INLINEFORM2 and INLINEFORM3 , respectively. A knowledge graph is composed of a set of triplet facts, namely DISPLAYFORM0 
+
+For each INLINEFORM0 , we denote the reverse of INLINEFORM1 by INLINEFORM2 , and add an additional triplet INLINEFORM3 to INLINEFORM4 .
+
+For an entity INLINEFORM0 , we denote by INLINEFORM1 its neighborhood in INLINEFORM2 , i.e., all related entities with the involved relations. Formally, DISPLAYFORM0 
+
+We denote the projection of INLINEFORM0 on INLINEFORM1 and INLINEFORM2 by INLINEFORM3 and INLINEFORM4 , respectively. Here INLINEFORM5 are neighbors and INLINEFORM6 are neighboring relations. When the context is clear, we simplify the INLINEFORM7 -th entity INLINEFORM8 by its subscript INLINEFORM9 . We denote vectors by bold lower letters, and matrices or sets of vectors by bold upper letters.
+
+Given a knowledge graph INLINEFORM0 , we would like to learn a neighborhood aggregator INLINEFORM1 that acts as follows:
+
+For an entity INLINEFORM0 on INLINEFORM1 , INLINEFORM2 depends on INLINEFORM3 's neighborhood INLINEFORM4 to embed INLINEFORM5 as a low-dimensional vector INLINEFORM6 ;
+
+For an unknown triplet INLINEFORM0 , the embeddings of INLINEFORM1 and INLINEFORM2 output by INLINEFORM3 suggest the plausibility of the triplet.
+
+When a new entity emerges with some triplets involving INLINEFORM0 and INLINEFORM1 , we could apply such an aggregator INLINEFORM2 on its newly established neighborhood, and use the output embedding to infer new facts about it.
+
+## Framework
+
+To obtain such a neighborhood aggregator INLINEFORM0 , we adopt an encoder-decoder framework as illustrated by Figure FIGREF12 . Given a training triplet, the encoder INLINEFORM1 encodes INLINEFORM2 and INLINEFORM3 into two embeddings with INLINEFORM4 . The decoder measures the plausibility of the triplet, and provides feedbacks to the encoder to adjust the parameters of INLINEFORM5 . In the remainder of this section, we describe general configurations of the two components.
+
+As specified in Figure FIGREF12 , for an entity INLINEFORM0 on focus, the encoder works on a collection of input neighbor embeddings, and output INLINEFORM1 's embedding. To differentiate between input and output embeddings, we use superscripts INLINEFORM2 and INLINEFORM3 on the respective vectors. Let INLINEFORM4 , which is obtained from an embedding matrix INLINEFORM5 , be the embedding of a neighbor INLINEFORM6 , where INLINEFORM7 . To reflect the impact of relation INLINEFORM8 on INLINEFORM9 , we apply a relation-specific transforming function INLINEFORM10 on INLINEFORM11 as follows, DISPLAYFORM0 
+
+where INLINEFORM0 is the transforming vector for relation INLINEFORM1 and is restricted as a unit vector. We adopt this transformation from BIBREF27 wang2014knowledge since it does not involve matrix product operations and is of low computation complexity.
+
+After neighbor embeddings are transformed, these transformed embeddings are fed to the aggregator INLINEFORM0 to output an embedding INLINEFORM1 for the target entity INLINEFORM2 , i.e., DISPLAYFORM0 
+
+By definition, an aggregator INLINEFORM0 essentially takes as input a collection of vectors INLINEFORM1 ( INLINEFORM2 ) and maps them to a single vector. With this observation, the following two types of functions seem to be natural choices for neighborhood aggregators, and have been adopted previously:
+
+Pooling Functions. A typical pooling function is mean-pooling, which is defined by INLINEFORM0 . Besides mean-pooling, other previously adopted choices include sum- and max-pooling BIBREF9 . Due to their simple forms, pooling functions are permutation-invariant, but consider the neighbors equally. It is aware of neither potential redundancy in the neighborhood nor the query relations.
+
+Recurrent Neural Networks (RNNs). In various natural language processing tasks, RNNs prove effective in modeling sequential dependencies. In BIBREF26 , the authors adopt an RNN variant LSTM BIBREF28 as neighborhood aggregator, i.e., INLINEFORM0 . To train and apply the LSTM-based aggregator, they have to randomly permute the neighbors, which violates the permutation variance property.
+
+Given the subject and object embeddings INLINEFORM0 and INLINEFORM1 output by the encoder, the decoder is required to measure the plausibility of the training triplet. To avoid potential mixture with relations INLINEFORM2 in the neighborhood, we refer to the relation in the training triplet by query relation, and denote it by INLINEFORM3 instead. After looking up INLINEFORM4 's representation INLINEFORM5 from an embedding matrix INLINEFORM6 , the decoder scores the training triplet INLINEFORM7 with a scoring function INLINEFORM8 . Following BIBREF9 ijcai2017-250, we mainly investigate a scoring function based on TransE BIBREF11 defined by DISPLAYFORM0 
+
+where INLINEFORM0 denotes the L1 norm. To test whether the studied aggregators generalize among different scoring function, we will also consider several alternatives in experiments.
+
+## Logic Attention Network
+
+As discussed above, traditional neighborhood aggregators do not preserve all desired properties. In this section, we describe a novel aggregator, namely Logic Attention Network (LAN), which addresses all three properties. We also provide details in training the LAN aggregator.
+
+## Incorporating Neighborhood Attention
+
+Traditional neighborhood aggregators only depend on collections of transformed embeddings. They neglect other useful information in the neighborhood INLINEFORM0 and the query relation INLINEFORM1 , which may facilitate more effective aggregation of the transformed embeddings. To this end, we propose generalizing the aggregators from INLINEFORM2 to INLINEFORM3 .
+
+Specifically, for an entity INLINEFORM0 , its neighbors INLINEFORM1 should contribute differently to INLINEFORM2 according to its importance in representing INLINEFORM3 . To consider the different contribution while preserving the permutation invariance property, we employ a weighted or attention-based aggregating approach on the transformed embeddings. The additional information in INLINEFORM4 and INLINEFORM5 is then exploited when estimating the attention weights. Formally, we obtain INLINEFORM6 by DISPLAYFORM0 
+
+Here INLINEFORM0 is the attention weight specified for each neighbor INLINEFORM1 given INLINEFORM2 and the query relation INLINEFORM3 .
+
+To assign larger weights INLINEFORM0 to more important neighbors, from the perspective of INLINEFORM1 , we ask ourselves two questions at progressive levels: 1) What types of neighboring relations may lead us to potentially important neighbors? 2) Following those relations, which specific neighbor (in transformed embedding) may contain important information? Inspired by the two questions, we adopt the following two mechanisms to estimate INLINEFORM2 .
+
+Relations in a KG are simply not independent of each other. For an entity INLINEFORM0 , one neighboring relation INLINEFORM1 may imply the existence of another neighboring relation INLINEFORM2 , though they may not necessarily connect INLINEFORM3 to the same neighbor. For example, a neighboring relation play_for may suggest the home city, i.e., live_in, of the current athlete entity. Following notations in logics, we denote potential dependency between INLINEFORM4 and INLINEFORM5 by a “logic rule” INLINEFORM6 . To measure the extent of such dependency, we define the confidence of a logic rule INLINEFORM7 as follows: DISPLAYFORM0 
+
+Here the function INLINEFORM0 equals 1 when INLINEFORM1 is true and 0 otherwise. As an empirical statistic over the entire KG, INLINEFORM2 is larger if more entities with neighboring relation INLINEFORM3 also have INLINEFORM4 as a neighboring relation.
+
+With the confidence scores INLINEFORM0 between all relation pairs at hand, we are ready to characterize neighboring relations INLINEFORM1 that lead to important neighbors. On one hand, such a relation INLINEFORM2 should have a large INLINEFORM3 , i.e., it is statistically relevant to INLINEFORM4 . Following the above example, play_for should be consulted to if the query relation is live_in. On the other hand, INLINEFORM5 should not be implied by other relations in the neighborhood. For example, no matter whether the query relation is live_in or not, the neighboring relation work_as should not be assigned too much weight, because sufficient information is already provided by play_for.
+
+Following the above intuitions, we implement the logic rule mechanism of measuring neighboring relations' usefulness as follow: DISPLAYFORM0 
+
+We note that INLINEFORM0 promotes relations INLINEFORM1 strongly implying INLINEFORM2 (the numerator) and demotes those implied by some other relation in the same neighborhood (the denominator). In this manner, our logic rule mechanism addresses both query relation awareness and neighborhood redundancy awareness.
+
+With global statistics about relations, the logic rule mechanism guides the attention weight to be distributed at a coarse granularity of relations. However, it may be insufficient not to consult finer-grained information hidden in the transformed neighbor embeddings to determine which neighbor is important indeed. To take the transformed embeddings into consideration, we adopt an attention network BIBREF10 .
+
+Specifically, given a query relation INLINEFORM0 , the importance of an entity INLINEFORM1 's neighbor INLINEFORM2 is measured by DISPLAYFORM0 
+
+Here the unnormalized attention weight INLINEFORM0 is given by an attention neural network as DISPLAYFORM0 
+
+In this equation, INLINEFORM0 and INLINEFORM1 are global attention parameters, while INLINEFORM2 is a relation-specific attention parameter for the query relation INLINEFORM3 . All those attention parameters are regarded as parameters of the encoder, and learned directly from the data.
+
+Note that, unlike the logic rule mechanism at relation level, the computation of INLINEFORM0 concentrates more on the neighbor INLINEFORM1 itself. This is useful when the neighbor entity INLINEFORM2 is also helpful to explain the current training triplet. For example, in Figure FIGREF12 , the neighbor Chicago_Bulls could help to imply the object of live_in since there are other athletes playing for Chicago_Bulls while living in Chicago. Although working at the neighbor level, the dependency on transformed neighbor embeddings INLINEFORM3 and the relation-specific parameter INLINEFORM4 make INLINEFORM5 aware of both neighborhood redundancy and the query relation.
+
+Finally, to incorporate these two weighting mechanisms together in measuring the importance of neighbors, we employ a double-view attention and reformulate Eq. ( EQREF22 ) as DISPLAYFORM0 
+
+## Training Objective
+
+To train the entire model in Figure FIGREF12 , we need both positive triplets and negative ones. All triplets INLINEFORM0 from the knowledge graph naturally serve as positive triplets, which we denote by INLINEFORM1 . To make up for the absence of negative triplets, for each INLINEFORM2 , we randomly corrupt the object or subject (but not both) by another entity in INLINEFORM3 , and denote the corresponding negative triplets by INLINEFORM4 . Formally, DISPLAYFORM0 
+
+To encourage the decoder to give high scores for positive triplets and low scores for negative ones, we apply a margin-based ranking loss on each triplet INLINEFORM0 , i.e., DISPLAYFORM0 
+
+Here INLINEFORM0 denotes the positive part of x, and INLINEFORM1 is a hyper-parameter for the margin. Finally, the training objective is defined by DISPLAYFORM0 
+
+The above training objective only optimizes the output of the aggregator, i.e., the output entity embeddings INLINEFORM0 . The input entity embeddings INLINEFORM1 , however, are not directly aware of the structure of the entire KG. To make the input embeddings and thus the aggregation more meaningful, we set up a subtask for LAN.
+
+First, we define a second scoring function, which is similar to Eq. ( EQREF20 ) except that input embeddings INLINEFORM0 from INLINEFORM1 are used to represent the subject and object, i.e., DISPLAYFORM0 
+
+The embedding of query relation INLINEFORM0 is obtained from the same embedding matrix INLINEFORM1 as in the first scoring function. Then a similar margin-based ranking loss INLINEFORM2 as Eq. ( EQREF32 ) is defined for the subtask. Finally, we combine the subtask with the main task, and reformulate the overall training objective of LAN as DISPLAYFORM0 
+
+## Experimental Configurations
+
+We evaluate the effectiveness of our LAN model on two typical knowledge graph completion tasks, i.e., link prediction and triplet classification. We compare our LAN with two baseline aggregators, MEAN and LSTM, as described in the Encoder section. MEAN is used on behalf of pooling functions since it leads to the best performance in BIBREF9 ijcai2017-250. LSTM is used due to its large expressive capability BIBREF26 .
+
+## Data Construction
+
+In both tasks, we need datasets whose test sets contain new entities unseen during training. For the task of triplet classification, we directly use the datasets released by BIBREF9 ijcai2017-250 which are based on WordNet11 BIBREF29 . Since they do not conduct experiments on the link prediction task, we construct the required datasets based on FB15K BIBREF11 following a similar protocol used in BIBREF9 ijcai2017-250 as follows.
+
+Sampling unseen entities. Firstly, we randomly sample INLINEFORM0 of the original testing triplets to form a new test set INLINEFORM1 for our inductive scenario ( BIBREF9 ijcai2017-250 samples INLINEFORM2 testing triplets). Then two different strategies are used to construct the candidate unseen entities INLINEFORM6 . One is called Subject, where only entities appearing as the subjects in INLINEFORM7 are added to INLINEFORM8 . Another is called Object, where only objects in INLINEFORM9 are added to INLINEFORM10 . For an entity INLINEFORM11 , if it does not have any neighbor in the original training set, such an entity is filtered out, yielding the final unseen entity set INLINEFORM12 . For a triplet INLINEFORM13 , if INLINEFORM14 or INLINEFORM15 , it is removed from INLINEFORM16 .
+
+Filtering and splitting data sets. The second step is to ensure that unseen entities would not appear in final training set or validation set. We split the original training set into two data sets, the new training set and auxiliary set. For a triplet INLINEFORM0 in original training set, if INLINEFORM1 , it is added to the new training set. If INLINEFORM2 or INLINEFORM3 , it is added to the auxiliary set, which serves as existing neighbors for unseen entities in INLINEFORM4 .
+
+Finally, for a triplet INLINEFORM0 in the original validation set, if INLINEFORM1 or INLINEFORM2 , it is removed from the validation set.
+
+The statistics for the resulting INLINEFORM0 datasets using Subject and Object strategies are in Table TABREF34 .
+
+## Experiments on Triplet Classification
+
+Triplet classification aims at classifying a fact triplet INLINEFORM0 as true or false. In the dataset of BIBREF9 ijcai2017-250, triplets in the validation and testing sets are labeled as true or false, while triplets in the training set are all true ones.
+
+To tackle this task, we preset a threshold INLINEFORM0 for each relation r. If INLINEFORM1 , the triplet is classified as positive, otherwise it is negative. We determine the optimal INLINEFORM2 by maximizing classification accuracy on the validation set.
+
+## Experimental Setup
+
+Since this task is also conducted in BIBREF9 ijcai2017-250, we use the same configurations with learning rate INLINEFORM0 , embedding dimension INLINEFORM1 , and margin INLINEFORM2 for all datasets. We randomly sample 64 neighbors for each entity. Zero padding is used when the number of neighbors is less than 64. L2-regularization is applied on the parameters of LAN. The regularization rate is INLINEFORM3 .
+
+We search the best hyper-parameters of all models according to the performance on validation set. In detail, we search learning rate INLINEFORM0 in INLINEFORM1 , embedding dimension for neighbors INLINEFORM2 in INLINEFORM3 , and margin INLINEFORM4 in INLINEFORM5 . The optimal configurations are INLINEFORM6 for all the datasets.
+
+## Evaluation Results
+
+The results are reported in Table TABREF42 . Since we did not achieve the same results for MEAN as reported in BIBREF9 ijcai2017-250 with either our implementation or their released source code, the best results from their original paper are reported. From the table, we observe that, on one hand, LSTM results in poorer performance compared with MEAN, which involves fewer parameters though. This demonstrates the necessity of the permutation invariance for designing neighborhood aggregators for KGs. On the other hand, our LAN model consistently achieves the best results on all datasets, demonstrating the effectiveness of LAN on this KBC task.
+
+## Experiments on Link Prediction
+
+Link prediction in the inductive setting aims at reasoning the missing part “?” in a triplet when given INLINEFORM0 or INLINEFORM1 with emerging entities INLINEFORM2 or INLINEFORM3 respectively. To tackle the task, we firstly hide the object (subject) of each testing triplet in Subject-R (Object-R) to produce a missing part. Then we replace the missing part with all entities in the entity set INLINEFORM4 to construct candidate triplets. We compute the scoring function INLINEFORM5 defined in Eq. ( EQREF20 ) for all candidate triplets, and rank them in descending order. Finally, we evaluate whether the ground-truth entities are ranked ahead of other entities. We use traditional evaluation metrics as in the KG completion literature, i.e., Mean Rank (MR), Mean Reciprocal Rank (MRR), and the proportion of ground truth entities ranked top-k (Hits@k, INLINEFORM6 ). Since certain candidate triplets might also be true, we follow previous works and filter out these fake negatives before ranking.
+
+## Experimental Results
+
+The results on Subject-10 and Object-10 are reported in Table TABREF43 . The results on other datasets are similar and we summarize them later in Figure FIGREF50 . From Table TABREF43 , we still observe consistent results for all the models as in the triplet classification task. Firstly, LSTM results in the poorest performance on all datasets. Secondly, our LAN model outperforms all the other baselines significantly, especially on the Hit@k metrics. The improvement on the MR metric of LAN might not be considerable. This is due to the flaw of the MR metric since it is more sensitive to lower positions of the ranking, which is actually of less importance. The MRR metric is proposed for this reason, where we could observe consistent improvements brought by LAN. The effectiveness of LAN on link prediction validates LAN's superiority to other aggregators and the necessities to treat the neighbors differently in a permutation invariant way. To analyze whether LAN outperforms the others for expected reasons and generalizes to other configurations, we conduct the following studies.
+
+In this experiment, we would like to confirm that it's necessary for the aggregator to be aware of the query relation. Specifically, we investigate the attention neural network and design two degenerated baselines. One is referred to as Query-Attention and is simply an attention network as in LAN except that the logic rule mechanism is removed. The other is referred to as Global-Attention, which is also an attention network except that the query relation embedding INLINEFORM0 in Eq. ( EQREF28 ) is masked by a zero vector. The results are reported in Table TABREF46 . We observe that although superior to MEAN, Global-Attention is outperformed by Query-Attention, demonstrating the necessity of query relation awareness. The superiority of Global-Attention over MEAN could be attributed to the fact that the attention mechanism is effective to identify the neighbors which are globally important regardless of the query.
+
+We find that the logic rules greatly help to improve the attention network in LAN. We confirm this point by conducting further experiments where the logic rule mechanism is isolated as a single model (referred to as Logic Rules Only). The results are also demonstrated in Table TABREF46 , from which we find that Query-Attention outperforms MEAN by a limited margin. Meanwhile, Logic Rules Only outperforms both MEAN and Query-Attention by significant margins. These results demonstrate the effectiveness of logic rules in assigning meaningful weights to the neighbors. Specifically, in order to generate representations for unseen entities, it is crucial to incorporate the logic rules to train the aggregator, instead of depending solely on neural networks to learn from the data. By combining the logic rules and neural networks, LAN takes a step further in outperforming all the other models.
+
+To find out whether the superiority of LAN to the baselines can generalize to other scoring functions, we replace the scoring function in Eq. ( EQREF20 ) and Eq. ( EQREF36 ) by three typical scoring functions mentioned in Related Works. We omit the results of LSTM, for it is still inferior to MEAN. The results are listed in Table TABREF48 , from which we observe that with different scoring functions, LAN outperforms MEAN consistently by a large margin on all the evaluation metrics. Note that TransE leads to the best results on MEAN and LAN.
+
+It's reasonable to suppose that when the ratio of the unseen entities over the training entities increases (namely the observed knowledge graph becomes sparser), all models' performance would deteriorate. To figure out whether our LAN could suffer less on sparse knowledge graphs, we conduct link prediction on datasets with different sample rates INLINEFORM0 as described in Step 1 of the Data Construction section. The results are displayed in Figure FIGREF50 . We observe that the increasing proportion of unseen entities certainly has a negative impact on all models. However, the performance of LAN does not decrease as drastically as that of MEAN and LSTM, indicating that LAN is more robust on sparse KGs.
+
+## Case Studies on Neighbors' Weights
+
+In order to visualize how LAN specifies weights to neighbors, we sample some cases from the Subject-10 testing set. From Table FIGREF50 , we have the following observations. First, with the query relation, LAN could attribute higher weights to neighbors with more relevant relations. In the first case, when the query is origin, the top two neighbors are involved by place_lived and breed_origin, which are helpful to imply origin. In addition, in all three cases, neighbors with relation gender gain the lowest weights since they imply nothing about the query relation. Second, LAN could attribute higher weights to neighbor entities that are more informative. When the query relation is profession, the neighbors Aristotle, Metaphysics and Aesthetics are all relevant to the answer Philosopher. In the third case, we also observe similar situations. Here, the neighbor with the highest weight is (institution, University_of_Calgary) since the query relation place_lived helps the aggregator to focus on the neighboring relation institution, then the neighbor entity University_of_Calgary assists in locating the answer Calgary.
+
+## Conclusion
+
+In this paper, we address inductive KG embedding, which helps embed emerging entities efficiently. We formulate three characteristics required for effective neighborhood aggregators. To meet the three characteristics, we propose LAN, which attributes different weights to an entity's neighbors in a permutation invariant manner, considering both the redundancy of neighbors and the query relation. The weights are estimated from data with logic rules at a coarse relation level, and neural attention network at a fine neighbor level. Experiments show that LAN outperforms baseline models significantly on two typical KG completion tasks.
+
+## Acknowledgements
+
+We thank the three anonymous authors for their constructive comments. This work is supported by the National Natural Science Foundation of China (61472453, U1401256, U1501252, U1611264, U1711261, U1711262).

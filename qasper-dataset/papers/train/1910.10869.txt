@@ -1,0 +1,131 @@
+# Combining Acoustics, Content and Interaction Features to Find Hot Spots in Meetings
+
+**Paper ID:** 1910.10869
+
+## Abstract
+
+Involvement hot spots have been proposed as a useful concept for meeting analysis and studied off and on for over 15 years. These are regions of meetings that are marked by high participant involvement, as judged by human annotators. However, prior work was either not conducted in a formal machine learning setting, or focused on only a subset of possible meeting features or downstream applications (such as summarization). In this paper we investigate to what extent various acoustic, linguistic and pragmatic aspects of the meetings can help detect hot spots, both in isolation and jointly. In this context, the openSMILE toolkit \cite{opensmile} is to used to extract features based on acoustic-prosodic cues, BERT word embeddings \cite{BERT} are used for modeling the lexical content, and a variety of statistics based on the speech activity are used to describe the verbal interaction among participants. In experiments on the annotated ICSI meeting corpus, we find that the lexical modeling part is the most informative, with incremental contributions from interaction and acoustic-prosodic model components.
+
+## Introduction and Prior Work
+
+A definition of the meeting “hot spots” was first introduced in BIBREF2, where it was investigated whether human annotators could reliably identify regions in which participants are “highly involved in the discussion”. The motivation was that meetings generally have low information density and are tedious to review verbatim after the fact. An automatic system that could detect regions of high interest (as indicated by the involvement of the participants during the meeting) would thus be useful. Relatedly, automatic meeting summarization could also benefit from such information to give extra weight to hot spot regions in selecting or abstracting material for inclusion in the summary. Later work on the relationship between involvement and summarization BIBREF3 defined a different approach: hot spots are those regions chosen for inclusion in a summary by human annotators (“summarization hot spots”). In the present work we stick with the original “involvement hot spot” notion, and refer to such regions simply as “hot spots”, regardless of their possible role in summarization. We note that high involvement may be triggered both by a meeting's content (“what is being talked about”, and “what may be included in a textual summary”), as well as behavioral and social factors, such as a desire to participate, to stake out a position, or to oppose another participant. As related notion in dialog system research is “level of interest” BIBREF4.
+
+The initial research on hot spots focused on the reliability of human annotators and correlations with certain low-level acoustic features, such as pitch BIBREF2. Also investigated were the correlation between hot spots and dialog acts BIBREF5 and hot spots and speaker overlap BIBREF6, without however conducting experiments in automatic hot spot prediction using machine learning techniques. Laskowski BIBREF7 redefined the hot spot annotations in terms of time-based windows over meetings, and investigated various classifier models to detect “hotness” (i.e., elevated involvement). However, that work focused on only two types of speech features: presence of laughter and the temporal patterns of speech activity across the various participants, both of which were found to be predictive of involvement.
+
+For the related problem of level-of-interest prediction in dialog systems BIBREF8, it was found that content-based classification can also be effective, using both a discriminative TF-IDF model and lexical affect scores, as well as prosodic features. In line with the earlier hot spot research on interaction patterns and speaker overlap, turn-taking features were shown to be helpful for spotting summarization hot spots, in BIBREF3, and even more so than the human involvement annotations. The latter result confirms our intuition that summarization-worthiness and involvement are different notions of “hotness”.
+
+In this paper, following Laskowski, we focus on the automatic prediction of the speakers' involvement in sliding-time windows/segments. We evaluate machine learning models based on a range of features that can be extracted automatically from audio recordings, either directly via signal processing or via the use of automatic transcriptions (ASR outputs). In particular, we investigate the relative contributions of three classes of information:
+
+low-level acoustic-prosodic features, such as those commonly used in other paralinguistic tasks, such as sentiment analysis (extracted using openSMILE BIBREF0);
+
+spoken word content, as encoded with a state-of-the-art lexical embedding approach such as BERT BIBREF1;
+
+speaker interaction, based on speech activity over time and across different speakers.
+
+We attach lower importance to laughter, even though it was found to be highly predictive of involvement in the ICSI corpus, partly because we believe it would not transfer well to more general types of (e.g., business) meetings, and partly because laughter detection is still a hard problem in itself BIBREF9. Generation of speaker-attributed meeting transcriptions, on the other hand, has seen remarkable progress BIBREF10 and could support the features we focus on here.
+
+## Data
+
+The ICSI Meeting Corpus BIBREF11 is a collection of meeting recordings that has been thoroughly annotated, including annotations for involvement hot spots BIBREF12, linguistic utterance units, and word time boundaries based on forced alignment. The dataset is comprised of 75 meetings and about 70 hours of real-time audio duration, with 6 speakers per meeting on average. Most of the participants are well-acquainted and friendly with each other. Hot spots were originally annotated with 8 levels and degrees, ranging from `not hot' to `luke warm' to `hot +'. Every utterance was labeled with one of these discrete labels by a single annotator. Hightened involvement is rare, being marked on only 1% of utterances.
+
+Due to the severe imbalance in the label distribution, Laskowski BIBREF13 proposed extending the involvement, or hotness, labels to sliding time windows. In our implementation (details below), this resulted in 21.7% of samples (windows) being labeled as “involved”.
+
+We split the corpus into three subsets: training, development, and evaluation, keeping meetings intact. Table TABREF4 gives statistics of these partitions.
+
+We were concerned with the relatively small number of meetings in the test sets, and repeated several of our experiments with a (jackknifing) cross-validation setup over the training set. The results obtained were very similar to those with the fixed train/test split results that we report here.
+
+## Data ::: Time Windowing
+
+As stated above, the corpus was originally labeled for hot spots at the utterance level, where involvement was marked by either a `b' or a `b+' label. Training and test samples for our experiments correspond to 60 s-long sliding windows, with a 15 s step size. If a certain window, e.g., a segment spanning the times 15 s ...75 s, overlaps with any involved speech utterance, then we label that whole window as `hot'. Fig. FIGREF6 gives a visual representation.
+
+## Data ::: Metric
+
+In spite of the windowing approach, the class distribution is still skewed, and an accuracy metric would reflect the particular class distribution in our data set. Therefore, we adopt the unweighted average recall (UAR) metric commonly used in emotion classification research. UAR is a reweighted accuracy where the samples of both classes are weighted equally in aggregate. UAR thus simulates a uniform class distribution. To match the objective, our classifiers are trained on appropriately weighted training data. Note that chance performance for UAR is by definition 50%, making results more comparable across different data sets.
+
+## Feature Description ::: Acoustic-Prosodic Features
+
+Prosody encompasses pitch, energy, and durational features of speech. Prosody is thought to convey emphasis, sentiment, and emotion, all of which are presumably correlated with expressions of involvement. We used the openSMILE toolkit BIBREF0 to compute 988 features as defined by the emobase988 configuration file, operating on the close-talking meeting recordings. This feature set consists of low-level descriptors such as intensity, loudness, Mel-frequency cepstral coefficients, and pitch. For each low-level descriptor, functionals such as max/min value, mean, standard deviation, kurtosis, and skewness are computed. Finally, global mean and variance normalization are applied to each feature, using training set statistics. The feature vector thus captures acoustic-prosodic features aggregated over what are typically utterances. We tried extracting openSMILE features directly from 60 s windows, but found better results by extracting subwindows of 5 s, followed by pooling over the longer 60 s duration. We attribute this to the fact that emobase features are designed to operate on individual utterances, which have durations closer to 5 s than 60 s.
+
+## Feature Description ::: Word-Based Features ::: Bag of words with TF-IDF
+
+Initially, we investigated a simple bag-of-words model including all unigrams, bigrams, and trigrams found in the training set. Occurrences of the top 10,000 n-grams were encoded to form a 10,000-dimensional vector, with values weighted according to TD-IDF. TF-IDF weights n-grams according to both their frequency (TF) and their salience (inverse document frequency, IDF) in the data, where each utterance was treated as a separate document. The resulting feature vectors are very sparse.
+
+## Feature Description ::: Word-Based Features ::: Embeddings
+
+The ICSI dataset is too small to train a neural embedding model from scratch. Therefore, it is convenient to use the pre-trained BERT embedding architecture BIBREF1 to create an utterance-level embedding vector for each region of interest. Having been trained on a large text corpus, the resulting embeddings encode semantic similarities among utterances, and would enable generalization from word patterns seen in the ICSI training data to those that have not been observed on that limited corpus.
+
+We had previously also created an adapted version of the BERT model, tuned to to perform utterance-level sentiment classification, on a separate dataset BIBREF14. As proposed in BIBREF1, we fine-tuned all layers of the pre-trained BERT model by adding a single fully-connected layer and classifying using only the embedding corresponding to the classification ([CLS]) token prepended to each utterance. The difference in UAR between the hot spot classifiers using the pre-trained embeddings and those using the sentiment-adapted embeddings is small. Since the classifier using embeddings extracted by the sentiment-adapted model yielded slightly better performance, we report all results using these as input.
+
+To obtain a single embedding for each 60 s window, we experimented with various approaches of pooling the token and utterance-level embeddings. For our first approach, we ignored the ground-truth utterance segmentation and speaker information. We merged all words spoken within a particular window into a single contiguous span. Following BIBREF1, we added the appropriate classification and separation tokens to the text and selected the embedding corresponding to the [CLS] token as the window-level embedding. Our second approach used the ground-truth segmentation of the dialogue. Each speaker turn was independently modeled, and utterance-level embeddings were extracted using the representation corresponding to the [CLS] token. Utterances that cross window boundaries are truncated using the word timestamps, so only words spoken within the given time window are considered. For all reported experiments, we use L2-norm pooling to form the window-level embeddings for the final classifier, as this performed better than either mean or max pooling.
+
+## Feature Description ::: Speaker Activity Features
+
+These features were a compilation of three different feature types:
+
+Speaker overlap percentages: Based on the available word-level times, we computed a 6-dimensional feature vector, where the $i$th index indicates the fraction of time that $i$ or more speakers are talking within a given window. This can be expressed by $\frac{t_i}{60}$ with $t_i$ indicating the time in seconds that $i$ or more people were speaking at the same time.
+
+Unique speaker count: Counts the unique speakers within a window, as a useful metric to track the diversity of participation within a certain window.
+
+Turn switch count: Counts the number of times a speaker begins talking within a window. This is a similar metric to the number of utterances. However, unlike utterance count, turn switches can be computed entirely from speech activity, without requiring a linguistic segmentation.
+
+## Feature Description ::: Laughter Count
+
+Laskowski found that laughter is highly predictive of involvement in the ICSI data. Laughter is annotated on an utterance level and falls into two categories: laughter solely on its own (no words) or laughter contained within an utterance (i.e. during speech). The feature is a simple tally of the number of times people laughed within a window. We include it in some of our experiments for comparison purposes, though we do not trust it as general feature. (The participants in the ICSI meetings are far too familiar and at ease with each other to be representative with regards to laughter.)
+
+## Modeling ::: Non-Neural Models
+
+In preliminary experiments, we compared several non-neural classifiers, including logistic regression (LR), random forests, linear support vector machines, and multinomial naive Bayes. Logistic regression gave the best results all around, and we used it exclusively for the results shown here, unless neural networks are used instead.
+
+## Modeling ::: Feed-Forward Neural Networks ::: Pooling Techniques
+
+For BERT and openSMILE vector classification, we designed two different feed-forward neural network architectures. The sentiment-adapted embeddings described in Section SECREF3 produce one 1024-dimensional vector per utterance. Since all classification operates on time windows, we had to pool over all utterances falling withing a given window, taking care to truncate words falling outside the window. We tested four pooling methods: L2-norm, mean, max, and min, with L2-norm giving the best results.
+
+As for the prosodic model, each vector extracted from openSMILE represents a 5 s interval. Since there was both a channel/speaker-axis and a time-axis, we needed to pool over both dimensions in order to have a single vector representing the prosodic features of a 60 s window. The second to last layer is the pooling layer, max-pooling across all the channels, and then mean-pooling over time. The output of the pooling layer is directly fed into the classifier.
+
+## Modeling ::: Feed-Forward Neural Networks ::: Hyperparameters
+
+The hyperparameters of the neural networks (hidden layer number and sizes) were also tuned in preliminary experiments. Details are given in Section SECREF5.
+
+## Modeling ::: Model Fusion
+
+Fig. FIGREF19 depicts the way features from multiple categories are combined. Speech activity and word features are fed directly into a final LR step. Acoustic-prosodic features are first combined in a feed-forward neural classifier, whose output log posteriors are in turn fed into the LR step for fusion. (When using only prosodic features, the ANN outputs are used directly.)
+
+## Experiments
+
+We group experiments by the type of feaures they are based on: acoustic-prosodic, word-based, and speech activity, evaluating each group first by itself, and then in combination with others.
+
+## Experiments ::: Speech Feature Results
+
+As discussed in Section SECREF3, a multitude of input features were investigated, with some being more discriminative. The most useful speech activity features were speaker overlap percentage, number of unique speakers, and number of turn switches, giving evaluation set UARs of 63.5%, 63.9%, and 66.6%, respectively. When combined the UAR improved to 68.0%, showing that these features are partly complementary.
+
+## Experiments ::: Word-Based Results
+
+The TF-IDF model alone gave a UAR of 59.8%. A drastic increase in performance to 70.5% was found when using the BERT embeddings instead. Therefore we adopted embeddings for all further experiments based on word information.
+
+Three different types of embeddings were investigated, i.e. sentiment-adapted embeddings at an utterance-level, unadapted embeddings at the utterance-level, and unadapted embeddings over time windows.
+
+The adapted embeddings (on utterances) performed best, indicating that adaptation to sentiment task is useful for involvement classification. It is important to note, however, that the utterance-level embeddings are larger than the window-level embeddings. This is due to there being more utterances than windows in the meeting corpus.
+
+The best neural architecture we found for these embeddings is a 5-layer neural network with sizes 1024-64-32-12-2. Other hyperparameters for this model are dropout rate = 0.4, learning rate = $10^{-7}$ and activation function “tanh”. The UAR on the evaluation set with just BERT embeddings as input is 65.2%.
+
+Interestingly, the neural model was outperformed by a LR directly on the embedding vectors. Perhaps the neural network requires further fine-tuning, or the neural model is too prone to overfitting, given the small training corpus. In any case, we use LR on embeddings for all subsequent results.
+
+## Experiments ::: Acoustic-Prosodic Feature Results
+
+Our prosodic model is a 5-layer ANN, as described in Section SECREF15. The architecture is: 988-512-128-16-Pool-2. The hyperparameters are: dropout rate = 0.4, learning rate = $10^{-7}$, activation = “tanh". The UAR on the evaluation set with just openSMILE features is 62.0%.
+
+## Experiments ::: Fusion Results and Discussion
+
+Table TABREF24 gives the UAR for each feature subset individually, for all features combined, and for a combination in which one feature subset in turn is left out. The one-feature-set-at-time results suggest that prosody, speech activity and words are of increasing importance in that order. The leave-one-out analysis agrees that the words are the most important (largest drop in accuracy when removed), but on that criterion the prosodic features are more important than speech-activity. The combination of all features is 0.4% absolute better than any other subset, showing that all feature subsets are partly complementary.
+
+Fig. FIGREF25 shows the same results in histogram form, but also add those with laughter information. Laughter count by itself is the strongest cue to involvement, as Laskowski BIBREF7 had found. However, even given the strong individual laughter feature, the other features add information, pushing the UAR from from 75.1% to 77.5%.
+
+## Conclusion
+
+We studied detection of areas of high involvement, or “hot spots”, within meetings using the ICSI corpus. The features that yielded the best results are in line with our intuitions. Word embeddings, speech activity features such a number of turn changes, and prosodic features are all plausible indicators of high involvement. Furthermore, the feature sets are partly complementary and yield best results when combined using a simple logistic regression model. The combined model achieves 72.6% UAR, or 77.5% with laughter feature.
+
+For future work, we would want to see a validation on an independent meeting collection, such as business meetings. Some features, in particular laughter, are bound not be as useful in this case. More data could also enable the training of joint models that perform an early fusion of the different feature types. Also, the present study still relied on human transcripts, and it would be important to know how much UAR suffers with a realistic amount of speech recognition error. Transcription errors are expected to boost the importance of the features types that do not rely on words.
+
+## Acknowledgments
+
+We thank Britta Wrede, Elizabeth Shriberg and Kornel Laskowski for explanations concerning the details of the data.

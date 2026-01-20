@@ -1,0 +1,203 @@
+# Many Languages, One Parser
+
+**Paper ID:** 1602.01595
+
+## Abstract
+
+We train one multilingual model for dependency parsing and use it to parse sentences in several languages. The parsing model uses (i) multilingual word clusters and embeddings; (ii) token-level language information; and (iii) language-specific features (fine-grained POS tags). This input representation enables the parser not only to parse effectively in multiple languages, but also to generalize across languages based on linguistic universals and typological similarities, making it more effective to learn from limited annotations. Our parser's performance compares favorably to strong baselines in a range of data scenarios, including when the target language has a large treebank, a small treebank, or no treebank for training.
+
+## Introduction
+
+Developing tools for processing many languages has long been an important goal in NLP BIBREF0 , BIBREF1 , but it was only when statistical methods became standard that massively multilingual NLP became economical. The mainstream approach for multilingual NLP is to design language-specific models. For each language of interest, the resources necessary for training the model are obtained (or created), and separate parameters are fit for each language separately. This approach is simple and grants the flexibility of customizing the model and features to the needs of each language, but it is suboptimal for theoretical and practical reasons. Theoretically, the study of linguistic typology tells us that many languages share morphological, phonological, and syntactic phenomena BIBREF3 ; therefore, the mainstream approach misses an opportunity to exploit relevant supervision from typologically related languages. Practically, it is inconvenient to deploy or distribute NLP tools that are customized for many different languages because, for each language of interest, we need to configure, train, tune, monitor, and occasionally update the model. Furthermore, code-switching or code-mixing (mixing more than one language in the same discourse), which is pervasive in some genres, in particular social media, presents a challenge for monolingually-trained NLP models BIBREF4 .
+
+In parsing, the availability of homogeneous syntactic dependency annotations in many languages BIBREF5 , BIBREF6 , BIBREF7 , BIBREF8 has created an opportunity to develop a parser that is capable of parsing sentences in multiple languages, addressing these theoretical and practical concerns. A multilingual parser can potentially replace an array of language-specific monolingually-trained parsers (for languages with a large treebank). The same approach has been used in low-resource scenarios (with no treebank or a small treebank in the target language), where indirect supervision from auxiliary languages improves the parsing quality BIBREF11 , BIBREF12 , BIBREF13 , BIBREF14 , BIBREF15 , BIBREF16 , but these models may sacrifice accuracy on source languages with a large treebank. In this paper, we describe a model that works well for both low-resource and high-resource scenarios.
+
+We propose a parsing architecture that takes as input sentences in several languages, optionally predicting the part-of-speech (POS) tags and input language. The parser is trained on the union of available universal dependency annotations in different languages. Our approach integrates and critically relies on several recent developments related to dependency parsing: universal POS tagsets BIBREF17 , cross-lingual word clusters BIBREF18 , selective sharing BIBREF19 , universal dependency annotations BIBREF5 , BIBREF6 , BIBREF7 , BIBREF8 , advances in neural network architectures BIBREF20 , BIBREF21 , and multilingual word embeddings BIBREF22 , BIBREF16 , BIBREF23 . We show that our parser compares favorably to strong baselines trained on the same treebanks in three data scenarios: when the target language has a large treebank (Table 3 ), a small treebank (Table 7 ), or no treebank (Table 8 ). Our parser is publicly available.
+
+## Overview
+
+Our goal is to train a dependency parser for a set of target languages ${L}^t$ , given universal dependency annotations in a set of source languages ${L}^s$ . Ideally, we would like to have training data in all target languages (i.e., $L^t \subseteq L^s$ ), but we are also interested in the case where the sets of source and target languages are disjoint (i.e., $L^t \cap L^s = \emptyset $ ). When all languages in $L^t$ have a large treebank, the mainstream approach has been to train one monolingual parser per target language and route sentences of a given language to the corresponding parser at test time. In contrast, our approach is to train one parsing model with the union of treebanks in $L^s$ , then use this single trained model to parse text in any language in $L^t$ , hence the name “Many Languages, One Parser” (MaLOPa). MaLOPa strikes a balance between: (1) enabling cross-lingual model transfer via language-invariant input representations; i.e., coarse POS tags, multilingual word embeddings and multilingual word clusters, and (2) tweaking the behavior of the parser depending on the current input language via language-specific representations; i.e., fine-grained POS tags and language embeddings.
+
+In addition to universal dependency annotations in source languages (see Table 1 ), we use the following data resources for each language in ${L} = {L}^t \cup {L}^s$ :
+
+Novel contributions of this paper include: (i) using one parser instead of an array of monolingually-trained parsers without sacrificing accuracy on languages with a large treebank, (ii) an effective neural network architecture for using language embeddings to improve multilingual parsing, and (iii) a study of how automatic language identification affects the performance of a multilingual dependency parser.
+
+While not the primary focus of this paper, we also show that a variant of our parser outperforms previous work on multi-source cross-lingual parsing in low resource scenarios, where languages in $L^t$ have a small treebank (see Table 7 ) or where $L^t \cap L^s = \emptyset $ (see Table 8 ). In the small treebank setup with 3,000 token annotations, we show that our parser consistently outperforms a strong monolingual baseline with 5.7 absolute LAS (labeled attachment score) points per language, on average.
+
+## Parsing Model
+
+Recent advances suggest that recurrent neural networks, especially long short-term memory (LSTM) architectures, are capable of learning useful representations for modeling problems of sequential nature BIBREF24 , BIBREF25 . In this section, we describe our language-universal parser, which extends the stack LSTM (S-LSTM) parser of dyer:15.
+
+## Transition-based Parsing with S-LSTMs
+
+This section briefly reviews Dyer et al.'s S-LSTM parser, which we modify in the following sections. The core parser can be understood as the sequential manipulation of three data structures:
+
+a buffer (from which we read the token sequence),
+
+a stack (which contains partially-built parse trees), and
+
+a list of actions previously taken by the parser.
+
+The parser uses the arc-standard transition system BIBREF26 . At each timestep $t$ , a transition action is applied that alters these data structures according to Table 2 .
+
+Along with the discrete transitions of the arc-standard system, the parser computes vector representations for the buffer, stack and list of actions at time step $t$ denoted $\mathbf {b}_t$ , $\mathbf {s}_t$ , and $\mathbf {a}_t$ , respectively. The parser state at time $t$ is given by: 
+
+$$\mathbf {p}_t = \max \left\lbrace  0, \mathbf {W}[\mathbf {s}_t; \mathbf {b}_t; \mathbf {a}_t] + \mathbf {W}_{\text{bias}}\right\rbrace $$   (Eq. 24) 
+
+where the matrix $\mathbf {W}$ and the vector $\mathbf {W}_{\text{bias}}$ are learned parameters. The matrix $\mathbf {W}$ is multiplied by the vector $[\mathbf {s}_t; \mathbf {b}_t; \mathbf {a}_t]$ created by the concatenation of $\mathbf {s}_t, \mathbf {b}_t, \mathbf {a}_t$ . The parser state $\mathbf {p}_t$ is then used to define a categorical distribution over possible next actions $z$ : 
+
+$$p(z \mid \mathbf {p}_t) = \frac{\exp \left( \mathbf {g}_{z}^{\top } \mathbf {p}_t + q_{z} \right)}{\sum _{z^{\prime }} \exp \left( \mathbf {g}_{z^{\prime }}^{\top } \mathbf {p}_t + q_{z^{\prime }} \right)}$$   (Eq. 26) 
+
+where $\mathbf {g}_z$ and $q_z$ are parameters associated with action $z$ . The selected action is then used to update the buffer, stack and list of actions, and to compute $\mathbf {b}_{t+1}$ , $\mathbf {s}_{t+1}$ and $\mathbf {a}_{t+1}$ accordingly.
+
+The model is trained to maximize the log-likelihood of correct actions. At test time, the parser greedily chooses the most probable action in every time step until a complete parse tree is produced.
+
+The following sections describe our extensions of the core parser. More details about the core parser can be found in dyer:15.
+
+## Token Representations
+
+The vector representations of input tokens feed into the stack-LSTM modules of the buffer and the stack. For monolingual parsing, we represent each token by concatenating the following vectors:
+
+a fixed, pretrained embedding of the word type,
+
+a learned embedding of the word type,
+
+a learned embedding of the Brown cluster,
+
+a learned embedding of the fine-grained POS tag,
+
+a learned embedding of the coarse POS tag.
+
+For multilingual parsing with MaLOPa, we start with a simple delexicalized model where the token representation only consists of learned embeddings of coarse POS tags, which are shared across all languages to enable model transfer. In the following subsections, we enhance the token representation in MaLOPa to include lexical embeddings, language embeddings, and fine-grained POS embeddings.
+
+## Lexical Embeddings
+
+Previous work has shown that sacrificing lexical features amounts to a substantial decrease in the performance of a dependency parser BIBREF11 , BIBREF18 , BIBREF28 , BIBREF29 . Therefore, we extend the token representation in MaLOPa by concatenating learned embeddings of multilingual word clusters, and pretrained multilingual embeddings of word types.
+
+Before training the parser, we estimate Brown clusters of English words and project them via word alignments to words in other languages. This is similar to the `projected clusters' method in tackstrom:12. To go from Brown clusters to embeddings, we ignore the hierarchy within Brown clusters and assign a unique parameter vector to each cluster.
+
+We also use Guo et al.'s (2016) `robust projection' method to pretrain multilingual word embeddings. The first step in `robust projection' is to learn embeddings for English words using the skip-gram model BIBREF30 . Then, we compute an embedding of non-English words as the weighted average of English word embeddings, using word alignment probabilities as weights. The last step computes an embedding of non-English words which are not aligned to any English words by averaging the embeddings of all words within an edit distance of 1 in the same language. We experiment with two other methods—`multiCCA' and `multiCluster,' both proposed by ammar:16—for pretraining multilingual word embeddings in § "Target Languages with a Treebank (L t =L s L^t = L^s)" . `MultiCCA' uses a linear operator to project pretrained monolingual embeddings in each language (except English) to the vector space of pretrained English word embeddings, while `multiCluster' uses the same embedding for translationally-equivalent words in different languages. The results in Table 6 illustrate that the three methods perform similarly on this task.
+
+## Language Embeddings
+
+While many languages, especially ones that belong to the same family, exhibit some similar syntactic phenomena (e.g., all languages have subjects, verbs, and objects), substantial syntactic differences abound. Some of these differences are easy to characterize (e.g., subject-verb-object vs. verb-subject-object, prepositions vs. postpositions, adjective-noun vs. noun-adjective), while others are subtle (e.g., number and positions of negation morphemes). It is not at all clear how to translate descriptive facts about a language's syntax into features for a parser.
+
+Consequently, training a language-universal parser on treebanks in multiple source languages requires caution. While exposing the parser to a diverse set of syntactic patterns across many languages has the potential to improve its performance in each, dependency annotations in one language will, in some ways, contradict those in typologically different languages.
+
+For instance, consider a context where the next word on the buffer is a noun, and the top word on the stack is an adjective, followed by a noun. Treebanks of languages where postpositive adjectives are typical (e.g., French) will often teach the parser to predict reduce-left, while those of languages where prepositive adjectives are more typical (e.g., English) will teach the parser to predict shift.
+
+Inspired by naseem:12, we address this problem by informing the parser about the input language it is currently parsing. Let $\mathbf {l}$ be the input vector representation of a particular language. We consider three definitions for $\mathbf {l}$ :
+
+one-hot encoding of the language ID,
+
+one-hot encoding of individual word-order properties, and
+
+averaged one-hot encoding of WALS typological properties (including word-order properties).
+
+It is worth noting that the first definition (language ID) turns out to work best in our experiments.
+
+We use a hidden layer with $\tanh $ nonlinearity to compute the language embedding $\mathbf {l^{\prime }}$ as: 
+
+$$\mathbf {l^{\prime }} = \tanh (\mathbf {L l + L_{\text{bias}}}) \nonumber $$   (Eq. 43) 
+
+ where the matrix $\mathbf {L}$ and the vector $\mathbf {L_{\text{bias}}}$ are additional model parameters. We modify the parsing architecture as follows:
+
+include $\mathbf {l^{\prime }}$ in the token representation (which feeds into the stack-LSTM modules of the buffer and the stack as described in § "Transition-based Parsing with S-LSTMs" ),
+
+include $\mathbf {l^{\prime }}$ in the action vector representation (which feeds into the stack-LSTM module that represents previous actions as described in § "Transition-based Parsing with S-LSTMs" ), and
+
+redefine the parser state at time $t$ as $\mathbf {p}_t = \max \left\lbrace  0, \mathbf {W}[\mathbf {s}_t; \mathbf {b}_t; \mathbf {a}_t; \mathbf {l^{\prime }}] + \mathbf {W}_{\text{bias}}\right\rbrace $ .
+
+Intuitively, the first two modifications allow the input language to influence the vector representation of the stack, the buffer and the list of actions. The third modification allows the input language to influence the parser state which in turn is used to predict the next action. In preliminary experiments, we found that adding the language embeddings at the token and action level is important. We also experimented with computing more complex functions of ( $\mathbf {s}_t, \mathbf {b}_t, \mathbf {a}_t, \mathbf {l^{\prime }}$ ) to define the parser state, but they did not help.
+
+## Fine-grained POS Tag Embeddings
+
+tiedemann:15 shows that omitting fine-grained POS tags significantly hurts the performance of a dependency parser. However, those fine-grained POS tagsets are defined monolingually and are only available for a subset of the languages with universal dependency treebanks.
+
+We extend the token representation to include a fine-grained POS embedding (in addition to the coarse POS embedding). We stochastically dropout the fine-grained POS embedding for each token with 50% probability BIBREF31 so that the parser can make use of fine-grained POS tags when available but stay reliable when the fine-grained POS tags are missing.
+
+## Predicting POS Tags
+
+The model discussed thus far conditions on the POS tags of words in the input sentence. However, gold POS tags may not be available in real applications (e.g., parsing the web). Here, we describe two modifications to (i) model both POS tagging and dependency parsing, and (ii) increase the robustness of the parser to incorrect POS predictions.
+
+Let $x_1, \ldots , x_n$ , $y_1,\ldots , y_n$ , $z_1, \ldots , z_{2n}$ be the sequence of words, POS tags, and parsing actions, respectively, for a sentence of length $n$ . We define the joint distribution of a POS tag sequence and parsing actions given a sequence of words as follows: 
+
+$$p&(y_1,\ldots , y_n, z_1, \ldots ,z_{2n} \mid x_1,\ldots ,x_n) = \nonumber \\
+&\prod _{i=1}^{n} p(y_i \mid x_1,\ldots ,x_n) \nonumber \\
+\times & \prod _{j=1}^{2n} p(z_j \mid x_1, \ldots , x_n, y_1, \ldots , y_n, z_1, \ldots , z_{j-1}) \nonumber $$   (Eq. 50) 
+
+ where $p(z_j \mid \ldots )$ is defined in Eq. 26 , and $p(y_i \mid x_1, \ldots , x_n)$ uses a bidirectional LSTM BIBREF24 . huang:15 show that the performance of a bidirectional LSTM POS tagger is on par with a conditional random field tagger.
+
+We use slightly different token representations for tagging and parsing in the same model. For tagging, we construct the token representation by concatenating the embeddings of the word type (pretrained), the Brown cluster and the input language. This token representation feeds into the bidirectional LSTM, followed by a softmax layer (at each position) which defines a categorical distribution over possible POS tags. For parsing, we construct the token representation by further concatenating the embeddings of predicted POS tags. This token representation feeds into the stack-LSTM modules of the buffer and stack components of the transition-based parser. This multi-task learning setup enables us to predict both POS tags and dependency trees in the same model. We note that pretrained word embeddings, cluster embeddings and language embeddings are shared for tagging and parsing.
+
+We use an independently developed variant of word dropout BIBREF32 , which we call block dropout. The token representation used for parsing includes the embedding of predicted POS tags, which may be incorrect. We introduce another modification which makes the parser more robust to incorrect POS tag predictions, by stochastically zeroing out the entire embedding of the POS tag. While training the parser, we replace the POS embedding vector $\mathbf {e}$ with another vector (of the same dimensionality) stochastically computed as: $\mathbf {e^{\prime }} = (1-b)/\mu \times \mathbf {e}$ , where $b \in \lbrace 0,1\rbrace $ is a Bernoulli-distributed random variable with parameter $\mu $ which is initialized to 1.0 (i.e., always dropout, setting $b=1, \mathbf {e^{\prime }} = 0$ ), and is dynamically updated to match the error rate of the POS tagger on the development set. At test time, we never dropout the predicted POS embedding, i.e., $\mathbf {e^{\prime }}=\mathbf {e}$ . Intuitively, this method extends the dropout method BIBREF31 to address structured noise in the input layer.
+
+## Experiments
+
+In this section, we evaluate the MaLOPa approach in three data scenarios: when the target language has a large treebank (Table 3 ), a small treebank (Table 7 ) or no treebank (Table 8 ).
+
+## Target Languages with a Treebank (L t =L s L^t = L^s)
+
+Here, we evaluate our MaLOPa parser when the target language has a treebank.
+
+For each target language, the strong baseline we use is a monolingually-trained S-LSTM parser with a token representation which concatenates: pretrained word embeddings (50 dimensions), learned word embeddings (50 dimensions), coarse (universal) POS tag embeddings (12 dimensions), fine-grained (language-specific, when available) POS tag embeddings (12 dimensions), and embeddings of Brown clusters (12 dimensions), and uses a two-layer S-LSTM for each of the stack, the buffer and the list of actions. We independently train one baseline parser for each target language, and share no model parameters. This baseline, denoted `monolingual' in Tables 3 and 7 , achieves UAS score 93.0 and LAS score 91.5 when trained on the English Penn Treebank, which is comparable to dyer:15.
+
+We train MaLOPa on the concantenation of training sections of all seven languages. To balance the development set, we only concatenate the first 300 sentences of each language's development section.
+
+The first MaLOPa parser we evaluate uses only coarse POS embeddings to construct the token representation. As shown in Table 3 , this parser consistently underperforms the monolingual baselines, with a gap of 12.5 LAS points on average.
+
+Augmenting the token representation with lexical embeddings to the token representation (both multilingual word clusters and pretrained multilingual word embeddings, as described in § "Lexical Embeddings" ) substantially improves the performance of MaLOPa, recovering 83% of the gap in average performance.
+
+We experimented with three ways to include language information in the token representation, namely: `language ID', `word order' and `full typology' (see § "Language Embeddings" for details), and found all three to improve the performance of MaLOPa giving LAS scores 83.5, 83.2 and 82.5, respectively. It is noteworthy that the model benefits more from language ID than from typological properties. Using `language ID,' we recover another 12% of the original gap.
+
+Finally, the best configuration of MaLOPa adds fine-grained POS embeddings to the token representation. Surprisingly, adding fine-grained POS embeddings improves the performance even for some languages where fine-grained POS tags are not available (e.g., Spanish). This parser outperforms the monolingual baseline in five out of seven target languages, and wins on average by 0.3 LAS points. We emphasize that this model is only trained once on all languages, and the same model is used to parse the test set of each language, which simplifies the distribution or deployment of multilingual parsing software.
+
+To gain a better understanding of the model behavior, we analyze certain classes of dependency attachments/relations in German, which has notably flexible word order, in Table 4 . We consider the recall of left attachments (where the head word precedes the dependent word in the sentence), right attachments, root attachments, short-attachments (with distance $=1$ ), long-attachments (with distance $>6$ ), as well as the following relation groups: nsubj* (nominal subjects: nsubj, nsubjpass), dobj (direct object: dobj), conj (conjunct: conj), *comp (clausal complements: ccomp, xcomp), case (clitics and adpositions: case), *mod (modifiers of a noun: nmod, nummod, amod, appos), neg (negation modifier: neg).
+
+We found that each of the three improvements (lexical embeddings, language embeddings and fine-grained POS embeddings) tends to improve recall for most classes. MaLOPa underperforms (compared to the monolingual baseline) in some classes: nominal subjects, direct objects and modifiers of a noun. Nevertheless, MaLOPa outperforms the baseline in some important classes such as: root, long attachments and conjunctions.
+
+In Table 3 , we assume that both gold language ID of the input language and gold POS tags are given at test time. However, this assumption is not realistic in practical applications. Here, we quantify the degradation in parsing accuracy when language ID and POS tags are only given at training time, but must be predicted at test time. We do not use fine-grained POS tags in these experiments because some languages use a very large fine-grained POS tag set (e.g., 866 unique tags in Portuguese).
+
+In order to predict language ID, we use the langid.py library BIBREF34 and classify individual sentences in the test sets to one of the seven languages of interest, using the default models included in the library. The macro average language ID prediction accuracy on the test set across sentences is 94.7%. In order to predict POS tags, we use the model described in § "Predicting POS Tags" with both input and hidden LSTM dimensions of 60, and with block dropout. The macro average accuracy of the POS tagger is 93.3%. Table 5 summarizes the four configurations: {gold language ID, predicted language ID} $\times $ {gold POS tags, predicted POS tags}. The performance of the parser suffers mildly (–0.8 LAS points) when using predicted language IDs, but more (–5.1 LAS points) when using predicted POS tags. As an alternative approach to predicting POS tags, we trained the Stanford POS tagger, for each target language, on the coarse POS tag annotations in the training section of the universal dependency treebanks, then replaced the gold POS tags in the test set of each language with predictions of the monolingual tagger. The resulting degradation in parsing performance between gold vs. predicted POS tags is –6.0 LAS points (on average, compared to a degradation of –5.1 LAS points in Table 5 ). The disparity in parsing results with gold vs. predicted POS tags is an important open problem, and has been previously discussed by tiedemann:15.
+
+The predicted POS results in Table 5 use block dropout. Without using block dropout, we lose an extra 0.2 LAS points in both configurations using predicted POS tags.
+
+Several methods have been proposed for pretraining multilingual word embeddings. We compare three of them:
+
+multiCCA BIBREF23 uses a linear operator to project pretrained monolingual embeddings in each language (except English) to the vector space of pretrained English word embeddings.
+
+multiCluster BIBREF23 uses the same embedding for translationally-equivalent words in different languages.
+
+robust projection BIBREF29 first pretrains monolingual English word embeddings, then defines the embedding of a non-English word as the weighted average embedding of English words aligned to the non-English words (in a parallel corpus). The embedding of a non-English word which is not aligned to any English words is defined as the average embedding of words with a unit edit distance in the same language (e.g., `playz' is the average of `plays' and `play').
+
+All embeddings are trained on the same data and use the same number of dimensions (100). Table 6 illustrates that the three methods perform similarly on this task. Aside from Table 6 , in this paper, we exclusively use the robust projection multilingual embeddings trained in guo:16. The “robust projection” result in Table 6 (which uses 100 dimensions) is comparable to the last row in Table 3 (which uses 50 dimensions).
+
+duong:15 considered a setup where the target language has a small treebank of $\sim $ 3,000 tokens, and the source language (English) has a large treebank of $\sim $ 205,000 tokens. The parser proposed in duong:15 is a neural network parser based on chen:14, which shares most of the parameters between English and the target language, and uses an $\ell _2$ regularizer to tie the lexical embeddings of translationally-equivalent words. While not the primary focus of this paper, we compare our proposed method to that of duong:15 on five target languages for which multilingual Brown clusters are available from guo:16. For each target language, we train the parser on the English training data in the UD version 1.0 corpus BIBREF6 and a small treebank in the target language. Following duong:15, in this setup, we only use gold coarse POS tags, we do not use any development data in the target languages (we use the English development set instead), and we subsample the English training data in each epoch to the same number of sentences in the target language. We use the same hyperparameters specified before for the single MaLOPa parser and each of the monolingual baselines. Table 7 shows that our method outperforms duong:15 by 1.4 LAS points on average. Our method consistently outperforms the monolingual baselines in this setup, with an average improvement of 5.7 absolute LAS points.
+
+## Target Languages without a Treebank (L t ∩L s =∅L^t \cap L^s = \emptyset )
+
+mcdonald:11 established that, when no treebank annotations are available in the target language, training on multiple source languages outperforms training on one (i.e., multi-source model transfer outperforms single-source model transfer). In this section, we evaluate the performance of our parser in this setup. We use two strong baseline multi-source model transfer parsers with no supervision in the target language:
+
+zhang:15 is a graph-based arc-factored parsing model with a tensor-based scoring function. It takes typological properties of a language as input. We compare to the best reported configuration (i.e., the column titled “OURS” in Table 5 of Zhang and Barzilay, 2015).
+
+guo:16 is a transition-based neural-network parsing model based on chen:14. It uses a multilingual embeddings and Brown clusters as lexical features. We compare to the best reported configuration (i.e., the column titled “MULTI-PROJ” in Table 1 of Guo et al., 2016).
+
+Following guo:16, for each target language, we train the parser on six other languages in the Google universal dependency treebanks version 2.0 (de, en, es, fr, it, pt, sv, excluding whichever is the target language), and we use gold coarse POS tags. Our parser uses the same word embeddings and word clusters used in guo:16, and does not use any typology information.
+
+The results in Table 8 show that, on average, our parser outperforms both baselines by more than 1 point in LAS, and gives the best LAS results in four (out of six) languages.
+
+## Related Work
+
+Our work builds on the model transfer approach, which was pioneered by zeman:08 who trained a parser on a source language treebank then applied it to parse sentences in a target language. cohen:11 and mcdonald:11 trained unlexicalized parsers on treebanks of multiple source languages and applied the parser to different languages. naseem:12, tackstrom:13, and zhang:15 used language typology to improve model transfer. To add lexical information, tackstrom:12 used multilingual word clusters, while xiao:14, guo:15, sogaard:15 and guo:16 used multilingual word embeddings. duong:15 used a neural network based model, sharing most of the parameters between two languages, and used an $\ell _2$ regularizer to tie the lexical embeddings of translationally-equivalent words. We incorporate these ideas in our framework, while proposing a novel neural architecture for embedding language typology (see § "Language Embeddings" ), and use a variant of word dropout BIBREF32 for consuming noisy structured inputs. We also show how to replace an array of monolingually trained parsers with one multilingually-trained parser without sacrificing accuracy, which is related to vilares:16.
+
+Neural network parsing models which preceded dyer:15 include henderson:03, titov:07, henderson:10 and chen:14. Related to lexical features in cross-lingual parsing is durrett:12 who defined lexico-syntactic features based on bilingual lexicons. Other related work include ostling:15, which may be used to induce more useful typological properties to inform multilingual parsing.
+
+Another popular approach for cross-lingual supervision is to project annotations from the source language to the target language via a parallel corpus BIBREF35 , BIBREF36 or via automatically-translated sentences BIBREF37 . ma:14 used entropy regularization to learn from both parallel data (with projected annotations) and unlabeled data in the target language. rasooli:15 trained an array of target-language parsers on fully annotated trees, by iteratively decoding sentences in the target language with incomplete annotations. One research direction worth pursuing is to find synergies between the model transfer approach and annotation projection approach.
+
+## Conclusion
+
+We presented MaLOPa, a single parser trained on a multilingual set of treebanks. We showed that this parser, equipped with language embeddings and fine-grained POS embeddings, on average outperforms monolingually-trained parsers for target languages with a treebank. This pattern of results is quite encouraging. Although languages may share underlying syntactic properties, individual parsing models must behave quite differently, and our model allows this while sharing parameters across languages. The value of this sharing is more pronounced in scenarios where the target language's training treebank is small or non-existent, where our parser outperforms previous cross-lingual multi-source model transfer methods.
+
+## Acknowledgments
+
+Waleed Ammar is supported by the Google fellowship in natural language processing. Miguel Ballesteros is supported by the European Commission under the contract numbers FP7-ICT-610411 (project MULTISENSOR) and H2020-RIA-645012 (project KRISTINA). Part of this material is based upon work supported by a subcontract with Raytheon BBN Technologies Corp. under DARPA Prime Contract No. HR0011-15-C-0013, and part of this research was supported by a Google research award to Noah Smith. We thank Jiang Guo for sharing the multilingual word embeddings and multilingual word clusters. We thank Lori Levin, Ryan McDonald, Jörg Tiedemann, Yulia Tsvetkov, and Yuan Zhang for helpful discussions. Last but not least, we thank the anonymous TACL reviewers for their valuable feedback.

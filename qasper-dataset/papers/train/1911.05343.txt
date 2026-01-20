@@ -1,0 +1,75 @@
+# A Stable Variational Autoencoder for Text Modelling
+
+**Paper ID:** 1911.05343
+
+## Abstract
+
+Variational Autoencoder (VAE) is a powerful method for learning representations of high-dimensional data. However, VAEs can suffer from an issue known as latent variable collapse (or KL loss vanishing), where the posterior collapses to the prior and the model will ignore the latent codes in generative tasks. Such an issue is particularly prevalent when employing VAE-RNN architectures for text modelling (Bowman et al., 2016). In this paper, we present a simple architecture called holistic regularisation VAE (HR-VAE), which can effectively avoid latent variable collapse. Compared to existing VAE-RNN architectures, we show that our model can achieve much more stable training process and can generate text with significantly better quality.
+
+## Introduction
+
+Variational Autoencoder (VAE) BIBREF1 is a powerful method for learning representations of high-dimensional data. However, recent attempts of applying VAEs to text modelling are still far less successful compared to its application to image and speech BIBREF2, BIBREF3, BIBREF4. When applying VAEs for text modelling, recurrent neural networks (RNNs) are commonly used as the architecture for both encoder and decoder BIBREF0, BIBREF5, BIBREF6. While such a VAE-RNN based architecture allows encoding and generating sentences (in the decoding phase) with variable-length effectively, it is also vulnerable to an issue known as latent variable collapse (or KL loss vanishing), where the posterior collapses to the prior and the model will ignore the latent codes in generative tasks.
+
+Various efforts have been made to alleviate the latent variable collapse issue. BIBREF0 uses KL annealing, where a variable weight is added to the KL term in the cost function at training time. BIBREF7 discovered that there is a trade-off between the contextual capacity of the decoder and effective use of encoding information, and developed a dilated CNN as decoder which can vary the amount of conditioning context. They also introduced a loss clipping strategy in order to make the model more robust. BIBREF5 addressed the problem by replacing the standard normal distribution for the prior with the von Mises-Fisher (vMF) distribution. With vMF, the KL loss only depends on the concentration parameter which is fixed during training and testing, and hence results in a constant KL loss. In a more recent work, BIBREF6 avoided latent variable collapse by including skip connections in the generative model, where the skip connections enforce strong links between the latent variables and the likelihood function.
+
+Although the aforementioned works show effectiveness in addressing the latent variable collapse issue to some extent, they either require carefully engineering to balance the weight between the reconstruction loss and KL loss BIBREF0, BIBREF8, or resort to designing more sophisticated model structures BIBREF7, BIBREF5, BIBREF6.
+
+In this paper, we present a simple architecture called holistic regularisation VAE (HR-VAE), which can effectively avoid latent variable collapse. In contrast to existing VAE-RNN models for text modelling which merely impose a standard normal distribution prior on the last hidden state of the RNN encoder, our HR-VAE model imposes regularisation for all hidden states of the RNN encoder. Another advantage of our model is that it is generic and can be applied to any existing VAE-RNN-based architectures.
+
+We evaluate our model against several strong baselines which apply VAE for text modelling BIBREF0, BIBREF7, BIBREF5. We conducted experiments based on two public benchmark datasets, namely, the Penn Treebank dataset BIBREF9 and the end-to-end (E2E) text generation dataset BIBREF10. Experimental results show that our HR-VAE model not only can effectively mitigate the latent variable collapse issue with a stable training process, but also can give better predictive performance than the baselines, as evidenced by both quantitative (e.g., negative log likelihood and perplexity) and qualitative evaluation. The code for our model is available online.
+
+## Methodology ::: Background of VAE
+
+A variational autoencoder (VAE) is a deep generative model, which combines variational inference with deep learning. The VAE modifies the conventional autoencoder architecture by replacing the deterministic latent representation $\mathbf {z}$ of an input $\mathbf {x}$ with a posterior distribution $P(\mathbf {z}|\mathbf {x})$, and imposing a prior distribution on the posterior, such that the model allows sampling from any point of the latent space and yet able to generate novel and plausible output. The prior is typically chosen to be standard normal distributions, i.e., $P(\mathbf {z}) = \mathcal {N}(\mathbf {0},\mathbf {1})$, such that the KL divergence between posterior and prior can be computed in closed form BIBREF1.
+
+To train a VAE, we need to optimise the marginal likelihood $P_{\theta }(\mathbf {x})=\int {P(\mathbf {z})P_{\theta }(\mathbf {x}|\mathbf {z})d\mathbf {z}}$, where the log likelihood can take following form:
+
+Here $Q_{\phi }(\mathbf {z}|\mathbf {x})$ is the variational approximation for the true posterior $P_{\theta }(\mathbf {z}|\mathbf {x})$. Specifically, $Q_{\phi }(\mathbf {z}|\mathbf {x})$ can be regarded as an encoder (a.k.a. the recognition model) and $P_{\theta }(\mathbf {x}|\mathbf {z})$ the decoder (a.k.a. the generative model). Both encoder and decoder are implemented via neural networks. As proved in BIBREF1, optimising the marginal log likelihood is essentially equivalent to maximising $\mathcal {L}(\theta ,\phi ;\mathbf {x})$, i.e., the evidence lower bound (ELBO), which consists of two terms. The first term is the expected reconstruction error indicating how well the model can reconstruct data given a latent variable. The the second term is the KL divergence of the approximate posterior from prior, i.e., a regularisation pushing the learned posterior to be as close to the prior as possible.
+
+## Methodology ::: Variational Autoendoder with Holistic Regularisation
+
+In this section, we discuss the technical details of the proposed holistic regularisation VAE (HR-VAE) model, a general architecture which can effectively mitigate the KL vanishing phenomenon.
+
+Our model design is motivated by one noticeable defect shared by the VAE-RNN based models in previous works BIBREF0, BIBREF7, BIBREF5, BIBREF6. That is, all these models, as shown in Figure FIGREF2, only impose a standard normal distribution prior on the last hidden state of the RNN encoder, which potentially leads to learning a suboptimal representation of the latent variable and results in model vulnerable to KL loss vanishing. Our hypothesis is that to learn a good representation of data and a good generative model, it is crucial to impose the standard normal prior on all the hidden states of the RNN-based encoder (see Figure FIGREF2), which allows a better regularisation of the model learning process.
+
+We implement the HR-VAE model using a two-layer LSTM for both the encoder and decoder. However, one should note that our architecture can be readily applied to other types of RNN such as GRU. For each time stamp $t$ (see Figure FIGREF2), we concatenate the hidden state $\mathbf {h}_t$ and the cell state $\mathbf {c}_t$ of the encoder. The concatenation (i.e., $[\mathbf {h}_t;\mathbf {c}_t]$) is then fed into two linear transformation layers for estimating $\mu _t$ and $\sigma ^2_t$, which are parameters of a normal distribution corresponding to the concatenation of $\mathbf {h}_t$ and $\mathbf {c}_t$. Let $Q_{\phi _t}(\mathbf {z}_t | \mathbf {x})=\mathcal {N}(\mathbf {z}_t|\mu _t,\sigma ^2_t)$, we wish $Q_{\phi _t}(\mathbf {z}_t | \mathbf {x})$ to be close to a prior $P(\mathbf {z}_t)$, which is a standard Gaussian. Finally, the KL divergence between these two multivariate Gaussian distributions (i.e., $Q_{\phi _t}$ and $P(\mathbf {z}_t)$) will contribute to the overall KL loss of the ELBO. By taking the average of the KL loss at each time stamp $t$, the resulting ELBO takes the following form
+
+As can be seen in Eq. DISPLAY_FORM10, our solution to the KL collapse issue does not require any engineering for balancing the weight between the reconstruction term and KL loss as commonly the case in existing works BIBREF0, BIBREF8. The weight between these two terms of our model is simply $1:1$.
+
+## Experimental Setup ::: Datasets
+
+We evaluate our model on two public datasets, namely, Penn Treebank (PTB) BIBREF9 and the end-to-end (E2E) text generation corpus BIBREF10, which have been used in a number of previous works for text generation BIBREF0, BIBREF5, BIBREF11, BIBREF12. PTB consists of more than 40,000 sentences from Wall Street Journal articles whereas the E2E dataset contains over 50,000 sentences of restaurant reviews. The statistics of these two datasets are summarised in Table TABREF11.
+
+## Experimental Setup ::: Implementation Details
+
+For the PTB dataset, we used the train-test split following BIBREF0, BIBREF5. For the E2E dataset, we used the train-test split from the original dataset BIBREF10 and indexed the words with a frequency higher than 3. We represent input data with 512-dimensional word2vec embeddings BIBREF13. We set the dimension of the hidden layers of both encoder and decoder to 256. The Adam optimiser BIBREF14 was used for training with an initial learning rate of 0.0001. Each utterance in a mini-batch was padded to the maximum length for that batch, and the maximum batch-size allowed is 128.
+
+## Experimental Setup ::: Baselines
+
+We compare our HR-VAE model with three strong baselines using VAE for text modelling:
+
+VAE-LSTM-base: A variational autoencoder model which uses LSTM for both encoder and decoder. KL annealing is used to tackled the latent variable collapse issue BIBREF0;
+
+VAE-CNN: A variational autoencoder model with a LSTM encoder and a dilated CNN decoder BIBREF7;
+
+vMF-VAE: A variational autoencoder model using LSTM for both encoder and decoder where the prior distribution is the von Mises-Fisher (vMF) distribution rather than a Gaussian distribution BIBREF5.
+
+## Experimental Results
+
+We evaluate our HR-VAE model in two experimental settings, following the setup of BIBREF0, BIBREF5. In the standard setting, the input to the decoder at each time stamp is the concatenation of latent variable $\mathbf {z}$ and the ground truth word of the previous time stamp. Under this setting, the decoder will be more powerful because it uses the ground truth word as input, resulting in little information of the training data captured by latent variable $\mathbf {z}$. The inputless setting, in contrast, does not use the previous ground truth word as input for the decoder. In other words, the decoder needs to predict the entire sequence with only the help of the given latent variable $\mathbf {z}$. In this way, a high-quality representation abstracting the information of the input sentence is much needed for the decoder, and hence enforcing $\mathbf {z}$ to learn the required information.
+
+Overall performance. Table TABREF13 shows the language modelling results of our approach and the baselines. We report negative log likelihood (NLL), KL loss, and perplexity (PPL) on the test set. As expected, all the models have a higher KL loss in the inputless setting than the standard setting, as $\mathbf {z}$ is required to encode more information about the input data for reconstruction. In terms of overall performance, our model outperforms all the baselines in both datasets (i.e., PTB and E2E). For instance, when comparing with the strongest baseline vMF-VAE in the standard setting, our model reduces NLL from 96 to 79 and PPL from 98 to 43 in PTB, respectively. In the inputless setting, our performance gain is even higher, i.e., NLL reduced from 117 to 85 and PPL from 262 to 54. A similar pattern can be observed for the E2E dataset. These observations suggest that our approach can learn a better generative model for data.
+
+Loss analysis. To conduct a more thorough evaluation, we further investigate model behaviours in terms of both reconstruction loss and KL loss, as shown in Figure FIGREF14. These plots were obtained based on the E2E training set using the inputless setting.
+
+We can see that the KL loss of VAE-LSTM-base, which uses Sigmoid annealing BIBREF0, collapses to zero, leading to a poor generative performance as indicated by the high reconstruction loss. The KL loss for both VAE-CNN and vMF-VAE are nonzero, where the former mitigates the KL collapse issue with a KL loss clipping strategy and the latter by replacing the standard normal distribution for the prior with the vMF distribution (i.e., with the vMF distribution, the KL loss only depends on a fixed concentration parameter, and hence results in a constant KL loss). Although both VAE-CNN and vMF-VAE outperform VAE-LSTM-base by a large margin in terms of reconstruction loss as shown in Figure FIGREF14, one should also notice that these two models actually overfit the training data, as their performance on the test set is much worse (cf. Table TABREF13). In contrast to the baselines which mitigate the KL collapse issue by carefully engineering the weight between the reconstruction loss and KL loss or choosing a different choice of prior, we provide a simple and elegant solution through holistic KL regularisation, which can effectively mitigate the KL collapse issue and achieve a better reconstruction error in both training and testing.
+
+Sentence reconstruction. Lastly, we show some sentence examples reconstructed by vMF-VAE (i.e., the best baseline) and our model in the inputless setting using sentences from the E2E test set as input. As shown in Table TABREF15, the sentences generated by vMF-VAE contain repeated words in quite a few cases, such as `city city area' and `blue spice spice'. In addition, vMF-VAE also tends to generate unnecessary or unrelated words at the end of sentences, making the generated sentences ungrammatical. The sentences reconstructed by our model, in contrast, are more grammatical and more similar to the corresponding ground truth sentences than vMF-VAE.
+
+## Conclusion
+
+In this paper, we present a simple and generic architecture called holistic regularisation VAE (HR-VAE), which can effectively avoid latent variable collapse. In contrast to existing VAE-RNN models which merely impose a standard normal distribution prior on the last hidden state of the RNN encoder, our HR-VAE model imposes regularisation on all the hidden states, allowing a better regularisation of the model learning process. Empirical results show that our model can effectively mitigate the latent variable collapse issue while giving a better predictive performance than the baselines.
+
+## Acknowledgment
+
+This work is supported by the award made by the UK Engineering and Physical Sciences Research Council (Grant number: EP/P011829/1).

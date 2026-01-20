@@ -1,0 +1,171 @@
+# Simplify the Usage of Lexicon in Chinese NER
+
+**Paper ID:** 1908.05969
+
+## Abstract
+
+Recently, many works have tried to utilizing word lexicon to augment the performance of Chinese named entity recognition (NER). As a representative work in this line, Lattice-LSTM \cite{zhang2018chinese} has achieved new state-of-the-art performance on several benchmark Chinese NER datasets. However, Lattice-LSTM suffers from a complicated model architecture, resulting in low computational efficiency. This will heavily limit its application in many industrial areas, which require real-time NER response. In this work, we ask the question: if we can simplify the usage of lexicon and, at the same time, achieve comparative performance with Lattice-LSTM for Chinese NER?  ::: Started with this question and motivated by the idea of Lattice-LSTM, we propose a concise but effective method to incorporate the lexicon information into the vector representations of characters. This way, our method can avoid introducing a complicated sequence modeling architecture to model the lexicon information. Instead, it only needs to subtly adjust the character representation layer of the neural sequence model. Experimental study on four benchmark Chinese NER datasets shows that our method can achieve much faster inference speed, comparative or better performance over Lattice-LSTM and its follwees. It also shows that our method can be easily transferred across difference neural architectures.
+
+## Introduction
+
+Named Entity Recognition (NER) is concerned with identifying named entities, such as person, location, product, and organization names, in unstructured text. In languages where words are naturally separated (e.g., English), NER was conventionally formulated as a sequence labeling problem, and the state-of-the-art results have been achieved by those neural-network-based models BIBREF1, BIBREF2, BIBREF3, BIBREF4.
+
+Compared with NER in English, Chinese NER is more difficult since sentences in Chinese are not previously segmented. Thus, one common practice in Chinese NER is first performing word segmentation using an existing CWS system and then applying a word-level sequence labeling model to the segmented sentence BIBREF5, BIBREF6. However, it is inevitable that the CWS system will wrongly segment the query sequence. This will, in turn, result in entity boundary detection errors and even entity category prediction errors in the following NER. Take the character sequence “南京市 (Nanjing) / 长江大桥 (Yangtze River Bridge)" as an example, where “/" indicates the gold segmentation result. If the sequence is segmented into “南京 (Nanjing) / 市长 (mayor) / 江大桥 (Daqiao Jiang)", the word-based NER system is definitely not able to correctly recognize “南京市 (Nanjing)" and “长江大桥 (Yangtze River Bridge)" as two entities of the location type. Instead, it is possible to incorrectly treat “南京 (Nanjing)" as a location entity and predict “江大桥 (Daqiao Jiang)" to be a person's name. Therefore, some works resort to performing Chinese NER directly on the character level, and it has been shown that this practice can achieve better performance BIBREF7, BIBREF8, BIBREF9, BIBREF0.
+
+A drawback of the purely character-based NER method is that word information, which has been proved to be useful, is not fully exploited. With this consideration, BIBREF0 proposed to incorporating word lexicon into the character-based NER model. In addition, instead of heuristically choosing a word for the character if it matches multiple words of the lexicon, they proposed to preserving all matched words of the character, leaving the following NER model to determine which matched word to apply. To achieve this, they introduced an elaborate modification to the LSTM-based sequence modeling layer of the LSTM-CRF model BIBREF1 to jointly model the character sequence and all of its matched words. Experimental studies on four public Chinese NER datasets show that Lattice-LSTM can achieve comparative or better performance on Chinese NER over existing methods.
+
+Although successful, there exists a big problem in Lattice-LSTM that limits its application in many industrial areas, where real-time NER responses are needed. That is, its model architecture is quite complicated. This slows down its inference speed and makes it difficult to perform training and inference in parallel. In addition, it is far from easy to transfer the structure of Lattice-LSTM to other neural-network architectures (e.g., convolutional neural networks and transformers), which may be more suitable for some specific datasets.
+
+In this work, we aim to find a easier way to achieve the idea of Lattice-LSTM, i.e., incorporating all matched words of the sentence to the character-based NER model. The first principle of our method design is to achieve a fast inference speed. To this end, we propose to encoding the matched words, obtained from the lexicon, into the representations of characters. Compared with Lattice-LSTM, this method is more concise and easier to implement. It can avoid complicated model architecture design thus has much faster inference speed. It can also be quickly adapted to any appropriate neural architectures without redesign. Given an existing neural character-based NER model, we only have to modify its character representation layer to successfully introduce the word lexicon. In addition, experimental studies on four public Chinese NER datasets show that our method can even achieve better performance than Lattice-LSTM when applying the LSTM-CRF model. Our source code is published at https://github.com/v-mipeng/LexiconAugmentedNER.
+
+## Generic Character-based Neural Architecture for Chinese NER
+
+In this section, we provide a concise description of the generic character-based neural NER model, which conceptually contains three stacked layers. The first layer is the character representation layer, which maps each character of a sentence into a dense vector. The second layer is the sequence modeling layer. It plays the role of modeling the dependence between characters, obtaining a hidden representation for each character. The final layer is the label inference layer. It takes the hidden representation sequence as input and outputs the predicted label (with probability) for each character. We detail these three layers below.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Character Representation Layer
+
+For a character-based Chinese NER model, the smallest unit of a sentence is a character and the sentence is seen as a character sequence $s=\lbrace c_1, \cdots , c_n\rbrace \in \mathcal {V}_c$, where $\mathcal {V}_c$ is the character vocabulary. Each character $c_i$ is represented using a dense vector (embedding):
+
+where $\mathbf {e}^{c}$ denotes the character embedding lookup table.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Character Representation Layer ::: Char + bichar.
+
+In addition, BIBREF0 has proved that character bigrams are useful for representing characters, especially for those methods not use word information. Therefore, it is common to augment the character representation with bigram information by concatenating bigram embeddings with character embeddings:
+
+where $\mathbf {e}^{b}$ denotes the bigram embedding lookup table, and $\oplus $ denotes the concatenation operation. The sequence of character representations $\mathbf {\mathrm {x}}_i^c$ form the matrix representation $\mathbf {\mathrm {x}}^s=\lbrace \mathbf {\mathrm {x}}_1^c, \cdots , \mathbf {\mathrm {x}}_n^c\rbrace $ of $s$.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Sequence Modeling Layer
+
+The sequence modeling layer models the dependency between characters built on vector representations of the characters. In this work, we explore the applicability of our method to three popular architectures of this layer: the LSTM-based, the CNN-based, and the transformer-based.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Sequence Modeling Layer ::: LSTM-based
+
+The bidirectional long-short term memory network (BiLSTM) is one of the most commonly used architectures for sequence modeling BIBREF10, BIBREF3, BIBREF11. It contains two LSTM BIBREF12 cells that model the sequence in the left-to-right (forward) and right-to-left (backward) directions with two distinct sets of parameters. Here, we precisely show the definition of the forward LSTM:
+
+where $\sigma $ is the element-wise sigmoid function and $\odot $ represents element-wise product. $\mathbf {\mathrm {\mathrm {W}}} \in {\mathbf {\mathrm {\mathbb {R}}}^{4k_h\times (k_h+k_w)}}$ and $\mathbf {\mathrm {\mathrm {b}}}\in {\mathbf {\mathrm {\mathbb {R}}}^{4k_h}}$ are trainable parameters. The backward LSTM shares the same definition as the forward one but in an inverse sequence order. The concatenated hidden states at the $i^{th}$ step of the forward and backward LSTMs $\mathbf {\mathrm {h}}_i=[\overrightarrow{\mathbf {\mathrm {h}}}_i \oplus \overleftarrow{\mathbf {\mathrm {h}}}_i]$ forms the context-dependent representation of $c_i$.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Sequence Modeling Layer ::: CNN-based
+
+Another popular architecture for sequence modeling is the convolution network BIBREF13, which has been proved BIBREF14 to be effective for Chinese NER. In this work, we apply a convolutional layer to model trigrams of the character sequence and gradually model its multigrams by stacking multiple convolutional layers. Specifically, let $\mathbf {\mathrm {h}}^l_i$ denote the hidden representation of $c_i$ in the $l^{th}$ layer with $\mathbf {\mathrm {h}}_i^0=\mathbf {\mathrm {x}}^c_i$, and $\mathbf {\mathrm {F}}^l \in \mathbb {R}^{k_l \times k_c \times 3}$ denote the corresponding filter used in this layer. To obtain the hidden representation $\mathbf {\mathrm {h}}^{l+1}_i$ of $c_i$ in the $(l+1)^{th}$ layer, it takes the convolution of $\mathbf {\mathrm {F}}^l$ over the 3-gram representation:
+
+where $\mathbf {\mathrm {h}}^l_{<i-1, i+1>} = [\mathbf {\mathrm {h}}^l_{i-1}; \mathbf {\mathrm {h}}^l_{i}; \mathbf {\mathrm {h}}^l_{i+1}]$ and $\langle A,B \rangle _i=\mbox{Tr}(AB[i, :, :]^T)$. This operation applies $L$ times, obtaining the final context-dependent representation, $\mathbf {\mathrm {h}}_i = \mathbf {\mathrm {h}}_i^L$, of $c_i$.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Sequence Modeling Layer ::: Transformer-based
+
+Transformer BIBREF15 is originally proposed for sequence transduction, on which it has shown several advantages over the recurrent or convolutional neural networks. Intrinsically, it can also be applied to the sequence labeling task using only its encoder part.
+
+In similar, let $\mathbf {\mathrm {h}}^l_i$ denote the hidden representation of $c_i$ in the $l^{th}$ layer with $\mathbf {\mathrm {h}}_i^0=\mathbf {\mathrm {x}}^c_i$, and $f^l$ denote a feedforward module used in this layer. To obtain the hidden representation matrix $\mathbf {\mathrm {h}}^{l+1}$ of $s$ in the $(l+1)^{th}$ layer, it takes the self-attention of $\mathbf {\mathrm {h}}^l$:
+
+where $d^l$ is the dimension of $\mathbf {\mathrm {h}}^l_i$. This process applies $L$ times, obtaining $\mathbf {\mathrm {h}}^L$. After that, the position information of each character $c_i$ is introduced into $\mathbf {\mathrm {h}}^L_i$ to obtain its final context-dependent representation $\mathbf {\mathrm {h}}_i$:
+
+where $PE_i=sin(i/1000^{2j/d^L}+j\%2\cdot \pi /2)$. We recommend you to refer to the excellent guides “The Annotated Transformer.” for more implementation detail of this architecture.
+
+## Generic Character-based Neural Architecture for Chinese NER ::: Label Inference Layer
+
+On top of the sequence modeling layer, a sequential conditional random field (CRF) BIBREF16 layer is applied to perform label inference for the character sequence as a whole:
+
+where $\mathcal {Y}_s$ denotes all possible label sequences of $s$, $\phi _{t}({y}^\prime , {y}|\mathbf {\mathrm {s}})=\exp (\mathbf {w}^T_{{y}^\prime , {y}} \mathbf {\mathrm {h}}_t + b_{{y}^\prime , {y}})$, where $\mathbf {w}_{{y}^\prime , {y}}$ and $ b_{{y}^\prime , {y}}$ are trainable parameters corresponding to the label pair $({y}^\prime , {y})$, and $\mathbf {\theta }$ denotes model parameters. For label inference, it searches for the label sequence $\mathbf {\mathrm {y}}^{*}$ with the highest conditional probability given the input sequence ${s}$:
+
+which can be efficiently solved using the Viterbi algorithm BIBREF17.
+
+## Lattice-LSTM for Chinese NER
+
+Lattice-LSTM designs to incorporate word lexicon into the character-based neural sequence labeling model. To achieve this purpose, it first performs lexicon matching on the input sentence. It will add an directed edge from $c_i$ to $c_j$, if the sub-sequence $\lbrace c_i, \cdots , c_j\rbrace $ of the sentence matches a word of the lexicon for $i < j$. And it preserves all lexicon matching results on a character by allowing the character to connect with multiple characters. Concretely, for a sentence $\lbrace c_1, c_2, c_3, c_4, c_5\rbrace $, if both its sub-sequences $\lbrace c_1, c_2, c_3, c_4\rbrace $ and $\lbrace c_2, c_3, c_4\rbrace $ match a word of the lexicon, it will add a directed edge from $c_1$ to $c_4$ and a directed edge from $c_2$ to $c_4$. This practice will turn the input form of the sentence from a chained sequence into a graph.
+
+To model the graph-based input, Lattice-LSTM accordingly modifies the LSTM-based sequence modeling layer. Specifically, let $s_{<*, j>}$ denote the list of sub-sequences of a sentence $s$ that match the lexicon and end with $c_j$, $\mathbf {\mathrm {h}}_{<*, j>}$ denote the corresponding hidden state list $\lbrace \mathbf {\mathrm {h}}_i, \forall s_{<i, j>} \in s_{<*, j>}\rbrace $, and $\mathbf {\mathrm {c}}_{<*, j>}$ denote the corresponding memory cell list $\lbrace \mathbf {\mathrm {c}}_i, \forall s_{<i, j>} \in s_{<*, j>}\rbrace $. In Lattice-LSTM, the hidden state $\mathbf {\mathrm {h}}_j$ and memory cell $\mathbf {\mathrm {c}}_j$ of $c_j$ are now updated by:
+
+where $f$ is a simplified representation of the function used by Lattice-LSTM to perform memory update. Note that, in the updating process, the inputs now contains current step character representation $\mathbf {\mathrm {x}}_j^c$, last step hidden state $\mathbf {\mathrm {h}}_{j-1}$ and memory cell $\mathbf {\mathrm {c}}_{j-1}$, and lexicon matched sub-sequences $s_{<*, j>}$ and their corresponding hidden state and memory cell lists, $\mathbf {\mathrm {h}}_{<*, j>}$ and $\mathbf {\mathrm {c}}_{<*, j>}$. We refer you to the paper of Lattice-LSTM BIBREF0 for more detail of the implementation of $f$.
+
+A problem of Lattice-LSTM is that its speed of sequence modeling is much slower than the normal LSTM architecture since it has to additionally model $s_{<*, j>}$, $\mathbf {\mathrm {h}}_{<*, j>}$, and $\mathbf {\mathrm {c}}_{<*, j>}$ for memory update. In addition, considering the implementation of $f$, it is hard for Lattice-LSTM to process multiple sentences in parallel (in the published implementation of Lattice-LSTM, the batch size was set to 1). This raises the necessity to design a simpler way to achieve the function of Lattice-LSTM for incorporating the word lexicon into the character-based NER model.
+
+## Proposed Method
+
+In this section, we introduce our method, which aims to keep the merit of Lattice-LSTM and at the same time, make the computation efficient. We will start the description of our method from our thinking on Lattice-LSTM.
+
+From our view, the advance of Lattice-LSTM comes from two points. The first point is that it preserve all possible matching words for each character. This can avoid the error propagation introduced by heuristically choosing a matching result of the character to the NER system. The second point is that it can introduce pre-trained word embeddings to the system, which bring great help to the final performance. While the disadvantage of Lattice-LSTM is that it turns the input form of a sentence from a chained sequence into a graph. This will greatly increase the computational cost for sentence modeling. Therefore, the design of our method should try to keep the chained input form of the sentence and at the same time, achieve the above two advanced points of Lattice-LSTM.
+
+With this in mind, our method design was firstly motivated by the Softword technique, which was originally used for incorporating word segmentation information into downstream tasks BIBREF18, BIBREF19. Precisely, the Softword technique augments the representation of a character with the embedding of its corresponding segmentation label:
+
+Here, $seg(c_j) \in \mathcal {Y}_{seg}$ denotes the segmentation label of the character $c_j$ predicted by the word segmentor, $\mathbf {e}^{seg}$ denotes the segmentation label embedding lookup table, and commonly $\mathcal {Y}_{seg}=\lbrace \text{B}, \text{M}, \text{E}, \text{S}\rbrace $ with B, M, E indicating that the character is the beginning, middle, and end of a word, respectively, and S indicating that the character itself forms a single-character word.
+
+The first idea we come out based on the Softword technique is to construct a word segmenter using the lexicon and allow a character to have multiple segmentation labels. Take the sentence $s=\lbrace c_1, c_2, c_3, c_4, c_5\rbrace $ as an example. If both its sub-sequences $\lbrace c_1, c_2, c_3, c_4\rbrace $ and $\lbrace c_3, c_4\rbrace $ match a word of the lexicon, then the segmentation label sequence of $s$ using the lexicon is $segs(s)=\lbrace \lbrace \text{B}\rbrace , \lbrace \text{M}\rbrace , \lbrace \text{B}, \text{M}\rbrace , \lbrace \text{E}\rbrace , \lbrace \text{O}\rbrace \rbrace $. Here, $segs(s)_1=\lbrace \text{B}\rbrace $ indicates that there is at least one sub-sequence of $s$ matching a word of the lexicon and beginning with $c_1$, $segs(s)_3=\lbrace \text{B}, \text{M}\rbrace $ means that there is at least one sub-sequence of $s$ matching the lexicon and beginning with $c_3$ and there is also at least one lexicon matched sub-sequence in the middle of which $c_3$ occurs, and $segs(s)_5=\lbrace \text{O}\rbrace $ means that there is no sub-sequence of $s$ that matches the lexicon and contains $c_5$. The character representation is then obtained by:
+
+where $\mathbf {e}^{seg}(segs(s)_j)$ is a 5-dimensional binary vector with each dimension corresponding to an item of $\lbrace \text{B, M, E, S, O\rbrace }$. We call this method as ExSoftword in the following.
+
+However, through the analysis of ExSoftword, we can find out that the ExSoftword method cannot fully inherit the two merits of Lattice-LSTM. Firstly, it cannot not introduce pre-trained word embeddings. Secondly, though it tries to keep all the lexicon matching results by allowing a character to have multiple segmentation labels, it still loses lots of information. In many cases, we cannot restore the matching results from the segmentation label sequence. Consider the case that in the sentence $s=\lbrace c_1, c_2, c_3, c_4\rbrace $, $\lbrace c_1, c_2, c_3\rbrace $ and $\lbrace c_2, c_3, c_4\rbrace $ match the lexicon. In this case, $segs(s) = \lbrace \lbrace \text{B}\rbrace , \lbrace \text{B}, \text{M}\rbrace , \lbrace \text{M}, \text{E}\rbrace , \lbrace \text{E}\rbrace \rbrace $. However, based on $segs(s)$ and $s$, we cannot say that it is $\lbrace c_1, c_2, c_3\rbrace $ and $\lbrace c_2, c_3, c_4\rbrace $ matching the lexicon since we will obtain the same segmentation label sequence when $\lbrace c_1, c_2, c_3, c_4\rbrace $ and $\lbrace c_2,c_3\rbrace $ match the lexicon.
+
+To this end, we propose to preserving not only the possible segmentation labels of a character but also their corresponding matched words. Specifically, in this improved method, each character $c$ of a sentence $s$ corresponds to four word sets marked by the four segmentation labels “BMES". The word set $\rm {B}(c)$ consists of all lexicon matched words on $s$ that begin with $c$. Similarly, $\rm {M}(c)$ consists of all lexicon matched words in the middle of which $c$ occurs, $\rm {E}(c)$ consists of all lexicon matched words that end with $c$, and $\rm {S}(c)$ is the single-character word comprised of $c$. And if a word set is empty, we will add a special word “NONE" to it to indicate this situation. Consider the sentence $s=\lbrace c_1, \cdots , c_5\rbrace $ and suppose that $\lbrace c_1, c_2\rbrace $, $\lbrace c_1, c_2, c_3\rbrace $, $\lbrace c_2, c_3, c_4\rbrace $, and $\lbrace c_2, c_3, c_4, c_5\rbrace $ match the lexicon. Then, for $c_2$, $\rm {B}(c_2)=\lbrace \lbrace c_2, c_3, c_4\rbrace , \lbrace c_2, c_3, c_4, c_5\rbrace \rbrace $, $\rm {M}(c_2)=\lbrace \lbrace c_1, c_2, c_3\rbrace \rbrace $, $\rm {E}(c_2)=\lbrace \lbrace c_1, c_2\rbrace \rbrace $, and $\rm {S}(c_2)=\lbrace NONE\rbrace $. In this way, we can now introduce the pre-trained word embeddings and moreover, we can exactly restore the matching results from the word sets of each character.
+
+The next step of the improved method is to condense the four word sets of each character into a fixed-dimensional vector. In order to retain information as much as possible, we choose to concatenate the representations of the four word sets to represent them as a whole and add it to the character representation:
+
+Here, $\mathbf {v}^s$ denotes the function that maps a single word set to a dense vector.
+
+This also means that we should map each word set into a fixed-dimensional vector. To achieve this purpose, we first tried the mean-pooling algorithm to get the vector representation of a word set $\mathcal {S}$:
+
+Here, $\mathbf {e}^w$ denotes the word embedding lookup table. However, the empirical studies, as depicted in Table TABREF31, show that this algorithm performs not so well . Through the comparison with Lattice-LSTM, we find out that in Lattice-LSTM, it applies a dynamic attention algorithm to weigh each matched word related to a single character. Motivated by this practice, we propose to weighing the representation of each word in the word set to get the pooling representation of the word set. However, considering the computational efficiency, we do not want to apply a dynamical weighing algorithm, like attention, to get the weight of each word. With this in mind, we propose to using the frequency of the word as an indication of its weight. The basic idea beneath this algorithm is that the more times a character sequence occurs in the data, the more likely it is a word. Note that, the frequency of a word is a static value and can be obtained offline. This can greatly accelerate the calculation of the weight of each word (e.g., using a lookup table).
+
+Specifically, let $w_c$ denote the character sequence constituting $w$ and $z(w)$ denote the frequency of $w_c$ occurring in the statistic data set (in this work, we combine training and testing data of a task to construct the statistic data set. Of course, if we have unlabelled data for the task, we can take the unlabeled data as the statistic data set). Note that, we do not add the frequency of $w$ if $w_c$ is covered by that of another word of the lexicon in the sentence. For example, suppose that the lexicon contains both “南京 （Nanjing）" and “南京市 （Nanjing City）". Then, when counting word frequency on the sequence “南京市长江大桥", we will not add the frequency of “南京" since it is covered by “南京市" in the sequence. This can avoid the situation that the frequency of “南京" is definitely higher than “南京市". Finally, we get the weighted representation of the word set $\mathcal {S}$ by:
+
+where
+
+Here, we perform weight normalization on all words of the four word sets to allow them compete with each other across sets.
+
+Further, we have tried to introducing a smoothing to the weight of each word to increase the weights of infrequent words. Specifically, we add a constant $c$ into the frequency of each word and re-define $\mathbf {v}^s$ by:
+
+where
+
+We set $c$ to the value that there are 10% of training words occurring less than $c$ times within the statistic data set. In summary, our method mainly contains the following four steps. Firstly, we scan each input sentence with the word lexicon, obtaining the four 'BMES' word sets for each character of the sentence. Secondly, we look up the frequency of each word counted on the statistic data set. Thirdly, we obtain the vector representation of the four word sets of each character according to Eq. (DISPLAY_FORM22), and add it to the character representation according to Eq. (DISPLAY_FORM20). Finally, based on the augmented character representations, we perform sequence labeling using any appropriate neural sequence labeling model, like LSTM-based sequence modeling layer + CRF label inference layer.
+
+## Experiments ::: Experiment Design
+
+Firstly, we performed a development study on our method with the LSTM-based sequence modeling layer, in order to compare the implementations of $\mathbf {v}^s$ and to determine whether or not to use character bigrams in our method. Decision made in this step will be applied to the following experiments. Secondly, we verified the computational efficiency of our method compared with Lattice-LSTM and LR-CNN BIBREF20, which is a followee of Lattice-LSTM for faster inference speed. Thirdly, we verified the effectiveness of our method by comparing its performance with that of Lattice-LSTM and other comparable models on four benchmark Chinese NER data sets. Finally, we verified the applicability of our method to different sequence labeling models.
+
+## Experiments ::: Experiment Setup
+
+Most experimental settings in this work follow the protocols of Lattice-LSTM BIBREF0, including tested datasets, compared baselines, evaluation metrics (P, R, F1), and so on. To make this work self-completed, we concisely illustrate some primary settings of this work.
+
+## Experiments ::: Experiment Setup ::: Datasets
+
+The methods were evaluated on four Chinese NER datasets, including OntoNotes BIBREF21, MSRA BIBREF22, Weibo NER BIBREF23, BIBREF24, and Resume NER BIBREF0. OntoNotes and MSRA are from the newswire domain, where gold-standard segmentation is available for training data. For OntoNotes, gold segmentation is also available for development and testing data. Weibo NER and Resume NER are from social media and resume, respectively. There is no gold standard segmentation in these two datasets. Table TABREF26 shows statistic information of these datasets. As for the lexicon, we used the same one as Lattice-LSTM, which contains 5.7k single-character words, 291.5k two-character words, 278.1k three-character words, and 129.1k other words.
+
+## Experiments ::: Experiment Setup ::: Implementation Detail
+
+When applying the LSTM-based sequence modeling layer, we followed most implementation protocols of Lattice-LSTM, including character and word embedding sizes, dropout, embedding initialization, and LSTM layer number. The hidden size was set to 100 for Weibo and 256 for the rest three datasets. The learning rate was set to 0.005 for Weibo and Resume and 0.0015 for OntoNotes and MSRA with Adamax BIBREF25.
+
+When applying the CNN- and transformer- based sequence modeling layers, most hyper-parameters were the same as those used in the LSTM-based model. In addition, the layer number $L$ for the CNN-based model was set to 4, and that for transformer-based model was set to 2 with h=4 parallel attention layers. Kernel number $k_f$ of the CNN-based model was set to 512 for MSRA and 128 for the other datasets in all layers.
+
+## Experiments ::: Development Experiments
+
+In this experiment, we compared the implementations of $\mathbf {v}^s$ with the LSTM-based sequence modeling layer. In addition, we study whether or not character bigrams can bring improvement to our method.
+
+Table TABREF31 shows performance of three implementations of $\mathbf {v}^s$ without using character bigrams. From the table, we can see that the weighted pooling algorithm performs generally better than the other two implementations. Of course, we may obtain better results with the smoothed weighted pooling algorithm by reducing the value of $c$ (when $c=0$, it is equivalent to the weighted pooling algorithm). We did not do so for two reasons. The first one is to guarantee the generality of our system for unexplored tasks. The second one is that the performance of the weighted pooling algorithm is good enough compared with other state-of-the-art baselines. Therefore, in the following experiments, we in default applied the weighted pooling algorithm to implement $\mathbf {v}^s$.
+
+Figure FIGREF32 shows the F1-score of our method against the number of training iterations when using character bigram or not. From the figure, we can see that additionally introducing character bigrams cannot bring considerable improvement to our method. A possible explanation of this phenomenon is that the introduced word information by our proposed method has covered the bichar information. Therefore, in the following experiments, we did not use bichar in our method.
+
+## Experiments ::: Computational Efficiency Study
+
+Table TABREF34 shows the inference speed of our method when implementing the sequnece modeling layer with the LSTM-based, CNN-based, and Transformer-based architecture, respectively. The speed was evaluated by average sentences per second using a GPU (NVIDIA TITAN X). For a fair comparison with Lattice-LSTM and LR-CNN, we set the batch size of our method to 1 at inference time. From the table, we can see that our method has a much faster inference speed than Lattice-LSTM when using the LSTM-based sequence modeling layer, and it was also much faster than LR-CNN, which used an CNN architecture to implement the sequence modeling layer. And as expected, our method with the CNN-based sequence modeling layer showed some advantage in inference speed than those with the LSTM-based and Transformer-based sequence model layer.
+
+## Experiments ::: Effectiveness Study
+
+Table TABREF37$-$TABREF43 show the performance of method with the LSTM-based sequence modeling layer compared with Lattice-LSTM and other comparative baselines.
+
+## Experiments ::: Effectiveness Study ::: OntoNotes.
+
+Table TABREF37 shows results on OntoNotes, which has gold segmentation for both training and testing data. The methods of the “Gold seg" and "Auto seg" group are word-based that build on the gold word segmentation results and the automatic segmentation results, respectively. The automatic segmentation results were generated by the segmenter trained on training data of OntoNotes. Methods of the "No seg" group are character-based. From the table, we can obtain several informative observations. First, by replacing the gold segmentation with the automatically generated segmentation, the F1-score of the Word-based (LSTM) + char + bichar model decreased from 75.77% to 71.70%. This shows the problem of the practice that treats the predicted word segmentation result as the true one for the word-based Chinese NER. Second, the Char-based (LSTM)+bichar+ExSoftword model achieved a 71.89% to 72.40% improvement over the Char-based (LSTM)+bichar+softword baseline on the F1-score. This indicates the feasibility of the naive extension of ExSoftword to softword. However, it still greatly underperformed Lattice-LSTM, showing its deficiency in utilizing word information. Finally, our proposed method, which is a further extension of Exsoftword, obtained a statistically significant improvement over Lattice-LSTM and even performed similarly to those word-based methods with gold segmentation, verifying its effectiveness on this data set.
+
+## Experiments ::: Effectiveness Study ::: MSRA.
+
+Table TABREF40 shows results on MSRA. The word-based methods were built on the automatic segmentation results generated by the segmenter trained on training data of MSRA. Compared methods included the best statistical models on this data set, which leveraged rich handcrafted features BIBREF28, BIBREF29, BIBREF30, character embedding features BIBREF31, and radical features BIBREF32. From the table, we observe that our method obtained a statistically significant improvement over Lattice-LSTM and other comparative baselines on the recall and F1-score, verifying the effectiveness of our method on this data set.
+
+## Experiments ::: Effectiveness Study ::: Weibo/Resume.
+
+Table TABREF42 shows results on Weibo NER, where NE, NM, and Overall denote F1-scores for named entities, nominal entities (excluding named entities) and both, respectively. The existing state-of-the-art system BIBREF19 explored rich embedding features, cross-domain data, and semi-supervised data. From the table, we can see that our proposed method achieved considerable improvement over the compared baselines on this data set. Table TABREF43 shows results on Resume. Consistent with observations on the other three tested data sets, our proposed method significantly outperformed Lattice-LSTM and the other comparable methods on this data set.
+
+## Experiments ::: Transferability Study
+
+Table TABREF46 shows performance of our method with different sequence modeling architectures. From the table, we can first see that the LSTM-based architecture performed better than the CNN- and transformer- based architectures. In addition, our methods with different sequence modeling layers consistently outperformed their corresponding ExSoftword baselines. This shows that our method is applicable to different neural sequence modeling architectures for exploiting lexicon information.
+
+## Conclusion
+
+In this work, we address the computational efficiency for utilizing word lexicon in Chinese NER. To achieve a high-performing NER system with fast inference speed, we proposed to adding lexicon information into the character representation and keeping the input form of a sentence as a chained sequence. Experimental study on four benchmark Chinese NER datasets shows that our method can obtain faster inference speed than the comparative methods and at the same time, achieve high performance. It also shows that our methods can apply to different neural sequence labeling models for Chinese NER.

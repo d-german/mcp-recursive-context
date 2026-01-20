@@ -1,0 +1,87 @@
+# On the Robustness of Projection Neural Networks For Efficient Text Representation: An Empirical Study
+
+**Paper ID:** 1908.05763
+
+## Abstract
+
+Recently, there has been strong interest in developing natural language applications that live on personal devices such as mobile phones, watches and IoT with the objective to preserve user privacy and have low memory. Advances in Locality-Sensitive Hashing (LSH)-based projection networks have demonstrated state-of-the-art performance without any embedding lookup tables and instead computing on-the-fly text representations. However, previous works have not investigated "What makes projection neural networks effective at capturing compact representations for text classification?" and "Are these projection models resistant to perturbations and misspellings in input text?".  ::: In this paper, we analyze and answer these questions through perturbation analyses and by running experiments on multiple dialog act prediction tasks. Our results show that the projections are resistant to perturbations and misspellings compared to widely-used recurrent architectures that use word embeddings. On ATIS intent prediction task, when evaluated with perturbed input data, we observe that the performance of recurrent models that use word embeddings drops significantly by more than 30% compared to just 5% with projection networks, showing that LSH-based projection representations are robust and consistently lead to high quality performance.
+
+## Introduction
+
+At the core of Natural Language Processing (NLP) neural models are pre-trained word embeddings like Word2Vec BIBREF0, GloVe BIBREF1 and ELMo BIBREF2. They help initialize the neural models, lead to faster convergence and have improved performance for numerous application such as Question Answering BIBREF3, Summarization BIBREF4, Sentiment Analysis BIBREF5. While word embeddings are powerful in unlimited constraints such as computation power and compute resources, it becomes challenging to deploy them to on-device due to their huge size.
+
+This led to interesting research by BIBREF6, BIBREF7, BIBREF8, who showed that actually word embedding can be replaced with lightweight binary LSH projections learned on-the-fly. The projection approach BIBREF9, BIBREF10 surmounts the need to store any embedding matrices, since the projections are dynamically computed. This further enables user privacy by performing inference directly on device without sending user data (e.g., personal information) to the server. The computation of the representation is linear in the number of inputs in the sentence surmounting the need to maintain and lookup global vocabulary, and reducing the memory size to $O(|T \cdot d|)$. The projection representations can operate on word and character level, and can be used to represent a sentence or a word depending on the NLP application. BIBREF6 have shown that on-device LSH projections lead to state-of-the-art results in dialog act classification and reach significant improvement upon prior LSTM and CNN neural models.
+
+Despite being so successful, yet there are no studies showing the properties and power of LSH projections. In this paper, we address that by studying What makes projection models effective? and Are these projection models resistant to perturbations and misspellings in input text? To answer these questions, we conduct a series of experimental studies and analysis. For instance, by studying the collision of the learned projection representations, we verify the effectiveness of the produced representations. Our study showed that LSH projections have low collision, meaning that the representations are good allowing the model to capture the meaning of words, instead of colliding everything into one meaning. Next, by analyzing the different character perturbations, we show the robustness of LSH projections when modeling word or sentence level representations. The intuition is that the projection should be able to capture word misspellings as similar, and yet it should be robust to semantically dissimilar terms. We show that Self-Governing Neural Networks (SGNN) models BIBREF6 evaluated with perturbed LSH projections are resistant to misspellings and transformation attacks, while LSTMs with increased perturbations dropped in performance. Overall, the studies are very interesting showcasing the robustness of LSH projection representations, their resistance to misspellings and transformations, and also explains why they lead to better performance.
+
+## Background: LSH projections for text representations
+
+The Projection function, $\mathbb {P}$ (Figure FIGREF1), BIBREF9 used in SGNN models BIBREF6 extracts token (or character) n-gram & skip-gram features from a raw input text, $\textbf {x}$ and dynamically generates a binary projection representation, $\mathbb {P}(\mathbf {x}) \in [0,1]^{T.d}$ after a Locality-Sensitive Hashing (LSH) based transformation, $\mathbb {L}$ as in
+
+where $\mathbb {F}$ extracts n-grams(or skip-grams), $[f_1, \cdots , f_n]$ from the input text. Here, $[f_1, \cdots , f_n]$ could refer to either character level or token level n-grams(or skip-grams) features.
+
+## Collision Study
+
+Before diving into the actual collision studies, it is important to understand what the properties of good projections are. For instance, good projections should be as separate as possible, while still capturing the inherent n-gram features. Words with similar character n-gram feature vectors should be closer to each other i.e. cat and cats, but yet separate from each other so that the network can learn that cat and cats are related, but yet different. Such observations are not evident from the projections. One way to understand them is by looking at the collision rates. For instance, if there are too many projection collisions, this means that the network is fundamentally incapable of learning and it will not be able to generalize.
+
+For the purpose, we test how spread out the projections are for word and sentence representations. We take a large corpus enwik9 and analyze the average hamming distance of the words and sentences in the corpus. Intuitively, good projections should have less collisions. Our study shows that there is almost no collision. On an average the Hamming distances between words are 557 bits, which is around 50% of the projection dimension. Standard deviations are one order of magnitude lower compared to the average Hamming distances between words which means that on average projections are more or less spread out. For high deviation, it means too many words are either too close to each other or too far away from other other. To understand the properties of word and sentence projections, we conduct two experiments, one in which we compute the word projections and another one in which we compute the sentence projections. For our experiments, we fix the projection dimension, $dim(\mathbb {P}(w)) = 1120$ ($T=80, \, d=14$) following BIBREF6. Results are shown in Table TABREF3 and Table TABREF4 respectively.
+
+Table TABREF3 shows the collision results of the word level projections. On the left we list different projection configurations by varying the number of projection functions $T$, the dimensionality $d$, turning on or off character level projections, including varying size of n-gram and skip-gram features. For each projection configuration, we show the average Hamming distance and the standard deviation. As it can be seen, by increasing the number of n-gram and skip-gram features, the words become more spread out with lesser standard deviation. We recommend using higher number of n-gram and skip-gram features for better model performance.
+
+Table TABREF4 shows the collision results of the sentence level projections. Similarly to Table TABREF3 the left side shows the different projection configurations. For each configuration, we show the average Hamming distance and standard deviation. In the sentence level projection study, we observe that when we consider only word level features, the projections are insensitive to sentence length. But with the character projections on, they are sensitive to the sentence length. This happens because the character projection space is smaller than the words space, as we see only fewer variations for the sentence projections with n-gram and skip-gram compared to word level.
+
+In sentence level projection with word level features, the dimensionality of the spacer vector is high, hence applying projections on this leads to discriminative representations. More concretely, this means that projections with large feature spaces are able to capture the distinctions between any two observed pairs and adding more words to the sentence is not going to change that. On the other hand for short sentences with character level features, the number of possible observed unique char ngrams vs those observed in longer sentences can differ.
+
+## Perturbation Study
+
+To further test the robustness of the projections, we conduct perturbation study. A good projection should separate out perturbed word like baank from cats. Meaning that the average Hamming distance from the collision study should be greater than the Hamming distance with and without perturbations.
+
+## Perturbation Study ::: Character & Word Perturbations
+
+In this section, we analyze the Hamming distance between the projections of the sentences from the enwik9 dataset and the corresponding projections of the same sentences after applying character level perturbations. We experiment with three types of character level perturbation BIBREF11 and two types of word level perturbation operations.
+
+## Perturbation Study ::: Character Level Perturbation Operations
+
+insert(word, n) : We randomly choose n characters from the character vocabulary and insert them at random locations into the input word. We however retain the first and last characters of the word as is. Ex. transformation: $sample \rightarrow samnple$.
+
+swap(word, n): We randomly swap the location of two characters in the word n times. As with the insert operation, we retain the first and last characters of the word as is and only apply the swap operation to the remaining characters. Ex. transformation: $sample \rightarrow sapmle$.
+
+duplicate(word, n): We randomly duplicate a character in the word by n times. Ex. transformation: $sample \rightarrow saample$.
+
+## Perturbation Study ::: Character Level Perturbation Operations ::: Word Level Perturbation Operations
+
+drop(sentence, n): We randomly drop n words from the sentence. Ex. transformation: This is a big cat. $\rightarrow $ This is a cat.
+
+duplicate(sentence, n): Similar to duplicate(word, n) above, we randomly duplicate a word in the sentence n times. Ex. transformation: This is a big cat. $\rightarrow $ This is a big big cat.
+
+swap(sentence, n): Similar to swap(word, n), we randomly swap the location of two words in the sentence n times. Ex. transformation: This is a big cat. $\rightarrow $ This cat is big.
+
+For both character and word level perturbations, we decide whether or not to perturb each word in a sentence with a fixed probability. For the character level perturbations, once a word is chosen for perturbation, we randomly pick one of the perturbation operations from {insert, swap, duplicate} and randomly pick the number of characters to transform $n \in \lbrace 1,\;3\rbrace $. For the word level perturbations, we randomly apply one of the operations from {drop, duplicate, swap}. We consider perturbation probabilities of $0.05$ and $0.1$ for our experiments.
+
+## Perturbation Study ::: Discussion
+
+We show results on multiple perturbation studies. For instance, sentence has word and character level perturbations, while word has character only perturbation. We evaluate the impact of the word and character projections for sentence and word level projections on the enwik9 dataset. Table TABREF13 shows the character and word perturbation with sentence level projections. Table TABREF14 shows the character perturbation for word level projections.
+
+We observe that the hamming distances between the projections of the perturbed versions of the same words are significantly smaller than the average distance of the word projections measured in the collision study in Section SECREF3. This shows that the words are well separated in the projection space and could potentially be less susceptible to misspellings and omissions.
+
+Based on the results in all Tables 1 to 4, we found a nice linear relationship between the hamming distance, the projection dimension and the amount of perturbation. As it can be seen in the results, the hamming distance between the projections before and after perturbation is directly proportional to the product of the projection dimension and percentage of perturbation as follows: $ \Delta _{\mathbb {P}_{m}} = K_{m}\, \cdot T \, \cdot \, d \cdot P_{perturb} \; , m \in \lbrace word, \,character\rbrace , \; K_{m} > 0$ where $\Delta _{\mathbb {P}_{m}}$ refers to the hamming distance between the projections before and after perturbations and $m$ refers to the mode of projection - {word, character}. $T \cdot d$ refers to the projection space dimension and $P_{perturb}$ refers to the probability of perturbation. $K_{m} > 0$ is a proportionality constant which depends on the projection mode. We observe that $K_{word} > K_{char}$ from our experiments. Character mode projections are relatively more robust to perturbations, however we would also want to include word level n-gram and skipgram features to generate a holistic representation. This establishes a tradeoff between choosing word and character level features. Ideally, one would like to reserve some bits for word and some bits for character level features. We leave the design of the right bit division to future work.
+
+## Effect of Perturbation on Classification
+
+We evaluate LSH projections with text transformations to test whether the projections are robust to input perturbations by nature. We use the character level operations from Section SECREF4.
+
+## Effect of Perturbation on Classification ::: Evaluation Setup
+
+For evaluation, we used the widely popular dialog act and intent prediction datasets. MRDA BIBREF12 is a dialog corpus of multi-party meetings with 6 classes, 78K training and 15K test data; ATIS BIBREF13 is intent prediction dataset for flight reservations with 21 classes, 4.4K training and 893 test examples; and SWDA BIBREF14, BIBREF15 is an open domain dialog corpus between two speakers with 42 classes, 193K training and 5K test examples. For fair comparison, we train LSTM baseline with sub-words and 240 vocabulary size on MRDA, ATIS and SWDA. We uniformly randomly initialized the input word embeddings. We also trained the on-device SGNN model BIBREF6. Then, we created test sets with varying levels of perturbation operations - $\lbrace 20\%,40\%,60\%\rbrace $.
+
+## Effect of Perturbation on Classification ::: Results
+
+Table TABREF15 shows the accuracy results of LSTM and on-device SGNN models. Overall, SGNN models are consistently more robust to perturbations across all three datasets and tasks. One of the reasons is that SGNN relies on word and character level n-gram features, while for LSTMs, the character perturbations result in sub-words being mapped to unknown embedding. This leads LSTM to learn to map inputs with many unknown words to the majority class. We observed the same when we perturbed $100\%$ of the words in the input.
+
+As shown in Table TABREF18, the standard deviations of the accuracy with LSTMs are much higher compared to SGNN.
+
+This further reinforces the fact that SGNNs are fundamentally more robust to both word misspellings and black box attacks. In the future, we are plan to benchmark SGNN with more aggressive and exploitative black box based attacks.
+
+## Conclusion
+
+In this work, we perform a detailed study analyzing why recent LSH-based projection neural networks are effective for language classification tasks. Through extensive analyses including perturbation studies and experiments on multiple tasks, we show that projection-based neural models are resistant to text transformations compared to widely-used approaches like LSTMs with embeddings.

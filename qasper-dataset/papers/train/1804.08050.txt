@@ -1,0 +1,91 @@
+# Multi-Head Decoder for End-to-End Speech Recognition
+
+**Paper ID:** 1804.08050
+
+## Abstract
+
+This paper presents a new network architecture called multi-head decoder for end-to-end speech recognition as an extension of a multi-head attention model. In the multi-head attention model, multiple attentions are calculated, and then, they are integrated into a single attention. On the other hand, instead of the integration in the attention level, our proposed method uses multiple decoders for each attention and integrates their outputs to generate a final output. Furthermore, in order to make each head to capture the different modalities, different attention functions are used for each head, leading to the improvement of the recognition performance with an ensemble effect. To evaluate the effectiveness of our proposed method, we conduct an experimental evaluation using Corpus of Spontaneous Japanese. Experimental results demonstrate that our proposed method outperforms the conventional methods such as location-based and multi-head attention models, and that it can capture different speech/linguistic contexts within the attention-based encoder-decoder framework.
+
+## Introduction
+
+Automatic speech recognition (ASR) is the task to convert a continuous speech signal into a sequence of discrete characters, and it is a key technology to realize the interaction between human and machine. ASR has a great potential for various applications such as voice search and voice input, making our lives more rich. Typical ASR systems BIBREF0 consist of many modules such as an acoustic model, a lexicon model, and a language model. Factorizing the ASR system into these modules makes it possible to deal with each module as a separate problem. Over the past decades, this factorization has been the basis of the ASR system, however, it makes the system much more complex.
+
+With the improvement of deep learning techniques, end-to-end approaches have been proposed BIBREF1 . In the end-to-end approach, a continuous acoustic signal or a sequence of acoustic features is directly converted into a sequence of characters with a single neural network. Therefore, the end-to-end approach does not require the factorization into several modules, as described above, making it easy to optimize the whole system. Furthermore, it does not require lexicon information, which is handcrafted by human experts in general.
+
+The end-to-end approach is classified into two types. One approach is based on connectionist temporal classification (CTC) BIBREF2 , BIBREF3 , BIBREF1 , which makes it possible to handle the difference in the length of input and output sequences with dynamic programming. The CTC-based approach can efficiently solve the sequential problem, however, CTC uses Markov assumptions to perform dynamic programming and predicts output symbols such as characters or phonemes for each frame independently. Consequently, except in the case of huge training data BIBREF4 , BIBREF5 , it requires the language model and graph-based decoding BIBREF6 .
+
+The other approach utilizes attention-based method BIBREF7 . In this approach, encoder-decoder architecture BIBREF8 , BIBREF9 is used to perform a direct mapping from a sequence of input features into text. The encoder network converts the sequence of input features to that of discriminative hidden states, and the decoder network uses attention mechanism to get an alignment between each element of the output sequence and the encoder hidden states. And then it estimates the output symbol using weighted averaged hidden states, which is based on the alignment, as the inputs of the decoder network. Compared with the CTC-based approach, the attention-based method does not require any conditional independence assumptions including the Markov assumption, language models, and complex decoding. However, non-causal alignment problem is caused by a too flexible alignment of the attention mechanism BIBREF10 . To address this issue, the study BIBREF10 combines the objective function of the attention-based model with that of CTC to constrain flexible alignments of the attention. Another study BIBREF11 uses a multi-head attention (MHA) to get more suitable alignments. In MHA, multiple attentions are calculated, and then, they are integrated into a single attention. Using MHA enables the model to jointly focus on information from different representation subspaces at different positions BIBREF12 , leading to the improvement of the recognition performance.
+
+Inspired by the idea of MHA, in this study we present a new network architecture called multi-head decoder for end-to-end speech recognition as an extension of a multi-head attention model. Instead of the integration in the attention level, our proposed method uses multiple decoders for each attention and integrates their outputs to generate a final output. Furthermore, in order to make each head to capture the different modalities, different attention functions are used for each head, leading to the improvement of the recognition performance with an ensemble effect. To evaluate the effectiveness of our proposed method, we conduct an experimental evaluation using Corpus of Spontaneous Japanese. Experimental results demonstrate that our proposed method outperforms the conventional methods such as location-based and multi-head attention models, and that it can capture different speech/linguistic contexts within the attention-based encoder-decoder framework.
+
+## Attention-Based End-to-End ASR
+
+The overview of attention-based network architecture is shown in Fig. FIGREF1 .
+
+The attention-based method directly estimates a posterior INLINEFORM0 , where INLINEFORM1 represents a sequence of input features, INLINEFORM2 represents a sequence of output characters. The posterior INLINEFORM3 is factorized with a probabilistic chain rule as follows: DISPLAYFORM0 
+
+where INLINEFORM0 represents a subsequence INLINEFORM1 , and INLINEFORM2 is calculated as follows: DISPLAYFORM0 DISPLAYFORM1 
+
+where Eq. ( EQREF3 ) and Eq. () represent encoder and decoder networks, respectively, INLINEFORM0 represents an attention weight, INLINEFORM1 represents an attention weight vector, which is a sequence of attention weights INLINEFORM2 , INLINEFORM3 represents a subsequence of attention vectors INLINEFORM4 , INLINEFORM5 and INLINEFORM6 represent hidden states of encoder and decoder networks, respectively, and INLINEFORM7 represents the letter-wise hidden vector, which is a weighted summarization of hidden vectors with the attention weight vector INLINEFORM8 .
+
+The encoder network in Eq. ( EQREF3 ) converts a sequence of input features INLINEFORM0 into frame-wise discriminative hidden states INLINEFORM1 , and it is typically modeled by a bidirectional long short-term memory recurrent neural network (BLSTM): DISPLAYFORM0 
+
+In the case of ASR, the length of the input sequence is significantly different from the length of the output sequence. Hence, basically outputs of BLSTM are often subsampled to reduce the computational cost BIBREF7 , BIBREF13 .
+
+The attention weight INLINEFORM0 in Eq. ( EQREF4 ) represents a soft alignment between each element of the output sequence INLINEFORM1 and the encoder hidden states INLINEFORM2 .
+
+The decoder network in Eq. () estimates the next character INLINEFORM0 from the previous character INLINEFORM1 , hidden state vector of itself INLINEFORM2 and the letter-wise hidden state vector INLINEFORM3 , similar to RNN language model (RNNLM) BIBREF17 . It is typically modeled using LSTM as follows: DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 represent trainable matrix and vector parameters, respectively.
+
+Finally, the whole of above networks are optimized using back-propagation through time (BPTT) BIBREF18 to minimize the following objective function: DISPLAYFORM0 
+
+where INLINEFORM0 represents the ground truth of the previous characters.
+
+## Multi-Head Decoder
+
+The overview of our proposed multi-head decoder (MHD) architecture is shown in Fig. FIGREF19 . In MHD architecture, multiple attentions are calculated with the same manner in the conventional multi-head attention (MHA) BIBREF12 . We first describe the conventional MHA, and extend it to our proposed multi-head decoder (MHD).
+
+## Multi-head attention (MHA)
+
+The layer-wise hidden vector at the head INLINEFORM0 is calculated as follows: DISPLAYFORM0 
+
+where INLINEFORM0 , INLINEFORM1 , and INLINEFORM2 represent trainable matrix parameters, and any types of attention in Eq. ( EQREF4 ) can be used for INLINEFORM3 in Eq. ( EQREF21 ).
+
+In the case of MHA, the layer-wise hidden vectors of each head are integrated into a single vector with a trainable linear transformation: DISPLAYFORM0 
+
+where INLINEFORM0 is a trainable matrix parameter, INLINEFORM1 represents the number of heads.
+
+## Multi-head decoder (MHD)
+
+On the other hand, in the case of MHD, instead of the integration at attention level, we assign multiple decoders for each head and then integrate their outputs to get a final output. Since each attention decoder captures different modalities, it is expected to improve the recognition performance with an ensemble effect. The calculation of the attention weight at the head INLINEFORM0 in Eq. ( EQREF21 ) is replaced with following equation: DISPLAYFORM0 
+
+Instead of the integration of the letter-wise hidden vectors INLINEFORM0 with linear transformation, each letter-wise hidden vector INLINEFORM1 is fed to INLINEFORM2 -th decoder LSTM: DISPLAYFORM0 
+
+Note that each LSTM has its own hidden state INLINEFORM0 which is used for the calculation of the attention weight INLINEFORM1 , while the input character INLINEFORM2 is the same among all of the LSTMs. Finally, all of the outputs are integrated as follows: DISPLAYFORM0 
+
+where INLINEFORM0 represents a trainable matrix parameter, and INLINEFORM1 represents a trainable vector parameter.
+
+## Heterogeneous multi-head decoder (HMHD)
+
+As a further extension, we propose heterogeneous multi-head decoder (HMHD). Original MHA methods BIBREF12 , BIBREF11 use the same attention function such as dot-product or additive attention for each head. On the other hand, HMHD uses different attention functions for each head. We expect that this extension enables to capture the further different context in speech within the attention-based encoder-decoder framework.
+
+## Experimental Evaluation
+
+To evaluate the performance of our proposed method, we conducted experimental evaluation using Corpus of Spontaneous Japanese (CSJ) BIBREF20 , including 581 hours of training data, and three types of evaluation data. To compare the performance, we used following dot, additive, location, and three variants of multi-head attention methods:
+
+We used the input feature vector consisting of 80 dimensional log Mel filter bank and three dimensional pitch feature, which is extracted using open-source speech recognition toolkit Kaldi BIBREF21 . Encoder and decoder networks were six-layered BLSTM with projection layer BIBREF22 (BLSTMP) and one-layered LSTM, respectively. In the second and third bottom layers in the encoder, subsampling was performed to reduce the length of utterance, yielding the length INLINEFORM0 . For MHA/MHD, we set the number of heads to four. For HMHD, we used two kind of settings: (1) dot-product attention + additive attention + location-based attention + coverage mechanism attention (Dot+Add+Loc+Cov), and (2) two location-based attentions + two coverage mechanism attentions (2 INLINEFORM1 Loc+2 INLINEFORM2 Cov). The number of distinct output characters was 3,315 including Kanji, Hiragana, Katakana, alphabets, Arabic number and sos/eos symbols. In decoding, we used beam search algorithm BIBREF9 with beam size 20. We manually set maximum and minimum lengths of the output sequence to 0.1 and 0.5 times the length of the subsampled input sequence, respectively, and the length penalty to 0.1 times the length of the output sequence. All of the networks were trained using end-to-end speech processing toolkit ESPnet BIBREF23 with a single GPU (Titan X pascal). Character error rate (CER) was used as a metric. The detail of experimental condition is shown in Table TABREF28 .
+
+Experimental results are shown in Table TABREF35 .
+
+First, we focus on the results of the conventional methods. Basically, it is known that location-based attention yields better performance than additive attention BIBREF10 . However, in the case of Japanese sentence, its length is much shorter than that of English sentence, which makes the use of location-based attention less effective. In most of the cases, the use of MHA brings the improvement of the recognition performance. Next, we focus on the effectiveness of our proposed MHD architecture. By comparing with the MHA-Loc, MHD-Loc (proposed method) improved the performance in Tasks 1 and 2, while we observed the degradation in Task 3. However, the heterogeneous extension (HMHD), as introduced in Section SECREF27 , brings the further improvement for the performance of MHD, achieving the best performance among all of the methods for all test sets.
+
+Finally, Figure FIGREF36 shows the alignment information of each head of HMHD (2 INLINEFORM0 Loc+2 INLINEFORM1 Cov), which was obtained by visualizing the attention weights.
+
+Interestingly, the alignments of the right and left ends seem to capture more abstracted dynamics of speech, while the rest of two alignments behave like normal alignments obtained by a standard attention mechanism. Thus, we can see that the attention weights of each head have a different tendency, and it supports our hypothesis that HMHD can capture different speech/linguistic contexts within its framework.
+
+## Conclusions
+
+In this paper, we proposed a new network architecture called multi-head decoder for end-to-end speech recognition as an extension of a multi-head attention model. Instead of the integration in the attention level, our proposed method utilized multiple decoders for each attention and integrated their outputs to generate a final output. Furthermore, in order to make each head to capture the different modalities, we used different attention functions for each head. To evaluate the effectiveness of our proposed method, we conducted an experimental evaluation using Corpus of Spontaneous Japanese. Experimental results demonstrated that our proposed methods outperformed the conventional methods such as location-based and multi-head attention models, and that it could capture different speech/linguistic contexts within the attention-based encoder-decoder framework.
+
+In the future work, we will combine the multi-head decoder architecture with Joint CTC/Attention architecture BIBREF10 , and evaluate the performance using other databases.

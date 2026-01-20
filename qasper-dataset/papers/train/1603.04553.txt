@@ -1,0 +1,163 @@
+# Unsupervised Ranking Model for Entity Coreference Resolution
+
+**Paper ID:** 1603.04553
+
+## Abstract
+
+Coreference resolution is one of the first stages in deep language understanding and its importance has been well recognized in the natural language processing community. In this paper, we propose a generative, unsupervised ranking model for entity coreference resolution by introducing resolution mode variables. Our unsupervised system achieves 58.44% F1 score of the CoNLL metric on the English data from the CoNLL-2012 shared task (Pradhan et al., 2012), outperforming the Stanford deterministic system (Lee et al., 2013) by 3.01%.
+
+## Introduction
+
+Entity coreference resolution has become a critical component for many Natural Language Processing (NLP) tasks. Systems requiring deep language understanding, such as information extraction BIBREF2 , semantic event learning BIBREF3 , BIBREF4 , and named entity linking BIBREF5 , BIBREF6 all benefit from entity coreference information.
+
+Entity coreference resolution is the task of identifying mentions (i.e., noun phrases) in a text or dialogue that refer to the same real-world entities. In recent years, several supervised entity coreference resolution systems have been proposed, which, according to ng:2010:ACL, can be categorized into three classes — mention-pair models BIBREF7 , entity-mention models BIBREF8 , BIBREF9 , BIBREF10 and ranking models BIBREF11 , BIBREF12 , BIBREF13 — among which ranking models recently obtained state-of-the-art performance. However, the manually annotated corpora that these systems rely on are highly expensive to create, in particular when we want to build data for resource-poor languages BIBREF14 . That makes unsupervised approaches, which only require unannotated text for training, a desirable solution to this problem.
+
+Several unsupervised learning algorithms have been applied to coreference resolution. haghighi-klein:2007:ACLMain presented a mention-pair nonparametric fully-generative Bayesian model for unsupervised coreference resolution. Based on this model, ng:2008:EMNLP probabilistically induced coreference partitions via EM clustering. poon-domingos:2008:EMNLP proposed an entity-mention model that is able to perform joint inference across mentions by using Markov Logic. Unfortunately, these unsupervised systems' performance on accuracy significantly falls behind those of supervised systems, and are even worse than the deterministic rule-based systems. Furthermore, there is no previous work exploring the possibility of developing an unsupervised ranking model which achieved state-of-the-art performance under supervised settings for entity coreference resolution.
+
+In this paper, we propose an unsupervised generative ranking model for entity coreference resolution. Our experimental results on the English data from the CoNLL-2012 shared task BIBREF0 show that our unsupervised system outperforms the Stanford deterministic system BIBREF1 by 3.01% absolute on the CoNLL official metric. The contributions of this work are (i) proposing the first unsupervised ranking model for entity coreference resolution. (ii) giving empirical evaluations of this model on benchmark data sets. (iii) considerably narrowing the gap to supervised coreference resolution accuracy.
+
+## Notations and Definitions
+
+In the following, $D = \lbrace m_0, m_1, \ldots , m_n\rbrace $ represents a generic input document which is a sequence of coreference mentions, including the artificial root mention (denoted by $m_0$ ). The method to detect and extract these mentions is discussed later in Section "Mention Detection" . Let $C = \lbrace c_1, c_2, \ldots , c_n\rbrace $ denote the coreference assignment of a given document, where each mention $m_i$ has an associated random variable $c_i$ taking values in the set $\lbrace 0, i, \ldots , i-1\rbrace $ ; this variable specifies $m_i$ 's selected antecedent ( $c_i \in \lbrace 1, 2, \ldots , i-1\rbrace $ ), or indicates that it begins a new coreference chain ( $c_i = 0$ ).
+
+## Generative Ranking Model
+
+The following is a straightforward way to build a generative model for coreference: 
+
+$$\begin{array}{rcl}
+P(D, C) & = & P(D|C)P(C) \\
+& = & \prod \limits _{j=1}^{n}P(m_j|m_{c_j})\prod \limits _{j=1}^{n}P(c_j|j)
+\end{array}$$   (Eq. 3) 
+
+where we factorize the probabilities $P(D|C)$ and $P(C)$ into each position $j$ by adopting appropriate independence assumptions that given the coreference assignment $c_j$ and corresponding coreferent mention $m_{c_j}$ , the mention $m_j$ is independent with other mentions in front of it. This independent assumption is similar to that in the IBM 1 model on machine translation BIBREF15 , where it assumes that given the corresponding English word, the aligned foreign word is independent with other English and foreign words. We do not make any independent assumptions among different features (see Section "Features" for details).
+
+Inference in this model is efficient, because we can compute $c_j$ separately for each mention: $
+c^*_j = \operatornamewithlimits{argmax}\limits _{c_j} P(m_j|m_{c_j}) P(c_j|j)
+$ 
+
+The model is a so-called ranking model because it is able to identify the most probable candidate antecedent given a mention to be resolved.
+
+## Resolution Mode Variables
+
+According to previous work BIBREF17 , BIBREF18 , BIBREF1 , antecedents are resolved by different categories of information for different mentions. For example, the Stanford system BIBREF1 uses string-matching sieves to link two mentions with similar text and precise-construct sieve to link two mentions which satisfy special syntactic or semantic relations such as apposition or acronym. Motivated by this, we introduce resolution mode variables $\Pi = \lbrace \pi _1, \ldots , \pi _n\rbrace $ , where for each mention $j$ the variable $\pi _j \in \lbrace str, prec, attr\rbrace $ indicates in which mode the mention should be resolved. In our model, we define three resolution modes — string-matching (str), precise-construct (prec), and attribute-matching (attr) — and $\Pi $ is deterministic when $D$ is given (i.e. $P(\Pi |D)$ is a point distribution). We determine $\pi _j$ for each mention $m_j$ in the following way:
+
+ $\pi _j = str$ , if there exists a mention $m_i, i < j$ such that the two mentions satisfy the String Match sieve, the Relaxed String Match sieve, or the Strict Head Match A sieve in the Stanford multi-sieve system BIBREF1 .
+
+ $\pi _j = prec$ , if there exists a mention $m_i, i < j$ such that the two mentions satisfy the Speaker Identification sieve, or the Precise Constructs sieve.
+
+ $\pi _j = attr$ , if there is no mention $m_i, i < j$ satisfies the above two conditions.
+
+Now, we can extend the generative model in Eq. 3 to: $
+\begin{array}{rcl}
+& & P(D, C) = P(D, C, \Pi ) \\
+& = & \prod \limits _{j=1}^{n}P(m_j|m_{c_j}, \pi _j) P(c_j|\pi _j, j) P(\pi _j|j)
+\end{array}
+$ 
+
+where we define $P(\pi _j|j)$ to be uniform distribution. We model $P(m_j|m_{c_j}, \pi _j)$ and $P(c_j|\pi _j, j)$ in the following way: $
+\begin{array}{l}
+P(m_j|m_{c_j}, \pi _j) = t(m_j|m_{c_j}, \pi _j) \\
+P(c_j|\pi _j, j) = \left\lbrace  \begin{array}{ll}
+q(c_j|\pi _j, j) & \pi _j = attr \\
+\frac{1}{j} & \textrm {otherwise}
+\end{array}\right.
+\end{array}
+$ 
+
+where $\theta = \lbrace t, q\rbrace $ are parameters of our model. Note that in the attribute-matching mode ( $\pi _j = attr$ ) we model $P(c_j|\pi _j, j)$ with parameter $q$ , while in the other two modes, we use the uniform distribution. It makes sense because the position information is important for coreference resolved by matching attributes of two mentions such as resolving pronoun coreference, but not that important for those resolved by matching text or special relations like two mentions referring the same person and matching by the name. [t] Learning Model with EM Initialization: Initialize $\theta _0 = \lbrace t_0, q_0\rbrace $ 
+
+ $t=0$ to $T$ set all counts $c(\ldots ) = 0$ 
+
+each document $D$ $j=1$ to $n$ $k=0$ to $j - 1$ $L_{jk} = \frac{t(m_j|m_k,\pi _j)q(k|\pi _j, j)}{\sum \limits _{i = 0}^{j-1} t(m_j|m_i,\pi _j)q(i|\pi _j, j)}$ 
+
+ $c(m_j, m_k, \pi _j) \mathrel {+}= L_{jk}$ 
+
+ $c(m_k, \pi _j) \mathrel {+}= L_{jk}$ 
+
+ $c(k, j, \pi _j) \mathrel {+}= L_{jk}$ 
+
+ $c(j, \pi _j) \mathrel {+}= L_{jk}$ Recalculate the parameters $t(m|m^{\prime }, \pi ) = \frac{c(m, m^{\prime }, \pi )}{c(m^{\prime }, \pi )}$ 
+
+ $q(k, j, \pi ) = \frac{c(k, j, \pi )}{c(j, \pi )}$ 
+
+## Features
+
+In this section, we describe the features we use to represent mentions. Specifically, as shown in Table 1 , we use different features under different resolution modes. It should be noted that only the Distance feature is designed for parameter $q$ , all other features are designed for parameter $t$ .
+
+## Model Learning
+
+For model learning, we run EM algorithm BIBREF19 on our Model, treating $D$ as observed data and $C$ as latent variables. We run EM with 10 iterations and select the parameters achieving the best performance on the development data. Each iteration takes around 12 hours with 10 CPUs parallelly. The best parameters appear at around the 5th iteration, according to our experiments.The detailed derivation of the learning algorithm is shown in Appendix A. The pseudo-code is shown is Algorithm "Resolution Mode Variables" . We use uniform initialization for all the parameters in our model.
+
+Several previous work has attempted to use EM for entity coreference resolution. cherry-bergsma:2005 and charniak-elsner:2009 applied EM for pronoun anaphora resolution. ng:2008:EMNLP probabilistically induced coreference partitions via EM clustering. Recently, moosavi2014 proposed an unsupervised model utilizing the most informative relations and achieved competitive performance with the Stanford system.
+
+## Mention Detection
+
+The basic rules we used to detect mentions are similar to those of Lee:2013:CL, except that their system uses a set of filtering rules designed to discard instances of pleonastic it, partitives, certain quantified noun phrases and other spurious mentions. Our system keeps partitives, quantified noun phrases and bare NP mentions, but discards pleonastic it and other spurious mentions.
+
+## Experimental Setup
+
+Datasets. Due to the availability of readily parsed data, we select the APW and NYT sections of Gigaword Corpus (years 1994-2010) BIBREF20 to train the model. Following previous work BIBREF3 , we remove duplicated documents and the documents which include fewer than 3 sentences. The development and test data are the English data from the CoNLL-2012 shared task BIBREF0 , which is derived from the OntoNotes corpus BIBREF21 . The corpora statistics are shown in Table 2 . Our system is evaluated with automatically extracted mentions on the version of the data with automatic preprocessing information (e.g., predicted parse trees).
+
+Evaluation Metrics. We evaluate our model on three measures widely used in the literature: MUC BIBREF22 , B $^{3}$ BIBREF23 , and Entity-based CEAF (CEAF $_e$ ) BIBREF24 . In addition, we also report results on another two popular metrics: Mention-based CEAF (CEAF $_m$ ) and BLANC BIBREF25 . All the results are given by the latest version of CoNLL-2012 scorer 
+
+## Results and Comparison
+
+Table 3 illustrates the results of our model together as baseline with two deterministic systems, namely Stanford: the Stanford system BIBREF10 and Multigraph: the unsupervised multigraph system BIBREF26 , and one unsupervised system, namely MIR: the unsupervised system using most informative relations BIBREF27 . Our model outperforms the three baseline systems on all the evaluation metrics. Specifically, our model achieves improvements of 2.93% and 3.01% on CoNLL F1 score over the Stanford system, the winner of the CoNLL 2011 shared task, on the CoNLL 2012 development and test sets, respectively. The improvements on CoNLL F1 score over the Multigraph model are 1.41% and 1.77% on the development and test sets, respectively. Comparing with the MIR model, we obtain significant improvements of 2.62% and 3.02% on CoNLL F1 score.
+
+To make a thorough empirical comparison with previous studies, Table 3 (below the dashed line) also shows the results of some state-of-the-art supervised coreference resolution systems — IMS: the second best system in the CoNLL 2012 shared task BIBREF28 ; Latent-Tree: the latent tree model BIBREF29 obtaining the best results in the shared task; Berkeley: the Berkeley system with the final feature set BIBREF12 ; LaSO: the structured perceptron system with non-local features BIBREF30 ; Latent-Strc: the latent structure system BIBREF31 ; Model-Stack: the entity-centric system with model stacking BIBREF32 ; and Non-Linear: the non-linear mention-ranking model with feature representations BIBREF33 . Our unsupervised ranking model outperforms the supervised IMS system by 1.02% on the CoNLL F1 score, and achieves competitive performance with the latent tree model. Moreover, our approach considerably narrows the gap to other supervised systems listed in Table 3 .
+
+## Conclusion
+
+We proposed a new generative, unsupervised ranking model for entity coreference resolution into which we introduced resolution mode variables to distinguish mentions resolved by different categories of information. Experimental results on the data from CoNLL-2012 shared task show that our system significantly improves the accuracy on different evaluation metrics over the baseline systems.
+
+One possible direction for future work is to differentiate more resolution modes. Another one is to add more precise or even event-based features to improve the model's performance.
+
+## Acknowledgements
+
+This research was supported in part by DARPA grant FA8750-12-2-0342 funded under the DEFT program. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not necessarily reflect the views of DARPA.
+
+Appendix A. Derivation of Model Learning
+
+Formally, we iteratively estimate the model parameters $\theta $ , employing the following EM algorithm:
+
+For simplicity, we denote: $
+{\small \begin{array}{rcl}
+P(C|D; \theta ) & = & \tilde{P}(C|D) \\
+P(C|D; \theta ^{\prime }) & = & P(C|D)
+\end{array}}
+$ 
+
+In addition, we use $\tau (\pi _j|j)$ to denote the probability $P(\pi _j|j)$ which is uniform distribution in our model. Moreover, we use the following notation for convenience: $
+{\small \theta (m_j, m_k, j, k, \pi _j) = t(m_j|m_k, \pi _j) q(k|\pi _j, j) \tau (\pi _j|j)
+}
+$ 
+
+Then, we have $
+{\scriptsize {
+\begin{array}{rl}
+& E_{\tilde{P}(c|D)} [\log P(D, C)] \\
+= & \sum \limits _{C} \tilde{P}(C|D) \log P(D, C) \\
+= & \sum \limits _{C} \tilde{P}(C|D) \big (\sum \limits _{j=1}^{n} \log t(m_j|m_{c_j}, \pi _j) + \log q(c_j|\pi _j, j) + \log \tau (\pi _j|j) \big ) \\
+= & \sum \limits _{j=1}^{n} \sum \limits _{k=0}^{j-1} L_{jk} \big (\log t(m_j|m_k, \pi _j) + \log q(k|\pi _j, j) + \log \tau (\pi _j|j) \big )
+\end{array}}}
+$ 
+
+Then the parameters $t$ and $q$ that maximize $E_{\tilde{P}(c|D)} [\log P(D, C)]$ satisfy that $
+{\small \begin{array}{rcl}
+t(m_j|m_k, \pi _j) & = & \frac{L_{jk}}{\sum \limits _{i = 1}^{n} L_{ik}} \\
+q(k|\pi _j, j) & = & \frac{L_{jk}}{\sum \limits _{i = 0}^{j-1} L_{ji}}
+\end{array}}
+$ 
+
+where $L_{jk}$ can be calculated by $
+{\small \begin{array}{rcl}
+L_{jk} & = & \sum \limits _{C, c_j=k} \tilde{P}(C|D) = \frac{\sum \limits _{C, c_j=k} \tilde{P}(C, D)}{\sum \limits _{C} \tilde{P}(C, D)} \\
+& = & \frac{\sum \limits _{C, c_j=k}\prod \limits _{i = 1}^{n}\tilde{\theta }(m_i, m_{c_i}, c_i, i, \pi _i)}{\sum \limits _{C}\prod \limits _{i = 1}^{n}\tilde{\theta }(m_i, m_{c_i}, c_i, i, \pi _i)} \\
+& = & \frac{\tilde{\theta }(m_j, m_k, k, j, \pi _j)\sum \limits _{C(-j)}\tilde{P}(C(-j)|D)}{\sum \limits _{i=0}^{j-1}\tilde{\theta }(m_j, m_i, i, j, \pi _j)\sum \limits _{C(-j)}\tilde{P}(C(-j)|D)} \\
+& = & \frac{\tilde{\theta }(m_j, m_k, k, j, \pi _j)}{\sum \limits _{i=0}^{j-1}\tilde{\theta }(m_j, m_i, i, j, \pi _j)} \\
+& = & \frac{\tilde{t}(m_j|m_k, \pi _j) \tilde{q}(k|\pi _j, j) \tilde{\tau }(\pi _j|j)}{\sum \limits _{i=0}^{j-1}\tilde{t}(m_j|m_i, \pi _j) \tilde{q}(i|\pi _j, j) \tilde{\tau }(\pi _j|j)} \\
+& = & \frac{\tilde{t}(m_j|m_k, \pi _j) \tilde{q}(k|\pi _j, j)}{\sum \limits _{i=0}^{j-1}\tilde{t}(m_j|m_i, \pi _j) \tilde{q}(i|\pi _j, j)}
+\end{array}}
+$ 
+
+where $C(-j) = \lbrace c_1, \ldots , c_{j-1}, c_{j+1}, \ldots , c_{n}\rbrace $ . The above derivations correspond to the learning algorithm in Algorithm "Resolution Mode Variables" . 

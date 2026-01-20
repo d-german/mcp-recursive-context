@@ -1,0 +1,181 @@
+# Event Outcome Prediction using Sentiment Analysis and Crowd Wisdom in Microblog Feeds
+
+**Paper ID:** 1912.05066
+
+## Abstract
+
+Sentiment Analysis of microblog feeds has attracted considerable interest in recent times. Most of the current work focuses on tweet sentiment classification. But not much work has been done to explore how reliable the opinions of the mass (crowd wisdom) in social network microblogs such as twitter are in predicting outcomes of certain events such as election debates. In this work, we investigate whether crowd wisdom is useful in predicting such outcomes and whether their opinions are influenced by the experts in the field. We work in the domain of multi-label classification to perform sentiment classification of tweets and obtain the opinion of the crowd. This learnt sentiment is then used to predict outcomes of events such as: US Presidential Debate winners, Grammy Award winners, Super Bowl Winners. We find that in most of the cases, the wisdom of the crowd does indeed match with that of the experts, and in cases where they don't (particularly in the case of debates), we see that the crowd's opinion is actually influenced by that of the experts.
+
+## Introduction
+
+Over the past few years, microblogs have become one of the most popular online social networks. Microblogging websites have evolved to become a source of varied kinds of information. This is due to the nature of microblogs: people post real-time messages about their opinions and express sentiment on a variety of topics, discuss current issues, complain, etc. Twitter is one such popular microblogging service where users create status messages (called “tweets"). With over 400 million tweets per day on Twitter, microblog users generate large amount of data, which cover very rich topics ranging from politics, sports to celebrity gossip. Because the user generated content on microblogs covers rich topics and expresses sentiment/opinions of the mass, mining and analyzing this information can prove to be very beneficial both to the industrial and the academic community. Tweet classification has attracted considerable attention because it has become very important to analyze peoples' sentiments and opinions over social networks.
+
+Most of the current work on analysis of tweets is focused on sentiment analysis BIBREF0, BIBREF1, BIBREF2. Not much has been done on predicting outcomes of events based on the tweet sentiments, for example, predicting winners of presidential debates based on the tweets by analyzing the users' sentiments. This is possible intuitively because the sentiment of the users in their tweets towards the candidates is proportional to the performance of the candidates in the debate.
+
+In this paper, we analyze three such events: 1) US Presidential Debates 2015-16, 2) Grammy Awards 2013, and 3) Super Bowl 2013. The main focus is on the analysis of the presidential debates. For the Grammys and the Super Bowl, we just perform sentiment analysis and try to predict the outcomes in the process. For the debates, in addition to the analysis done for the Grammys and Super Bowl, we also perform a trend analysis. Our analysis of the tweets for the debates is 3-fold as shown below.
+
+Sentiment: Perform a sentiment analysis on the debates. This involves: building a machine learning model which learns the sentiment-candidate pair (candidate is the one to whom the tweet is being directed) from the training data and then using this model to predict the sentiment-candidate pairs of new tweets.
+
+Predicting Outcome: Here, after predicting the sentiment-candidate pairs on the new data, we predict the winner of the debates based on the sentiments of the users.
+
+Trends: Here, we analyze certain trends of the debates like the change in sentiments of the users towards the candidates over time (hours, days, months) and how the opinion of experts such as Washington Post affect the sentiments of the users.
+
+For the sentiment analysis, we look at our problem in a multi-label setting, our two labels being sentiment polarity and the candidate/category in consideration. We test both single-label classifiers and multi-label ones on the problem and as intuition suggests, the multi-label classifier RaKel performs better. A combination of document-embedding features BIBREF3 and topic features (essentially the document-topic probabilities) BIBREF4 is shown to give the best results. These features make sense intuitively because the document-embedding features take context of the text into account, which is important for sentiment polarity classification, and topic features take into account the topic of the tweet (who/what is it about).
+
+The prediction of outcomes of debates is very interesting in our case. Most of the results seem to match with the views of some experts such as the political pundits of the Washington Post. This implies that certain rules that were used to score the candidates in the debates by said-experts were in fact reflected by reading peoples' sentiments expressed over social media. This opens up a wide variety of learning possibilities from users' sentiments on social media, which is sometimes referred to as the wisdom of crowd.
+
+We do find out that the public sentiments are not always coincident with the views of the experts. In this case, it is interesting to check whether the views of the experts can affect the public, for example, by spreading through the social media microblogs such as Twitter. Hence, we also conduct experiments to compare the public sentiment before and after the experts' views become public and thus notice the impact of the experts' views on the public sentiment. In our analysis of the debates, we observe that in certain debates, such as the 5th Republican Debate, held on December 15, 2015, the opinions of the users vary from the experts. But we see the effect of the experts on the sentiment of the users by looking at their opinions of the same candidates the next day.
+
+Our contributions are mainly: we want to see how predictive the sentiment/opinion of the users are in social media microblogs and how it compares to that of the experts. In essence, we find that the crowd wisdom in the microblog domain matches that of the experts in most cases. There are cases, however, where they don't match but we observe that the crowd's sentiments are actually affected by the experts. This can be seen in our analysis of the presidential debates.
+
+The rest of the paper is organized as follows: in section SECREF2, we review some of the literature. In section SECREF3, we discuss the collection and preprocessing of the data. Section SECREF4 details the approach taken, along with the features and the machine learning methods used. Section SECREF7 discusses the results of the experiments conducted and lastly section SECREF8 ends with a conclusion on the results including certain limitations and scopes for improvement to work on in the future.
+
+## Related Work
+
+Sentiment analysis as a Natural Language Processing task has been handled at many levels of granularity. Specifically on the microblog front, some of the early results on sentiment analysis are by BIBREF0, BIBREF1, BIBREF2, BIBREF5, BIBREF6. Go et al. BIBREF0 applied distant supervision to classify tweet sentiment by using emoticons as noisy labels. Kouloumpis et al. BIBREF7 exploited hashtags in tweets to build training data. Chenhao Tan et al. BIBREF8 determined user-level sentiments on particular topics with the help of the social network graph.
+
+There has been some work in event detection and extraction in microblogs as well. In BIBREF9, the authors describe a way to extract major life events of a user based on tweets that either congratulate/offer condolences. BIBREF10 build a key-word graph from the data and then detect communities in this graph (cluster) to find events. This works because words that describe similar events will form clusters. In BIBREF11, the authors use distant supervision to extract events. There has also been some work on event retrieval in microblogs BIBREF12. In BIBREF13, the authors detect time points in the twitter stream when an important event happens and then classify such events based on the sentiments they evoke using only non-textual features to do so. In BIBREF14, the authors study how much of the opinion extracted from Online Social Networks (OSN) user data is reflective of the opinion of the larger population. Researchers have also mined Twitter dataset to analyze public reaction to various events: from election debate performance BIBREF15, where the authors demonstrate visuals and metrics that can be used to detect sentiment pulse, anomalies in that pulse, and indications of controversial topics that can be used to inform the design of visual analytic systems for social media events, to movie box-office predictions on the release day BIBREF16. Mishne and Glance BIBREF17 correlate sentiments in blog posts with movie box-office scores. The correlations they observed for positive sentiments are fairly low and not sufficient to use for predictive purposes. Recently, several approaches involving machine learning and deep learning have also been used in the visual and language domains BIBREF18, BIBREF19, BIBREF20, BIBREF21, BIBREF22, BIBREF23, BIBREF24.
+
+## Data Set and Preprocessing ::: Data Collection
+
+Twitter is a social networking and microblogging service that allows users to post real-time messages, called tweets. Tweets are very short messages, a maximum of 140 characters in length. Due to such a restriction in length, people tend to use a lot of acronyms, shorten words etc. In essence, the tweets are usually very noisy. There are several aspects to tweets such as: 1) Target: Users use the symbol “@" in their tweets to refer to other users on the microblog. 2) Hashtag: Hashtags are used by users to mark topics. This is done to increase the visibility of the tweets.
+
+We conduct experiments on 3 different datasets, as mentioned earlier: 1) US Presidential Debates, 2) Grammy Awards 2013, 3) Superbowl 2013. To construct our presidential debates dataset, we have used the Twitter Search API to collect the tweets. Since there was no publicly available dataset for this, we had to collect the data manually. The data was collected on 10 different presidential debates: 7 republican and 3 democratic, from October 2015 to March 2016. Different hashtags like “#GOP, #GOPDebate” were used to filter out tweets specific to the debate. This is given in Table TABREF2. We extracted only english tweets for our dataset. We collected a total of 104961 tweets were collected across all the debates. But there were some limitations with the API. Firstly, the server imposes a rate limit and discards tweets when the limit is reached. The second problem is that the API returns many duplicates. Thus, after removing the duplicates and irrelevant tweets, we were left with a total of 17304 tweets. This includes the tweets only on the day of the debate. We also collected tweets on the days following the debate.
+
+As for the other two datasets, we collected them from available-online repositories. There were a total of 2580062 tweets for the Grammy Awards 2013, and a total of 2428391 tweets for the Superbowl 2013. The statistics are given in Tables TABREF3 and TABREF3. The tweets for the grammy were before the ceremony and during. However, we only use the tweets before the ceremony (after the nominations were announced), to predict the winners. As for the superbowl, the tweets collected were during the game. But we can predict interesting things like Most Valuable Player etc. from the tweets. The tweets for both of these datasets were annotated and thus did not require any human intervention. However, the tweets for the debates had to be annotated.
+
+Since we are using a supervised approach in this paper, we have all the tweets (for debates) in the training set human-annotated. The tweets were already annotated for the Grammys and Super Bowl. Some statistics about our datasets are presented in Tables TABREF3, TABREF3 and TABREF3. The annotations for the debate dataset comprised of 2 labels for each tweet: 1) Candidate: This is the candidate of the debate to whom the tweet refers to, 2) Sentiment: This represents the sentiment of the tweet towards that candidate. This is either positive or negative.
+
+The task then becomes a case of multi-label classification. The candidate labels are not so trivial to obtain, because there are tweets that do not directly contain any candidates' name. For example, the tweets, “a business man for president??” and “a doctor might sure bring about a change in America!” are about Donal Trump and Ben Carson respectively. Thus, it is meaningful to have a multi-label task.
+
+The annotations for the other two datasets are similar, in that one of the labels was the sentiment and the other was category-dependent in the outcome-prediction task, as discussed in the sections below. For example, if we are trying to predict the "Album of the Year" winners for the Grammy dataset, the second label would be the nominees for that category (album of the year).
+
+## Data Set and Preprocessing ::: Preprocessing
+
+As noted earlier, tweets are generally noisy and thus require some preprocessing done before using them. Several filters were applied to the tweets such as: (1) Usernames: Since users often include usernames in their tweets to direct their message, we simplify it by replacing the usernames with the token “USER”. For example, @michael will be replaced by USER. (2) URLs: In most of the tweets, users include links that add on to their text message. We convert/replace the link address to the token “URL”. (3) Repeated Letters: Oftentimes, users use repeated letters in a word to emphasize their notion. For example, the word “lol” (which stands for “laugh out loud”) is sometimes written as “looooool” to emphasize the degree of funnyness. We replace such repeated occurrences of letters (more than 2), with just 3 occurrences. We replace with 3 occurrences and not 2, so that we can distinguish the exaggerated usage from the regular ones. (4) Multiple Sentiments: Tweets which contain multiple sentiments are removed, such as "I hate Donald Trump, but I will vote for him". This is done so that there is no ambiguity. (5) Retweets: In Twitter, many times tweets of a person are copied and posted by another user. This is known as retweeting and they are commonly abbreviated with “RT”. These are removed and only the original tweets are processed. (6) Repeated Tweets: The Twitter API sometimes returns a tweet multiple times. We remove such duplicates to avoid putting extra weight on any particular tweet.
+
+## Methodology ::: Procedure
+
+Our analysis of the debates is 3-fold including sentiment analysis, outcome prediction, and trend analysis.
+
+Sentiment Analysis: To perform a sentiment analysis on the debates, we first extract all the features described below from all the tweets in the training data. We then build the different machine learning models described below on these set of features. After that, we evaluate the output produced by the models on unseen test data. The models essentially predict candidate-sentiment pairs for each tweet.
+
+Outcome Prediction: Predict the outcome of the debates. After obtaining the sentiments on the test data for each tweet, we can compute the net normalized sentiment for each presidential candidate in the debate. This is done by looking at the number of positive and negative sentiments for each candidate. We then normalize the sentiment scores of each candidate to be in the same scale (0-1). After that, we rank the candidates based on the sentiment scores and predict the top $k$ as the winners.
+
+Trend Analysis: We also analyze some certain trends of the debates. Firstly, we look at the change in sentiments of the users towards the candidates over time (hours, days, months). This is done by computing the sentiment scores for each candidate in each of the debates and seeing how it varies over time, across debates. Secondly, we examine the effect of Washington Post on the views of the users. This is done by looking at the sentiments of the candidates (to predict winners) of a debate before and after the winners are announced by the experts in Washington Post. This way, we can see if Washington Post has had any effect on the sentiments of the users. Besides that, to study the behavior of the users, we also look at the correlation of the tweet volume with the number of viewers as well as the variation of tweet volume over time (hours, days, months) for debates.
+
+As for the Grammys and the Super Bowl, we only perform the sentiment analysis and predict the outcomes.
+
+## Methodology ::: Machine Learning Models
+
+We compare 4 different models for performing our task of sentiment classification. We then pick the best performing model for the task of outcome prediction. Here, we have two categories of algorithms: single-label and multi-label (We already discussed above why it is meaningful to have a multi-label task earlier), because one can represent $<$candidate, sentiment$>$ as a single class label or have candidate and sentiment as two separate labels. They are listed below:
+
+## Methodology ::: Machine Learning Models ::: Single-label Classification
+
+Naive Bayes: We use a multinomial Naive Bayes model. A tweet $t$ is assigned a class $c^{*}$ such that
+
+where there are $m$ features and $f_i$ represents the $i^{th}$ feature.
+
+Support Vector Machines: Support Vector Machines (SVM) constructs a hyperplane or a set of hyperplanes in a high-dimensional space, which can then be used for classification. In our case, we use SVM with Sequential Minimal Optimization (SMO) BIBREF25, which is an algorithm for solving the quadratic programming (QP) problem that arises during the training of SVMs.
+
+Elman Recurrent Neural Network: Recurrent Neural Networks (RNNs) are gaining popularity and are being applied to a wide variety of problems. They are a class of artificial neural networks, where connections between units form a directed cycle. This creates an internal state of the network which allows it to exhibit dynamic temporal behavior. The Elman RNN was proposed by Jeff Elman in the year 1990 BIBREF26. We use this in our task.
+
+## Methodology ::: Machine Learning Models ::: Multi-label Classification
+
+RAkEL (RAndom k labELsets): RAkEL BIBREF27 is a multi-label classification algorithm that uses labeled powerset (LP) transformation: it basically creates a single binary classifier for every label combination and then uses multiple LP classifiers, each trained on a random subset of the actual labels, for classification.
+
+## Methodology ::: Feature Space
+
+In order to classify the tweets, a set of features is extracted from each of the tweets, such as n-gram, part-of-speech etc. The details of these features are given below:
+
+n-gram: This represents the frequency counts of n-grams, specifically that of unigrams and bigrams.
+
+punctuation: The number of occurrences of punctuation symbols such as commas, exclamation marks etc.
+
+POS (part-of-speech): The frequency of each POS tagger is used as the feature.
+
+prior polarity scoring: Here, we obtain the prior polarity of the words BIBREF6 using the Dictionary of Affect in Language (DAL) BIBREF28. This dictionary (DAL) of about 8000 English words assigns a pleasantness score to each word on a scale of 1-3. After normalizing, we can assign the words with polarity higher than $0.8$ as positive and less than $0.5$ as negative. If a word is not present in the dictionary, we lookup its synonyms in WordNet: if this word is there in the dictionary, we assign the original word its synonym's score.
+
+Twitter Specific features:
+
+Number of hashtags ($\#$ symbol)
+
+Number of mentioning users ( symbol)
+
+Number of hyperlinks
+
+Document embedding features: Here, we use the approach proposed by Mikolov et al. BIBREF3 to embed an entire tweet into a vector of features
+
+Topic features: Here, LDA (Latent Dirichlet Allocation) BIBREF4 is used to extract topic-specific features for a tweet (document). This is basically the topic-document probability that is outputted by the model.
+
+In the following experiments, we use 1-$gram$, 2-$gram$ and $(1+2)$-$gram$ to denote unigram, bigram and a combination of unigram and bigram features respectively. We also combine punctuation and the other features as miscellaneous features and use $MISC$ to denote this. We represent the document-embedding features by $DOC$ and topic-specific features by $TOPIC$.
+
+## Data Analysis
+
+In this section, we analyze the presidential debates data and show some trends.
+
+First, we look at the trend of the tweet frequency. Figure FIGREF21 shows the trends of the tweet frequency and the number of TV viewers as the debates progress over time. We observe from Figures FIGREF21 and FIGREF21 that for the first 5 debates considered, the trend of the number of TV viewers matches the trend of the number of tweets. However, we can see that towards the final debates, the frequency of the tweets decreases consistently. This shows an interesting fact that although the people still watch the debates, the number of people who tweet about it are greatly reduced. But the tweeting community are mainly youngsters and this shows that most of the tweeting community, who actively tweet, didn't watch the later debates. Because if they did, then the trends should ideally match.
+
+Next we look at how the tweeting activity is on days of the debate: specifically on the day of the debate, the next day and two days later. Figure FIGREF22 shows the trend of the tweet frequency around the day of the 5th republican debate, i.e December 15, 2015. As can be seen, the average number of people tweet more on the day of the debate than a day or two after it. This makes sense intuitively because the debate would be fresh in their heads.
+
+Then, we look at how people tweet in the hours of the debate: specifically during the debate, one hour after and then two hours after. Figure FIGREF23 shows the trend of the tweet frequency around the hour of the 5th republican debate, i.e December 15, 2015. We notice that people don't tweet much during the debate but the activity drastically increases after two hours. This might be because people were busy watching the debate and then taking some time to process things, so that they can give their opinion.
+
+We have seen the frequency of tweets over time in the previous trends. Now, we will look at how the sentiments of the candidates change over time.
+
+First, Figure FIGREF24 shows how the sentiments of the candidates changed across the debates. We find that many of the candidates have had ups and downs towards in the debates. But these trends are interesting in that, it gives some useful information about what went down in the debate that caused the sentiments to change (sometimes drastically). For example, if we look at the graph for Donald Trump, we see that his sentiment was at its lowest point during the debate held on December 15. Looking into the debate, we can easily see why this was the case. At a certain point in the debate, Trump was asked about his ideas for the nuclear triad. It is very important that a presidential candidate knows about this, but Trump had no idea what the nuclear triad was and, in a transparent attempt to cover his tracks, resorted to a “we need to be strong" speech. It can be due to this embarrassment that his sentiment went down during this debate.
+
+Next, we investigate how the sentiments of the users towards the candidates change before and after the debate. In essence, we examine how the debate and the results of the debates given by the experts affects the sentiment of the candidates. Figure FIGREF25 shows the sentiments of the users towards the candidate during the 5th Republican Debate, 15th December 2015. It can be seen that the sentiments of the users towards the candidates does indeed change over the course of two days. One particular example is that of Jeb Bush. It seems that the populace are generally prejudiced towards the candidates, which is reflected in their sentiments of the candidates on the day of the debate. The results of the Washington Post are released in the morning after the debate. One can see the winners suggested by the Washington Post in Table TABREF35. One of the winners in that debate according to them is Jeb Bush. Coincidentally, Figure FIGREF25 suggests that the sentiment of Bush has gone up one day after the debate (essentially, one day after the results given by the experts are out).
+
+There is some influence, for better or worse, of these experts on the minds of the users in the early debates, but towards the final debates the sentiments of the users are mostly unwavering, as can be seen in Figure FIGREF25. Figure FIGREF25 is on the last Republican debate, and suggests that the opinions of the users do not change much with time. Essentially the users have seen enough debates to make up their own minds and their sentiments are not easily wavered.
+
+## Evaluation Metrics
+
+In this section, we define the different evaluation metrics that we use for different tasks. We have two tasks at hand: 1) Sentiment Analysis, 2) Outcome Prediction. We use different metrics for these two tasks.
+
+## Evaluation Metrics ::: Sentiment Analysis
+
+In the study of sentiment analysis, we use “Hamming Loss” to evaluate the performance of the different methods. Hamming Loss, based on Hamming distance, takes into account the prediction error and the missing error, normalized over the total number of classes and total number of examples BIBREF29. The Hamming Loss is given below:
+
+where $|D|$ is the number of examples in the dataset and $|L|$ is the number of labels. $S_i$ and $Y_i$ denote the sets of true and predicted labels for instance $i$ respectively. $\oplus $ stands for the XOR operation BIBREF30. Intuitively, the performance is better, when the Hamming Loss is smaller. 0 would be the ideal case.
+
+## Evaluation Metrics ::: Outcome Prediction
+
+For the case of outcome prediction, we will have a predicted set and an actual set of results. Thus, we can use common information retrieval metrics to evaluate the prediction performance. Those metrics are listed below:
+
+Mean F-measure: F-measure takes into account both the precision and recall of the results. In essence, it takes into account how many of the relevant results are returned and also how many of the returned results are relevant.
+
+where $|D|$ is the number of queries (debates/categories for grammy winners etc.), $P_i$ and $R_i$ are the precision and recall for the $i^{th}$ query.
+
+Mean Average Precision: As a standard metric used in information retrieval, Mean Average Precision for a set of queries is mean of the average precision scores for each query:
+
+where $|D|$ is the number of queries (e.g., debates), $P_i(k)$ is the precision at $k$ ($P@k$) for the $i^{th}$ query, $rel_i(k)$ is an indicator function, equaling 1 if the document at position $k$ for the $i^th$ query is relevant, else 0, and $|RD_i|$ is the number of relevant documents for the $i^{th}$ query.
+
+## Results ::: Sentiment Analysis
+
+We use 3 different datasets for the problem of sentiment analysis, as already mentioned. We test the four different algorithms mentioned in Section SECREF6, with a different combination of features that are described in Section SECREF10. To evaluate our models, we use the “Hamming Loss” metric as discussed in Section SECREF6. We use this metric because our problem is in the multi-class classification domain. However, the single-label classifiers like SVM, Naive Bayes, Elman RNN cannot be evaluated against this metric directly. To do this, we split the predicted labels into a format that is consistent with that of multi-label classifiers like RaKel. The results of the experiments for each of the datasets are given in Tables TABREF34, TABREF34 and TABREF34. In the table, $f_1$, $f_2$, $f_3$, $f_4$, $f_5$ and $f_6$ denote the features 1-$gram$, 2-$gram$, $(1+2)$-$gram$, $(1+2)$-$gram + MISC$, $DOC$ and $DOC + TOPIC$ respectively. Note that lower values of hamming losses are more desirable. We find that RaKel performs the best out of all the algorithms. RaKel is more suited for the task because our task is a multi-class classification. Among all the single-label classifiers, SVM performs the best. We also observe that as we use more complex feature spaces, the performance increases. This is true for almost all of the algorithms listed.
+
+Our best performing features is a combination of paragraph embedding features and topic features from LDA. This makes sense intuitively because paragraph-embedding takes into account the context in the text. Context is very important in determining the sentiment of a short text: having negative words in the text does not always mean that the text contains a negative sentiment. For example, the sentence “never say never is not a bad thing” has many negative words; but the sentence as a whole does not have a negative sentiment. This is why we need some kind of context information to accurately determine the sentiment. Thus, with these embedded features, one would be able to better determine the polarity of the sentence. The other label is the entity (candidate/song etc.) in consideration. Topic features here make sense because this can be considered as the topic of the tweet in some sense. This can be done because that label captures what or whom the tweet is about.
+
+## Results ::: Results for Outcome Prediction
+
+In this section, we show the results for the outcome-prediction of the events. RaKel, as the best performing method, is trained to predict the sentiment-labels for the unlabeled data. The sentiment labels are then used to determine the outcome of the events. In the Tables (TABREF35, TABREF36, TABREF37) of outputs given, we only show as many predictions as there are winners.
+
+## Results ::: Results for Outcome Prediction ::: Presidential Debates
+
+The results obtained for the outcome prediction task for the US presidential debates is shown in Table TABREF35. Table TABREF35 shows the winners as given in the Washington Post (3rd column) and the winners that are predicted by our system (2nd column). By comparing the set of results obtained from both the sources, we find that the set of candidates predicted match to a large extent with the winners given out by the Washington Post. The result suggests that the opinions of the social media community match with that of the journalists in most cases.
+
+## Results ::: Results for Outcome Prediction ::: Grammy Awards
+
+A Grammy Award is given to outstanding achievement in the music industry. There are two types of awards: “General Field” awards, which are not restricted by genre, and genre-specific awards. Since, there can be upto 80 categories of awards, we only focus on the main 4: 1) Album of the Year, 2) Record of the Year, 3) Song of the Year, and 4) Best New Artist. These categories are the main in the awards ceremony and most looked forward to. That is also why we choose to predict the outcomes of these categories based on the tweets. We use the tweets before the ceremony (but after the nominations) to predict the outcomes.
+
+Basically, we have a list of nominations for each category. We filter the tweets based on these nominations and then predict the winner as with the case of the debates. The outcomes are listed in Table TABREF36. We see that largely, the opinion of the users on the social network, agree with the deciding committee of the awards. The winners agree for all the categories except “Song of the Year”.
+
+## Results ::: Results for Outcome Prediction ::: Super Bowl
+
+The Super Bowl is the annual championship game of the National Football League. We have collected the data for the year 2013. Here, the match was between the Baltimore Ravens and the San Francisco 49ers. The tweets that we have collected are during the game. From these tweets, one could trivially determine the winner. But an interesting outcome would be to predict the Most Valuable Player (MVP) during the game. To determine this, all the tweets were looked at and we determined the candidate with the highest positive sentiment by the end of the game. The result in Table TABREF37 suggests that we are able to determine the outcomes accurately.
+
+Table TABREF43 displays some evaluation metrics for this task. These were computed based on the predicted outcomes and the actual outcomes for each of the different datasets. Since the number of participants varies from debate-to-debate or category-to-category for Grammy etc., we cannot return a fixed number of winners for everything. So, the size of our returned ranked-list is set to half of the number of participants (except for the MVP for Super Bowl; there are so many players and returning half of them when only one of them is relevant is meaningless. So, we just return the top 10 players). As we can see from the metrics, the predicted outcomes match quite well with the actual ones (or the ones given by the experts).
+
+## Conclusions
+
+This paper presents a study that compares the opinions of users on microblogs, which is essentially the crowd wisdom, to that of the experts in the field. Specifically, we explore three datasets: US Presidential Debates 2015-16, Grammy Awards 2013, Super Bowl 2013. We determined if the opinions of the crowd and the experts match by using the sentiments of the tweets to predict the outcomes of the debates/Grammys/Super Bowl. We observed that in most of the cases, the predictions were right indicating that crowd wisdom is indeed worth looking at and mining sentiments in microblogs is useful. In some cases where there were disagreements, however, we observed that the opinions of the experts did have some influence on the opinions of the users. We also find that the features that were most useful in our case of multi-label classification was a combination of the document-embedding and topic features.

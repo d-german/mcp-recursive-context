@@ -1,0 +1,133 @@
+# Multiplicative Models for Recurrent Language Modeling
+
+**Paper ID:** 1907.00455
+
+## Abstract
+
+Recently, there has been interest in multiplicative recurrent neural networks for language modeling. Indeed, simple Recurrent Neural Networks (RNNs) encounter difficulties recovering from past mistakes when generating sequences due to high correlation between hidden states. These challenges can be mitigated by integrating second-order terms in the hidden-state update. One such model, multiplicative Long Short-Term Memory (mLSTM) is particularly interesting in its original formulation because of the sharing of its second-order term, referred to as the intermediate state. We explore these architectural improvements by introducing new models and testing them on character-level language modeling tasks. This allows us to establish the relevance of shared parametrization in recurrent language modeling.
+
+## Introduction
+
+One of the principal challenges in computational linguistics is to account for the word order of the document or utterance being processed BIBREF0 . Of course, the numbers of possible phrases grows exponentially with respect to a given phrase length, requiring an approximate approach to summarizing its content. rnn are such an approach, and they are used in various tasks in nlp, such as machine translation BIBREF1 , abstractive summarization BIBREF2 and question answering BIBREF3 . However, rnn, as approximations, suffer from numerical troubles that have been identified, such as that of recovering from past errors when generating phrases. We take interest in a model that mitigates this problem, mrnn, and how it has been and can be combined for new models. To evaluate these models, we use the task of recurrent language modeling, which consists in predicting the next token (character or word) in a document. This paper is organized as follows: rnn and mrnn are introduced respectively in Sections SECREF2 and SECREF3 . Section SECREF4 presents new and existing multiplicative models. Section SECREF5 describes the datasets and experiments performed, as well as results obtained. Sections SECREF6 discusses and concludes our findings.
+
+## Recurrent neural networks
+
+rnn are powerful tools of sequence modeling that can preserve the order of words or characters in a document. A document is therefore a sequence of words, INLINEFORM0 . Given the exponential growth of possible histories with respect to the sequence length, the probability of observing a given sequence needs to be approximated. rnn will make this approximation using the product rule, INLINEFORM1 
+
+and updating a hidden state at every time step. This state is first null, INLINEFORM0 
+
+Thereafter, it is computed as a function of the past hidden state as well as the input at the current time step, INLINEFORM0 
+
+known as the transition function. INLINEFORM0 is a learned function, often taking the form INLINEFORM1 
+
+This allows, in theory, for straightforward modeling of sequences of arbitrary length.
+
+In practice, rnn encounter some difficulties that need some clever engineering to be mitigated. For example, learning long-term dependencies such as those found in language is not without its share of woes arising from numerical considerations, such as the well-known vanishing gradient problem BIBREF4 . This can be addressed with gating mechanisms, such as lstm BIBREF5 and gru BIBREF6 .
+
+A problem that is more specific to generative rnn is their difficulty recovering from past errors BIBREF7 , which BIBREF8 argue arises from having hidden-state transitions that are highly correlated across possible inputs. One approach to adapting rnn to have more input-dependent transition functions is to use the multiplicative "trick" BIBREF9 . This approximates the idea of having the input at each time synthesize a dedicated kernel of parameters dictating the transition from the previous hidden state to the next. These two approaches can be combined, as in the mlstm BIBREF8 .
+
+We begin by contending that, in making rnn multiplicative, sharing what is known as the intermediate state does not significantly hinder performance when parameter counts are equal. We verify this with existing as well as new gated models on several well-known language modeling tasks.
+
+## Multiplicative RNNs
+
+Most recurrent neural network architectures, including lstm and gru share the following building block: DISPLAYFORM0 
+
+ INLINEFORM0 is the candidate hidden state, computed from the previous hidden state, INLINEFORM1 , and the current input, INLINEFORM2 , weighted by the parameter matrices INLINEFORM3 and INLINEFORM4 , respectively. This candidate hidden state may then be passed through gating mechanisms and non-linearities depending on the specific recurrent model.
+
+Let us assume for simplicity that the input is a one-hot vector (one component is 1, the rest are 0 BIBREF10 [see p.45]), as it is often the case in nlp. Then, the term INLINEFORM0 is reduced to a single column of INLINEFORM1 and can therefore be thought of as an input-dependent bias in the hidden state transition. As the dependencies we wish to establish between the elements of the sequences under consideration become more distant, the term INLINEFORM2 will have to be significantly larger than this input-dependent bias, INLINEFORM3 , in order to remain unchanged across time-steps. This will mean that from one time-step to the next, the hidden-to-hidden transition will be highly correlated across possible inputs. This can be addressed by having more input-dependent hidden state transitions, making rnn more expressive.
+
+In order to remedy the aforementioned problem, each possible input INLINEFORM0 can be given its own matrix INLINEFORM1 parameterizing the contribution of INLINEFORM2 to INLINEFORM3 . DISPLAYFORM0 
+
+This is known as a trnn BIBREF9 , because all the matrices can be stacked to form a rank 3 tensor, INLINEFORM0 . The input INLINEFORM1 selects the relevant slice of the tensor in the one-hot case and a weighted sum over all slices in the dense case. The resulting matrix then acts as the appropriate INLINEFORM2 .
+
+However, such an approach is impractical because of the high parameter count such a tensor would entail. The tensor can nonetheless be approximated by factorizing it BIBREF11 as follows: DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 are weight matrices, and INLINEFORM2 is the operator turning a vector INLINEFORM3 into a diagonal matrix where the elements of INLINEFORM4 form the main diagonal of said matrix. Replacing INLINEFORM5 in Equation ( EQREF2 ) by this tensor factorization, we obtain DISPLAYFORM0 
+
+where INLINEFORM0 is known as the intermediate state, given by DISPLAYFORM0 
+
+Here, INLINEFORM0 refers to the Hadamard or element-wise product of vectors. The intermediate state is the result of having the input apply a learned filter via the new parameter kernel INLINEFORM1 to the factors of the hidden state. It should be noted that the dimensionality of INLINEFORM2 is free and, should it become sufficiently large, the factorization becomes as expressive as the tensor. The ensuing model is known as a mrnn BIBREF9 .
+
+## Sharing intermediate states
+
+While mrnn outperform simple rnn in character-level language modeling, they have been found wanting with respect to the popular lstm BIBREF5 . This prompted BIBREF8 to apply the multiplicative "trick" to lstm resulting in the mlstm, which achieved promising results in several language modeling tasks BIBREF8 .
+
+## mLSTM
+
+Gated rnn, such as lstm and gru, use gates to help signals move through the network. The value of these gates is computed in much the same way as the candidate hidden state, albeit with different parameters. For example, lstm uses two different gates, INLINEFORM0 and INLINEFORM1 in updating its memory cell, INLINEFORM2 , DISPLAYFORM0 
+
+It uses another gate, INLINEFORM0 , in mapping INLINEFORM1 to the new hidden state, INLINEFORM2 , DISPLAYFORM0 
+
+where INLINEFORM0 is the sigmoid function, squashing its input between 0 and 1. INLINEFORM1 and INLINEFORM2 are known as forget and input gates, respectively. The forget gates allows the network to ignore components of the value of the memory cell at the past state. The input gate filters out certain components of the new hidden state. Finally, the output gates separates the memory cell from the actual hidden state. The values of these gates are computed at each time step as follows: DISPLAYFORM0 DISPLAYFORM1 
+
+Each gate has its own set of parameters to infer. If we were to replace each INLINEFORM0 by a tensor factorization as in mrnn, we would obtain a mlstm model. However, in the original formulation of mlstm, there is no factorization of each would-be INLINEFORM1 individually. There is no separate intermediate state for each gate, as one would expect. Instead, a single intermediate state, INLINEFORM2 , is computed to replace INLINEFORM3 in all equations in the system, by Eq. EQREF5 . Furthermore, each gate has its own INLINEFORM4 weighting INLINEFORM5 . Their values are computed as follows: DISPLAYFORM0 DISPLAYFORM1 
+
+The model can therefore no longer be understood as as an approximation of the trnn. Nonetheless, it has achieved empirical success in nlp. We therefore try to explore the empirical merits of this shared parametrization and apply them to other rnn architectures.
+
+## True mLSTM
+
+We have presented the original mlstm model with its shared intermediate state. If we wish to remain true to the original multiplicative model, however, we have to factorize every would-be INLINEFORM0 tensor separately. We have: DISPLAYFORM0 DISPLAYFORM1 
+
+with each INLINEFORM0 being given by a separate set of parameters: DISPLAYFORM0 
+
+We henceforth refer to this model as tmlstm. We sought to apply the same modifications to the gru model, as lstm and gru are known to perform similarly BIBREF12 , BIBREF13 , BIBREF14 . That is, we build a tmgru model, as well as a mgru with a shared intermediate state.
+
+## GRU
+
+The gru was first proposed by BIBREF6 as a lighter, simpler variant of lstm. gru relies on two gates, called, respectively, the update and reset gates, and no additional memory cell. These gates intervene in the computation of the hidden state as follows: DISPLAYFORM0 
+
+where the candidate hidden state, INLINEFORM0 , is given by: DISPLAYFORM0 
+
+The update gate deletes specific components of the hidden state and replaces them with those of the candidate hidden state, thus updating its content. On the other hand, the reset gate allows the unit to start anew, as if it were reading the first symbol of the input sequence. They are computed much in the same way as the gates of lstm: DISPLAYFORM0 
+
+ DISPLAYFORM0 
+
+## True mGRU
+
+We can now make gru multiplicative by using the tensor factorization for INLINEFORM0 and INLINEFORM1 : DISPLAYFORM0 DISPLAYFORM1 
+
+with each INLINEFORM0 given by Eq. EQREF19 . There is a subtlety to computing INLINEFORM1 , as we need to apply the reset gate to INLINEFORM2 . While INLINEFORM3 itself is given by Eq. EQREF4 , INLINEFORM4 is not computed the same way as in mlstm and mrnn. Instead, it is given by: DISPLAYFORM0 
+
+## mGRU with shared intermediate state
+
+Sharing an intermediate state is not as immediate for gru. This is due to the application of INLINEFORM0 , which we need in computing the intermediate state that we want to share. That is, INLINEFORM1 and INLINEFORM2 would both depend on each other. We modify the role of INLINEFORM3 to act as a filter on INLINEFORM4 , rather than a reset on individual components of INLINEFORM5 . Note that, when all components of INLINEFORM6 go to zero, it amounts to having all components of INLINEFORM7 at zero. We have DISPLAYFORM0 
+
+and DISPLAYFORM0 
+
+ INLINEFORM0 is given by DISPLAYFORM0 
+
+with INLINEFORM0 the same as in mrnn and mlstm this time, i.e. Eq. EQREF5 . The final hidden state is computed the same way as in the original gru (Eq. EQREF21 ).
+
+## Experiments in character-level language modeling
+
+Character-level language modeling (or character prediction) consists in predicting the next character while reading a document one character at a time. It is a common benchmark for rnn because of the heightened need for shared parametrization when compared to word-level models. We test mgru on two well-known datasets, the Penn Treebank and Text8.
+
+## Penn Treebank
+
+The Penn Treebank dataset BIBREF15 comes from a series of Wall Street Journal articles written in English. Following BIBREF16 , sections 0-20 were used for training, 21-22 for validation and 23-24 for testing, respectively, which amounts to 5.1M, 400K and 450K characters, respectively.
+
+The vocabulary consists of 10K lowercase words. All punctuation is removed and numbers were substituted for a single capital N. All words out of vocabulary are replaced by the token <unk>.
+
+The training sequences were passed to the model in batches of 32 sequences. Following BIBREF8 , we built an initial mlstm model of 700 units. However, we set the dimensionality of the intermediate state to that of the input in order to keep the model small. We do the same for our mgru, tmlstm and tmgru, changing only the size of the hidden state so that all four models have roughly the same parameter count. We trained it using the Adam optimizer BIBREF17 , selecting the best model on validation over 10 epochs. We apply no regularization other than a checkpoint which keeps the best model over all epochs.
+
+ The performance of the model is evaluated using cross entropy in bpc, which is INLINEFORM0 of perplexity.
+
+All models outperform previously reported results for mlstm BIBREF8 despite lower parameter counts. This is likely due to our relatively small batch size. However, they perform fairly similarly. Encouraged by these results, we built an mgru with both hidden and intermediate state sizes set to that of the original mlstm (700). This version highly surpasses the previous state of the art while still having fewer parameters than previous work.
+
+For the sake of comparison, results as well as parameter counts (where available) of our models (bold) and related approaches are presented in Table TABREF34 . mgru and larger mgru, our best models, achieved respectively an error of 1.07 and 0.98 bpc on the test data, setting a new state of the art for this task.
+
+## Text8
+
+The Text8 corpus BIBREF21 comprises the first 100M plain text characters in English from Wikipedia in 2006. As such, the alphabet consists of the 26 letters of the English alphabet as well as the space character. No vocabulary restrictions were put in place. As per BIBREF16 , the first 90M and 5M characters were used for training and validation, respectively, with the last 5M used for testing.
+
+Encouraged by our results on the Penn Treebank dataset, we opted to use similar configurations. However, as the data is one long sequence of characters, we divide it into sequences of 200 characters. We pass these sequences to the model in slightly larger batches of 50 to speed up computation. Again, the dimensionality of the hidden state for mlstm is set at 450 after the original model, and that of the intermediate state is set to the size of the alphabet. The size of the hidden state is adjusted for the other three models as it was for the PTB experiments. The model is also trained using the Adam optimizer over 10 epochs.
+
+The best model as per validation data over 10 epochs achieves 1.40 bpc on the test data, slightly surpassing an mlstm of smaller hidden-state dimensionality (450) but larger parameter count. Our results are more modest, as are those of the original mlstm. Once again, results do not vary greatly between models.
+
+As with the Penn Treebank, we proceed with building an mgru with both hidden and intermediate state sizes set to 450. This improves performance to 1.21 bpc, setting a new state of the art for this task and surpassing a large mlstm of 1900 units from BIBREF8 despite having far fewer parameters (45M to 5M).
+
+For the sake of comparison, results as well as parameter counts of our models and related approaches are presented in Table TABREF36 . It should be noted that some of these models employ dynamic evaluation BIBREF7 , which fits the model further during evaluation. We refer the reader to BIBREF22 . These models are indicated by a star.
+
+## Conclusion
+
+We have found that competitive results can be achieved with mrnn using small models. We have not found significant differences in the approaches presented, despite added non-intuitive parameter-sharing constraints when controlling for model size. Our results are restricted to character-level language modeling. Along this line of thought, previous work on mrnn demonstrated their increased potential when compared to their regular variants BIBREF9 , BIBREF8 , BIBREF23 . We therefore offer other variants as well as a first investigation into their differences. We hope to have evinced the impact of increased flexibility in hidden-state transitions on rnn sequence-modeling capabilities. Further work in this area is required to transpose these findings into applied tasks in nlp.

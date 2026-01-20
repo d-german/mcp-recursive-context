@@ -1,0 +1,169 @@
+# Select and Attend: Towards Controllable Content Selection in Text Generation
+
+**Paper ID:** 1909.04453
+
+## Abstract
+
+Many text generation tasks naturally contain two steps: content selection and surface realization. Current neural encoder-decoder models conflate both steps into a black-box architecture. As a result, the content to be described in the text cannot be explicitly controlled. This paper tackles this problem by decoupling content selection from the decoder. The decoupled content selection is human interpretable, whose value can be manually manipulated to control the content of generated text. The model can be trained end-to-end without human annotations by maximizing a lower bound of the marginal likelihood. We further propose an effective way to trade-off between performance and controllability with a single adjustable hyperparameter. In both data-to-text and headline generation tasks, our model achieves promising results, paving the way for controllable content selection in text generation.
+
+## Introduction
+
+Many text generation tasks, e.g., data-to-text, summarization and image captioning, can be naturally divided into two steps: content selection and surface realization. The generations are supposed to have two levels of diversity: (1) content-level diversity reflecting multiple possibilities of content selection (what to say) and (2) surface-level diversity reflecting the linguistic variations of verbalizing the selected contents (how to say) BIBREF0 , BIBREF1 . Recent neural network models handle these tasks with the encoder-decoder (Enc-Dec) framework BIBREF2 , BIBREF3 , which simultaneously performs selecting and verbalizing in a black-box way. Therefore, both levels of diversity are entangled within the generation. This entanglement, however, sacrifices the controllability and interpretability, making it diffifcult to specify the content to be conveyed in the generated text BIBREF4 , BIBREF5 .
+
+With this in mind, this paper proposes decoupling content selection from the Enc-Dec framework to allow finer-grained control over the generation. Table TABREF2 shows an example. We can easily modify the content selection to generate text with various focuses, or sample multiple paraphrases by fixing the content selection.
+
+Though there has been much work dealing with content selection for the Enc-Dec, none of them is able to address the above concerns properly. Current methods can be categorized into the following three classes and have different limits:
+
+In this paper, we treat the content selection as latent variables and train with amortized variational inference BIBREF10 , BIBREF11 . This provides a lower training variance than Reinforce-select. The selector and generator are co-trained within the same objective, the generations are thus more faithful to the selected contents than Bottom-up methods. Our model is task-agnostic, end-to-end trainable and can be seamlessly inserted into any encoder-decoder architecture. On both the data-to-text and headline generation task, we show our model outperforms others regarding content-level diversity and controllability while maintaining comparable performance. The performance/controllability trade-off can be effectively adjusted by adjusting a single hyperparameter in the training stage, which constrains an upper bound of the conditional mutual information (CMI) between the selector and generated text BIBREF12 , BIBREF13 . A higher CMI leads to stronger controllability with a bit more risk of text disfluency.
+
+In summary, our contributions are (1) systematically studying the problem of controllable content selection for Enc-Dec text generation, (2) proposing a task-agnostic training framework achieving promising results and (3) introducing an effective way to achieve the trade-off between performance and controllability.
+
+## Background and Notation
+
+Let INLINEFORM0 denote a source-target pair. INLINEFORM1 is a sequence of INLINEFORM2 and can be either some structured data or unstructured text/image depending on the task. INLINEFORM3 corresponds to INLINEFORM4 which is a text description of INLINEFORM5 . The goal of text generation is to learn a distribution INLINEFORM6 to automatically generate proper text.
+
+The Enc-Dec architecture handles this task with an encode-attend-decode process BIBREF3 , BIBREF14 . The encoder first encodes each INLINEFORM0 into a vector INLINEFORM1 . At each time step, the decoder pays attentions to some source embeddings and outputs the probability of the next token by INLINEFORM2 . INLINEFORM3 is a weighted average of source embeddings: DISPLAYFORM0 
+
+ INLINEFORM0 is the hidden state of the decoder at time step INLINEFORM1 . INLINEFORM2 is a score function to compute the similarity between INLINEFORM3 and INLINEFORM4 BIBREF15 .
+
+## Content Selection
+
+Our goal is to decouple the content selection from the decoder by introducing an extra content selector. We hope the content-level diversity can be fully captured by the content selector for a more interpretable and controllable generation process. Following BIBREF6 , BIBREF16 , we define content selection as a sequence labeling task. Let INLINEFORM0 denote a sequence of binary selection masks. INLINEFORM1 if INLINEFORM2 is selected and 0 otherwise. INLINEFORM3 is assumed to be independent from each other and is sampled from a bernoulli distribution INLINEFORM4 . INLINEFORM6 is the bernoulli parameter, which we estimate using a two-layer feedforward network on top of the source encoder. Text are generated by first sampling INLINEFORM7 from INLINEFORM8 to decide which content to cover, then decode with the conditional distribution INLINEFORM9 . The text is expected to faithfully convey all selected contents and drop unselected ones. Fig. FIGREF8 depicts this generation process. Note that the selection is based on the token-level context-aware embeddings INLINEFORM10 and will maintain information from the surrounding contexts. It encourages the decoder to stay faithful to the original information instead of simply fabricating random sentences by connecting the selected tokens.
+
+For each source-target pair, the ground-truth selection mask is unknown, so training is challenging. In the following session, we discuss several training possibilities and introduce the proposed model in detail.
+
+## Bottom-up
+
+The most intuitive way is training the content selector to target some heuristically extracted contents. For example, we can train the selector to select overlapped words between the source and target BIBREF6 , sentences with higher tf-idf scores BIBREF20 or identified image objects that appear in the caption BIBREF21 . A standard encoder-decoder model is independently trained. In the testing stage, the prediction of the content selector is used to hard-mask the attention vector to guide the text generation in a bottom-up way. Though easy to train, Bottom-up generation has the following two problems: (1) The heuristically extracted contents might be coarse and cannot reflect the variety of human languages and (2) The selector and decoder are independently trained towards different objectives thus might not adapt to each other well.
+
+ INLINEFORM0 as Latent Variable: Another way is to treat INLINEFORM1 as a latent variable and co-train selector and generator by maximizing the marginal data likelihood. By doing so, the selector has the potential to automatically explore optimal selecting strategies best fit for the corresponding generator component.
+
+With this in mind. We design INLINEFORM0 by changing the original decoder in the following way: (1) We initialize hidden states of the decoder from a mean pooling over selected contents to inform the decoder which contents to cover and (2) Unselected contents will be prohibited from being attended to: DISPLAYFORM0 
+
+ INLINEFORM0 is the initial decoder hidden state and MLP denotes multi-layer-perceptron.
+
+Since computing the exact marginal likelihood INLINEFORM0 requires enumerating over all possible combinations of INLINEFORM1 (complexity INLINEFORM2 ), we need some way to efficiently estimate the likelihood.
+
+## Soft-Select
+
+Soft-select falls back on a deterministic network to output the likelihood function's first-order Taylor series approximation expanded at INLINEFORM0 : INLINEFORM1 
+
+By moving the expectation into the decoding function, we can deterministically compute the likelihood by setting INLINEFORM0 , reducing complexity to INLINEFORM1 . Each attention weight will first be “soft-masked" by INLINEFORM2 before being passed to the decoder. soft-select is fully differentiable and can be easily trained by gradient descent. However, this soft-approximation is normally inaccurate, especially when INLINEFORM3 has a high entropy, which is common in one-to-many text generation tasks. The gap between INLINEFORM4 and INLINEFORM5 will be large BIBREF22 , BIBREF23 . In practice, this would lead to unrealistic generations when sampling INLINEFORM6 from the deterministically trained distribution.
+
+## Reinforce-Select
+
+Reinforce-select (RS) BIBREF24 , BIBREF9 utilizes reinforcement learning to approximate the marginal likelihood. Specifically, it is trained to maximize a lower bound of the likelihood by applying the Jensen inequalily: DISPLAYFORM0 
+
+The gradient to INLINEFORM0 is approximated with Monte-Carlo sampling by applying the REINFORCE algorithm BIBREF25 , BIBREF26 . To speed up convergence, we pre-train the selector by some distant supervision, which is a common practice in reinforcement learning. REINFORCE is unbiased but has a high variance. Many research have proposed sophisticated techniques for variance reduction BIBREF11 , BIBREF27 , BIBREF28 . In text generation, the high-variance problem is aggravated because there exists multiple valid selections. Accurately estimating the likelihood becomes difficult. Another issue is its tendency to avoid stochasticity BIBREF29 , which we will show in Sec SECREF27 that it results in low content-level diversity.
+
+## Variational Reinforce-Select
+
+We propose Variational Reinforce-Select (VRS) which applies variational inference BIBREF10 for variance reduction. Instead of directly integrating over INLINEFORM0 , it imposes a proposal distribution INLINEFORM1 for importance sampling. The marginal likelihood is lower bounded by: DISPLAYFORM0 
+
+By choosing a proper INLINEFORM0 , the bound will be improved and the variance can be largely reduced compared with REINFORCE. If INLINEFORM1 equals the posterior distribution INLINEFORM2 , the bound is tight and the variance would be zero BIBREF30 . We define INLINEFORM3 as a mean-field distribution parameterized by a set of global parameters INLINEFORM4 to approach the true posterior distribution. INLINEFORM5 , INLINEFORM6 and INLINEFORM7 are simultaneously trained by minimizing the last tine of Eq. EQREF15 . INLINEFORM8 also allows us to further perform posterior inference: Given an arbitrary text INLINEFORM9 for a source INLINEFORM10 , we can infer which source contents are included in INLINEFORM11 (An example is given in Appendix SECREF9 ).
+
+In Eq. EQREF15 , the KL divergence term can be computed analytically. As for the independence assumption, it can be summed over each individual INLINEFORM0 . The likelihood term is differentiable to INLINEFORM1 but not to INLINEFORM2 , we estimate the gradient to INLINEFORM3 in Eq EQREF15 by applying the REINFORCE estimator: DISPLAYFORM0 
+
+ INLINEFORM0 is the control variate BIBREF25 . The optimal INLINEFORM1 would be BIBREF31 : DISPLAYFORM0 
+
+which we set as a soft-select approximation: DISPLAYFORM0 
+
+We estimate Eq. EQREF16 with a single sample from INLINEFORM0 for efficiency. Though multiple-sample could potentially further tighten the bound and reduce the variance BIBREF32 , BIBREF33 , BIBREF34 , it brings significant computational overhead, especially in text generation tasks where the whole sentence needs to be decoded.
+
+## Degree of Controllability
+
+In practice, when treating content selection as latent variables, the model tends to end up with a trivial solution of always selecting all source tokens BIBREF35 , BIBREF36 . This behavior is understandable since Eq. EQREF10 strictly masks unselected tokens. Wrongly unselecting one token will largely deteriorate the likelihood. Under the maximum likelihood (MLE) objective, this high risk pushes the selector to take a conservative strategy of always keeping all tokens, then the whole model degenerates to the standard Enc-Dec and the selection mask loses effects on the generation. Usually people apply a penalty term to the selecting ratio when optimizing the likelihood: DISPLAYFORM0 
+
+ INLINEFORM0 is the MLE loss function, INLINEFORM1 is the mean of INLINEFORM2 and INLINEFORM3 is the target selecting ratio. This forces the selector to select the most important INLINEFORM4 tokens for each source input instead of keeping all of them.
+
+In our VRS model, we can easily adjust the degree of controllability by limiting an upper bound of the conditional mutual information (CMI) INLINEFORM0 BIBREF13 . Specifically, we can change our objective into: DISPLAYFORM0 
+
+ INLINEFORM0 is a fixed lagrangian multiplier. Eq. EQREF21 can be proved equal to maximum likelihood with the constraint INLINEFORM1 given proper INLINEFORM2 BIBREF12 . A higher INLINEFORM3 indicates INLINEFORM4 has more influences to INLINEFORM5 (higher controllability) while always safely selecting all tokens will lead INLINEFORM6 . It is preferred over Eq. EQREF20 because (a) CMI directly considers the dependency between the selection and multiple-possible text while limiting the ratio aims at finding the single most salient parts for each source. (b) Unlike CMI, limiting the ratio is coarse. It considers only the total selected size and ignores its internal distribution.
+
+[tb] Variational Reinforce-Select (VRS) Parameters: INLINEFORM0 INLINEFORM1 TRUE Sample X,Y from the corpus; Encode X into INLINEFORM2 ;
+
+ INLINEFORM0 Update INLINEFORM1 with distant supervision;
+
+Update INLINEFORM0 by INLINEFORM1 Eq. EQREF15 ; Update INLINEFORM2 by INLINEFORM3 Eq. EQREF21 ; INLINEFORM4 FALSE if Eq. EQREF15 degrades convergence and INLINEFORM5 is False
+
+In practice, we can set INLINEFORM0 to adjust the degree of controllability we want. Later we will show it leads to a trade-off with performance. The final algorithm is detailed in Algorithm SECREF19 . To keep fairness, we trian RS and VRS with the same control variate and pre-training strategy.
+
+## Related Work
+
+Most content selection models train the selector with heuristic rules BIBREF39 , BIBREF20 , BIBREF16 , BIBREF6 , BIBREF40 , BIBREF41 , which fail to fully capture the relation between selection and generation. BIBREF7 , BIBREF8 , BIBREF42 , BIBREF20 “soft-select" word or sentence embeddings based on a gating function. The output score from the gate is a deterministic vector without any probabilistic variations, so controlling the selection to generate diverse text is impossible. Very few works explicitly define a bernoulli distribution for the selector, then train with the REINFORCE algorithm BIBREF24 , BIBREF9 , but the selection targets at a high recall regardless of the low precision, so the controllability over generated text is weak. BIBREF43 control the generation by manually concatenating entity embeddings, while our model is much more flexible by explicitly defining the selection probability over all source tokens. Our work is closely related with learning discrete representations with variational inference BIBREF44 , BIBREF45 , BIBREF46 , BIBREF33 , where we treat content selection as the latent representation. Limiting the KL-term is a common technique to deal with the “posterior collapse" problem BIBREF47 , BIBREF48 , BIBREF49 . We adopt a similar approach and use it to further control the selecting strategy.
+
+## Experiments
+
+For the experiments, we focus on comparing (1) Bottom-up generation (Bo.Up.), (2) soft-select (SS), (3) Reinforce-select (RS) and (4) Variational-Reinforce-select (VRS) regarding their performance on content selection. SS and RS are trained with the selecting ratio constraint in Eq. EQREF20 . For the SS model, we further add a regularization term to encourage the maximum value of INLINEFORM0 to be close to 1 as in BIBREF7 . We first briefly introduce the tasks and important setup, then present the evaluation results.
+
+## Tasks and Setup
+
+We test content-selection models on the headline and data-to-text generation task. Both tasks share the same framework with the only difference of source-side encoders.
+
+Headline Generation: We use English Gigaword preprocessed by BIBREF50 , which pairs first sentences of news articles with their headlines. We keep most settings same as in BIBREF8 , but use a vocabulary built by byte-pair-encoding BIBREF51 . We find it speeds up training with superior performance.
+
+Data-to-Text Generation: We use the Wikibio dataset BIBREF52 . The source is a Wikipedia infobox and the target is a one-sentence biography description. Most settings are the same as in BIBREF53 , but we use a bi-LSTM encoder for better performance.
+
+Heuristically extracted content: This is used to train the selector for bottom up models and pre-train the RS and VRS model. For wikibio, we simply extract overlapped words between the source and target. In Gigaword, as the headline is more abstractive, we select the closest source word for each target word in the embedding space. Stop words and punctuations are prohibited from being selected.
+
+Choice of INLINEFORM0 : As seen in Sec SECREF19 , we need to set the hyperparameter INLINEFORM1 for RS/SS and INLINEFORM2 for VRS. INLINEFORM3 corresponds to the selecting ratio. We set them as INLINEFORM4 for Wikibio and INLINEFORM5 for Gigaword. The value is decided by running a human evaluation to get the empirical estimation. To keep comparison fairness, we tune INLINEFORM6 to make VRS select similar amount of tokens with RS. The values we get are INLINEFORM7 for Wikibio and INLINEFORM8 for Gigaword. INLINEFORM9 is the number of source tokens. 
+
+## Results and Analysis
+
+Ideally we would expect the learned content selector to (1) have reasonable diversity so that text with various contents can be easily sampled, (2) properly control the contents described in the generated text and (3) not hurt performance. The following section will evaluate these three points in order.
+
+Diversity: We first look into the diversity of content selection learned by different models. For each test data, 50 selection masks are randomly sampled from the model's learned distribution. Greedy decoding is run to generate the text for each mask. We measure the entropy of the selector, proportion of unique selection masks and generated text in the 50 samples. We further define the “effect" of the selector as the ratio of sampled unique text and mask. This indicates how often changing the selection mask will also lead to a change in the generated text. The results are averaged over all test data. Following BIBREF50 and BIBREF52 , we measure the quality of generated text with ROUGE-1, 2, L F-score for Gigaword and ROUGE-4, BLEU-4, NIST for Wikibio. As there is only one reference text for each source, we report an oracle upper bound of these scores by assuming an “oracle" that can choose the best text among all the candidates BIBREF54 , BIBREF21 . Namely, out of each 50 sampled text, we pick the one with the maximum metric score. The final metric score is evaluated on these “oracle" picked samples. The intuition is that if the content selector is properly trained, at least one out of the 50 samples should describe similar contents with the reference text, the metric score between it and the reference text should be high. Table TABREF25 lists the results. We can have the following observations:
+
+RS model completely fails to capture the content-level diversity. Its selector is largely deterministic, with a lowest entropy value among all models. In contrast, the selector from SS, VRS and Bo.Up. have reasonable diversity, with over INLINEFORM0 and INLINEFORM1 unique selection masks for Gigaword and Wikibio respectively.
+
+The selector from VRS has the strongest effect to the generator, especially on the Gigaword data where modifying the content selection changes the corresponding text in more than 95% of the cases. RS has the lowest effect value, which indicates that even with the selecting ratio constraint, its generator still ignores the selection mask to a large extent.
+
+The oracle metric score of VRS is much higher than the other two. This is beneficial when people want to apply the model to generate a few candidate text then hand-pick the suitable one. VRS has more potential than the other three to contain the expected text. SS performs worst. The gap between the soft approximation and the real distribution, as mentioned before, indeed results in a large drop of performance.
+
+In short, compared with others, the content selector of VRS is (1) diverse, (2) has stronger effect on the text generation and (3) with a larger potential of producing an expected text.
+
+Controllability: We have shown the content selector of VRS is diverse and has strong effect on the text generation. This section aims at examining whether such effect is desirable, i.e., whether the selector is able to properly control the contents described in the text. We measure it based on the self-bleu metric and a human evaluation.
+
+The self-bleu metric measures the controllability by evaluating the “intra-selection" similarity of generated text. Intuitively, by fixing the selection mask, multiple text sampled from the decoder are expected to describe the same contents and thereby should be highly similar to each other. The decoder should only model surface-level diversity without further modifying the selected contents. With this in mind, for each test data, we randomly sample a selection mask from the selector's distribution, then fix the mask and run the decoder to sample 10 different text. The self-BLEU-1 score BIBREF55 on the sampled text is reported, which is the average BLEU score between each text pair. A higher self-BLEU score indicates the sampled text are more similar with each other. The results are shown in Table TABREF31 . We can see generations from VRS have a clearly higher intra-selection similarity. SS performs even worse than RS, despite having a high effect score in Table TABREF25 . The selector from SS affects the generation in an undesirable way, which also explain why SS has a lowest oracle metric score though with a high score on content diversity and effect.
+
+We further run a human evaluation to measure the text-content consistency among different models. 100 source text are randomly sampled from the human-written DUC 2004 data for task 1&2 BIBREF56 . Bo.Up, SS, RS and VRS are applied to generate the target text by first sampling a selection mask, then run beam search decoding with beam size 10. We are interested in seeing (1) if multiple generations from the same selection mask are paraphrases to each other (intra-consistent) and (2) if generations from different selection masks do differ in the content they described (inter-diverse). The results in Table TABREF32 show that VRS significantly outperforms the other two in both intra-consistency and inter-diversity. RS has the lowest score on both because the selector has very weak effects on the generation as measured in the last section. Bo.Up and SS lay between them. Overall VRS is able to maintain the highest content-text consistency among them.
+
+Performance INLINEFORM0 Trade-off: To see if the selector affects performance, we also ask human annotators to judge the text fluency. The fluency score is computed as the average number of text being judged as fluent. We include generations from the standard Enc-Dec model. Table TABREF32 shows the best fluency is achieved for Enc-Dec. Imposing a content selector always affects the fluency a bit. The main reason is that when the controllability is strong, the change of selection will directly affect the text realization so that a tiny error of content selection might lead to unrealistic text. If the selector is not perfectly trained, the fluency will inevitably be influenced. When the controllability is weaker, like in RS, the fluency is more stable because it will not be affected much by the selection mask. For SS and Bo.Up, the drop of fluency is significant because of the gap of soft approximation and the independent training procedure. In general, VRS does properly decouple content selection from the enc-dec architecture, with only tiny degrade on the fluency.
+
+Table TABREF33 / TABREF34 further measure the metric scores on Gigaword/Wikibio by decoding text from the best selection mask based on the selector's distribution (set INLINEFORM0 if INLINEFORM1 and 0 otherwise). We include results from VRS model with INLINEFORM2 , which puts no constraint on the mutual information. We further report the score by generating the best selection mask from the learned posterior distribution INLINEFORM3 for VRS model. Two current SOTA results from BIBREF8 and BIBREF53 and the proportion of selected source words for each model are also included. We have the following observations:
+
+As the value of INLINEFORM0 decreases, the performance of VRS improves, but the selector loses more controllability because the model tends to over-select contents (over INLINEFORM1 source words selected). The text-content consistency will become low.
+
+Increasing INLINEFORM0 sacrifices a bit performance, but still comparable with SOTA. Especially on Wikibio where the performance drop is minor. The reason should be that Wikibio is relatively easier to predict the selection but Gigaword has more uncertainty.
+
+Increasing INLINEFORM0 improves the accuracy of the posterior selection. This would be useful when we want to perform posterior inference for some source-target pair.
+
+Setting INLINEFORM0 can actually outperform SOTA seq2seq which keeps all tokens, suggesting it is still beneficial to use the VRS model even if we do not care about the controllability.
+
+Figure FIGREF39 visualizes how changing the value of INLINEFORM0 affects the negative log likelihood (NLL), entropy of the selector and self-bleu score, which roughly correlates with performance, diversity and controllability. NLL is evaluated based on the lower bound in Eq EQREF15 BIBREF57 . We can see as INLINEFORM1 increases, the performance decreases gradually but the content selection gains more diversity and controllability. In practice we can tune the INLINEFORM2 value to achieve a trade-off.
+
+Generation Example: Figure FIGREF40 shows some examples from Gigaword. As can be seen, decodings from the VRS model are largely consistent with each other, in most cases only replacing one or two words with corresponding synonyms. Samples are able to faithfully convey all selected contents. In contrast, generations from SS. Bo.Up. and RS are unpreditable, differing in both selected contents and also the way of saying. SS and Bo.Up also suffer more from the text disfluency. The generations from them are largely uncertain.
+
+## Conclusion
+
+In this paper, we tackle the unaddressed problem of controllable content selection in text generation. We propose a general framework based on variational inference that can be potentiall applied to arbitrary tasks. On both the headline generation and data-to-text tasks, our model outperforms state-of-the-art models regarding the diversity and controllability of content selection. We further introduce an effective way to achieve a performance/controllability trade-off, which can be easily tuned to meet specific requirement.
+
+## Acknowledgments
+
+We thank anonymous reviewers for valuable comments, thank Aditya Mogadala, Shun Kiyono, Thomas Mclachlan and other members of the LIAT team at RIKEN AIP for useful discussions. Xiaoyu Shen is supported by IMPRS-CS fellowship. The work of J. Suzuki was partly supported by JSPS KAKENHI Grant Number JP19104418 and AIRPF Grant Number 30AI036-8. This work is also partially funded by DFG collaborative research center SFB 1102.
+
+## Performance/Controllability trade-off
+
+The trade-off between performance and interpretability has been a long-standing problem in feature selection BIBREF60 , BIBREF59 . The trade-off exists because it is usually very difficult to accurately find the exact features needed to make the prediction. Safely keeping more features will almost always lead to better performance. Some models do succeed in achieving superior performance by selecting only a subset of the input. However, they mostly still target at the recall of the selection BIBREF39 , BIBREF9 , BIBREF35 , i.e., to select all possible content that might help predict the target. The final selected contents reduce some most useful information from the source, but they still contain many redundant contents (same like our VRS-( INLINEFORM0 ) as in Table TABREF34 and TABREF33 ). This makes them unsuitable for controllable content selection. In text generation, a recent work from BIBREF41 shows they could control the contents by integrating a symbolic selector into the neural network. However, their selector is tailored by some rules only for the RDF triples. Moreover, even based on their fine-tuned selector, the fluency they observe is still slightly worse than a standard seq2seq.
+
+We assume the content selector is the major bottle if we want a model that can achieve controllability without sacrificing the performance. We can clearly observe in Table TABREF34 that the performance drop in Wikibio is marginal compared with Gigaword. The reason should be that the selection on Wikibio is much easier than Gigaword. The biography of a person almost always follow some simple patterns, like name, birthday and profession, but for news headlines, it can contain information with various focuses. In our two tasks, due to the independence assumption we made on INLINEFORM0 and the model capacity limit, the content selector cannot fully fit the true selecting distribution, so the trade-off is necessary. Improving the selector with SOTA sequence labelling models like Bert BIBREF17 would be worth trying.
+
+There are also other ways to improve. For example, we could learn a ranker to help us choose the best contents BIBREF63 . Or we could manually define some matching rules to help rank the selection BIBREF58 . In Table TABREF25 , we show the VRS model achieves very high metric scores based on an oracle ranker, so learning a ranker should be able to improve the performance straightforwardly.
+
+## Example from Wikibio
+
+To see how we can manually control the content selection, Figure FIGREF42 shows an example from Wikibio, the model is mostly able to form a proper sentence covering all selected information. If the selector assigns very high probability to select some content and we force to remove it, the resulting text could be unnatual (as in summary 4 in Figure FIGREF42 because the model has seen very few text without containing the birthday information in the training corpus). However, thanks to the diversity of the content selector as shown in the previous section, it is able to handle most combinatorial patterns of content selection.
+
+## Posterior inference
+
+Figure FIGREF41 further provides an example of how we can perform posterior inference given a provided text. Our model is able to infer which source contents are covered in the given summary. With the inferred selection, we can sample multiple paraphrases describing the same contents. As seen in Table TABREF34 and TABREF33 , the metric scores are remarkably high when decoding from the posterior inferred selections (last three rows), suggesting the posterior distribution is well trained. The posterior inference part could be beneficial for other tasks like content transfer among text BIBREF38 , BIBREF62 . The described source contents can be first predicted with the posterior inference, then transferred to a new text.

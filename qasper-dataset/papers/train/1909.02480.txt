@@ -1,0 +1,227 @@
+# FlowSeq: Non-Autoregressive Conditional Sequence Generation with Generative Flow
+
+**Paper ID:** 1909.02480
+
+## Abstract
+
+Most sequence-to-sequence (seq2seq) models are autoregressive; they generate each token by conditioning on previously generated tokens. In contrast, non-autoregressive seq2seq models generate all tokens in one pass, which leads to increased efficiency through parallel processing on hardware such as GPUs. However, directly modeling the joint distribution of all tokens simultaneously is challenging, and even with increasingly complex model structures accuracy lags significantly behind autoregressive models. In this paper, we propose a simple, efficient, and effective model for non-autoregressive sequence generation using latent variable models. Specifically, we turn to generative flow, an elegant technique to model complex distributions using neural networks, and design several layers of flow tailored for modeling the conditional density of sequential latent variables. We evaluate this model on three neural machine translation (NMT) benchmark datasets, achieving comparable performance with state-of-the-art non-autoregressive NMT models and almost constant decoding time w.r.t the sequence length.
+
+## Introduction
+
+Neural sequence-to-sequence (seq2seq) models BIBREF0, BIBREF1, BIBREF2, BIBREF3 generate an output sequence $\mathbf {y} = \lbrace y_1, \ldots , y_T\rbrace $ given an input sequence $\mathbf {x} = \lbrace x_1, \ldots , x_{T^{\prime }}\rbrace $ using conditional probabilities $P_\theta (\mathbf {y}|\mathbf {x})$ predicted by neural networks (parameterized by $\theta $).
+
+Most seq2seq models are autoregressive, meaning that they factorize the joint probability of the output sequence given the input sequence $P_\theta (\mathbf {y}|\mathbf {x})$ into the product of probabilities over the next token in the sequence given the input sequence and previously generated tokens:
+
+Each factor, $P_\theta (y_{t} | y_{<t}, \mathbf {x})$, can be implemented by function approximators such as RNNs BIBREF0 and Transformers BIBREF3. This factorization takes the complicated problem of joint estimation over an exponentially large output space of outputs $\mathbf {y}$, and turns it into a sequence of tractable multi-class classification problems predicting $y_t$ given the previous words, allowing for simple maximum log-likelihood training. However, this assumption of left-to-right factorization may be sub-optimal from a modeling perspective BIBREF4, BIBREF5, and generation of outputs must be done through a linear left-to-right pass through the output tokens using beam search, which is not easily parallelizable on hardware such as GPUs.
+
+Recently, there has been work on non-autoregressive sequence generation for neural machine translation (NMT; BIBREF6, BIBREF7, BIBREF8) and language modeling BIBREF9. Non-autoregressive models attempt to model the joint distribution $P_\theta (\mathbf {y}|\mathbf {x})$ directly, decoupling the dependencies of decoding history during generation. A naïve solution is to assume that each token of the target sequence is independent given the input:
+
+Unfortunately, the performance of this simple model falls far behind autoregressive models, as seq2seq tasks usually do have strong conditional dependencies between output variables BIBREF6. This problem can be mitigated by introducing a latent variable $\mathbf {z}$ to model these conditional dependencies:
+
+where $p_{\theta }(\mathbf {z}|\mathbf {x})$ is the prior distribution over latent $\mathbf {z}$ and $P_{\theta }(\mathbf {y}|\mathbf {z}, \mathbf {x})$ is the “generative” distribution (a.k.a decoder). Non-autoregressive generation can be achieved by the following independence assumption in the decoding process:
+
+BIBREF6 proposed a $\mathbf {z}$ representing fertility scores specifying the number of output words each input word generates, significantly improving the performance over Eq. (DISPLAY_FORM4). But the performance still falls behind state-of-the-art autoregressive models due to the limited expressiveness of fertility to model the interdependence between words in $\textbf {y}$.
+
+In this paper, we propose a simple, effective, and efficient model, FlowSeq, which models expressive prior distribution $p_{\theta }(\mathbf {z}|\mathbf {x})$ using a powerful mathematical framework called generative flow BIBREF10. This framework can elegantly model complex distributions, and has obtained remarkable success in modeling continuous data such as images and speech through efficient density estimation and sampling BIBREF11, BIBREF12, BIBREF13. Based on this, we posit that generative flow also has potential to introduce more meaningful latent variables $\mathbf {z}$ in the non-autoregressive generation in Eq. (DISPLAY_FORM5).
+
+FlowSeq is a flow-based sequence-to-sequence model, which is (to our knowledge) the first non-autoregressive seq2seq model utilizing generative flows. It allows for efficient parallel decoding while modeling the joint distribution of the output sequence. Experimentally, on three benchmark datasets for machine translation – WMT2014, WMT2016 and IWSLT-2014, FlowSeq achieves comparable performance with state-of-the-art non-autoregressive models, and almost constant decoding time w.r.t. the sequence length compared to a typical left-to-right Transformer model, which is super-linear.
+
+## Background
+
+As noted above, incorporating expressive latent variables $\mathbf {z}$ is essential to decouple the dependencies between tokens in the target sequence in non-autoregressive models. However, in order to model all of the complexities of sequence generation to the point that we can read off all of the words in the output in an independent fashion (as in Eq. (DISPLAY_FORM6)), the prior distribution $p_{\theta }(\mathbf {z}|\mathbf {x})$ will necessarily be quite complex. In this section, we describe generative flows BIBREF10, an effective method for arbitrary modeling of complicated distributions, before describing how we apply them to sequence-to-sequence generation in §SECREF3.
+
+## Background ::: Flow-based Generative Models
+
+Put simply, flow-based generative models work by transforming a simple distribution (e.g. a simple Gaussian) into a complex one (e.g. the complex prior distribution over $\mathbf {z}$ that we want to model) through a chain of invertible transformations.
+
+Formally, a set of latent variables $\mathbf {\upsilon } \in \Upsilon $ are introduced with a simple prior distribution $p_{\Upsilon }(\upsilon )$. We then define a bijection function $f: \mathcal {Z} \rightarrow \Upsilon $ (with $g = f^{-1}$), whereby we can define a generative process over variables $\mathbf {z}$:
+
+An important insight behind flow-based models is that given this bijection function, the change of variable formula defines the model distribution on $\mathbf {z}\in \mathcal {Z}$ by:
+
+Here $\frac{\partial f_{\theta }(\mathbf {z})}{\partial \mathbf {z}}$ is the Jacobian matrix of $f_{\theta }$ at $\mathbf {z}$.
+
+Eq. (DISPLAY_FORM9) provides a way to calculate the (complex) density of $\mathbf {z}$ by calculating the (simple) density of $\upsilon $ and the Jacobian of the transformation from $\mathbf {z}$ to $\upsilon $. For efficiency purposes, flow-based models generally use certain types of transformations $f_{\theta }$ where both the inverse functions $g_{\theta }$ and the Jacobian determinants are tractable to compute. A stacked sequence of such invertible transformations is also called a (normalizing) flow BIBREF10:
+
+where $f = f_1 \circ f_2 \circ \cdots \circ f_K$ is a flow of $K$ transformations (omitting $\theta $s for brevity).
+
+## Background ::: Variational Inference and Training
+
+In the context of maximal likelihood estimation (MLE), we wish to minimize the negative log-likelihood of the parameters:
+
+where $D=\lbrace (\mathbf {x}^i, \mathbf {y}^i)\rbrace _{i=1}^{N}$ is the set of training data. However, the likelihood $P_{\theta }(\mathbf {y}| \mathbf {x})$ after marginalizing out latent variables $\mathbf {z}$ (LHS in Eq. (DISPLAY_FORM5)) is intractable to compute or differentiate directly. Variational inference BIBREF14 provides a solution by introducing a parametric inference model $q_{\phi }(\mathbf {z}|\mathbf {y}, \mathbf {x})$ (a.k.a posterior) which is then used to approximate this integral by sampling individual examples of $\mathbf {z}$. These models then optimize the evidence lower bound (ELBO), which considers both the “reconstruction error” $\log P_\theta (\mathbf {y}|\mathbf {z},\mathbf {x})$ and KL-divergence between the posterior and the prior:
+
+Both inference model $\phi $ and decoder $\theta $ parameters are optimized according to this objective.
+
+## FlowSeq
+
+We first overview FlowSeq's architecture (shown in Figure FIGREF13) and training process here before detailing each component in following sections. Similarly to classic seq2seq models, at both training and test time FlowSeq first reads the whole input sequence $\mathbf {x}$ and calculates a vector for each word in the sequence, the source encoding.
+
+At training time, FlowSeq's parameters are learned using a variational training paradigm overviewed in §SECREF10. First, we draw samples of latent codes $\mathbf {z}$ from the current posterior $q_{\phi } (\mathbf {z}|\mathbf {y}, \mathbf {x})$. Next, we feed $\mathbf {z}$ together with source encodings into the decoder network and the prior flow to compute the probabilities of $P_{\theta }(\mathbf {y}|\mathbf {z}, \mathbf {x})$ and $p_{\theta }(\mathbf {z}|\mathbf {x})$ for optimizing the ELBO (Eq. (DISPLAY_FORM12)).
+
+At test time, generation is performed by first sampling a latent code $\mathbf {z}$ from the prior flow by executing the generative process defined in Eq. (DISPLAY_FORM8). In this step, the source encodings produced from the encoder are used as conditional inputs. Then the decoder receives both the sampled latent code $\mathbf {z}$ and the source encoder outputs to generate the target sequence $\mathbf {y}$ from $P_{\theta }(\mathbf {y}|\mathbf {z}, \mathbf {x})$.
+
+## FlowSeq ::: Source Encoder
+
+The source encoder encodes the source sequences into hidden representations, which are used in computing attention when generating latent variables in the posterior network and prior network as well as the cross-attention with decoder. Any standard neural sequence model can be used as its encoder, including RNNs BIBREF0 or Transformers BIBREF3.
+
+## FlowSeq ::: Posterior ::: Generation of Latent Variables.
+
+The latent variables $\mathbf {z}$ are represented as a sequence of continuous random vectors $\mathbf {z}=\lbrace \mathbf {z}_1, \ldots , \mathbf {z}_T\rbrace $ with the same length as the target sequence $\mathbf {y}$. Each $\mathbf {z}_t$ is a $d_{\mathrm {z}}$-dimensional vector, where $d_{\mathrm {z}}$ is the dimension of the latent space. The posterior distribution $q_{\phi } (\mathbf {z}|\mathbf {y}, \mathbf {x})$ models each $\mathbf {z}_t$ as a diagonal Gaussian with learned mean and variance:
+
+where $\mu _{t}(\cdot )$ and $\sigma _{t}(\cdot )$ are neural networks such as RNNs or Transformers.
+
+## FlowSeq ::: Posterior ::: Zero initialization.
+
+While we perform standard random initialization for most layers of the network, we initialize the last linear transforms that generate the $\mu $ and $\log \sigma ^2$ values with zeros. This ensures that the posterior distribution as a simple normal distribution, which we found helps train very deep generative flows more stably.
+
+## FlowSeq ::: Posterior ::: Token Dropout.
+
+The motivation of introducing the latent variable $\mathbf {z}$ into the model is to model the uncertainty in the generative process. Thus, it is preferable that $\mathbf {z}$ capture contextual interdependence between tokens in $\mathbf {y}$. However, there is an obvious local optimum where the posterior network generates a latent vector $\mathbf {z}_t$ that only encodes the information about the corresponding target token $y_t$, and the decoder simply generates the “correct” token at each step $t$ with $\mathbf {z}_t$ as input. In this case, FlowSeq reduces to the baseline model in Eq. (DISPLAY_FORM4). To escape this undesired local optimum, we apply token-level dropout to randomly drop an entire token when calculating the posterior, to ensure the model also has to learn how to use contextual information. This technique is similar to the “masked language model” in previous studies BIBREF15, BIBREF16, BIBREF17.
+
+## FlowSeq ::: Decoder
+
+As the decoder, we take the latent sequence $\mathbf {z}$ as input, run it through several layers of a neural sequence model such as a Transformer, then directly predict the output tokens in $\mathbf {y}$ individually and independently. Notably, unlike standard seq2seq decoders, we do not perform causal masking to prevent attending to future tokens, making the model fully non-autoregressive.
+
+## FlowSeq ::: Flow Architecture for Prior
+
+The flow architecture is based on Glow BIBREF11. It consists of a series of steps of flow, combined in a multi-scale architecture (see Figure FIGREF13.) Each step of flow consists three types of elementary flows – actnorm, invertible multi-head linear, and coupling. Note that all three functions are invertible and conducive to calculation of log determinants (details in Appendix SECREF6).
+
+## FlowSeq ::: Flow Architecture for Prior ::: Actnorm.
+
+The activation normalization layer (actnorm; BIBREF11) is an alternative for batch normalization BIBREF18, that has mainly been used in the context of image data to alleviate problems in model training. Actnorm performs an affine transformation of the activations using a scale and bias parameter per feature for sequences:
+
+Both $\mathbf {z}$ and $\mathbf {z}^{\prime }$ are tensors of shape $[T\times d_{\mathrm {z}}]$ with time dimension $t$ and feature dimension $d_{\mathrm {z}}$. The parameters are initialized such that over each feature $\mathbf {z}_{t}^{\prime }$ has zero mean and unit variance given an initial mini-batch of data.
+
+## FlowSeq ::: Flow Architecture for Prior ::: Invertible Multi-head Linear Layers.
+
+To incorporate general permutations of variables along the feature dimension to ensure that each dimension can affect every other ones after a sufficient number of steps of flow, BIBREF11 proposed a trainable invertible $1\times 1$ convolution layer for 2D images. It is straightforward to apply similar transformations to sequential data:
+
+where $\mathbf {W}$ is the weight matrix of shape $[d_{\mathrm {z}} \times d_{\mathrm {z}}]$. The log-determinant of this transformation is:
+
+The cost of computing $\mathrm {det}(\mathbf {W})$ is $O(d_{\mathrm {z}}^3)$.
+
+Unfortunately, $d_{\mathrm {z}}$ in Seq2Seq generation is commonly large, e.g. 512, significantly slowing down the model for computing $\mathrm {det}(\mathbf {W})$. To apply this to sequence generation, we propose a multi-head invertible linear layer, which first splits each $d_{\mathrm {z}}$-dimensional feature vector into $h$ heads with dimension $d_h = d_{\mathrm {z}}/h$. Then the linear transformation in (DISPLAY_FORM26) is applied to each head, with $d_h\times d_h$ weight matrix $\mathbf {W}$, significantly reducing the dimension. For splitting of heads, one step of flow contains one linear layer with either row-major or column-major splitting format, and these steps with different linear layers are composed in an alternating pattern.
+
+## FlowSeq ::: Flow Architecture for Prior ::: Affine Coupling Layers.
+
+To model interdependence across time steps, we use affine coupling layers BIBREF19:
+
+where $\mathrm {s}(\mathbf {z}_a, \mathbf {x})$ and $\mathrm {b}(\mathbf {z}_a, \mathbf {x})$ are outputs of two neural networks with $\mathbf {z}_a$ and $\mathbf {x}$ as input. These are shown in Figure FIGREF21 (c). In experiments, we implement $\mathrm {s}(\cdot )$ and $\mathrm {b}(\cdot )$ with one Transformer decoder layer BIBREF3: multi-head self-attention over $\mathbf {z}_a$, followed by multi-head inter-attention over $\mathbf {x}$, followed by a position-wise feed-forward network. The input $\mathbf {z}_a$ is fed into this layer in one pass, without causal masking.
+
+As in BIBREF19, the $\mathrm {split}()$ function splits $\mathbf {z}$ the input tensor into two halves, while the $\mathrm {concat}$ operation performs the corresponding reverse concatenation operation. In our architecture, three types of split functions are used, based on the split dimension and pattern. Figure FIGREF21 (b) illustrates the three splitting types. The first type of split groups $\mathbf {z}$ along the time dimension on alternate indices. In this case, FlowSeq mainly models the interactions between time-steps. The second and third types of splits perform on the feature dimension, with continuous and alternate patterns, respectively. For each type of split, we alternate $\mathbf {z}_a$ and $\mathbf {z}_b$ to increase the flexibility of the split function. Different types of affine coupling layers alternate in the flow, similar to the linear layers.
+
+## FlowSeq ::: Flow Architecture for Prior ::: Multi-scale Architecture.
+
+We follow BIBREF19 in implementing a multi-scale architecture using the squeezing operation on the feature dimension, which has been demonstrated helpful for training deep flows. Formally, each scale is a combination of several steps of the flow (see Figure FIGREF21 (a)). After each scale, the model drops half of the dimensions with the third type of split in Figure FIGREF21 (b) to reduce computational and memory cost, outputting the tensor with shape $[T \times \frac{d}{2}]$. Then the squeezing operation transforms the $T \times \frac{d}{2}$ tensor into an $\frac{T}{2} \times d$ one as the input of the next scale. We pad each sentence with EOS tokens to ensure $T$ is divisible by 2. The right component of Figure FIGREF13 illustrates the multi-scale architecture.
+
+## FlowSeq ::: Predicting Target Sequence Length
+
+In autoregressive seq2seq models, it is natural to determine the length of the sequence dynamically by simply predicting a special EOS token. However, for FlowSeq to predict the entire sequence in parallel, it needs to know its length in advance to generate the latent sequence $\mathbf {z}$. Instead of predicting the absolute length of the target sequence, we predict the length difference between source and target sequences using a classifier with a range of $[-20, 20]$. Numbers in this range are predicted by max-pooling the source encodings into a single vector, running this through a linear layer, and taking a softmax. This classifier is learned jointly with the rest of the model.
+
+## FlowSeq ::: Decoding Process
+
+At inference time, the model needs to identify the sequence with the highest conditional probability by marginalizing over all possible latent variables (see Eq. (DISPLAY_FORM5)), which is intractable in practice. We propose three approximating decoding algorithms to reduce the search space.
+
+## FlowSeq ::: Decoding Process ::: Argmax Decoding.
+
+Following BIBREF6, one simple and effective method is to select the best sequence by choosing the highest-probability latent sequence $\mathbf {z}$:
+
+where identifying $\mathbf {y}^*$ only requires independently maximizing the local probability for each output position (see Eq. DISPLAY_FORM6).
+
+## FlowSeq ::: Decoding Process ::: Noisy Parallel Decoding (NPD).
+
+A more accurate approximation of decoding, proposed in BIBREF6, is to draw samples from the latent space and compute the best output for each latent sequence. Then, a pre-trained autoregressive model is adopted to rank these sequences. In FlowSeq, different candidates can be generated by sampling different target lengths or different samples from the prior, and both of the strategies can be batched via masks during decoding. In our experiments, we first select the top $l$ length candidates from the length predictor in §SECREF29. Then, for each length candidate we use $r$ random samples from the prior network to generate output sequences, yielding a total of $l\times r$ candidates.
+
+## FlowSeq ::: Decoding Process ::: Importance Weighted Decoding (IWD)
+
+The third approximating method is based on the lower bound of importance weighted estimation BIBREF20. Similarly to NPD, IWD first draws samples from the latent space and computes the best output for each latent sequence. Then, IWD ranks these candidate sequences with $K$ importance samples:
+
+IWD does not rely on a separate pre-trained model, though it significantly slows down the decoding speed. The detailed comparison of these three decoding methods is provided in §SECREF45.
+
+## FlowSeq ::: Discussion
+
+Different from the architecture proposed in BIBREF9, the architecture of FlowSeq is not using any autoregressive flow BIBREF21, BIBREF22, yielding a truly non-autoregressive model with efficient generation. Note that the FlowSeq remains non-autoregressive even if we use an RNN in the architecture because RNN is only used to encode a complete sequence of codes and all the input tokens can be fed into the RNN in parallel. This makes it possible to use highly-optimized implementations of RNNs such as those provided by cuDNN. Thus while RNNs do experience some drop in speed, it is less extreme than that experienced when using autoregressive models.
+
+## Experiments ::: Experimental Setups ::: Translation Datasets
+
+We evaluate FlowSeq on three machine translation benchmark datasets: WMT2014 DE-EN (around 4.5M sentence pairs), WMT2016 RO-EN (around 610K sentence pairs) and a smaller dataset IWSLT2014 DE-EN (around 150K sentence pairs). We use scripts from fairseq BIBREF23 to preprocess WMT2014 and IWSLT2014, where the preprocessing steps follow BIBREF3 for WMT2014. We use the data provided in BIBREF7 for WMT2016. For both WMT datasets, the source and target languages share the same set of BPE embeddings while for IWSLT2014 we use separate embeddings. During training, we filter out sentences longer than 80 for WMT dataset and 60 for IWSLT, respectively.
+
+## Experiments ::: Experimental Setups ::: Modules and Hyperparameters
+
+We implement the encoder, decoder and posterior networks with standard (unmasked) Transformer layers BIBREF3. For WMT datasets, the encoder consists of 6 layers, and the decoder and posterior are composed of 4 layers, and 8 attention heads. and for IWSLT, the encoder has 5 layers, and decoder and posterior have 3 layers, and 4 attention heads. The prior flow consists of 3 scales with the number of steps $[48, 48, 16]$ from bottom to top. To dissect the impact of model dimension on translation quality and speed, we perform experiments on two versions of FlowSeq with $d_{model}/d_{hidden} = 256/512$ (base) and $d_{model}/d_{hidden} = 512/1024$ (large). More model details are provided in Appendix SECREF7.
+
+## Experiments ::: Experimental Setups ::: Optimization
+
+Parameter optimization is performed with the Adam optimizer BIBREF24 with $\beta =(0.9, 0.999)$ and $\epsilon =1e-6$. Each mini-batch consist of 2048 sentences. The learning rate is initialized to $5e-4$, and exponentially decays with rate $0.999995$. The gradient clipping cutoff is $1.0$. For all the FlowSeq models, we apply $0.1$ label smoothing and averaged the 5 best checkpoints to create the final model.
+
+At the beginning of training, the posterior network is randomly initialized, producing noisy supervision to the prior. To mitigate this issue, we first set the weight of the $\mathrm {KL}$ term in ELBO to zero for 30,000 updates to train the encoder, decoder and posterior networks. Then the $\mathrm {KL}$ weight linearly increases to one for another 10,000 updates, which we found essential to accelerate training and achieve stable performance.
+
+## Experiments ::: Experimental Setups ::: Knowledge Distillation
+
+Previous work on non-autoregressive generation BIBREF6, BIBREF8 has used translations produced by a pre-trained autoregressive NMT model as the training data, noting that this can significantly improve the performance. We analyze the impact of distillation in § SECREF45.
+
+## Experiments ::: Main Results
+
+We first conduct experiments to compare the performance of FlowSeq with strong baseline models, including NAT w/ Fertility BIBREF6, NAT-IR BIBREF7, NAT-REG BIBREF25, LV NAR BIBREF26, CTC Loss BIBREF27, and CMLM BIBREF8.
+
+Table TABREF39 provides the BLEU scores of FlowSeq with argmax decoding, together with baselines with purely non-autoregressive decoding methods that generate output sequence in one parallel pass. The first block lists results of models trained on raw data, while the second block are results using knowledge distillation. Without using knowledge distillation, FlowSeq base model achieves significant improvement (more than 9 BLEU points) over CMLM-base and LV NAR. It demonstrates the effectiveness of FlowSeq on modeling the complex interdependence in target languages.
+
+Towards the effect of knowledge distillation, we can mainly obtain two observations: i) Similar to the findings in previous work, knowledge distillation still benefits the translation quality of FlowSeq. ii) Compared to previous models, the benefit of knowledge distillation on FlowSeq is less significant, yielding less than 3 BLEU improvement on WMT2014 DE-EN corpus, and even no improvement on WMT2016 RO-EN corpus. The reason might be that FlowSeq does not rely much on knowledge distillation to alleviate the multi-modality problem.
+
+Table TABREF40 illustrates the BLEU scores of FlowSeq and baselines with advanced decoding methods such as iterative refinement, IWD and NPD rescoring. The first block in Table TABREF40 includes the baseline results from autoregressive Transformer. For the sampling procedure in IWD and NPD, we sampled from a reduced-temperature model BIBREF11 to obtain high-quality samples. We vary the temperature within $\lbrace 0.1, 0.2, 0.3, 0.4, 0.5, 1.0\rbrace $ and select the best temperature based on the performance on development sets. The analysis of the impact of sampling temperature and other hyper-parameters on samples is in § SECREF50. For FlowSeq, NPD obtains better results than IWD, showing that FlowSeq still falls behind auto-regressive Transformer on model data distributions. Comparing with CMLM BIBREF8 with 10 iterations of refinement, which is a contemporaneous work that achieves state-of-the-art translation performance, FlowSeq obtains competitive performance on both WMT2014 and WMT2016 corpora, with only slight degradation in translation quality. Leveraging iterative refinement to further improve the performance of FlowSeq has been left to future work.
+
+## Experiments ::: Analysis on Decoding Speed
+
+In this section, we compare the decoding speed (measured in average time in seconds required to decode one sentence) of FlowSeq at test time with that of the autoregressive Transformer model. We use the test set of WMT14 EN-DE for evaluation and all experiments are conducted on a single NVIDIA TITAN X GPU.
+
+## Experiments ::: Analysis on Decoding Speed ::: How does batch size affect the decoding speed?
+
+First, we investigate how different decoding batch size can affect the decoding speed. We vary the decoding batch size within $\lbrace 1, 4, 8, 32, 64, 128\rbrace $. Figure. FIGREF44 shows that for both FlowSeq and Transformer decoding is faster when using a larger batch size. However, FlowSeq has much larger gains in the decoding speed w.r.t. the increase in batch size, gaining a speed up of 594% of base model and 403% of large model when using a batch size of 128. We hypothesize that this is because the operations in FlowSeq are more friendly to batching while the Transformer model with beam search at test time is less efficient in benefiting from batching.
+
+## Experiments ::: Analysis on Decoding Speed ::: How does sentence length affect the decoding speed?
+
+Next, we examine if sentence length is a major factor affecting the decoding speed. We bucket the test data by the target sentence length. From Fig. FIGREF44, we can see that as the sentence length increases, FlowSeq achieves almost constant decoding time while Transformer has a linearly increasing decoding time. The relative decoding speed up of FlowSeq versus Transformer linearly increases as the sequence length increases. The potential of decoding long sequences with constant time is an attractive property of FlowSeq.
+
+## Experiments ::: Analysis of Rescoring Candidates
+
+In Fig. FIGREF49, we analyze how different sampling hyperparameters affect the performance of rescoring. First, we observe that the number of samples $r$ for each length is the most important factor. The performance is always improved with a larger sample size. Second, a larger number of length candidates does not necessarily increase the rescoring performance. Third, we find that a larger sampling temperature (0.3 - 0.5) can increase the diversity of translations and leads to better rescoring BLEU. However, the latent samples become noisy when a large temperature (1.0) is used.
+
+## Experiments ::: Analysis of Translation Diversity
+
+Following BIBREF28, we analyze the output diversity of FlowSeq. BIBREF28 proposed pairwise-BLEU and BLEU computed in a leave-one-out manner to calibrate the diversity and quality of translation hypotheses. A lower pairwise-BLEU score implies a more diverse hypothesis set. And a higher BLEU score implies a better translation quality. We experiment on a subset of test set of WMT14-ENDE with ten references each sentence BIBREF29. In Fig. FIGREF52, we compare FlowSeq with other multi-hypothesis generation methods (ten hypotheses each sentence) to analyze how well the generation outputs of FlowSeq are in terms of diversity and quality. The right corner area of the figure indicates the ideal generations: high diversity and high quality. While FlowSeq still lags behind the autoregressive generations, by increasing the sampling temperature it provides a way of generating more diverse outputs while keeping the translation quality almost unchanged. More analysis of translation outputs and detailed results are provided in the Appendix SECREF9 and SECREF10.
+
+## Conclusion
+
+We propose FlowSeq, an efficient and effective model for non-autoregressive sequence generation by using generative flows. One potential direction for future work is to leverage iterative refinement techniques such as masked language models to further improve translation quality. Another exciting direction is to, theoretically and empirically, investigate the latent space in FlowSeq, hence providing deep insights of the model, even enhancing controllable text generation.
+
+## Acknowledgments
+
+This work was supported in part by DARPA grant FA8750-18-2-0018 funded under the AIDA program and grant HR0011-15-C-0114 funded under the LORELEI program. Any opinions, findings, and conclusions expressed in this material are those of the authors and do not necessarily reflect the views of DARPA. The authors thank Amazon for their gift of AWS cloud credits and anonymous reviewers for their helpful suggestions.
+
+Appendix: FlowSeq
+
+## Flow Layers ::: ActNorm
+
+Log-determinant:
+
+## Flow Layers ::: Invertible Linear
+
+Log-determinant:
+
+where $h$ is the number of heads.
+
+## Flow Layers ::: Affine Coupling
+
+Log-determinant:
+
+## Analysis of training dynamics
+
+In Fig. FIGREF57, we plot the train and dev loss together with dev BLEU scores for the first 50 epochs. We can see that the reconstruction loss is increasing at the initial stage of training, then start to decrease when training with full KL loss. In addition, we observed that FlowSeq does not suffer the KL collapse problem BIBREF30, BIBREF31. This is because the decoder of FlowSeq is non-autogressive, with latent variable $\mathbf {z}$ as the only input.
+
+## Analysis of Translation Results
+
+In Tab. TABREF58, we present randomly picked translation outputs from the test set of WMT14-DEEN. For each German input sentence, we pick three hypotheses from 30 samples. We have the following observations: First, in most cases, it can accurately express the meaning of the source sentence, sometimes in a different way from the reference sentence, which cannot be precisely reflected by the BLEU score. Second, by controlling the sampling hyper-parameters such as the length candidates $l$, the sampling temperature $\tau $ and the number of samples $r$ under each length, FlowSeq is able to generate diverse translations expressing the same meaning. Third, repetition and broken translations also exist in some cases due to the lack of language model dependencies in the decoder.
+
+## Results of Translation Diversity
+
+Table TABREF59 shows the detailed results of translation deversity.

@@ -1,0 +1,166 @@
+# Exploration on Generating Traditional Chinese Medicine Prescriptions from Symptoms with an End-to-End Approach
+
+**Paper ID:** 1801.09030
+
+## Abstract
+
+Traditional Chinese Medicine (TCM) is an influential form of medical treatment in China and surrounding areas. In this paper, we propose a TCM prescription generation task that aims to automatically generate a herbal medicine prescription based on textual symptom descriptions. Sequence-tosequence (seq2seq) model has been successful in dealing with sequence generation tasks. We explore a potential end-to-end solution to the TCM prescription generation task using seq2seq models. However, experiments show that directly applying seq2seq model leads to unfruitful results due to the repetition problem. To solve the problem, we propose a novel decoder with coverage mechanism and a novel soft loss function. The experimental results demonstrate the effectiveness of the proposed approach. Judged by professors who excel in TCM, the generated prescriptions are rated 7.3 out of 10. It shows that the model can indeed help with the prescribing procedure in real life.
+
+## Introduction
+
+Traditional Chinese Medicine (TCM) is one of the most important forms of medical treatment in China and the surrounding areas. TCM has accumulated large quantities of documentation and therapy records in the long history of development. Prescriptions consisting of herbal medication are the most important form of TCM treatment. TCM practitioners prescribe according to a patient's symptoms that are observed and analyzed by the practitioners themselves instead of using medical equipment, e.g., the CT. The patient takes the decoction made out of the herbal medication in the prescription. A complete prescription includes the composition of herbs, the proportion of herbs, the preparation method and the doses of the decoction. In this work, we focus on the composition part of the prescription, which is the most essential part of the prescription.
+
+During the long history of TCM, there has been a number of therapy records or treatment guidelines in the TCM classics composed by outstanding TCM researchers and practitioners. In real life, TCM practitioners often take these classical records for reference when prescribing for the patient, which inspires us to design a model that can automatically generate prescriptions by learning from these classics. It also needs to be noted that due to the issues in actual practice, the objective of this work is to generate candidate prescriptions to facilitate the prescribing procedure instead of substituting the human practitioners completely. An example of TCM prescription is shown in Table 1 . The herbs in the prescription are organized in a weak order. By “weak order”, we mean that the effect of the herbs are not influenced by the order. However, the order of the herbs reflects the way of thinking when constructing the prescription. Therefore, the herbs are connected to each other, and the most important ones are usually listed first.
+
+Due to the lack of digitalization and formalization, TCM has not attracted sufficient attention in the artificial intelligence community. To facilitate the studies on automatic TCM prescription generation, we collect and clean a large number of prescriptions as well as their corresponding symptom descriptions from the Internet.
+
+Inspired by the great success of natural language generation tasks like neural machine translation (NMT) BIBREF0 , BIBREF1 , BIBREF2 , abstractive summarization BIBREF3 , generative question answering BIBREF4 , and neural dialogue response generation BIBREF5 , BIBREF6 , we propose to adopt the end-to-end paradigm, mainly the sequence to sequence model, to tackle the task of generating TCM prescriptions based on textual symptom descriptions.
+
+The sequence to sequence model (seq2seq) consists of an encoder that encodes the input sequence and a decoder that generates the output sequence. The success in the language generation tasks indicates that the seq2seq model can learn the semantic relation between the output sequence and the input sequence quite well. It is also a desirable characteristic for generating prescriptions according to the textual symptom description.
+
+The prescription generation task is similar to the generative question answering (QA). In such task settings, the encoder part of the model takes in the question, and encodes the sequence of tokens into a set of hidden states, which embody the information of the question. The decoder part then iteratively generates tokens based on the information encoded in the hidden states of the encoder. The model would learn how to generate response after training on the corresponding question-answer pairs.
+
+In the TCM prescription generation task, the textual symptom descriptions can be seen as the question and the aim of the task is to produce a set of TCM herbs that form a prescription as the answer to the question. However, the set of herbs is different from the textual answers to a question in the QA task. A difference that is most evident is that there will not be any duplication of herbs in the prescription. However, the basic seq2seq model sometimes produces the same herb tokens repeatedly when applied to the TCM prescription generation task. This phenomenon can hurt the performance of recall rate even after applying a post-process to eliminate repetitions. Because in a limited length of the prescription , the model would produce the same token over and over again, rather than real and novel ones. Furthermore, the basic seq2seq assumes a strict order between generated tokens, but in reality, we should not severely punish the model when it predicts the correct tokens in the wrong order. In this paper, we explore to automatically generate TCM prescriptions based on textual symptoms. We propose a soft seq2seq model with coverage mechanism and a novel soft loss function. The coverage mechanism is designed to make the model aware of the herbs that have already been generated while the soft loss function is to relieve the side effect of strict order assumption. In the experiment results, our proposed model beats all the baselines in professional evaluations, and we observe a large increase in both the recall rate and the F1 score compared with the basic seq2seq model.
+
+The main contributions of this paper lie in the following three folds:
+
+## Related Work
+
+There has not been much work concerning computational TCM. zhou2010development attempted to build a TCM clinical data warehouse so that the TCM knowledge can be analyzed and used. This is a typical way of collecting data, since the number of prescriptions given by the practitioners in the clinics is very large. However, in reality, most of the TCM doctors do not refer to the constructed digital systems, because the quality of the input data tends to be poor. Therefore, we choose prescriptions in the classics (books or documentation) of TCM. Although the available data can be fewer than the clinical data, it guarantees the quality of the prescriptions.
+
+wang2004self attempted to construct a self-learning expert system with several simple classifiers to facilitate the TCM diagnosis procedure, Wang2013TCM proposed to use shallow neural networks and CRF based multi-labeling learning methods to model TCM inquiry process, but they only considered the disease of chronic gastritis and its taxonomy is very simple. These methods either utilize traditional data mining methods or are highly involved with expert crafted systems. Zhang2011Topic,Zhu2017TCM proposed to use LDA to model the herbs. li2017distributed proposed to learn the distributed embedding for TCM herbs with recurrent neural networks.
+
+## Methodology
+
+Neural sequence to sequence model has proven to be very effective in a wide range of natural language generation tasks, including neural machine translation and abstractive text summarization. In this section, we first describe the definition of the TCM prescription generation task. Then, we introduce how to apply seq2seq model in the prescription composition task. Next, we show how to guide the model to generate more fruitful herbs in the setting of this task by introducing coverage mechanism. Finally, we introduce our novel soft loss function that relieves the strict assumption of order between tokens. An overview of the our final model is shown in Figure 1 .
+
+## Task Definition
+
+Given a TCM herbal treatment dataset that consists of $N$ data samples, the $i$ -th data sample ( $x^{(i)}, p^{(i)}$ ) contains one piece of source text $x^{(i)}$ that describes the symptoms, and $M_{i}$ TCM herbs $(p_{1}^{i},p_{2}^{i}, ..., p_{M_{i}}^{i})$ that make up the herb prescription $p^{(i)}$ .
+
+We view the symptoms as a sequence of characters $x^{(i)} = (x^{(i)}_{1}, x^{(i)}_{2}, ..., x^{(i)}_{T})$ . We do not segment the characters into words because they are mostly in traditional Chinese that uses characters as basic semantic units. The herbs $p_{1}^{i},p_{2}^{i}, ..., p_{M_{i}}^{i}$ are all different from each other.
+
+## Basic Encoder-Decoder Model
+
+Sequence-to-sequence model was first proposed to solve the machine translation problem. The model consists of two parts, an encoder and a decoder. The encoder is bound to take in the source sequence and compress the sequence into a series of hidden states. The decoder is used to generate a sequence of target tokens based on the information embodied in the hidden states given by the encoder. Typically, both the encoder and the decoder are implemented with recurrent neural networks (RNN).
+
+In our TCM prescription generation task, the encoder RNN converts the variable-length symptoms in character sequence $x = (x_{1},x_{2},...,x_{T})$ into a set of hidden representations $h = (h_{1},h_{2},...,h_{T})$ , by iterating the following equations along time $t$ : 
+
+$$h_{t} = f(x_{t},h_{t-1})$$   (Eq. 8) 
+
+where $f$ is a RNN family function. In our implementation, we choose gated recurrent unit (GRU BIBREF1 ) as $f$ , as the gating mechanism is expected to model long distance dependency better. Furthermore, we choose the bidirectional version of recurrent neural networks as the encoder to solve the problem that the later words get more emphasis in the unidirectional version. We concatenate both the $h_{t}$ in the forward and backward pass and get $\widehat{h_{t}}$ as the final representation of the hidden state at time step $t$ .
+
+We get the context vector $c$ representing the whole source $x$ at the $t$ -th time through a non-linear function $q$ , normally known as the attention mechanism: 
+
+$$c_{t} = \sum _{j=1}^{T}\alpha _{tj}h_{j} \\
+\alpha _{tj} = \frac{\text{exp}\left( a\left(s_{t-1},h_{j}\right)\right)}{\sum _{k=1}^{T}\text{exp}\left( a\left(s_{t-1},h_{k}\right)\right)}$$   (Eq. 9) 
+
+The context vector $c_{t}$ is calculated as a weighted sum of hidden representation produced by the encoder $\textbf {h} = (h_{1},...,h_{T})$ . $a(s_{t-1},h_{j})$ is a soft alignment function that measures the relevance between $s_{t-1}$ and $h_{j}$ . It computes how much $h_j$ is needed for the $t$ -th output word based on the previous hidden state of the decoder $s_{t-1}$ . The decoder is another RNN. It generates a variable-length sequence $y = (y_{1},y_{2}, ..., y_{T^{\prime }})$ token by token (herb), through a conditional language model: 
+
+$$s_{t} = f(s_{t-1},c_{t},Ey_{t-1})  \\
+p(y_{t}|y_{1,...,t},x) = g(s_{t})$$   (Eq. 10) 
+
+where $s_{t}$ is the hidden state of the decoder RNN at time step $t$ . $f$ is also a gated recurrent unit. The non-linear function $g$ is a $softmax$ layer, which outputs the probabilities of all the herbs in the herb vocabulary. $E \in (V\times d)$ is the embedding matrix of the target tokens, $V$ is the number of herb vocabulary, $d$ is the embedding dimension. $y_{t-1}$ is the last predicted token.
+
+In the decoder, the context vector $c_{t}$ is calculated based on the hidden state $s_{t-1}$ of the decoder at time step $t-1$ and all the hidden states in the encoder. The procedure is known as the attention mechanism. The attention mechanism is expected to supplement the information from the source sequence that is more connected to the current hidden state of the decoder instead of only depending on a fixed vector produced by the encoder.
+
+The encoder and decoder networks are trained jointly to maximize the conditional probability of the target sequence. A soft version of cross entropy loss is applied to maximize the conditional probability, which we will describe in detail.
+
+## Coverage Mechanism
+
+Different from natural language generation tasks, there is no duplicate herb in the TCM prescription generation task. When directly applying seq2seq model in this task, the decoder tends to generate some frequently observed herbs over and over again. Although we can prune the repeated herbs through post processing by eliminating the repeated ones, it still hurts the recall performance as the maximum length of a prescription is limited. This situation is still true when we use a $<EOS>$ label to indicate where the generation should stop.
+
+To encourage the decoder to generate more diverse and reasonable herb tokens, we propose to apply coverage mechanism to make the model aware of the already generated herbs. Coverage mechanism BIBREF7 , BIBREF8 , BIBREF9 was first proposed to help the decoder focus on the part that has not been paid much attention by feeding a fertility vector to the attention calculation, indicating how much information of the input is used.
+
+In our model, we do not use the fertility vector to tune the attention weights. The reason is that the symptoms are related to others and altogether describe the whole disease, which is explained in Section "Introduction" . Still, inspired by its motivation, we adapt the coverage mechanism to the decoder where a coverage vector is fed to the GRU cell together with the context vector. Equation 10 is then replaced by the following ones. 
+
+$$a_{t} = \tanh (WD_{t}+b) \\
+s_{t} = f(s_{t-1}, c_{t}, Ey_{t-1}, a_{t})$$   (Eq. 12) 
+
+where $a_{t}$ is the coverage vector at the $t$ -th time step in decoding. $D_{t}$ is the one-hot representation of the generated tokens until the $t$ -th time step. $W\in \mathbb {R}^{V\times H}$ is a learnable parameter matrix, where $V$ is the size of the herb vocabulary and $H$ is the size of the hidden state. By feeding the coverage vector, which is also a sketch of the generated herbs, to the GRU as part of the input, our model can softly switch more probability to the herbs that have not been predicted. This way, the model is encouraged to produce novel herbs rather than repeatedly predicting the frequently observed ones, thus increasing the recall rate.
+
+## Soft Loss Function
+
+We argue that even though the order of the herbs matters when generating the prescription BIBREF10 , BIBREF11 , we should not strictly restrict the order. However, the traditional cross entropy loss function applied to the basic seq2seq model puts a strict assumption on the order of the labels. To deal with the task of predicting weakly ordered labels (or even unordered labels), we propose a soft loss function instead of the original hard cross entropy loss function: 
+
+$$loss = -\sum _{t}\ q^{\prime }_{t}\ log(p_t)$$   (Eq. 14) 
+
+Instead of using the original hard one-hot target probability $q_t$ , we use a soft target probability distribution $q^{\prime }_{t}$ , which is calculated according to $q_t$ and the target sequence $\mathbf {q}$ of this sample. Let $\mathbf {q_v}$ denote the bag of words representation of $\mathbf {q}$ , where only slots of the target herbs in $\mathbf {q}$ are filled with $1s$ . We use a function $\xi $ to project the original target label probability $q_t$ into a new probability distribution $q^{\prime }_{t}$0 . 
+
+$$q^{\prime }_t = \xi (q_t, \mathbf {q_v})$$   (Eq. 15) 
+
+This function $\xi $ is designed so as to decrease the harsh punishment when the model predicts the labels in the wrong order. In this paper, we apply a simple yet effective projection function as Equation 16 . This is an example implementation, and one can design more sophisticated projection functions if needed. 
+
+$$\xi (y_t,\mathbf {s}) = ((\mathbf {q_v}/M) + y_t) / 2 $$   (Eq. 16) 
+
+where $M$ is the length of $q$ . This function means that at the $t$ -th time of decoding, for each target herb token $p_i$ , we first split a probability density of $1.0$ equally across all the $l$ herbs into $1/M$ . Then, we take the average of this probability distribution and the original probability $q_t$ to be the final probability distribution at time $t$ .
+
+## Dataset Construction
+
+We crawl the data from UTF8gbsnTCM Prescription Knowledge Base (中医方剂知识库) . This knowledge base includes comprehensive TCM documentation in the history. The database includes 710 TCM historic books or documents as well as some modern ones, consisting of 85,166 prescriptions in total. Each item in the database provides the name, the origin, the composition, the effect, the contraindications, and the preparation method. We clean and formalize the database and get 82,044 usable symptom-prescription pairs
+
+In the process of formalization, we temporarily omit the dose information and the preparation method description, as we are mainly concerned with the composition. Because the names of the herbs have evolved a lot, we conclude heuristic rules as well as specific projection rules to project some rarely seen herbs to their similar forms that are normally referred to. There are also prescriptions that refer to the name of other prescriptions. We simply substitute these names with their constituents.
+
+To make the experiment result more robust, we conduct our experiments on two separate test datasets. The first one is a subset of the data described above. We randomly split the whole data into three parts, the training data (90%), the development data (5%) and the test data (5%). The second one is a set of symptom-prescription pairs we manually extracted from the modern text book of the course Formulaology of TCM (UTF8gbsn中医方剂学) that is popularly adopted by many TCM colleges in China.
+
+There are more cases in the first sampled test dataset (4,102 examples), but it suffers from lower quality, as this dataset was parsed with simple rules, which may not cover all exceptions. The second test dataset has been proofread and all of the prescriptions are the most classical and influential ones in the history. So the quality is much better than the first one. However, the number of the cases is limited. There are 141 symptom-prescription pairs in the second dataset. Thus we use two test sets to do evaluation to take the advantages of both data magnitude and quality.
+
+## Experiment Settings
+
+In our experiments, we implement our models with the PyTorch toolkit . We set the embedding size of both Chinese characters in the symptoms and the herb tokens to 100. We set the hidden state size to 300, and the batch size to 20. We set the maximum length of the herb sequence to 20 because the length of nearly all the prescriptions are within this range (see Table 2 for the statistics of the length of prescriptions). Unless specifically stated, we use bidirectional gated recurrent neural networks (BiGRNN) to encode the symptoms. Adam BIBREF12 , and use the model parameters that generate the best F1 score on the development set in testing
+
+## Proposed Baseline
+
+In this sub-section, we present the Multi-label baseline we apply. In this model, we use a BiGRNN as the encoder, which encodes symptoms in the same way as it is described in Section "Methodology" . Because the position of the herbs does not matter in the results, for the generation part, we implement a multi-label classification method to predict the herbs. We use the multi-label max-margin loss (MultiLabelMarginLoss in pytorch) as the optimization objective, because this loss function is more insensitive to the threshold, thus making the model more robust. We set the threshold to be 0.5, that is, if the probability given by the model is above 0.5 and within the top $k$ range (we set k to 20 in our experiment, same to seq2seq model), we take the tokens as answers. The way to calculate probability is shown below. 
+
+$$p(i) = \sigma (W_{o}h_{T})$$   (Eq. 23) 
+
+where $\sigma $ indicates the non-linear function $sigmoid$ , $W_{o} \in \mathbb {R}^{H \times V}$ , $H$ is the size of the hidden state produced by the encoder and $V$ is the size of the herb vocabulary. $h_{T}$ is the last hidden state produced by the encoder.
+
+During evaluation, we choose the herbs satisfying two conditions:
+
+The predicted probability of the herb is within top $k$ among all the herbs, where $k$ is a hyper-parameter. We set $k$ to be the same as the maximum length of seq2seq based models (20).
+
+The predicted probability is above a threshold 0.5 (related to the max-margin).
+
+## Human Evaluation
+
+Since medical treatment is a very complex task, we invite two professors from Beijing University of Chinese Medicine, which is one of the best Traditional Chinese Medicine academies in China. Both of the professors enjoy over five years of practicing traditional Chinese medical treatment. The evaluators are asked to evaluate the prescriptions with scores between 0 and 10. Both the textual symptoms and the standard reference are given, which is similar to the form of evaluation in a normal TCM examination. Different from the automatic evaluation method, the human evaluators focus on the potential curative effect of the candidate answers, rather than merely the literal similarity. We believe this way of evaluation is much more reasonable and close to reality.
+
+Because the evaluation procedure is very time consuming (each item requires more than 1 minute), we only ask the evaluators to judge the results from test set 2.
+
+As shown in Table 3 , both of the basic seq2seq model and our proposed modification are much better than the multi-label baseline. Our proposed model gets a high score of 7.3, which can be of real help to TCM practitioners when prescribing in the real life treatment.
+
+## Automatic Evaluation Results
+
+We use micro Precision, Recall, and F1 score as the automatic metrics to evaluate the results, because the internal order between the herbs does not matter when we do not consider the prescribing process.
+
+In Table 4 , we show the results of our proposed models as well as the baseline models. One thing that should be noted is that since the data in Test set 2 (extracted from text book) have much better quality than Test set 1, the performance on Test set 2 is much higher than it is on Test set 1, which is consistent with our instinct.
+
+From the experiment results we can see that the baseline model multi-label has higher micro recall rate 29.72, 40.49 but much lower micro precision 10.83, 13.51. This is because unlike the seq2seq model that dynamically determines the length of the generated sequence, the output length is rigid and can only be determined by thresholds. We take the tokens within the top 20 as the answer for the multi-label model.
+
+As to the basic seq2seq model, although it beats the multi-label model overall, the recall rate drops substantially. This problem is partly caused by the repetition problem, the basic seq2seq model sometimes predicts high frequent tokens instead of more meaningful ones. Apart from this, although the seq2seq based model is better able to model the correlation between target labels, it makes a strong assumption on the order of the target sequence. In the prescription generation task, the order between herb tokens are helpful for generating the sequence. However, since the order between the herbs does not affect the effect of the prescription, we do not consider the order when evaluating the generated sequence. We call the phenomenon that the herbs are under the “weak order”. The much too strong assumption on order can hurt the performance of the model when the correct tokens are placed in the wrong order.
+
+In Table 5 we show the effect of applying coverage mechanism and soft loss function.
+
+Coverage mechanism gives a sketch on the prescription. The mechanism not only encourages the model to generate novel herbs but also enables the model to generate tokens based on the already predicted ones. This can be proved by the improvement on Test set 2, where both the precision and the recall are improved over the basic seq2seq model.
+
+The most significant improvement comes from applying the soft loss function. The soft loss function can relieve the strong assumption of order made by seq2seq model. Because predicting a correct token in the wrong position is not as harmful as predicting a completely wrong token. This simple modification gives a big improvement on both test sets for all the three evaluation metrics.
+
+## Case Study
+
+In this subsection, we show an example generated by various models in Table 6 in test set 2 because the quality of test set 2 is much more satisfactory. The multi-label model produces too many herbs that lower the precision, we do not go deep into its results, already we report its results in the table.
+
+For the basic seq2seq model, the result is better than multi-label baseline in this case. UTF8gbsn“柴胡” (radix bupleuri)、“葛根” (the root of kudzu vine) can be roughly matched with “恶风发热，汗出头疼” (Aversion to wind, fever, sweating, headache), “甘草” (Glycyrrhiza)、“陈皮” (dried tangerine or orange peel)、“桔梗” (Platycodon grandiflorum) can be roughly matched with “鼻鸣咽干，苔白不渴” (nasal obstruction, dry throat, white tongue coating, not thirsty), “川芎” (Ligusticum wallichii) can be used to treat the symptom of “头疼” (headache). In this case, most of the herbs can be matched with certain symptoms in the textual description. However, the problem is that unlike the reference, the composition of herbs lacks the overall design. The symptoms should not be treated independently, as they are connected to other symptoms. For example, the appearance of symptom UTF8gbsn“头疼” (headache) must be treated together with UTF8gbsn“汗出” (sweat). When there is simply headache without sweat, UTF8gbsn“川芎” (Ligusticum wallichii) may be suitable. However, since there is already sweat, this herb is not suitable in this situation. This drawback results from the fact that this model heavily relies on the attention mechanism that tries to match the current hidden state in the decoder to a part of the context in the encoder every time it predicts a token.
+
+Translation: UTF8gbsn桂枝 - cassia twig, 芍药 - Chinese herbaceous peony 大黄 - Rhubarb, 厚朴 - Magnolia officinalis, 枳实 - Fructus Aurantii Immaturus, 芒硝 - Mirabilite, 栀子 - Cape Jasmine Fruit, 枳壳 - Fructus Aurantii, 当归 - Angelica Sinensis, 甘草 - Glycyrrhiza, 黄芩 - Scutellaria, 生姜 - ginger, 大枣 - Chinese date, 柴胡 - radix bupleuri, 葛根 - the root of kudzu vine, 陈皮 - dried tangerine or orange peel, 桔梗 - Platycodon grandiflorum, 川芎 - Ligusticum wallichii, 麻黄 - Chinese ephedra
+
+For our proposed model, the results are much more satisfactory. UTF8gbsn“外感风寒” (Exogenous wind-cold exterior deficiency syndrome) is the reason of the disease, the symptoms UTF8gbsn“恶风发热，汗出头疼，鼻鸣咽干，苔白不渴，脉浮缓或浮弱” (Aversion to wind, fever, sweating, headache, nasal obstruction, dry throat, white tongue coating, not thirsty, floating slow pulse or floating weak pulse) are the corresponding results. The prescription generated by our proposed model can also be used to cure UTF8gbsn“外感风寒” (Exogenous wind-cold exterior deficiency syndrome), in fact UTF8gbsn“麻黄” (Chinese ephedra) and “桂枝” (cassia twig) together is a common combination to cure cold. However, UTF8gbsn“麻黄” (Chinese ephedra) is not suitable here because there is already sweat. One of the most common effect of UTF8gbsn“麻黄” (Chinese ephedra) is to make the patient sweat. Since there is already sweat, it should not be used. Compared with the basic seq2seq model, our proposed model have a sense of overall disease, rather than merely discretely focusing on individual symptoms.
+
+From the above analysis, we can see that compared with the basic seq2seq model, our proposed soft seq2seq model is aware more of the connections between symptoms, and has a better overall view on the disease. This advantage is correspondent to the principle of prescribing in TCM that the prescription should be focusing on the UTF8gbsn“辩证” (the reason behind the symptoms) rather than the superficial UTF8gbsn“症” (symptoms).
+
+## Conclusion
+
+In this paper, we propose a TCM prescription generation task that automatically predicts the herbs in a prescription based on the textual symptom descriptions. To our knowledge, this is the first time that this critical and practicable task has been considered. To advance the research in this task, we construct a dataset of 82,044 symptom-prescription pairs based on the TCM Prescription Knowledge Base.
+
+Besides the automatic evaluation, we also invite professionals to evaluate the prescriptions given by various models, the results of which show that our model reaches the score of 7.3 out of 10, demonstrating the effectiveness. In the experiments, we observe that directly applying seq2seq model would lead to the repetition problem that lowers the recall rate and the strong assumption of the order between herb tokens can hurt the performance. We propose to apply the coverage mechanism and the soft loss function to solve this problem. From the experimental results, we can see that this approach alleviates the repetition problem and results in an improved recall rate.

@@ -1,0 +1,130 @@
+# Bi-Directional Lattice Recurrent Neural Networks for Confidence Estimation
+
+**Paper ID:** 1810.13024
+
+## Abstract
+
+The standard approach to mitigate errors made by an automatic speech recognition system is to use confidence scores associated with each predicted word. In the simplest case, these scores are word posterior probabilities whilst more complex schemes utilise bi-directional recurrent neural network (BiRNN) models. A number of upstream and downstream applications, however, rely on confidence scores assigned not only to 1-best hypotheses but to all words found in confusion networks or lattices. These include but are not limited to speaker adaptation, semi-supervised training and information retrieval. Although word posteriors could be used in those applications as confidence scores, they are known to have reliability issues. To make improved confidence scores more generally available, this paper shows how BiRNNs can be extended from 1-best sequences to confusion network and lattice structures. Experiments are conducted using one of the Cambridge University submissions to the IARPA OpenKWS 2016 competition. The results show that confusion network and lattice-based BiRNNs can provide a significant improvement in confidence estimation.
+
+## Introduction
+
+ Recent years have seen an increased usage of spoken language technology in applications ranging from speech transcription BIBREF0 to personal assistants BIBREF1 . The quality of these applications heavily depends on the accuracy of the underlying automatic speech recognition (ASR) system yielding 1-best hypotheses and how well ASR errors are mitigated. The standard approach to ASR error mitigation is confidence scores BIBREF2 , BIBREF3 . A low confidence can give a signal to downstream applications about the high uncertainty of the ASR in its prediction and measures can be taken to mitigate the risk of making a wrong decision. However, confidence scores can also be used in upstream applications such as speaker adaptation BIBREF4 and semi-supervised training BIBREF5 , BIBREF6 to reflect uncertainty among multiple possible alternative hypotheses. Downstream applications, such as machine translation and information retrieval, could similarly benefit from using multiple hypotheses.
+
+A range of confidence scores has been proposed in the literature BIBREF3 . In the simplest case, confidence scores are posterior probabilities that can be derived using approaches such as confusion networks BIBREF7 , BIBREF8 . These posteriors typically significantly over-estimate confidence BIBREF8 . Therefore, a number of approaches have been proposed to rectify this problem. These range from simple piece-wise linear mappings given by decision trees BIBREF8 to more complex sequence models such as conditional random fields BIBREF9 , and to neural networks BIBREF10 , BIBREF11 , BIBREF12 . Though improvements over posterior probabilities on 1-best hypotheses were reported, the impact of these approaches on all hypotheses available within confusion networks and lattices has not been investigated.
+
+Extending confidence estimation to confusion network and lattice structures can be straightforward for some approaches, such as decision trees, and challenging for others, such as recurrent forms of neural networks. The previous work on encoding graph structures into neural networks BIBREF13 has mostly focused on embedding lattices into a fixed dimensional vector representation BIBREF14 , BIBREF15 . This paper examines a particular example of extending a bi-directional recurrent neural network (BiRNN) BIBREF16 to confusion network and lattice structures. This requires specifying how BiRNN states are propagated in the forward and backward directions, how to merge a variable number of BiRNN states, and how target confidence values are assigned to confusion network and lattice arcs. The paper shows that the state propagation in the forward and backward directions has close links to the standard forward-backward algorithm BIBREF17 . This paper proposes several approaches for merging BiRNN states, including an attention mechanism BIBREF18 . Finally, it describes a Levenshtein algorithm for assigning targets to confusion networks and an approximate solution for lattices. Combined these make it possible to assign confidence scores to every word hypothesised by the ASR, not just from a single extracted hypothesis.
+
+The rest of this paper is organised as follows. Section "Bi-Directional Recurrent Neural Network" describes the use of bi-directional recurrent neural networks for confidence estimation in 1-best hypotheses. Section "Confusion Network and Lattice Extensions" describes the extension to confusion network and lattice structures. Experimental results are presented in Section "Experiments" . The conclusions drawn from this work are given in Section "Conclusions" .
+
+## Bi-Directional Recurrent Neural Network
+
+ Fig. 1 shows the simplest form of the BiRNN BIBREF16 . Unlike its uni-directional version, the BiRNN makes use of two recurrent states, one going in the forward direction in time $\overrightarrow{\mathbf {h}}_{t}$ and another in the backward direction $\overleftarrow{\mathbf {h}}_{t}$ to model past (history) and future information respectively.
+
+The past information can be modelled by 
+
+$$\overrightarrow{\mathbf {h}}_{t} = \sigma (\mathbf { W}^{(\overrightarrow{{h}})}\overrightarrow{\mathbf {h}}_{t-1} + \mathbf { W}^{(x)}\mathbf {x}_{t})$$   (Eq. 4) 
+
+where $\mathbf {x}_{t}$ is an input feature vector at time $t$ , $\mathbf {W}^{(x)}$ is an input matrix, $\mathbf {W}^{(\overrightarrow{{h}})}$ is a history matrix and $\sigma $ is an element-wise non-linearity such as a sigmoid. The future information is typically modelled in the same way. At any time $t$ the confidence $c_t$ can be estimated by 
+
+$$c_{t} = \sigma (\mathbf {w}^{(c)^{\sf T}}{\bf h}_{t} + {b}^{(c)})$$   (Eq. 5) 
+
+where $\mathbf {w}^{c}$ and $b^{(b)}$ are a parameter vector and a bias, $\sigma $ is any non-linearity that maps confidence score into the range $[0,1]$ and $\mathbf {h}_{t}$ is a context vector that combines the past and future information. 
+
+$$\mathbf {h}_{t} = \begin{bmatrix}\overrightarrow{\bf h}_{t} & \overleftarrow{\bf h}_{t}\end{bmatrix}^{\sf T}$$   (Eq. 6) 
+
+The input features $\mathbf {x}_{t}$ play a fundamental role in the model's ability to assign accurate confidence scores. Numerous hand-crafted features have been proposed BIBREF19 , BIBREF20 , BIBREF21 , BIBREF22 . In the simplest case, duration and word posterior probability can be used as input features. More complex features may include embeddings BIBREF23 , acoustic and language model scores and other information. The BiRNN can be trained by minimising the binary cross-entropy 
+
+$$H(\mathbf {c},\mathbf {c}^{*};\mathbf {\theta }) = -\dfrac{1}{T}\sum _{t=1}^{T} \Big \lbrace {c}_{t}^{*} \log (c_{t}) + (1 - {c}_{t}^{*}) \log (1 - c_{t})\Big \rbrace $$   (Eq. 7) 
+
+where $c_{t}$ is a predicted confidence score for time slot $t$ and $c_{t}^{*}$ is the associated reference value. The reference values can be obtained by aligning the 1-best ASR output and reference text using the Levenshtein algorithm. Note that deletion errors cannot be handled under this framework and need to be treated separately BIBREF22 , BIBREF12 . This form of BiRNN has been examined for confidence estimation in BIBREF11 , BIBREF12 
+
+The perfect confidence estimator would assign scores of one and zero to correctly and incorrectly hypothesised words respectively. In order to measure the accuracy of confidence predictions, a range of metrics have been proposed. Among these, normalised cross-entropy (NCE) is the most frequently used BIBREF24 . NCE measures the relative change in the binary cross-entropy when the empirical estimate of ASR correctness, $P_c$ , is replaced by predicted confidences $\mathbf {c}={c_1,\ldots ,c_T}$ . Using the definition of binary cross-entropy in Eqn. 7 , NCE can be expressed as 
+
+$$\text{NCE}(\mathbf {c},\mathbf {c^*}) =
+\dfrac{H(P_{c}\cdot \textbf {1},\mathbf {c^*}) - H(\mathbf {c},\mathbf {c^*})}{H(P_{c}\cdot \textbf {1},\mathbf {c^*})}$$   (Eq. 8) 
+
+where $\mathbf {1}$ is a length $T$ vector of ones, and the empirical estimate of ASR correctness is given by 
+
+$$P_{c} = \dfrac{1}{T}\sum _{t=1}^{T} {c}_{t}^{*}$$   (Eq. 9) 
+
+When hypothesised confidence scores $\mathbf {c}$ are systematically better than the estimate of ASR correctness $P_c$ , NCE is positive. In the limit of perfect confidence scores, NCE approaches one.
+
+NCE alone is not always the most optimal metric for evaluating confidence estimators. This is because the theoretical limit of correct words being assigned a score of one and incorrect words a score of zero is not necessary for perfect operation of an upstream or downstream application. Often it is sufficient that the rank ordering of the predictions is such that all incorrect words fall below a certain threshold, and all correct words above. This is the case, for instance, in various information retrieval tasks BIBREF25 , BIBREF26 . A more suitable metric in such cases could be an area under a curve (AUC)-type metric. For balanced data the chosen curve is often the receiver operation characteristics (ROC). Whereas for imbalanced data, as is the case in this work, the precision-recall (PR) curve is normally used BIBREF27 . The PR curve is obtained by plotting precision versus recall 
+
+$$\text{Precision}(\theta ) = \dfrac{\text{TP}(\theta )}{\text{TP}(\theta )+\text{FP}(\theta )},\;
+\text{Recall}(\theta ) = \dfrac{\text{TP}(\theta )}{\text{TP}(\theta ) + \text{FN}(\theta )}$$   (Eq. 10) 
+
+for a range of thresholds $\theta $ , where TP are true positives, FP and FN are false positives and negatives. When evaluating performance on lattices and confusion networks, these metrics are computed across all arcs in the network.
+
+## Confusion Network and Lattice Extensions
+
+ A number of important downstream and upstream applications rely on accurate confidence scores in graph-like structures, such as confusion networks (CN) in Fig. 2 and lattices in Fig. 2 , where arcs connected by nodes represent hypothesised words. This section describes an extension of BiRNNs to CNs and lattices.
+
+Fig. 2 shows that compared to 1-best sequences in Fig. 2 , each node in a CN may have multiple incoming arcs. Thus, a decision needs to be made on how to optimally propagate information to the outgoing arcs. Furthermore, any such approach would need to handle a variable number of incoming arcs. One popular approach BIBREF15 , BIBREF14 is to use a weighted combination 
+
+$$\overrightarrow{\mathbf {h}}_{t} = \sum _{i} \alpha _{t}^{(i)} \overrightarrow{\mathbf {h}}_{t}^{(i)}$$   (Eq. 14) 
+
+where $\overrightarrow{\mathbf {h}}_{t}^{(i)}$ represents the history information associated with the $i^{\text{th}}$ arc of the $t^{\text{th}}$ CN bin and $\alpha _{t}^{(i)}$ is the associated weight. A number of approaches can be used to set these weights. One simple approach is to set weights of all arcs other than the one with the highest posterior to zero. This yields a model that for 1-best hypotheses has no advantage over BiRNNs in Section "Bi-Directional Recurrent Neural Network" . Other simple approaches include average or normalised confidence score $\alpha _t^{(i)} = c_t^{(i)}/\sum _{j} c_t^{(j)}$ where $c_{t}^{(i)}$ is a word posterior probability, possibly mapped by decision trees. A more complex approach is an attention mechanism 
+
+$$\alpha _{t}^{(i)} = \dfrac{\exp (z_{t}^{(i)})}{\sum _{j} \exp (z_{t}^{(j)})}, \;\text{where } z_{t}^{(i)} = \sigma \left({\mathbf {w}^{(a)}}^{\sf {T}}\overrightarrow{\mathbf {k}}_{t}^{(i)} + b^{(a)}\right)$$   (Eq. 15) 
+
+where $\mathbf {w}^{(a)}$ and $b^{(a)}$ are attention parameters, $\overrightarrow{\mathbf {k}}_{t}^{(i)}$ is a key. The choice of the key is important as it helps the attention mechanism decide which information should be propagated. It is not obvious a priori what the key should contain. One option is to include arc history information as well as some basic confidence score statistics 
+
+$$\overrightarrow{\mathbf {k}}_{t}^{(i)} = \begin{bmatrix}
+\overrightarrow{\mathbf {h}}_{t}^{(i)^{\sf T}} & c_{t}^{(i)} & \mu _{t} & \sigma _{t} \end{bmatrix}^{\sf T}$$   (Eq. 16) 
+
+where $\mu _t$ and $\sigma _t$ are the mean and standard deviation computed over $c_t^{(i)}$ at time $t$ . At the next $(t+1)^{\text{th}}$ CN bin the forward information associated with the $i^{\text{th}}$ arc is updated by 
+
+$$\overrightarrow{\mathbf {h}}_{t+1}^{(i)} = \sigma (\mathbf { W}^{(\overrightarrow{{h}})}\overrightarrow{\mathbf {h}}_{t} + \mathbf { W}^{(x)}\mathbf {x}_{t+1}^{(i)})$$   (Eq. 17) 
+
+The confidence score for each CN arc is computed by 
+
+$$c_{t}^{(i)} = \sigma (\mathbf {w}^{(c)^{\sf T}}{\bf h}_{t}^{(i)} + {b}^{(c)})$$   (Eq. 18) 
+
+where ${\bf h}_{t}^{(i)}$ is an arc context vector 
+
+$${\bf h}_{t}^{(i)} = \begin{bmatrix}
+\overrightarrow{\mathbf {h}}_{t}^{(i)} & \overleftarrow{\mathbf {h}}_{t}^{(i)}
+\end{bmatrix}$$   (Eq. 19) 
+
+A summary of dependencies in this model is shown in Fig. 1 for a CN with 1 arc in the $t^{\text{th}}$ bin and 2 arcs in the $(t+1)^{\text{th}}$ bin.
+
+As illustrated in Fig. 2 , each node in a lattice marks a timestamp in an utterance and each arc represents a hypothesised word with its corresponding acoustic and language model scores. Although lattices do not normally obey a linear graph structure, if they are traversed in the topological order, no changes are required to compute confidences over lattice structures. The way the information is propagated in these graph structures is similar to the forward-backward algorithm BIBREF17 . There, the forward probability at time $t$ is 
+
+$$\overrightarrow{h}_{t+1}^{(i)} = \overrightarrow{h}_{t} x_{t+1}^{(i)}, \;\text{where } \overrightarrow{h}_{t} = \sum _{j} \alpha _{i,j} \overrightarrow{h}_{t}^{(j)}$$   (Eq. 20) 
+
+Compared to equations Eqn. 14 and Eqn. 17 , the forward recursion employs a different way to combine features $x_{t+1}^{(i)}$ and node states $\overrightarrow{h}_{t}$ , and maintains stationary weights, i.e. the transition probabilities $\alpha _{i,j}$ , for combining arc states $\overrightarrow{h}_{t}^{(j)}$ . In addition, each $\overrightarrow{h}_{t}^{(i)}$ has a probabilistic meaning which the vector $\overrightarrow{\mathbf {h}}_{t}^{(i)}$ does not. Furthermore, unlike in the standard algorithm, the past information at the final node is not constrained to be equal to the future information at the initial node.
+
+In order to train these models, each arc of a CN or lattice needs to be assigned an appropriate reference confidence value. For aligning a reference word sequence to another sequence, the Levenshtein algorithm can be used. The ROVER method has been used to iteratively align word sequences to a pivot reference sequence to construct CNs BIBREF28 . This approach can be extended to confusion network combination (CNC), which allows the merging of two CNs BIBREF29 . The reduced CNC alignment scheme proposed here uses a reference one-best sequence rather than a CN as the pivot, in order to tag CN arcs against a reference sequence. A soft loss of aligning reference word $\omega _\tau $ with the $t^{\text{th}}$ CN bin is used 
+
+$$\ell _{t}(\omega _{\tau }) = 1 - P_{t}(\omega _{\tau })$$   (Eq. 21) 
+
+where $P_t(\omega )$ is a word posterior probability distribution associated with the CN bin at time $t$ . The optimal alignment is then found by minimising the above loss.
+
+The extension of the Levenshtein algorithm to lattices, though possible, is computationally expensive BIBREF30 . Therefore approximate schemes are normally used BIBREF31 . Common to those schemes is the use of information about the overlap of lattice arcs and time-aligned reference words to compute the loss 
+
+$$o_{t,\tau } = \max \bigg \lbrace 0,\frac{|\min \lbrace e_{\tau }^{*},e_{t}\rbrace | - |\max \lbrace s_{\tau }^{*},s_{t}\rbrace |}{|\max \lbrace e_{\tau }^{*},e_{t}\rbrace |-|\min \lbrace s_{\tau }^{*},s_{t}\rbrace |}\bigg \rbrace $$   (Eq. 22) 
+
+where $\lbrace s_t, e_t\rbrace $ and $\lbrace s^{*}_{\tau }, e^{*}_{\tau }\rbrace $ are start and end times of lattice arcs and time-aligned words respectively. In order to yield “hard” 0 or 1 loss a threshold can be set either on the loss or the amount of overlap.
+
+## Experiments
+
+ Evaluation was conducted on IARPA Babel Georgian full language pack (FLP). The FLP contains approximately 40 hours of conversational telephone speech (CTS) for training and 10 hours for development. The lexicon was obtained using the automatic approach described in BIBREF32 . The automatic speech recognition (ASR) system combines 4 diverse acoustic models in a single recognition run BIBREF33 . The diversity is obtained through the use of different model types, a tandem and a hybrid, and features, multi-lingual bottlenecks extracted by IBM and RWTH Aachen from 28 languages. The language model is a simple $n$ -gram estimated on acoustic transcripts and web data. As a part of a larger consortium, this ASR system took part in the IARPA OpenKWS 2016 competition BIBREF34 . The development data was used to assess the accuracy of confidence estimation approaches. The data was split with a ratio of $8:1:1$ into training, validation and test sets. The ASR system was used to produce lattices. Confusion networks were obtained from lattices using consensus decoding BIBREF7 . The word error rates of the 1-best sequences are 39.9% for lattices and 38.5% for confusion networks.
+
+The input features for the standard bi-directional recurrent neural network (BiRNN) and CN-based (BiCNRNN) are decision tree mapped posterior, duration and a 50-dimensional fastText word embedding BIBREF35 estimated from web data. The lattice-based BiRNN (BiLatRNN) makes additional use of acoustic and language model scores. All forms of BiRNNs contain one $[\overrightarrow{128},\overleftarrow{128}]$ dimensional bi-directional LSTM layer and one 128 dimensional feed-forward hidden layer. The implementation uses PyTorch library and is available online. For efficient training, model parameters are updated using Hogwild! stochastic gradient descent BIBREF36 , which allows asynchronous update on multiple CPU cores in parallel.
+
+Table 1 shows the NCE and AUC performance of confidence estimation schemes on 1-best hypotheses extracted from CNs. As expected, “raw” posterior probabilities yield poor NCE results although AUC performance is high. The decision tree, as expected, improves NCE and does not affect AUC due to the monotonicity of the mapping. The BiRNN yields gains over the simple decision tree, which is consistent with the previous work in the area BIBREF11 , BIBREF12 .
+
+The next experiment examines the extension of BiRNNs to confusion networks. The BiCNRNN uses a similar model topology, merges incoming arcs using the attention mechanism described in Section "Confusion Network and Lattice Extensions" and uses the Levenshtein algorithm with loss given by Eqn. 21 to obtain reference confidence values. The model parameters are estimated by minimising average binary cross-entropy loss on all CN arcs. The performance is evaluated over all CN arcs. When transitioning from 1-best arcs to all CN arcs the AUC performance is expected to drop due to an increase in the Bayes risk. Table 2 shows that BiCNRNN yields gains similar to BiRNN in Table 1 .
+
+As mentioned in Section "Confusion Network and Lattice Extensions" there are alternatives to attention for merging incoming arcs. Table 3 shows that mean and normalised posterior weights may provide a competitive alternative.
+
+Extending BiRNNs to lattices requires making a choice of a loss function and a method of setting reference values to lattice arcs. A simple global threshold on the amount of overlap between reference time-aligned words and lattice arcs is adopted to tag arcs. This scheme yields a false negative rate of 2.2% and false positive rate of 0.9% on 1-best CN arcs and 1.4% and 0.7% on 1-best lattice arcs. Table 4 shows the impact of using approximate loss in training the BiCNRNN. The results suggest that the mismatch between training and testing criteria, i.e. approximate in training and Levenshtein in testing, could play a significant role on BiLatRNN performance. Using this approximate scheme, a BiLatRNN was trained on lattices.
+
+Table 5 compares BiLatRNN performance to “raw” posteriors and decision trees. As expected, lower AUC performances are observed due to higher Bayes risk in lattices compared to CNs. The “raw” posteriors offer poor confidence estimates as can be seen from the large negative NCE and low AUC. The decision tree yields significant gains in NCE and no change in AUC performance. Note that the AUC for a random classifier on this data is 0.2466. The BiLatRNN yields very large gains in both NCE and AUC performance.
+
+As mentioned in Section "Introduction" , applications such as language learning and information retrieval rely on confidence scores to give high-precision feedback BIBREF37 or high-recall retrieval BIBREF25 , BIBREF26 . Therefore, Fig. 3 shows precision-recall curves for BiRNN in Table 1 and BiLatRNN in Table 5 . Fig. 3 shows that the BiRNN yields largest gain in the region of high precision and low recall which is useful for feedback-like applications. Whereas the BiLatRNN in Fig. 3 can be seen to significantly improve precision in the high recall region, which is useful for some retrieval tasks.
+
+## Conclusions
+
+ Confidence scores play an important role in many applications of spoken language technology. The standard form of confidence scores are decision tree mapped word posterior probabilities. A number of approaches have been proposed to improve confidence estimation, such as bi-directional recurrent neural networks (BiRNN). BiRNNs, however, can predict confidences of sequences only, which limits their more general application to 1-best hypotheses. This paper extends BiRNNs to confusion network (CN) and lattice structures. In particular, it proposes to use an attention mechanism to combine variable number of incoming arcs, shows how recursions are linked to the standard forward-backward algorithm and describes how to tag CN and lattice arcs with reference confidence values. Experiments were performed on a challenging limited resource IARPA Babel Georgian pack and shows that the extended forms of BiRNNs yield significant gains in confidence estimation accuracy over all arcs in CNs and lattices. Many related applications like information retrieval, speaker adaptation, keyword spotting and semi-supervised training will benefit from the improved confidence measure.

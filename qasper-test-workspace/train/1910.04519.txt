@@ -1,0 +1,67 @@
+# Language Transfer for Early Warning of Epidemics from Social Media
+
+**Paper ID:** 1910.04519
+
+## Abstract
+
+Statements on social media can be analysed to identify individuals who are experiencing red flag medical symptoms, allowing early detection of the spread of disease such as influenza. Since disease does not respect cultural borders and may spread between populations speaking different languages, we would like to build multilingual models. However, the data required to train models for every language may be difficult, expensive and time-consuming to obtain, particularly for low-resource languages. Taking Japanese as our target language, we explore methods by which data in one language might be used to build models for a different language. We evaluate strategies of training on machine translated data and of zero-shot transfer through the use of multilingual models. We find that the choice of source language impacts the performance, with Chinese-Japanese being a better language pair than English-Japanese. Training on machine translated data shows promise, especially when used in conjunction with a small amount of target language data.
+
+## Introduction
+
+The spread of influenza is a major health concern. Without appropriate preventative measures, this can escalate to an epidemic, causing high levels of mortality. A potential route to early detection is to analyse statements on social media platforms to identify individuals who have reported experiencing symptoms of the illness. These numbers can be used as a proxy to monitor the spread of the virus.
+
+Since disease does not respect cultural borders and may spread between populations speaking different languages, we would like to build models for several languages without going through the difficult, expensive and time-consuming process of generating task-specific labelled data for each language. In this paper we explore ways of taking data and models generated in one language and transferring to other languages for which there is little or no data.
+
+## Related Work
+
+Previously, authors have created multilingual models which should allow transfer between languages by aligning models BIBREF0 or embedding spaces BIBREF1, BIBREF2. An alternative is translation of a high-resource language into the target low-resource language; for instance, BIBREF3 combined translation with subsequent selective correction by active learning of uncertain words and phrases believed to describe entities, to create a labelled dataset for named entity recognition.
+
+## MedWeb Dataset
+
+We use the MedWeb (“Medical Natural Language Processing for Web Document”) dataset BIBREF4 that was provided as part of a subtask at the NTCIR-13 Conference BIBREF5. The data is summarised in Table TABREF1. There are a total of 2,560 pseudo-tweets in three different languages: Japanese (ja), English (en) and Chinese (zh). These were created in Japanese and then manually translated into English and Chinese (see Figure FIGREF2). Each pseudo-tweet is labelled with a subset of the following 8 labels: influenza, diarrhoea/stomach ache, hay fever, cough/sore throat, headache, fever, runny nose, and cold. A positive label is assigned if the author (or someone they live with) has the symptom in question. As such it is more than a named entity recognition task, as can be seen in pseudo-tweet #3 in Figure FIGREF2 where the term “flu” is mentioned but the label is negative.
+
+## Methods ::: Bidirectional Encoder Representations from Transformers (BERT):
+
+The BERT model BIBREF6 base version is a 12-layer Transformer model trained on two self-supervised tasks using a large corpus of text. In the first (denoising autoencoding) task, the model must map input sentences with some words replaced with a special “MASK” token back to the original unmasked sentences. In the second (binary classification) task, the model is given two sentences and must predict whether or not the second sentence immediately follows the first in the corpus. The output of the final Transformer layer is passed through a logistic output layer for classification. We have used the original (English) BERT-base, trained on Wikipedia and books corpus BIBREF7, and a Japanese BERT (jBERT) BIBREF8 trained on Japanese Wikipedia. The original BERT model and jBERT use a standard sentence piece tokeniser with roughly 30,000 tokens.
+
+## Methods ::: Multilingual BERT:
+
+Multilingual BERT (mBERT) is a BERT model simultaneously trained on Wikipedia in 100 different languages. It makes use of a shared sentence piece tokeniser with roughly 100,000 tokens trained on the same data. This model provides state-of-the-art zero-shot transfer results on natural language inference and part-of-speech tagging tasks BIBREF9.
+
+## Methods ::: Translation:
+
+We use two publicly available machine translation systems to provide two possible translations for each original sentence: Google's neural translation system BIBREF10 via Google Cloud, and Amazon Translate. We experiment using the translations singly and together.
+
+## Methods ::: Training procedure:
+
+Models are trained for 20 epochs, using the Adam optimiser BIBREF11 and a cyclical learning rate BIBREF12 varied linearly between $5 \times 10^{-6}$ and $3 \times 10^{-5}$.
+
+## Experiments
+
+Using the multilingual BERT model, we run three experiments as described below. The “exact match” metric from the original MedWeb challenge is reported, which means that all labels must be predicted correctly for a given pseudo-tweet to be considered correct; macro-averaged F1 is also reported. Each experiment is run 5 times (with different random seeds) and the mean performance is shown in Table TABREF11. Our experiments are focused around using Japanese as the low-resource target language, with English and Chinese as the more readily available source languages.
+
+## Experiments ::: Baselines
+
+To establish a target for our transfer techniques we train and test models on a single language, i.e. English to English, Japanese to Japanese, and Chinese to Chinese. For English we use the uncased base-BERT, for Japanese we use jBERT, and for Chinese we use mBERT (since there is no Chinese-specific model available in the public domain). This last choice seems reasonable since mBERT performed similarly to the single-language models when trained and tested on the same language.
+
+For comparison, we show the results of BIBREF13 who created the most successful model for the MedWeb challenge. Their final system was an ensemble of 120 trained models, using two architectures: a hierarchical attention network and a convolutional neural network. They exploited the fact that parallel data is available in three languages by ensuring consistency between outputs of the models in each language, giving a final exact match score of 0.880. However, for the purpose of demonstrating language transfer we report their highest single-model scores to show that our single-language models are competitive with the released results. We also show results for a majority class classifier (predicting all negative labels, see Table TABREF1) and a random classifier that uses the label frequencies from the training set to randomly predict labels.
+
+## Experiments ::: Zero-shot transfer with multilingual pre-training
+
+Our first experiment investigates the zero-shot transfer ability of multilingual BERT. If mBERT has learned a shared embedding space for all languages, we would expect that if the model is fine-tuned on the English training dataset, then it should be applicable also to the Japanese dataset. To test this we have run this with both the English and Chinese training data, results are shown in Table TABREF11. We ran additional experiments where we froze layers within BERT, but observed no improvement.
+
+The results indicate poor transfer, especially between English and Japanese. To investigate why the model does not perform well, we visualise the output vectors of mBERT using t-SNE BIBREF14 in Figure FIGREF14. We can see that the language representations occupy separate parts of the representation space, with only small amounts of overlap. Further, no clear correlation can be observed between sentence pairs.
+
+The better transfer between Chinese and Japanese likely reflects the fact that these languages share tokens; one of the Japanese alphabets (the Kanji logographic alphabet) consists of Chinese characters. There is 21% vocabulary overlap for the training data and 19% for the test data, whereas there is no token overlap between English and Japanese. Our finding is consistent with previous claims that token overlap impacts mBERT's transfer capability BIBREF9.
+
+## Experiments ::: Training on machine translated data
+
+Our second experiment investigates the use of machine translated data for training a model. We train on the machine translated source data and test on the target test set. Results are shown in Table TABREF11. Augmenting the data by using two sets of translations rather than one proves beneficial. In the end, the difference between training on real Japanese and training on translations from English is around 9% while training on translations from Chinese is around 4%.
+
+## Experiments ::: Mixing translated data with original data
+
+Whilst the results for translated data are promising, we would like to bridge the gap to the performance of the original target data. Our premise is that we start with a fixed-size dataset in the source language, and we have a limited annotation budget to manually translate a proportion of this data into the target language. For this experiment we mix all the translated data with different portions of original Japanese data, varying the amount between 1% and 100%. The results of these experiments are shown in Figure FIGREF17. Using the translated data with just 10% of the original Japanese data, we close the gap by half, with 50% we match the single-language model, and with 100% appear to even achieve a small improvement (for English), likely through the data augmentation provided by the translations.
+
+## Discussion and Conclusions
+
+Zero-shot transfer using multilingual BERT performs poorly when transferring to Japanese on the MedWeb data. However, training on machine translations gives promising performance, and this performance can be increased by adding small amounts of original target data. On inspection, the drop in performance between translated and original Japanese was often a result of translations that were reasonable but not consistent with the labels. For example, when translating the first example in Figure FIGREF2, both machine translations map “UTF8min風邪”, which means cold (the illness), into “UTF8min寒さ”, which means cold (low temperature). Another example is where the Japanese pseudo-tweet “UTF8min花粉症の時期はすごい疲れる。” was provided alongside an English pseudo-tweet “Allergy season is so exhausting.”. Here, the Japanese word for hay fever “UTF8min花粉症。” has been manually mapped to the less specific word “allergies” in English; the machine translation maps back to Japanese using the word for “allergies” i.e. “UTF8minアレルギー” in the katakana alphabet (katakana is used to express words derived from foreign languages), since there is no kanji character for the concept of allergies. In future work, it would be interesting to understand how to detect such ambiguities in order to best deploy our annotation budget.

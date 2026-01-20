@@ -1,0 +1,125 @@
+# Efficient Summarization with Read-Again and Copy Mechanism
+
+**Paper ID:** 1611.03382
+
+## Abstract
+
+Encoder-decoder models have been widely used to solve sequence to sequence prediction tasks. However current approaches suffer from two shortcomings. First, the encoders compute a representation of each word taking into account only the history of the words it has read so far, yielding suboptimal representations. Second, current decoders utilize large vocabularies in order to minimize the problem of unknown words, resulting in slow decoding times. In this paper we address both shortcomings. Towards this goal, we first introduce a simple mechanism that first reads the input sequence before committing to a representation of each word. Furthermore, we propose a simple copy mechanism that is able to exploit very small vocabularies and handle out-of-vocabulary words. We demonstrate the effectiveness of our approach on the Gigaword dataset and DUC competition outperforming the state-of-the-art.
+
+## Introduction
+
+Encoder-decoder models have been widely used in sequence to sequence tasks such as machine translation ( BIBREF0 , BIBREF1 ). They consist of an encoder which represents the whole input sequence with a single feature vector. The decoder then takes this representation and generates the desired output sequence. The most successful models are LSTM and GRU as they are much easier to train than vanilla RNNs.
+
+In this paper we are interested in summarization where the input sequence is a sentence/paragraph and the output is a summary of the text. Several encoding-decoding approaches have been proposed ( BIBREF2 , BIBREF3 , BIBREF4 ). Despite their success, it is commonly believed that the intermediate feature vectors are limited as they are created by only looking at previous words. This is particularly detrimental when dealing with large input sequences. Bi-directorial RNNs ( BIBREF5 , BIBREF6 ) try to address this problem by computing two different representations resulting of reading the input sequence left-to-right and right-to-left. The final vectors are computed by concatenating the two representations. However, the word representations are computed with limited scope.
+
+The decoder employed in all these methods outputs at each time step a distribution over a fixed vocabulary. In practice, this introduces problems with rare words (e.g., proper nouns) which are out of vocabulary. To alleviate this problem, one could potentially increase the size of the decoder vocabulary, but decoding becomes computationally much harder, as one has to compute the soft-max over all possible words. BIBREF7 , BIBREF8 and BIBREF9 proposed to use a copy mechanism that dynamically copy the words from the input sequence while decoding. However, they lack the ability to extract proper embeddings of out-of-vocabulary words from the input context. BIBREF6 proposed to use an attention mechanism to emphasize specific parts of the input sentence when generating each word. However the encoder problem still remains in this approach.
+
+In this work, we propose two simple mechanisms to deal with both encoder and decoder problems. We borrowed intuition from human readers which read the text multiple times before generating summaries. We thus propose a `Read-Again' model that first reads the input sequence before committing to a representation of each word. The first read representation then biases the second read representation and thus allows the intermediate hidden vectors to capture the meaning appropriate for the input text. We show that this idea can be applied to both LSTM and GRU models. Our second contribution is a copy mechanism which allows us to use much smaller decoder vocabulary sizes resulting in much faster decoding. Our copy mechanism also allows us to construct a better representation of out-of-vocabulary words. We demonstrate the effectiveness of our approach in the challenging Gigaword dataset and DUC competition showing state-of-the-art performance.
+
+## Summarization
+
+In the past few years, there has been a lot of work on extractive summarization, where a summary is created by composing words or sentences from the source text. Notable examples are BIBREF10 , BIBREF11 , BIBREF12 , BIBREF13 and BIBREF14 . As a consequence of their extractive nature the summary is restricted to words (sentences) in the source text.
+
+Abstractive summarization, on the contrary, aims at generating consistent summaries based on understanding the input text. Although there has been much less work on abstractive methods, they can in principle produce much richer summaries. Abstractive summarization is standardized by the DUC2003 and DUC2004 competitions ( BIBREF15 ). Some of the prominent approaches on this task includes BIBREF16 , BIBREF17 , BIBREF18 and BIBREF19 . Among them, the TOPIARY system ( BIBREF17 ) performs the best in the competitions amongst non neural net based methods.
+
+Very recently, the success of deep neural networks in many natural language processing tasks ( BIBREF20 ) has inspired new work in abstractive summarization . BIBREF2 propose a neural attention model with a convolutional encoder to solve this task. BIBREF3 build a large dataset for Chinese text summarization and propose to feed all hidden states from the encoder into the decoder. More recently, BIBREF4 extended BIBREF2 's work with an RNN decoder, and BIBREF8 proposed an RNN encoder-decoder architecture for summarization. Both techniques are currently the state-of-the-art on the DUC competition. However, the encoders exploited in these methods lack the ability to encode each word condition on the whole text, as an RNN encodes a word into a hidden vector by taking into account only the words up to that time step. In contrast, in this work we propose a `Read-Again' encoder-decoder architecture, which enables the encoder to understand each input word after reading the whole sentence. Our encoder first reads the text, and the results from the first read help represent the text in the second pass over the source text. Our second contribution is a simple copy mechanism that allows us to significantly reduce the decoder vocabulary size resulting in much faster inference times. Furthermore our copy mechanism allows us to handle out-of-vocabulary words in a principled manner. Finally our experiments show state-of-the-art performance on the DUC competition.
+
+## Neural Machine Translation
+
+Our work is also closely related to recent work on neural machine translation, where neural encoder-decoder models have shown promising results ( BIBREF21 , BIBREF0 , BIBREF1 ). BIBREF6 further developed an attention mechanism in the decoder in order to pay attention to a specific part of the input at every generating time-step. Our approach also exploits an attention mechanism during decoding.
+
+## Out-Of-Vocabulary and Copy Mechanism
+
+Dealing with Out-Of-Vocabulary words (OOVs) is an important issue in sequence to sequence approaches as we cannot enumerate all possible words and learn their embeddings since they might not be part of our training set. BIBREF22 address this issue by annotating words on the source, and aligning OOVs in the target with those source words. Recently, BIBREF23 propose Pointer Networks, which calculate a probability distribution over the input sequence instead of predicting a token from a pre-defined dictionary. BIBREF24 develop a neural-based extractive summarization model, which predicts the targets from the input sequences. BIBREF7 , BIBREF8 add a hard gate to allow the model to decide wether to generate a target word from the fixed-size dictionary or from the input sequence. BIBREF9 use a softmax operation instead of the hard gating. This softmax pointer mechanism is similar to our decoder. However, our decoder can also extract different OOVs' embedding from the input text instead of using a single INLINEFORM0 UNK INLINEFORM1 embedding to represent all OOVs. This further enhances the model's ability to handle OOVs.
+
+## The read again model
+
+Text summarization can be formulated as a sequence to sequence prediction task, where the input is a longer text and the output is a summary of that text. In this paper we develop an encoder-decoder approach to summarization. The encoder is used to represent the input text with a set of continuous vectors, and the decoder is used to generate a summary word by word.
+
+In the following, we first introduce our `Read-Again' model for encoding sentences. The idea behind our approach is very intuitive and is inspired by how humans do this task. When we create summaries, we first read the text and then we do a second read where we pay special attention to the words that are relevant to generate the summary. Our `Read-Again' model implements this idea by reading the input text twice and using the information acquired from the first read to bias the second read. This idea can be seamlessly plugged into LSTM and GRU models. Our second contribution is a copy mechanism used in the decoder. It allows us to reduce the decoder vocabulary size dramatically and can be used to extract a better embedding for OOVs. fig:model:overall gives an overview of our model.
+
+## Encoder
+
+We first review the typical encoder used in machine translation (e.g., BIBREF1 , BIBREF6 ). Let INLINEFORM0 be the input sequence of words. An encoder sequentially reads each word and creates the hidden representation INLINEFORM1 by exploting a recurrent neural network (RNN) DISPLAYFORM0 
+
+where INLINEFORM0 is the word embedding of INLINEFORM1 . The hidden vectors INLINEFORM2 are then treated as the feature representations for the whole input sentence and can be used by another RNN to decode and generate a target sentence. Although RNNs have been shown to be useful in modeling sequences, one of the major drawback is that INLINEFORM3 depends only on past information i.e., INLINEFORM4 . However, it is hard (even for humans) to have a proper representation of a word without reading the whole input sentence. Following this intuition, we propose our `Read-Again' model where the encoder reads the input sentence twice. In particular, the first read is used to bias the second more attentive read. We apply this idea to two popular RNN architectures, i.e. GRU and LSTM, resulting in better encodings of the input text.
+
+Note that although other alternatives, such as bidirectional RNN exist, the hidden states from the forward RNN lack direct interactions with the backward RNN, and thus forward/backward hidden states still cannot utilize the whole sequence. Besides, although we only use our model in a uni-directional manner, it can also be easily adapted to the bidirectional case. We now describe the two variants of our model.
+
+We read the input sentence INLINEFORM0 for the first-time using a standard GRU DISPLAYFORM0 
+
+where the function INLINEFORM0 is defined as, DISPLAYFORM0 
+
+ It consists of two gatings INLINEFORM0 , controlling whether the current hidden state INLINEFORM1 should be directly copied from INLINEFORM2 or should pass through a more complex path INLINEFORM3 .
+
+Given the sentence feature vector INLINEFORM0 , we then compute an importance weight vector INLINEFORM1 of each word for the second reading. We put the importance weight INLINEFORM2 on the skip-connections as shown in fig:model:gru to bias the two information flows: If the current word INLINEFORM3 has a very small weight INLINEFORM4 , then the second read hidden state INLINEFORM5 will mostly take the information directly from the previous state INLINEFORM6 , ignoring the influence of the current word. If INLINEFORM7 is close to 1 then it will be similar to a standard GRU, which is only influenced from the current word. Thus the second reading has the following update rule DISPLAYFORM0 
+
+where INLINEFORM0 means element-wise product. We compute the importance weights by attending INLINEFORM1 with INLINEFORM2 as follows DISPLAYFORM0 
+
+where INLINEFORM0 , INLINEFORM1 , INLINEFORM2 are learnable parameters. Note that INLINEFORM3 is a vector representing the importance of each dimension in the word embedding. Empirically, we find that using a vector is better than a single value. We hypothesize that this is because different dimensions represent different semantic meanings, and a single value lacks the ability to model the variances among these dimensions.
+
+Combining this with the standard GRU update rule INLINEFORM0 
+
+we can simplify the updating rule Eq. ( EQREF15 ) to get DISPLAYFORM0 
+
+This equations shows that our `read-again' model on GRU is equivalent to replace the GRU cell with a more general gating mechanism that also depends on the feature representation of the whole sentence computed from the first reading pass. We argue that adding this global information could help direct the information flow for the forward pass resulting in a better encoder.
+
+We now apply the `Read-Again' idea to the LSTM architecture as shown in fig:model:lstm. Our first reading is performed by an INLINEFORM0 defined as DISPLAYFORM0 
+
+Different from the GRU architecture, LSTM calculates the hidden state by applying a non-linear activation function to the cell state INLINEFORM0 , instead of a linear combination of two paths used in the GRU. Thus for our second read, instead of using skip-connections, we make the gating functions explicitly depend on the whole sentence vector computed from the first reading pass. We argue that this helps the encoding of the second reading INLINEFORM1 , as all gating and updating increments are also conditioned on the whole sequence feature vector INLINEFORM2 , INLINEFORM3 . Thus DISPLAYFORM0 
+
+In this section we extend our `Read-Again' model to the case where the input sequence has more than one sentence. Towards this goal, we propose to use a hierarchical representation, where each sentence has its own feature vector from the first reading pass. We then combine them into a single vector to bias the second reading pass. We illustrate this in the context of two input sentences, but it is easy to generalize to more sentences. Let INLINEFORM0 and INLINEFORM1 be the two input sentences. The first RNN reads these two sentences independently to get two sentence feature vectors INLINEFORM2 and INLINEFORM3 respectively.
+
+Here we investigate two different ways to handle multiple sentences. Our first option is to simply concatenate the two feature vectors to bias our second reading pass: DISPLAYFORM0 
+
+ where INLINEFORM0 and INLINEFORM1 are initial zero vectors. Feeding INLINEFORM2 into the second RNN provides more global information explicitly and helps acquire long term dependencies.
+
+The second option we explored is shown in fig:modelhierarchy. In particular, we use a non-linear transformation to get a single feature vector INLINEFORM0 from both sentence feature vectors: DISPLAYFORM0 
+
+ The second reading pass is then DISPLAYFORM0 
+
+ Note that this is more easily scalable to more sentences. In our experiments both approaches perform similarly.
+
+## Decoder with copy mechanism
+
+In this paper we argue that only a small number of common words are needed for generating a summary in addition to the words that are present in the source text. We can consider this as a hybrid approach which combines extractive and abstractive summarization. This has two benefits: first it allow us to use a very small vocabulary size, speeding up inference. Furthermore, we can create summaries which contain OOVs if they are present in the source text.
+
+Our decoder reads the vector representations of the input text using an attention mechanism, and generates the target summary word by word. We use an LSTM as our decoder, with a fixed-size vocabulary dictionary INLINEFORM0 and learnable word embeddings INLINEFORM1 . At time-step INLINEFORM2 the LSTM generates a summary word INLINEFORM3 by first computing the current hidden state INLINEFORM4 from the previous hidden state INLINEFORM5 , previous summary word INLINEFORM6 and current context vector INLINEFORM7 DISPLAYFORM0 
+
+where the context vector INLINEFORM0 is computed with an attention mechanism on the encoder hidden states: DISPLAYFORM0 
+
+The attention score INLINEFORM0 at time-step INLINEFORM1 on the INLINEFORM2 -th word is computed via a soft-max over INLINEFORM3 , where DISPLAYFORM0 
+
+ with INLINEFORM0 , INLINEFORM1 , INLINEFORM2 learnable parameters.
+
+A typical way to treat OOVs is to encode them with a single shared embedding. However, different OOVs can have very different meanings, and thus using a single embedding for all OOVs will confuse the model. This is particularly detrimental when using small vocabulary sizes. Here we address this issue by deriving the representations of OOVs from their corresponding context in the input text. Towards this goal, we change the update rule of INLINEFORM0 . In particular, if INLINEFORM1 belongs to a word that is in our decoder vocabulary we take its representation from the word embedding, otherwise if it appears in the input sentence as INLINEFORM2 we use DISPLAYFORM0 
+
+ where INLINEFORM0 and INLINEFORM1 are learnable parameters. Since INLINEFORM2 encodes useful context information of the source word INLINEFORM3 , INLINEFORM4 can be interpreted as the semantics of this word extracted from the input sentence. Furthermore, if INLINEFORM5 does not appear in the input text, nor in INLINEFORM6 , then we represent INLINEFORM7 using the INLINEFORM8 UNK INLINEFORM9 embedding.
+
+Given the current decoder's hidden state INLINEFORM0 , we can generate the target summary word INLINEFORM1 . As shown in fig:model:decoder, at each time step during decoding, the decoder outputs a distribution over generating words from INLINEFORM2 , as well as over copying a specific word INLINEFORM3 from the source sentence.
+
+## Learning
+
+We jointly learn our encoder and decoder by maximizing the likelihood of decoding the correct word at each time step. We refer the reader to the experimental evaluation for more details.
+
+## Experimental Evalaluation
+
+In this section, we show results of abstractive summarization on Gigaword ( BIBREF25 , BIBREF26 ) and DUC2004 ( BIBREF15 ) datasets. Our model can learn a meaningful re-reading weight distribution for each word in the input text, putting more emphasis on important verb and nous, while ignoring common words such as prepositions. As for the decoder, we demonstrate that our copy mechanism can successfully reduce the typical vocabulary size by a factor 5 while achieving much better performance than the state-of-the-art, and by a factor of 30 while maintaining the same level of performance. In addition, we provide an analysis and examples of which words are copied during decoding.
+
+## Quantitative Evaluation
+
+Results on Gigaword: We compare the performances of different architectures and report ROUGE scores in Tab. TABREF32 . Our baselines include the ABS model of BIBREF2 with its proposed vocabulary size as well as an attention encoder-decoder model with uni-directional GRU encoder. We allow the decoder to generate variable length summaries. As shown in Tab. TABREF32 our Read-Again models outperform the baselines on all ROUGE scores, when using both 15K and 69K sized vocabularies. We also observe that adding the copy mechanism further helps to improve performance: Even though the decoder vocabulary size of our approach with copy (15K) is much smaller than ABS (69K) and GRU (69K), it achieves a higher ROUGE score. Besides, our Multiple-Sentences model achieves the best performance.
+
+Evaluation on DUC2004: DUC 2004 ( BIBREF15 ) is a commonly used benchmark on summarization task consisting of 500 news articles. Each article is paired with 4 different human-generated reference summaries, capped at 75 characters. This dataset is evaluation-only. Similar to BIBREF2 , we train our neural model on the Gigaword training set, and show the models' performances on DUC2004. Following the convention, we also use ROUGE limited-length recall as our evaluation metric, and set the capping length to 75 characters. We generate summaries with 15 words using beam-size of 10. As shown in Table TABREF35 , our method outperforms all previous methods on Rouge-1 and Rouge-L, and is comparable on Rouge-2. Furthermore, our model only uses 15k decoder vocabulary, while previous methods use 69k or 200k.
+
+Importance Weight Visualization: As we described in the section before, INLINEFORM0 is a high-dimension vector representing the importance of each word INLINEFORM1 . While the importance of a word is different over each dimension, by averaging we can still look at general trends of which word is more relevant. fig:weightvisual depicts sample sentences with the importance weight INLINEFORM2 over input words. Words such as the, a, 's, have small INLINEFORM3 , while words such as aeronautics, resettled, impediments, which carry more information have higher values. This shows that our read-again technique indeed extracts useful information from the first reading to help bias the second reading results.
+
+## Decoder Vocabulary Size
+
+Table TABREF42 shows the effect on our model of decreasing the decoder vocabulary size. We can see that when using the copy mechanism, we are able to reduce the decoder vocabulary size from 69K to 2K, with only 2-3 points drop on ROUGE score. This contrasts the models that do not use the copy mechanism. This is possibly due to two reasons. First, when faced with OOVs during decoding time, our model can extract their meanings from the input text. Second, equipped with a copy mechanism, our model can generate OOVs as summary words, maintaining its expressive ability even with a small decoder vocabulary size. Tab. TABREF43 shows the decoding time as a function of vocabulary size. As computing the soft-max is usually the bottleneck for decoding, reducing vocabulary size dramatically reduces the decoding time from 0.38 second per sentence to 0.08 second.
+
+Tab. TABREF44 provides some examples of visualization of the copy mechanism. Note that we are able to copy key words from source sentences to improve the summary. From these examples we can see that our model is able to copy different types of rare words, such as special entities' names in case 1 and 2, rare nouns in case 3 and 4, adjectives in case 5 and 6, and even rare verbs in the last example. Note that in the third example, when the copy model's decoder uses the embedding of headmaster as its first input, which is extracted from the source sentence, it generates the same following sentence as the no-copy model. This probably means that the extracted embedding of headmaster is closely related to the learned embedding of teacher.
+
+## Conclusion
+
+In this paper we have proposed two simple mechanisms to alleviate the problems of current encoder-decoder models. Our first contribution is a `Read-Again' model which does not form a representation of the input word until the whole sentence is read. Our second contribution is a copy mechanism that can handle out-of-vocabulary words in a principled manner allowing us to reduce the decoder vocabulary size and significantly speed up inference. We have demonstrated the effectiveness of our approach in the context of summarization and shown state-of-the-art performance. In the future, we plan to tackle summarization problems with large input text. We also plan to exploit our findings in other tasks such as machine translation.

@@ -1,0 +1,97 @@
+# Improving Deep Transformer with Depth-Scaled Initialization and Merged Attention
+
+**Paper ID:** 1908.11365
+
+## Abstract
+
+The general trend in NLP is towards increasing model capacity and performance via deeper neural networks. However, simply stacking more layers of the popular Transformer architecture for machine translation results in poor convergence and high computational overhead. Our empirical analysis suggests that convergence is poor due to gradient vanishing caused by the interaction between residual connections and layer normalization. We propose depth-scaled initialization (DS-Init), which decreases parameter variance at the initialization stage, and reduces output variance of residual connections so as to ease gradient back-propagation through normalization layers. To address computational cost, we propose a merged attention sublayer (MAtt) which combines a simplified averagebased self-attention sublayer and the encoderdecoder attention sublayer on the decoder side. Results on WMT and IWSLT translation tasks with five translation directions show that deep Transformers with DS-Init and MAtt can substantially outperform their base counterpart in terms of BLEU (+1.1 BLEU on average for 12-layer models), while matching the decoding speed of the baseline model thanks to the efficiency improvements of MAtt.
+
+## Introduction
+
+The capability of deep neural models of handling complex dependencies has benefited various artificial intelligence tasks, such as image recognition where test error was reduced by scaling VGG nets BIBREF0 up to hundreds of convolutional layers BIBREF1. In NLP, deep self-attention networks have enabled large-scale pretrained language models such as BERT BIBREF2 and GPT BIBREF3 to boost state-of-the-art (SOTA) performance on downstream applications. By contrast, though neural machine translation (NMT) gained encouraging improvement when shifting from a shallow architecture BIBREF4 to deeper ones BIBREF5, BIBREF6, BIBREF7, BIBREF8, the Transformer BIBREF9, a currently SOTA architecture, achieves best results with merely 6 encoder and decoder layers, and no gains were reported by BIBREF9 from further increasing its depth on standard datasets.
+
+We start by analysing why the Transformer does not scale well to larger model depth. We find that the architecture suffers from gradient vanishing as shown in Figure FIGREF2, leading to poor convergence. An in-depth analysis reveals that the Transformer is not norm-preserving due to the involvement of and the interaction between residual connection (RC) BIBREF1 and layer normalization (LN) BIBREF10.
+
+To address this issue, we propose depth-scaled initialization (DS-Init) to improve norm preservation. We ascribe the gradient vanishing to the large output variance of RC and resort to strategies that could reduce it without model structure adjustment. Concretely, DS-Init scales down the variance of parameters in the $l$-th layer with a discount factor of $\frac{1}{\sqrt{l}}$ at the initialization stage alone, where $l$ denotes the layer depth starting from 1. The intuition is that parameters with small variance in upper layers would narrow the output variance of corresponding RCs, improving norm preservation as shown by the dashed lines in Figure FIGREF2. In this way, DS-Init enables the convergence of deep Transformer models to satisfactory local optima.
+
+Another bottleneck for deep Transformers is the increase in computational cost for both training and decoding. To combat this, we propose a merged attention network (MAtt). MAtt simplifies the decoder by replacing the separate self-attention and encoder-decoder attention sublayers with a new sublayer that combines an efficient variant of average-based self-attention (AAN) BIBREF11 and the encoder-decoder attention. We simplify the AAN by reducing the number of linear transformations, reducing both the number of model parameters and computational cost. The merged sublayer benefits from parallel calculation of (average-based) self-attention and encoder-decoder attention, and reduces the depth of each decoder block.
+
+We conduct extensive experiments on WMT and IWSLT translation tasks, covering five translation tasks with varying data conditions and translation directions. Our results show that deep Transformers with DS-Init and MAtt can substantially outperform their base counterpart in terms of BLEU (+1.1 BLEU on average for 12-layer models), while matching the decoding speed of the baseline model thanks to the efficiency improvements of MAtt.
+
+Our contributions are summarized as follows:
+
+We analyze the vanishing gradient issue in the Transformer, and identify the interaction of residual connections and layer normalization as its source.
+
+To address this problem, we introduce depth-scaled initialization (DS-Init).
+
+To reduce the computational cost of training deep Transformers, we introduce a merged attention model (MAtt). MAtt combines a simplified average-attention model and the encoder-decoder attention into a single sublayer, allowing for parallel computation.
+
+We conduct extensive experiments and verify that deep Transformers with DS-Init and MAtt improve translation quality while preserving decoding efficiency.
+
+## Related Work
+
+Our work aims at improving translation quality by increasing model depth. Compared with the single-layer NMT system BIBREF4, deep NMT models are typically more capable of handling complex language variations and translation relationships via stacking multiple encoder and decoder layers BIBREF5, BIBREF6, BIBREF12, BIBREF8, and/or multiple attention layers BIBREF7. One common problem for the training of deep neural models are vanishing or exploding gradients. Existing methods mainly focus on developing novel network architectures so as to stabilize gradient back-propagation, such as the fast-forward connection BIBREF5, the linear associative unit BIBREF13, or gated recurrent network variants BIBREF14, BIBREF15, BIBREF16, BIBREF17. In contrast to the above recurrent network based NMT models, recent work focuses on feed-forward alternatives with more smooth gradient flow, such as convolutional networks BIBREF18 and self-attention networks BIBREF9.
+
+The Transformer represents the current SOTA in NMT. It heavily relies on the combination of residual connections BIBREF1 and layer normalization BIBREF10 for convergence. Nevertheless, simply extending this model with more layers results in gradient vanishing due to the interaction of RC and LN (see Section SECREF4). Recent work has proposed methods to train deeper Transformer models, including a rescheduling of RC and LN BIBREF19, the transparent attention model BIBREF20 and the stochastic residual connection BIBREF21. In contrast to these work, we identify the large output variance of RC as the source of gradient vanishing, and employ scaled initialization to mitigate it without any structure adjustment. The effect of careful initialization on boosting convergence was also investigated and verified in previous work BIBREF22, BIBREF23, BIBREF2, BIBREF3.
+
+The merged attention network falls into the category of simplifying the Transformer so as to shorten training and/or decoding time. Methods to improve the Transformer's running efficiency range from algorithmic improvements BIBREF24, non-autoregressive translation BIBREF25, BIBREF26 to decoding dependency reduction such as average attention network BIBREF11 and blockwise parallel decoding BIBREF27. Our MAtt builds upon the AAN model, further simplifying the model by reducing the number of linear transformations, and combining it with the encoder-decoder attention. In work concurrent to ours, BIBREF28 propose the evolved Transformer which, based on automatic architecture search, also discovered a parallel structure of self-attention and encoder-decoder attention.
+
+## Background: Transformer
+
+Given a source sequence $\mathbf {X}=\lbrace x_1, x_2, \ldots , x_n\rbrace \in \mathbb {R}^{n\times d}$, the Transformer predicts a target sequence $\mathbf {Y}=\lbrace y_1, y_2, \ldots , y_m\rbrace $ under the encoder-decoder framework. Both the encoder and the decoder in the Transformer are composed of attention networks, functioning as follows:
+
+where $\mathbf {Z}_x \in \mathbb {R}^{I\times d}$ and $\mathbf {Z}_y \in \mathbb {R}^{J\times d}$ are input sequence representations of length $I$ and $J$ respectively, $\mathbf {W}_* \in \mathbb {R}^{d\times d}$ denote weight parameters. The attention network can be further enhanced with multi-head attention BIBREF9.
+
+Formally, the encoder stacks $L$ identical layers, each including a self-attention sublayer (Eq. DISPLAY_FORM8) and a point-wise feed-forward sublayer (Eq. ):
+
+$\mathbf {H}^l \in \mathbb {R}^{n\times d}$ denotes the sequence representation of the $l$-th encoder layer. Input to the first layer $\mathbf {H}^0$ is the element-wise addition of the source word embedding $\mathbf {X}$ and the corresponding positional encoding. $\textsc {Ffn}(\cdot )$ is a two-layer feed-forward network with a large intermediate representation and $\text{ReLU}$ activation function. Each encoder sublayer is wrapped with a residual connection (Eq. DISPLAY_FORM9), followed by layer normalization (Eq. ):
+
+where $\mathbf {z}$ and $\mathbf {z}^\prime $ are input vectors, and $\odot $ indicates element-wise multiplication. $\mu $ and $\sigma $ denote the mean and standard deviation statistics of vector $\mathbf {z}$. The normalized $\mathbf {z}$ is then re-scaled and re-centered by trainable parameters $\mathbf {g}$ and $\mathbf {b}$ individually.
+
+The decoder also consists of $L$ identical layers, each of them extends the encoder sublayers with an encoder-decoder attention sublayer (Eq. ) to capture translation alignment from target words to relevant source words:
+
+$\mathbf {S}^l \in \mathbb {R}^{m\times d}$ is the sequence representation of the $l$-th decoder layer. Input $\mathbf {S}^0$ is defined similar to $\mathbf {H}^0$. To ensure auto-regressive decoding, the attention weights in Eq. DISPLAY_FORM10 are masked to prevent attention to future target tokens.
+
+The Transformer's parameters are typically initialized by sampling from a uniform distribution:
+
+where $d_i$ and $d_o$ indicate input and output dimension separately. This initialization has the advantage of maintaining activation variances and back-propagated gradients variance and can help train deep neural networks BIBREF29.
+
+## Vanishing Gradient Analysis
+
+One natural way to deepen Transformer is simply enlarging the layer number $L$. Unfortunately, Figure FIGREF2 shows that this would give rise to gradient vanishing on both the encoder and the decoder at the lower layers, and that the case on the decoder side is worse. We identified a structural problem in the Transformer architecture that gives rise to this issue, namely the interaction of RC and LN, which we will here discuss in more detail.
+
+Given an input vector $\mathbf {z} \in \mathbb {R}^d$, let us consider the general structure of RC followed by LN:
+
+where $\mathbf {r}, \mathbf {o} \in \mathbb {R}^d$ are intermediate outputs. $f(\cdot )$ represents any neural network, such as recurrent, convolutional or attention network, etc. Suppose during back-propagation, the error signal at the output of LN is $\mathbf {\delta }_o$. Contributions of RC and LN to the error signal are as follows:
+
+where $\mathbf {\bar{r}}$ denotes the normalized input. $\mathbf {I}$ is the identity matrix and $\text{diag}(\cdot )$ establishes a diagonal matrix from its input. The resulting $\mathbf {\delta }_r$ and $\mathbf {\delta }_z$ are error signals arrived at output $\mathbf {r}$ and $\mathbf {z}$ respectively.
+
+We define the change of error signal as follows:
+
+where $\beta $ (or model ratio), $\beta _{\textsc {Ln}}$ (or LN ratio) and $\beta _{\textsc {Rc}}$ (or RC ratio) measure the gradient norm ratio of the whole residual block, the layer normalization and the residual connection respectively. Informally, a neural model should preserve the gradient norm between layers ($\beta \approx 1$) so as to allow training of very deep models BIBREF30.
+
+We resort to empirical evidence to analyze these ratios. Results in Table TABREF16 show that LN weakens error signal ($\beta _{\textsc {Ln}} < 1$) but RC strengthens it ($\beta _{\textsc {Rc}} > 1$). One explanation about LN's decay effect is the large output variance of RC ($\text{Var}(\mathbf {r}) > 1$) which negatively affects $\mathbf {\delta }_r$ as shown in Eq. DISPLAY_FORM13. By contrast, the short-cut in RC ensures that the error signal at higher layer $\mathbf {\delta }_r$ can always be safely carried on to lower layer no matter how complex $\frac{\partial f}{\partial \mathbf {z}}$ would be as in Eq. , increasing the ratio.
+
+## Depth-Scaled Initialization
+
+Results on the model ratio show that self-attention sublayer has a (near) increasing effect ($\beta > 1$) that intensifies error signal, while feed-forward sublayer manifests a decreasing effect ($\beta < 1$). In particular, though the encoder-decoder attention sublayer and the self-attention sublayer share the same attention formulation, the model ratio of the former is smaller. As shown in Eq. and DISPLAY_FORM7, part of the reason is that encoder-decoder attention can only back-propagate gradients to lower layers through the query representation $\mathbf {Q}$, bypassing gradients at the key $\mathbf {K}$ and the value $\mathbf {V}$ to the encoder side. This negative effect explains why the decoder suffers from more severe gradient vanishing than the encoder in Figure FIGREF2.
+
+The gradient norm is preserved better through the self-attention layer than the encoder-decoder attention, which offers insights on the successful training of the deep Transformer in BERT BIBREF2 and GPT BIBREF3, where encoder-decoder attention is not involved. However, results in Table TABREF16 also suggests that the self-attention sublayer in the encoder is not strong enough to counteract the gradient loss in the feed-forward sublayer. That is why BERT and GPT adopt a much smaller standard deviation (0.02) for initialization, in a similar spirit to our solution.
+
+We attribute the gradient vanishing issue to the large output variance of RC (Eq. DISPLAY_FORM13). Considering that activation variance is positively correlated with parameter variance BIBREF29, we propose DS-Init and change the original initialization method in Eq. DISPLAY_FORM11 as follows:
+
+where $\alpha $ is a hyperparameter in the range of $[0, 1]$ and $l$ denotes layer depth. Hyperparameter $\alpha $ improves the flexibility of our method. Compared with existing approaches BIBREF19, BIBREF20, our solution does not require modifications in the model architecture and hence is easy to implement.
+
+According to the property of uniform distribution, the variance of model parameters decreases from $\frac{\gamma ^2}{3}$ to $\frac{\gamma ^2\alpha ^2}{3l}$ after applying DS-Init. By doing so, a higher layer would have smaller output variance of RC so that more gradients can flow back. Results in Table TABREF16 suggest that DS-Init narrows both the variance and different ratios to be $\sim $1, ensuring the stability of gradient back-propagation. Evidence in Figure FIGREF2 also shows that DS-Init helps keep the gradient norm and slightly increases it on the encoder side. This is because DS-Init endows lower layers with parameters of larger variance and activations of larger norm. When error signals at different layers are of similar scale, the gradient norm at lower layers would be larger. Nevertheless, this increase does not hurt model training based on our empirical observation.
+
+DS-Init is partially inspired by the Fixup initialization BIBREF22. Both of them try to reduce the output variance of RC. The difference is that Fixup focuses on overcoming gradient explosion cased by consecutive RCs and seeks to enable training without LN but at the cost of carefully handling parameter initialization of each matrix transformation, including manipulating initialization of different bias and scale terms. Instead, DS-Init aims at solving gradient vanishing in deep Transformer caused by the structure of RC followed by LN. We still employ LN to standardize layer activation and improve model convergence. The inclusion of LN ensures the stability and simplicity of DS-Init.
+
+## Merged Attention Model
+
+With large model depth, deep Transformer unavoidably introduces high computational overhead. This brings about significantly longer training and decoding time. To remedy this issue, we propose a merged attention model for decoder that integrates a simplified average-based self-attention sublayer into the encoder-decoder attention sublayer. Figure FIGREF17 highlights the difference.
+
+The AAN model (Figure FIGREF19), as an alternative to the self-attention model (Figure FIGREF18), accelerates Transformer decoding by allowing decoding in linear time, avoiding the $\mathcal {O}(n^2)$ complexity of the self-attention mechanism BIBREF11. Unfortunately, the gating sublayer and the feed-forward sublayer inside AAN reduce the empirical performance improvement. We propose a simplified AAN by removing all matrix computation except for two linear projections:
+
+where $\mathbf {M}_a$ denotes the average mask matrix for parallel computation BIBREF11. This new model is then combined with the encoder-decoder attention as shown in Figure FIGREF20:
+
+The mapping $\mathbf {W}_o$ is shared for $\textsc {SAan}$ and $\textsc {Att}$. After combination, MAtt allows for the parallelization of AAN and encoder-decoder attention.

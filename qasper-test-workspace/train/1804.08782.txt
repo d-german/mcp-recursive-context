@@ -1,0 +1,119 @@
+# Towards an Unsupervised Entrainment Distance in Conversational Speech using Deep Neural Networks
+
+**Paper ID:** 1804.08782
+
+## Abstract
+
+Entrainment is a known adaptation mechanism that causes interaction participants to adapt or synchronize their acoustic characteristics. Understanding how interlocutors tend to adapt to each other's speaking style through entrainment involves measuring a range of acoustic features and comparing those via multiple signal comparison methods. In this work, we present a turn-level distance measure obtained in an unsupervised manner using a Deep Neural Network (DNN) model, which we call Neural Entrainment Distance (NED). This metric establishes a framework that learns an embedding from the population-wide entrainment in an unlabeled training corpus. We use the framework for a set of acoustic features and validate the measure experimentally by showing its efficacy in distinguishing real conversations from fake ones created by randomly shuffling speaker turns. Moreover, we show real world evidence of the validity of the proposed measure. We find that high value of NED is associated with high ratings of emotional bond in suicide assessment interviews, which is consistent with prior studies.
+
+## Introduction
+
+Vocal entrainment is an established social adaptation mechanism. It can be loosely defined as one speaker's spontaneous adaptation to the speaking style of the other speaker. Entrainment is a fairly complex multifaceted process and closely associated with many other mechanisms such as coordination, synchrony, convergence etc. While there are various aspects and levels of entrainment BIBREF0 , there is also a general agreement that entrainment is a sign of positive behavior towards the other speaker BIBREF1 , BIBREF2 , BIBREF3 . High degree of vocal entrainment has been associated with various interpersonal behavioral attributes, such as high empathy BIBREF4 , more agreement and less blame towards the partner and positive outcomes in couple therapy BIBREF5 , and high emotional bond BIBREF6 . A good understanding of entrainment provides insights to various interpersonal behaviors and facilitates the recognition and estimation of these behaviors in the realm of Behavioral Signal Processing BIBREF7 , BIBREF8 . Moreover, it also contributes to the modeling and development of `human-like' spoken dialog systems or conversational agents.
+
+Unfortunately, quantifying entrainment has always been a challenging problem. There is a scarcity of reliable labeled speech databases on entrainment, possibly due to the subjective and diverse nature of its definition. This makes it difficult to capture entrainment using supervised models, unlike many other behaviors. Early studies on entrainment relied on highly subjective and context-dependent manual observation coding for measuring entrainment. The objective methods based on extracted speech features employed classical synchrony measures such as Pearson's correlation BIBREF0 and traditional (linear) time series analysis techniques BIBREF9 . Lee et al. BIBREF10 , BIBREF4 proposed a measure based on PCA representation of prosody and MFCC features of consecutive turns. Most of the these approaches assume a linear relationship between features of consecutive speaker turns which is not necessarily true, given the complex nature of entrainment. For example, the effect of rising pitch or energy can potentially have a nonlinear influence across speakers.
+
+Recently, various complexity measures (such as largest Lyapunov exponent) of feature streams based on nonlinear dynamical systems modeling showed promising results in capturing entrainment BIBREF5 , BIBREF6 . A limitation of this modeling, however, is the assumption of the short-term stationary or slowly varying nature of the features. While this can be reasonable for global or session-level complexity, the measure is not very meaningful capturing turn-level or local entrainment. Nonlinear dynamical measures also suffer from scalability to a multidimensional feature set, including spectral coefficients such as MFCCs. Further, all of the above metrics are knowledge-driven and do not exploit the vast amount of information that can be gained from existing interactions.
+
+A more holistic approach is to capture entrainment in consecutive speaker turns through a more robust nonlinear function. Conceptually speaking, such a formulation of entrainment is closely related to the problem of learning a transfer function which maps vocal patterns of one speaker turn to the next. A compelling choice to nonlinearly approximate the transfer function would be to employ Deep Neural Networks (DNNs). This is supported by recent promising applications of deep learning models, both in supervised and unsupervised paradigm, in modeling and classification of emotions and behaviors from speech. For example in BIBREF11 the authors learned, in an unsupervised manner, a latent embedding towards identifying behavior in out-of-domain tasks. Similarly in BIBREF12 , BIBREF13 the authors employ Neural Predictive Coding to derive embeddings that link to speaker characteristics in an unsupervised manner.
+
+We propose an unsupervised training framework to contextually learn the transfer function that ties the two speakers. The learned bottleneck embedding contains cross-speaker information closely related to entrainment. We define a distance measure between the consecutive speaker turns represented in the bottleneck feature embedding space. We call this metric the Neural Entrainment Distance (NED).
+
+Towards this modeling approach we use features that have already been established as useful for entrainment. The majority of research BIBREF0 , BIBREF14 , BIBREF10 , BIBREF5 , BIBREF6 focused on prosodic features like pitch, energy, and speech rate. Others also analyzed entrainment in spectral and voice quality features BIBREF10 , BIBREF4 . Unlike classical nonlinear measures, we jointly learn from a multidimensional feature set comprising of prosodic, spectral, and voice quality features.
+
+We then experimentally investigate the validity and effectiveness of the NED measure in association with interpersonal behavior.
+
+## Datasets
+
+We use two datasets in this work: the training is done on the Fisher Corpus English Part 1 (LDC2004S13) BIBREF15 and testing on the Suicide Risk Assessment corpus BIBREF16 , along with Fisher.
+
+## Preprocessing
+
+A number of audio preprocessing steps are required in the entrainment framework for obtaining boundaries of relevant segments of audio from consecutive turns. First, we perform voice activity detection (VAD) to identify the speech regions. Following this, speaker diarization is performed in order to distinguish speech segments spoken by different speakers. However, our training dataset, the Fisher corpus also contains transcripts with speaker turn boundaries as well as timings for pauses within a turn. Since, these time stamps appeared to be reasonably accurate, we use them as oracle VAD and diarization. On the other hand, for the Suicide Risk Assessment corpus, we perform VAD and diarization on raw audio to obtain the turn boundaries. Subsequently, we also split a single turn into inter-pausal units (IPUs) if there is any pause of at least 50 ms present within the turn. For the purpose of capturing entrainment-related information, we only consider the initial and the final IPU of every turn. This is done based on the hypothesis that during a turn-taking, entrainment is mostly prominent between the most recent IPU of previous speaker's turn and the first IPU of the next speaker's turn BIBREF0 .
+
+## Feature Extraction
+
+We extract 38 different acoustic features from the segments (IPUs) of our interest. The extracted feature set includes 4 prosody features (pitch, energy and their first order deltas), 31 spectral features (15 MFCCs, 8 MFBs, 8 LSFs) and 3 voice quality features (shimmer and 2 variants of jitter). We found in our early analysis that derivatives of spectral and voice quality features do not seem to contribute significantly to entrainment and hence we do include them for the NED model. The feature extraction is performed with a Hamming window of 25 ms width and 10 ms shift using the OpenSMILE toolkit BIBREF17 . For pitch, we perform an additional post-processing by applying a median-filter based smoothing technique (with a window size of 5 frames) as pitch extraction is not very robust and often prone to errors, such as halving or doubling errors. We also perform z-score normalization of the features across the whole session, except for pitch and energy features, which are normalized by dividing them by their respective means.
+
+## Turn-level Features
+
+We propose to calculate NED as directional entrainment-related measure from speaker 1 to speaker 2 for a change of turn as shown in Figure FIGREF6 . The segments of interest in this case are the final IPU of speaker 1's turn and the initial IPU of the subsequent turn by speaker 2, marked by the bounding boxes in the figure. As turn-level features, we compute six statistical functionals over all frames in those two IPUs, generating two sets of functionals of features for each pair of turns. The functionals we compute are as follows: mean, median, standard deviation, 1st percentile, 99th percentile and range between 99th and 1st percentile. Thus we obtain INLINEFORM0 turn-level features from each IPU representing the turn. Let us denote the turn-level feature vector of the final IPU of speaker 1 and the initial IPU of speaker 2 as INLINEFORM1 and INLINEFORM2 , respectively, for further discussion in the paper.
+
+## Modeling with Neural Network
+
+Most work in the entrainment literature directly computes a measure between INLINEFORM0 and INLINEFORM1 (such as correlation BIBREF0 ) or their lower-dimensional representations BIBREF10 . However, one conceptual limitation of all these approaches is that turn-level features INLINEFORM2 and INLINEFORM3 do not only contain the underlying acoustic information that can be entrained across turns, but also speaker-specific, phonetic and paralinguistic information that is specific to the corresponding turns and not influenced by the previous turn (non-entrainable). If we represent those two types of information as vector embeddings, INLINEFORM4 and INLINEFORM5 respectively, we can model turn-level feature vectors INLINEFORM6 as a nonlinear function INLINEFORM7 over them, i.e., INLINEFORM8 and INLINEFORM9 . In this formulation, the distance between INLINEFORM10 and INLINEFORM11 should be zero in the hypothetical case of `perfect' entrainment.
+
+Our goal is to approximate the inverse mappings that maps the feature vector INLINEFORM0 to entrainment embedding INLINEFORM1 and ideally to learn the same from `perfect' or very highly entrained turns. Unfortunately, in absence of such a dataset, we learn it from consecutive turns in real data where entrainment is present, at least to some extent. As shown in Figure FIGREF6 , we adopt a feed-forward deep neural network (DNN) as an encoder for this purpose.
+
+The different components of the model are described below:
+
+First we use INLINEFORM0 as the input to the encoder network. We choose the output of the encoder network, INLINEFORM1 to be undercomplete representation of INLINEFORM2 , by restricting the dimensionality of INLINEFORM3 to be lower than that of INLINEFORM4 .
+
+ INLINEFORM0 is then passed through another feed-forward ( INLINEFORM1 ) network used as decoder to predict INLINEFORM2 . The output of the decoder is denoted as INLINEFORM3 .
+
+Then INLINEFORM0 and its reference INLINEFORM1 are compared to obtain the loss function of the model, INLINEFORM2 .
+
+Even though this deep neural network resembles autoencoder architectures, it does not reconstruct itself but rather tries to encode relevant information from one turn to predict the next turn, parallel to BIBREF12 , BIBREF13 , BIBREF11 . Thus the bottleneck embedding INLINEFORM0 can be considered closely related to the entrainment embedding INLINEFORM1 mentioned above.
+
+## Unsupervised Training of the Model
+
+In this work, we use two fully connected layers as hidden layers both in the encoder and decoder network. Batch normalization layers and Rectified Linear Unit (ReLU) activation layers (in respective order) are used between fully connected layers in both of the networks. The dimension of the embedding is chosen to be 30. The number of neuron units in the hidden layers are: [ 228 INLINEFORM0 128 INLINEFORM1 30 INLINEFORM2 128 INLINEFORM3 228 ]. We use smooth L1 norm, a variant of L1 norm which is more robust to outliers BIBREF18 , so that
+
+ DISPLAYFORM0 
+
+where
+
+ DISPLAYFORM0 
+
+and INLINEFORM0 is the dimension of INLINEFORM1 which is 228 in our case.
+
+For training the network, we choose a subset (80% of all sessions) of Fisher corpus and use all turn-level feature pairs ( INLINEFORM0 ). We employ the Adam optimizer BIBREF19 and a minibatch size of 128 for training the network. The validation error is computed on the validation subset (10% of the data) of the Fisher corpus and the best model is chosen.
+
+## Neural Entrainment Distance (NED) Measure
+
+After the unsupervised training phase, we use the encoder network to obtain the embedding representation ( INLINEFORM0 ) from any turn-level feature vector INLINEFORM1 . To quantify the entrainment from a turn to the subsequent turn, we extract turn-level feature vectors from their final and initial IPUs, respectively, denoted as INLINEFORM2 and INLINEFORM3 . Next we encode INLINEFORM4 and INLINEFORM5 using the pretrained encoder network and obtain INLINEFORM6 and INLINEFORM7 as the outputs, respectively. Then we compute a distance measure INLINEFORM8 , which we term Neural Entrainment Distance (NED), between the two turns by taking smooth L1 distance INLINEFORM9 and INLINEFORM10 .
+
+ DISPLAYFORM0 
+
+where INLINEFORM0 is defined in Equation (2) and INLINEFORM1 is the dimensionality of the embedding. Note that even though smooth L1 distance is symmetric in nature, our distance measure is still asymmetric because of the directionality in the training of the neural network model.
+
+## Experimental Results
+
+We conduct a number of experiments to validate NED as a valid proxy metric for entrainment.
+
+## Experiment 1: Classification of real vs. fake sessions
+
+We first create a fake session ( INLINEFORM0 ) from each real session ( INLINEFORM1 ) by randomly shuffling the speaker turns. Then we run a simple classification experiment of using the NED measure to identify the real session from the pair ( INLINEFORM2 , INLINEFORM3 ). The steps of the experiments are as follows:
+
+We compute NED for each (overlapping) pair of consecutive turns and their average across the session for both sessions in the pair ( INLINEFORM0 , INLINEFORM1 ).
+
+The session with lower NED is inferred to be the real one. The hypothesis behind this rule is that higher entrainment is seen across consecutive turns than randomly paired turns and is well captured through a lower value of proposed measure.
+
+If the inferred real session is indeed the real one, we consider it to be correctly classified.
+
+We compute classification accuracy averaged over 30 runs (to account for the randomness in creating the fake session) and report it in Table TABREF24 . The experiment is conducted on two datasets: a subset (10%) of Fisher corpus set aside as test data and Suicide corpus. We use a number of baseline measures:
+
+Baseline 1: smooth L1 distance directly computed between turn-level features ( INLINEFORM0 and INLINEFORM1 )
+
+Baseline 2: PCA-based symmetric acoustic similarity measure by Lee et al. BIBREF10 
+
+Baseline 3: Nonlinear dynamical systems-based complexity measure BIBREF6 .
+
+For the baselines, we conduct the classification experiments in a similar manner. Since Baseline 1 and 2 have multiple measures, we choose the best performing one for reporting, thus providing an upper-bound performance. Also, for baseline 2 we choose the session with higher value of the measure as real, since it measures similarity.
+
+As we can see in Table TABREF24 , our proposed NED measure achieves higher accuracy than all baselines on the Fisher corpus. The accuracy of our measure declines in the Suicide corpus as compared to the Fisher corpus, which is probably due to data mismatch as the model was trained on Fisher (mismatch of acoustics, recording conditions, sampling frequency, interaction style etc.). However, our measure still performs better than all baselines on Suicide corpus.
+
+## Experiment 2: Correlation with Emotional Bond
+
+According to prior work, both from domain theory BIBREF16 and from experimental validation BIBREF6 , a high emotional bond in patient-therapist interactions in the suicide therapy domain is associated with more entrainment. In this experiment, we compute the correlation of the proposed NED measure with the patient-perceived emotional bond ratings. Since the proposed measure is asymmetric in nature, we compute the measures for both patient-to-therapist and therapist-to-patient entrainment. We also compute the correlation of emotional bond with the baselines used in Experiment 1. We report Pearson's correlation coefficients ( INLINEFORM0 ) for this experiment in Table TABREF26 along with their INLINEFORM1 -values. We test against the null hypothesis INLINEFORM2 that there is no linear association between emotional bond and the candidate measure.
+
+Results in Table TABREF26 show that the patient-to-therapist NED is negatively correlated with emotional bond with high statistical significance ( INLINEFORM0 ). This negative sign is consistent with previous studies as higher distance in acoustic features indicates lower entrainment. However, the therapist-to-patient NED does not have a significant correlation with emotional bond. A possible explanation for this finding is that the emotional bond is reported by the patient and influenced by the degree of their perceived therapist-entrainment. Thus, equipped with an asymmetric measure, we are also able to identify the latent directionality of the emotional bond metric. The complexity measure (Baseline 2) also shows statistically significant correlation, but the value of INLINEFORM1 is lower than that of the proposed measure.
+
+To analyze the embeddings encoded by our model, we also compute a t-SNE BIBREF20 transformation of the difference of all patient-to-therapist turn embedding pairs, denoted as INLINEFORM0 in Equation (3). Figure FIGREF27 shows the results of a session with high emotional bond and another one with low emotional bond (with values of 7 and 1 respectively) as a 2-dimensional scatter plot. Visibly there is some separation between the sessions with low and high emotional bond.
+
+## Conclusion and Future Work
+
+In this work, a novel deep neural network-based Neural Entrainment Distance (NED) measure is proposed for capturing entrainment in conversational speech. The neural network architecture consisting of an encoder and a decoder is trained on the Fisher corpus in an unsupervised training framework and then the measure is defined on the bottleneck embedding. We show that the proposed measure can distinguish between real and fake sessions by capturing presence of entrainment in real sessions. In this way we also validate the natural occurrence of vocal entrainment in dyadic conversations, well-known in psychology literature BIBREF21 , BIBREF22 , BIBREF23 . We further show that the measure for patient-to-therapist direction achieves statistically significant correlation with their perceived emotional bond. The proposed measure is asymmetric in nature and can be useful for analyzing different interpersonal (especially directional) behaviors in many other applications. Given the benefits shown by the unsupervised data-driven approach we will employ Recurrent Neural Networks (RNNs) to better capture temporal dynamics. We also intend to explore (weakly) supervised learning of entrainment using the bottleneck embeddings as features, in presence of session-level annotations.
+
+## Acknowledgements
+
+The U.S. Army Medical Research Acquisition Activity, 820 Chandler Street, Fort Detrick MD 21702- 5014 is the awarding and administering acquisition office. This work was supported by the Office of the Assistant Secretary of Defense for Health Affairs through the Military Suicide Research Consortium under Award No. W81XWH-10-2-0181, and through the Psychological Health and Traumatic Brain Injury Research Program under Award No. W81XWH-15-1-0632. Opinions, interpretations, conclusions and recommendations are those of the author and are not necessarily endorsed by the Department of Defense.

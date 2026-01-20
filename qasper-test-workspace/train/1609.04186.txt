@@ -1,0 +1,121 @@
+# Neural Machine Translation with Supervised Attention
+
+**Paper ID:** 1609.04186
+
+## Abstract
+
+The attention mechanisim is appealing for neural machine translation, since it is able to dynam- ically encode a source sentence by generating a alignment between a target word and source words. Unfortunately, it has been proved to be worse than conventional alignment models in aligment accuracy. In this paper, we analyze and explain this issue from the point view of re- ordering, and propose a supervised attention which is learned with guidance from conventional alignment models. Experiments on two Chinese-to-English translation tasks show that the super- vised attention mechanism yields better alignments leading to substantial gains over the standard attention based NMT.
+
+## Introduction
+
+Neural Machine Translation (NMT) has achieved great successes on machine translation tasks recently BIBREF0 , BIBREF1 . Generally, it relies on a recurrent neural network under the Encode-Decode framework: it firstly encodes a source sentence into context vectors and then generates its translation token-by-token, selecting from the target vocabulary. Among different variants of NMT, attention based NMT, which is the focus of this paper, is attracting increasing interests in the community BIBREF0 , BIBREF2 . One of its advantages is that it is able to dynamically make use of the encoded context through an attention mechanism thereby allowing the use of fewer hidden layers while still maintaining high levels of translation performance.
+
+An attention mechanism is designed to predict the alignment of a target word with respect to source words. In order to facilitate incremental decoding, it tries to make this alignment prediction without any information about the target word itself, and thus this attention can be considered to be a form of a reordering model (see § SECREF2 for more details). However, it differs from conventional alignment models that are able to use the target word to infer its alignments BIBREF3 , BIBREF4 , BIBREF5 , and as a result there is a substantial gap in quality between the alignments derived by this attention based NMT and conventional alignment models (54 VS 30 in terms of AER for Chinese-to-English as reported in BIBREF6 ). This discrepancy might be an indication that the potential of NMT is limited. In addition, the attention in NMT is learned in an unsupervised manner without explicit prior knowledge about alignment. In contrast, in conventional statistical machine translation (SMT), it is standard practice to learn reordering models in a supervised manner with the guidance from conventional alignment models.
+
+Inspired by the supervised reordering in conventional SMT, in this paper, we propose a Supervised Attention based NMT (SA-NMT) model. Specifically, similar to conventional SMT, we first run off-the-shelf aligners (GIZA++ BIBREF3 or fast_align BIBREF4 etc.) to obtain the alignment of the bilingual training corpus in advance. Then, treating this alignment result as the supervision of attention, we jointly learn attention and translation, both in supervised manners. Since the conventional aligners delivers higher quality alignment, it is expected that the alignment in the supervised attention NMT will be improved leading to better end-to-end translation performance. One advantage of the proposed SA-NMT is that it implements the supervision of attention as a regularization in the joint training objective (§3.2). Furthermore, since the supervision of attention lies in the middle of the entire network architecture rather than the top ( as in the supervision of translation (see Figure 1(b)), it serves to mitigate the vanishing gradient problem during the back-propagation BIBREF7 .
+
+This paper makes the following contributions:
+
+## Revisiting Neural Machine Translation
+
+Suppose INLINEFORM0 denotes a source sentence, INLINEFORM1 a target sentence. In addition, let INLINEFORM2 denote a prefix of INLINEFORM3 . Neural Machine Translation (NMT) directly maps a source sentence into a target under an encode-decode framework. In the encoding stage, it uses two bidirectional recurrent neural networks to encode INLINEFORM4 into a sequence of vectors INLINEFORM5 , with INLINEFORM6 representing the concatenation of two vectors for INLINEFORM7 source word from two directional RNNs. In the decoding stage, it generates the target translation from the conditional probability over the pair of sequences INLINEFORM8 and INLINEFORM9 via a recurrent neural network parametrized by INLINEFORM10 as follows: DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 respectively denote an RNN hidden state (i.e. a vector) and a context vector at timestep INLINEFORM2 ; INLINEFORM3 is a transformation function mapping into a vector with dimension of the target vocabulary size; and INLINEFORM4 denotes the INLINEFORM5 component of a vector. Furthermore, INLINEFORM7 is defined by an activation function, i.e. a Gated Recurrent Unit BIBREF8 ; and the context vector INLINEFORM8 is a dynamical source representation at timestep INLINEFORM9 , and calculated as the weighted sum of source encodings INLINEFORM10 , i.e. INLINEFORM11 . Here the weight INLINEFORM12 implements an attention mechanism, and INLINEFORM13 is the alignment probability of INLINEFORM14 being aligned to INLINEFORM15 . INLINEFORM16 is derived through a feedforward neural network INLINEFORM17 as follows: DISPLAYFORM0 
+
+where INLINEFORM0 consists of two layers, the top one being a softmax layer. We skip the detailed definitions of INLINEFORM1 together with INLINEFORM2 , INLINEFORM3 and INLINEFORM4 , and refer the readers to BIBREF0 instead. Figure 1(a) shows one slice of computational graph for NMT definition at time step INLINEFORM9 .
+
+To train NMT, the following negative log-likelyhood is minimized: DISPLAYFORM0 
+
+where INLINEFORM0 is a bilingual sentence pair from a given training corpus, INLINEFORM1 is as defined in Eq.( EQREF5 ). Note that even though the training is conducted in a supervised manner with respect to translation, i.e., INLINEFORM2 are observable in Figure 1(a), the attention is learned in a unsupervised manner, since INLINEFORM3 is hidden.
+
+In Figure 1(a), INLINEFORM0 can not be dependent on INLINEFORM1 , as the target word INLINEFORM2 is unknown at the timestep INLINEFORM3 during the testing. Therefore, at timestep INLINEFORM4 , NMT firstly tries to calculate INLINEFORM5 , through which NMT figures out those source words will be translated next, even though the next target word INLINEFORM6 is unavailable. From this point of view, the attention mechanism plays a role in reordering and thus can be considered as a reordering model. Unlike this attention model, conventional alignment models define the alignment INLINEFORM7 directly over INLINEFORM8 and INLINEFORM9 as follows: INLINEFORM10 
+
+where INLINEFORM0 denotes either a log-probability INLINEFORM1 for a generative model like IBM models BIBREF9 or a feature function for discriminative models BIBREF5 . In order to infer INLINEFORM2 , alignment models can readily use the entire INLINEFORM3 , of course including INLINEFORM4 as well, thereby they can model the alignment between INLINEFORM5 and INLINEFORM6 more sufficiently. As a result, the attention based NMT might not deliver satisfying alignments, as reported in BIBREF6 , compared to conventional alignment models. This may be a sign that the potential of NMT is limited in end-to-end translation.
+
+## Supervised Attention
+
+In this section, we introduce supervised attention to improve the alignment, which consequently leads to better translation performance for NMT. Our basic idea is simple: similar to conventional SMT, it firstly uses a conventional aligner to obtain the alignment on the training corpus; then it employs these alignment results as supervision to train the NMT. During testing, decoding proceeds in exactly the same manner as standard NMT, since there is no alignment supervision available for unseen test sentences.
+
+## Preprocessing Alignment Supervision
+
+As described in §2, the attention model outputs a soft alignment INLINEFORM0 , such that INLINEFORM1 is a normalized probability distribution. In contrast, most aligners are typically oriented to grammar induction for conventional SMT, and they usually output `hard' alignments, such as BIBREF3 . They only indicate whether a target word is aligned to a source word or not, and this might not correspond to a distribution for each target word. For example, one target word may align to multiple source words, or no source words at all.
+
+Therefore, we apply the following heuristics to preprocess the hard alignment: if a target word does not align to any source words, we inherit its affiliation from the closest aligned word with preference given to the right, following BIBREF10 ; if a target word is aligned to multiple source words, we assume it aligns to each one evenly. In addition, in the implementation of NMT, there are two special tokens `eol' added to both source and target sentences. We assume they are aligned to each other. In this way, we can obtain the final supervision of attention, denoted as INLINEFORM0 .
+
+## Jointly Supervising Translation and Attention
+
+We propose a soft constraint method to jointly supervise the translation and attention as follows: DISPLAYFORM0 
+
+where INLINEFORM0 is as defined in Eq. ( EQREF5 ), INLINEFORM1 is a loss function that penalizes the disagreement between INLINEFORM2 and INLINEFORM3 , and INLINEFORM4 is a hyper-parameter that balances the preference between likelihood and disagreement. In this way, we treat the attention variable INLINEFORM5 as an observable variable as shown in Figure 1(b), and this is different from the standard NMT as shown in Figure 1(a) in essence. Note that this training objective resembles to that in multi-task learning BIBREF11 . Our supervised attention method has two further advantages: firstly, it is able to alleviate overfitting by means of the INLINEFORM6 ; and secondly it is capable of addressing the vanishing gradient problem because the supervision of INLINEFORM7 is more close to INLINEFORM8 than INLINEFORM9 as in Figure 1(b).
+
+In order to quantify the disagreement between INLINEFORM0 and INLINEFORM1 , three different methods are investigated in our experiments:
+
+Mean Squared Error (MSE) INLINEFORM0 
+
+MSE is widely used as a loss for regression tasks BIBREF12 , and it directly encourages INLINEFORM0 to be equal to INLINEFORM1 .
+
+Multiplication (MUL) INLINEFORM0 
+
+MUL is particularly designed for agreement in word alignment and it has been shown to be effective BIBREF13 , BIBREF6 . Note that different from those in BIBREF6 , INLINEFORM0 is not a parametrized variable but a constant in this paper.
+
+Cross Entropy (CE) INLINEFORM0 
+
+Since for each INLINEFORM0 , INLINEFORM1 is a distribution, it is natural to use CE as the metric to evaluate the disagreement BIBREF14 .
+
+## Experiments
+
+We conducted experiments on two Chinese-to-English translation tasks: one is the NIST task oriented to NEWS domain, which is a large scale task and suitable to NMT; and the other is the speech translation oriented to travel domain, which is a low resource task and thus is very challenging for NMT. We used the case-insensitive BLEU4 to evaluate translation quality and adopted the multi-bleu.perl as its implementation.
+
+## The Large Scale Translation Task
+
+We used the data from the NIST2008 Open Machine Translation Campaign. The training data consisted of 1.8M sentence pairs, the development set was nist02 (878 sentences), and the test sets are were nist05 (1082 sentences), nist06 (1664 sentences) and nist08 (1357 sentences).
+
+We compared the proposed approach with three strong baselines:
+
+Moses: a phrase-based machine translation system BIBREF15 ;
+
+NMT1: an attention based NMT BIBREF0 system at https://github.com/lisa-groundhog/GroundHog;
+
+NMT2: another implementation of BIBREF0 at https://github.com/nyu-dl/dl4mt-tutorial.
+
+We developed the proposed approach based on NMT2, and denoted it as SA-NMT.
+
+We followed the standard pipeline to run Moses. GIZA++ with grow-diag-final-and was used to build the translation model. We trained a 5-gram target language model on the Gigaword corpus, and used a lexicalized distortion model. All experiments were run with the default settings.
+
+To train NMT1, NMT2 and SA-NMT, we employed the same settings for fair comparison. Specifically, except the stopping iteration which was selected using development data, we used the default settings set out in BIBREF0 for all NMT-based systems: the dimension of word embedding was 620, the dimension of hidden units was 1000, the batch size was 80, the source and target side vocabulary sizes were 30000, the maximum sequence length was 50, the beam size for decoding was 12, and the optimization was done by Adadelta with all hyper-parameters suggested by BIBREF16 . Particularly for SA-NMT, we employed a conventional word aligner to obtain the word alignment on the training data before training SA-NMT. In this paper, we used two different aligners, which are fast_align and GIZA++. We tuned the hyper-parameter INLINEFORM0 to be 0.3 on the development set, to balance the preference between the translation and alignment. Training was conducted on a single Tesla K40 GPU machine. Each update took about 3.0 seconds for both NMT2 and SA-NMT, and 2.4 seconds for NMT1. Roughly, it took about 10 days to NMT2 to finish 300000 updates.
+
+We implemented three different losses to supervise the attention as described in §3.2. To explore their behaviors on the development set, we employed the GIZA++ to generate the alignment on the training set prior to the training SA-NMT. In Table TABREF21 , we can see that MUL is better than MSE. Furthermore, CE performs best among all losses, and thus we adopt it for the following experiments.
+
+In addition, we also run fast_align to generate alignments as the supervision for SA-NMT and the results were reported in Table TABREF22 . We can see that GIZA++ performs slightly better than fast_align and thus we fix the external aligner as GIZA++ in the following experiments.
+
+Figure FIGREF26 shows the learning curves of NMT2 and SA-NMT on the development set. We can see that NMT2 generally obtains higher BLEU as the increasing of updates before peaking at update of 150000, while it is unstable from then on. On the other hand, SA-NMT delivers much better BLEU for the beginning updates and performs more steadily along with the updates, although it takes more updates to reach the peaking point.
+
+Table TABREF27 reports the main end-to-end translation results for the large scale task. We find that both standard NMT generally outperforms Moses except NMT1 on nist05. The proposed SA-NMT achieves significant and consistent improvements over all three baseline systems, and it obtains the averaged gains of 2.2 BLEU points on test sets over its direct baseline NMT2. It is clear from these results that our supervised attention mechanism is highly effective in practice.
+
+As explained in §2, standard NMT can not use the target word information to predict its aligned source words, and thus might fail to predict the correct source words for some target words. For example, for the sentence in the training set in Figure FIGREF29 (a), NMT2 aligned `following' to `皮诺契特 (gloss: pinochet)' rather than `继 (gloss: follow)', and worse still it aligned the word `.' to `在 (gloss: in)' rather than `。' even though this word is relatively easy to align correctly. In contrast, with the help of information from the target word itself, GIZA++ successfully aligned both `following' and `.' to the expected source words (see Figure FIGREF29 (c)). With the alignment results from GIZA++ as supervision, we can see that our SA-NMT can imitate GIZA++ and thus align both words correctly. More importantly, for sentences in the unseen test set, like GIZA++, SA-NMT confidently aligned `but' and `.' to their correct source words respectively as in Figure FIGREF29 (b), where NMT2 failed. It seems that SA-NMT can learn its alignment behavior from GIZA++, and subsequently apply the alignment abilities it has learned to unseen test sentences.
+
+Table TABREF30 shows the overall alignment results on word alignment task in terms of the metric, alignment error rate. We used the manually-aligned dataset as in BIBREF5 as the test set. Following BIBREF17 , we force-decode both the bilingual sentences including source and reference sentences to obtain the alignment matrices, and then for each target word we extract one-to-one alignments by picking up the source word with the highest alignment confidence as the hard alignment. From Table TABREF30 , we can see clearly that standard NMT (NMT2) is far behind GIZA++ in alignment quality. This shows that it is possible and promising to supervise the attention with GIZA++. With the help from GIZA++, our supervised attention based NMT (SA-NMT) significantly reduces the AER, compared with the unsupervised counterpart (NMT2). This shows that the proposed approach is able to realize our intuition: the alignment is improved, leading to better translation performance.
+
+Note that there is still a gap between SA-NMT and GIZA++ as indicated in Table TABREF30 . Since SA-NMT was trained for machine translation instead of word alignment, it is possible to reduce its AER if we aim to the word alignment task only. For example, we can enlarge INLINEFORM0 in Eq.( EQREF12 ) to bias the training objective towards word alignment task, or we can change the architecture slightly to add the target information crucial for alignment as in BIBREF18 , BIBREF19 .
+
+## Results on the Low Resource Translation Task
+
+For the low resource translation task, we used the BTEC corpus as the training data, which consists of 30k sentence pairs with 0.27M Chinese words and 0.33M English words. As development and test sets, we used the CSTAR03 and IWSLT04 held out sets, respectively. We trained a 4-gram language model on the target side of training corpus for running Moses. For training all NMT systems, we employed the same settings as those in the large scale task, except that vocabulary size is 6000, batch size is 16, and the hyper-parameter INLINEFORM0 for SA-NMT.
+
+Table TABREF32 reports the final results. Firstly, we can see that both standard neural machine translation systems NMT1 and NMT2 are much worse than Moses with a substantial gap. This result is not difficult to understand: neural network systems typically require sufficient data to boost their performance, and thus low resource translation tasks are very challenging for them. Secondly, the proposed SA-NMT gains much over NMT2 similar to the case in the large scale task, and the gap towards Moses is narrowed substantially.
+
+While our SA-NMT does not advance the state-of-the-art Moses as in large scale translation, this is a strong result if we consider that previous works on low resource translation tasks: arthur+:2016 gained over Moses on the Japanese-to-English BTEC corpus, but they resorted to a corpus consisting of 464k sentence pairs; luong+manning:2015 revealed the comparable performance to Moses on English-to-Vietnamese with 133k sentences pairs, which is more than 4 times of our corprus size. Our method is possible to advance Moses by using reranking as in BIBREF20 , BIBREF21 , but it is beyond the scope of this paper and instead we remain it as future work.
+
+## Related Work
+
+Many recent works have led to notable improvements in the attention mechanism for neural machine translation. tu+:2016 introduced an explicit coverage vector into the attention mechanism to address the over-translation and under-translation inherent in NMT. feng+:2016 proposed an additional recurrent structure for attention to capture long-term dependencies. cheng+:2016 proposed an agreement-based bidirectional NMT model for symmetrizing alignment. cohn+:2016 incorporated multiple structural alignment biases into attention learning for better alignment. All of them improved the attention models that were learned in an unsupervised manner. While we do not modify the attention model itself, we learn it in a supervised manner, therefore our approach is orthogonal to theirs.
+
+It has always been standard practice to learn reordering models from alignments for conventional SMT either at the phrase level or word level. At the phrase level, koehn+:2007 proposed a lexicalized MSD model for phrasal reordering; xiong+:2006 proposed a feature-rich model to learn phrase reordering for BTG; and li+:2014 proposed a neural network method to learn a BTG reordering model. At the word level, bisazza+federico:2016 surveyed many word reordering models learned from alignment models for SMT, and in particular there are some neural network based reordering models, such as BIBREF22 . Our work is inspired by these works in spirit, and it can be considered to be a recurrent neural network based word-level reordering model. The main difference is that in our approach the reordering model and translation model are trained jointly rather than separately as theirs.
+
+## Conclusion
+
+It has been shown that attention mechanism in NMT is worse than conventional word alignment models in its alignment accuracy. This paper firstly provides an explanation for this by viewing the atten- tion mechanism from the point view of reordering. Then it proposes a supervised attention for NMT with guidance from external conventional alignment models, inspired by the supervised reordering models in conventional SMT. Experiments on two Chinese-to-English translation tasks show that the proposed approach achieves better alignment results leading to significant gains relative to standard attention based NMT.
+
+## Acknowledgements
+
+We would like to thank Xugang Lu for invaluable discussions on this work.

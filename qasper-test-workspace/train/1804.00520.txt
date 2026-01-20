@@ -1,0 +1,75 @@
+# NIHRIO at SemEval-2018 Task 3: A Simple and Accurate Neural Network Model for Irony Detection in Twitter
+
+**Paper ID:** 1804.00520
+
+## Abstract
+
+This paper describes our NIHRIO system for SemEval-2018 Task 3"Irony detection in English tweets". We propose to use a simple neural network architecture of Multilayer Perceptron with various types of input features including: lexical, syntactic, semantic and polarity features. Our system achieves very high performance in both subtasks of binary and multi-class irony detection in tweets. In particular, we rank third using the accuracy metric and fifth using the F1 metric. Our code is available at https://github.com/NIHRIO/IronyDetectionInTwitter
+
+## Introduction
+
+Mining Twitter data has increasingly been attracting much research attention in many NLP applications such as in sentiment analysis BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 , BIBREF5 and stock market prediction BIBREF6 , BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 . Recently, Davidov2010 and Reyes2013 have shown that Twitter data includes a high volume of “ironic” tweets. For example, a user can use positive words in a Twitter message to her intended negative meaning (e.g., “It is awesome to go to bed at 3 am #not”). This especially results in a research challenge to assign correct sentiment labels for ironic tweets BIBREF11 , BIBREF12 , BIBREF13 , BIBREF14 , BIBREF15 .
+
+To handle that problem, much attention has been focused on automatic irony detection in Twitter BIBREF16 , BIBREF17 , BIBREF18 , BIBREF19 , BIBREF13 , BIBREF20 , BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 . In this paper, we propose a neural network model for irony detection in tweets. Our model obtains the fifth best performances in both binary and multi-class irony detection subtasks in terms of INLINEFORM0 score BIBREF25 . Details of the two subtasks can be found in the task description paper BIBREF25 . We briefly describe the subtasks as follows:
+
+## Dataset
+
+The dataset consists of 4,618 tweets (2,222 ironic + 2,396 non-ironic) that are manually labelled by three students. Some pre-processing steps were applied to the dataset, such as the emoji icons in a tweet are replaced by a describing text using the Python emoji package. Additionally, all the ironic hashtags, such as #not, #sarcasm, #irony, in the dataset have been removed. This makes difficult to correctly predict the label of a tweet. For example, “@coreybking thanks for the spoiler!!!! #not” is an ironic tweet but without #not, it probably is a non-ironic tweet. The dataset is split into the training and test sets as detailed in Table TABREF5 .
+
+Note that there is also an extended version of the training set, which contains the ironic hashtags. However, we only use the training set which does not contain the ironic hashtags to train our model as it is in line with the test set.
+
+## Our modeling approach
+
+We first describe our MLP-based model for ironic tweet detection in Section SECREF7 . We then present the features used in our model in Section SECREF8 .
+
+## Neural network model
+
+We propose to use the Multilayer Perceptron (MLP) model BIBREF28 to handle both the ironic tweet detection subtasks. Figure FIGREF3 presents an overview of our model architecture including an input layer, two hidden layers and a softmax output layer. Given a tweet, the input layer represents the tweet by a feature vector which concatenates lexical, syntactic, semantic and polarity feature representations. The two hidden layers with ReLU activation function take the input feature vector to select the most important features which are then fed into the softmax layer for ironic detection and classification.
+
+## Features
+
+Table TABREF11 shows the number of lexical, syntactic, semantic and polarity features used in our model.
+
+Our lexical features include 1-, 2-, and 3-grams in both word and character levels. For each type of INLINEFORM0 -grams, we utilize only the top 1,000 INLINEFORM1 -grams based on the term frequency-inverse document frequency (tf-idf) values. That is, each INLINEFORM2 -gram appearing in a tweet becomes an entry in the feature vector with the corresponding feature value tf-idf. We also use the number of characters and the number of words as features.
+
+We use the NLTK toolkit to tokenize and annotate part-of-speech tags (POS tags) for all tweets in the dataset. We then use all the POS tags with their corresponding tf-idf values as our syntactic features and feature values, respectively.
+
+A major challenge when dealing with the tweet data is that the lexicon used in a tweet is informal and much different from tweet to tweet. The lexical and syntactic features seem not to well-capture that property. To handle this problem, we apply three approaches to compute tweet vector representations.
+
+Firstly, we employ 300-dimensional pre-trained word embeddings from GloVe BIBREF29 to compute a tweet embedding as the average of the embeddings of words in the tweet.
+
+Secondly, we apply the latent semantic indexing BIBREF30 to capture the underlying semantics of the dataset. Here, each tweet is represented as a vector of 100 dimensions.
+
+Thirdly, we also extract tweet representation by applying the Brown clustering algorithm BIBREF31 , BIBREF32 —a hierarchical clustering algorithm which groups the words with similar meaning and syntactical function together. Applying the Brown clustering algorithm, we obtain a set of clusters, where each word belongs to only one cluster. For example in Table TABREF13 , words that indicate the members of a family (e.g., “mum”, “dad”) or positive sentiment (e.g., “interesting”, “awesome”) are grouped into the same cluster. We run the algorithm with different number of clustering settings (i.e., 80, 100, 120) to capture multiple semantic and syntactic aspects. For each clustering setting, we use the number of tweet words in each cluster as a feature. After that, for each tweet, we concatenate the features from all the clustering settings to form a cluster-based tweet embedding.
+
+Motivated by the verbal irony by means of polarity contrast, such as “I really love this year's summer; weeks and weeks of awful weather”, we use the number of polarity signals appearing in a tweet as the polarity features. The signals include positive words (e.g., love), negative words (e.g., awful), positive emoji icon and negative emoji icon. We use the sentiment dictionaries provided by BIBREF33 to identify positive and negative words in a tweet. We further use boolean features that check whether or not a negation word is in a tweet (e.g., not, n't).
+
+## Implementation details
+
+We use Tensorflow BIBREF34 to implement our model. Model parameters are learned to minimize the the cross-entropy loss with L INLINEFORM0 regularization. Figure FIGREF16 shows our training mechanism. In particular, we follow a 10-fold cross-validation based voting strategy. First, we split the training set into 10 folds. Each time, we combine 9 folds to train a classification model and use the remaining fold to find the optimal hyperparameters. Table TABREF18 shows optimal settings for each subtask.
+
+In total, we have 10 classification models to produce 10 predicted labels for each test tweet. Then, we use the voting technique to return the final predicted label.
+
+## Metrics
+
+The metrics used to evaluate our model include accuracy, precision, recall and F INLINEFORM0 . The accuracy is calculated using all classes in both tasks. The remainders are calculated using only the positive label in subtask 1 or per class label (i.e., macro-averaged) in subtask 2. Detail description of the metrics can be found in BIBREF25 .
+
+## Results for subtask 1
+
+Table TABREF21 shows our official results on the test set for subtask 1 with regards to the four metrics. By using a simple MLP neural network architecture, our system achieves a high performance which is ranked third and fifth out of forty-four teams using accuracy and F INLINEFORM0 metrics, respectively.
+
+## Results for subtask 2
+
+Table TABREF23 presents our results on the test set for subtask 2. Our system also achieves a high performance which is ranked third and fifth out of thirty-two teams using accuracy and F INLINEFORM0 metrics, respectively. We also show in Table TABREF24 the performance of our system on different class labels. For ironic classes, our system achieves the best performance on the verbal irony by means of a polarity contrast with INLINEFORM1 of 60.73%. Note that the performance on the situational class is not high. The reason is probably that the number of situational tweets in the training set is small (205/3,834), i.e. not enough to learn a good classifier.
+
+## Discussions
+
+Apart from the described MLP models, we have also tried other neural network models, such as Long Short-Term Memory (LSTM) BIBREF35 and Convolutional Neural Network (CNN) for relation classification BIBREF36 . We found that LSTM achieves much higher performance than MLP does on the extended training set containing the ironic hashtags (about 92% vs 87% with 10-fold cross-validation using INLINEFORM0 on subtask 1). However, without the ironic hashtags, the performance is lower than MLP's. We also employed popular machine learning techniques, such as SVM BIBREF37 , Logistic Regression BIBREF38 , Ridge Regression Classifier BIBREF39 , but none of them produces as good results as MLP does. We have also implemented ensemble models, such as voting, bagging and stacking. We found that with 10-fold cross-validation based voting strategy, our MLP models produce the best irony detection and classification results.
+
+## Conclusion
+
+We have presented our NIHRIO system for participating the Semeval-2018 Task 3 on “Irony detection in English tweets”. We proposed to use Multilayer Perceptron to handle the task using various features including lexical features, syntactic features, semantic features and polarity features. Our system was ranked the fifth best performing one with regards to F INLINEFORM0 score in both the subtasks of binary and multi-class irony detection in tweets.
+
+## Acknowledgments
+
+This research is supported by the National Institute for Health Research (NIHR) Innovation Observatory at Newcastle University, United Kingdom.

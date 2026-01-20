@@ -1,0 +1,119 @@
+# Simultaneous Speech Recognition and Speaker Diarization for Monaural Dialogue Recordings with Target-Speaker Acoustic Models
+
+**Paper ID:** 1909.08103
+
+## Abstract
+
+This paper investigates the use of target-speaker automatic speech recognition (TS-ASR) for simultaneous speech recognition and speaker diarization of single-channel dialogue recordings. TS-ASR is a technique to automatically extract and recognize only the speech of a target speaker given a short sample utterance of that speaker. One obvious drawback of TS-ASR is that it cannot be used when the speakers in the recordings are unknown because it requires a sample of the target speakers in advance of decoding. To remove this limitation, we propose an iterative method, in which (i) the estimation of speaker embeddings and (ii) TS-ASR based on the estimated speaker embeddings are alternately executed. We evaluated the proposed method by using very challenging dialogue recordings in which the speaker overlap ratio was over 20%. We confirmed that the proposed method significantly reduced both the word error rate (WER) and diarization error rate (DER). Our proposed method combined with i-vector speaker embeddings ultimately achieved a WER that differed by only 2.1 % from that of TS-ASR given oracle speaker embeddings. Furthermore, our method can solve speaker diarization simultaneously as a by-product and achieved better DER than that of the conventional clustering-based speaker diarization method based on i-vector.
+
+## Introduction
+
+Our main goal is to develop a monaural conversation transcription system that can not only perform automatic speech recognition (ASR) of multiple talkers but also determine who spoke the utterance when, known as speaker diarization BIBREF0, BIBREF1. For both ASR and speaker diarization, the main difficulty comes from speaker overlaps. For example, a speaker-overlap ratio of about 15% was reported in real meeting recordings BIBREF2. For such overlapped speech, neither conventional ASR nor speaker diarization provides a result with sufficient accuracy. It is known that mixing two speech significantly degrades ASR accuracy BIBREF3, BIBREF4, BIBREF5. In addition, no speaker overlaps are assumed with most conventional speaker diarization techniques, such as clustering of speech partitions (e.g. BIBREF0, BIBREF6, BIBREF7, BIBREF8, BIBREF9), which works only if there are no speaker overlaps. Due to these difficulties, it is still very challenging to perform ASR and speaker diarization for monaural recordings of conversation.
+
+One solution to the speaker-overlap problem is applying a speech-separation method such as deep clustering BIBREF10 or deep attractor network BIBREF11. However, a major drawback of such a method is that the training criteria for speech separation do not necessarily maximize the accuracy of the final target tasks. For example, if the goal is ASR, it will be better to use training criteria that directly maximize ASR accuracy.
+
+In one line of research using ASR-based training criteria, multi-speaker ASR based on permutation invariant training (PIT) has been proposed BIBREF3, BIBREF12, BIBREF13, BIBREF14, BIBREF15. With PIT, the label-permutation problem is solved by considering all possible permutations when calculating the loss function BIBREF16. PIT was first proposed for speech separation BIBREF16 and soon extended to ASR loss with promising results BIBREF3, BIBREF12, BIBREF13, BIBREF14, BIBREF15. However, a PIT-ASR model produces transcriptions for each utterance of speakers in an unordered manner, and it is no longer straightforward to solve speaker permutations across utterances. To make things worse, a PIT model trained with ASR-based loss normally does not produce separated speech waveforms, which makes speaker tracing more difficult.
+
+In another line of research, target-speaker (TS) ASR, which automatically extracts and transcribes only the target speaker's utterances given a short sample of that speaker's speech, has been proposed BIBREF17, BIBREF4. Žmolíková et al. proposed a target-speaker neural beamformer that extracts a target speaker's utterances given a short sample of that speaker's speech BIBREF17. This model was recently extended to handle ASR-based loss to maximize ASR accuracy with promising results BIBREF4. TS-ASR can naturally solve the speaker-permutation problem across utterances. Importantly, if we can execute TS-ASR for each speaker correctly, speaker diarization is solved at the same time just by extracting the start and end time information of the TS-ASR result. However, one obvious drawback of TS-ASR is that it cannot be applied when the speakers in the recordings are unknown because it requires a sample of the target speakers in advance of decoding.
+
+Based on this background, we propose a speech recognition and speaker diarization method that is based on TS-ASR but can be applied without knowing the speaker information in advance. To remove the limitation of TS-ASR, we propose an iterative method, in which (i) the estimation of target-speaker embeddings and (ii) TS-ASR based on the estimated embeddings are alternately executed. As an initial trial, we evaluated the proposed method by using real dialogue recordings in the Corpus of Spontaneous Japanese (CSJ). Although it contains the speech of only two speakers, the speaker-overlap ratio of the dialogue speech is very high; 20.1% . Thus, this is very challenging even for state-of-the-art ASR and speaker diarization. We show that the proposed method effectively reduced both word error rate (WER) and diarizaton error rate (DER).
+
+## Simultaneous ASR and Speaker Diarization
+
+In this section, we first explain the problem we targeted then the proposed method with reference to Figure FIGREF1.
+
+## Simultaneous ASR and Speaker Diarization ::: Problem statement
+
+The overview of the problem is shown in Figure FIGREF1 (left). We assume a sequence of observations $\mathcal {X}=\lbrace {\bf X}_1,...,{\bf X}_U\rbrace $, where $U$ is the number of observations, and ${\bf X}_u$ is the $u$-th observation consisting of a sequence of acoustic features. Such a sequence is naturally generated when we separate a long recording into small segments based on voice activity detection which is a basic preprocess for ASR so as not to generate overly large lattices. We also assume a tuple of word hypotheses ${\bf W}_u=(W_{1,u},...,W_{J,u})$ for an observation ${\bf X}_u$ where $J$ is the number of speakers, and $W_{j,u}$ represents the speech-recognition hypothesis of the $j$-th speaker given observation ${\bf X}_u$. We assume $W_{j,u}$ contains not only word sequences but also their corresponding frame-level time alignments of phonemes and silences. Finally, we assume a tuple of speaker embeddings $\mathcal {E}=(e_1, ..., e_J)$, where $e_j\in \mathbb {R}^d$ represents the $d$-dim speaker embedding of the $j$-th speaker.
+
+Then, our objective is to find the best possible $\mathcal {W}=\lbrace {\bf W}_1,...,{\bf W}_U\rbrace $ given a sequence of observations $\mathcal {X}$ as follows.
+
+Here, the starting point is the conventional maximum a posteriori-based decoding given $\mathcal {X}$ but for multiple speakers. We then introduce the speaker embeddings $\mathcal {E}$ as a hidden variable (Eq. ). Finally, we approximate the summation by using a max operation (Eq. ).
+
+Our motivation to introduce $\mathcal {E}$, which is constant across all observation indices $u$, is to explicitly enforce the order of speakers in $\mathcal {W}$ to be constant over indices $u$. It should be emphasized that if we can solve the problem, speaker diarization is solved at the same time just by extracting the start and end time information of each hypothesis in $\mathcal {W}$. Also note that there are $J!$ possible solutions by swapping the order of speakers in $\mathcal {E}$, and it is sufficient to find just one such solution.
+
+## Simultaneous ASR and Speaker Diarization ::: Iterative maximization
+
+It is not easy to directly solve $P(\mathcal {W},\mathcal {E}|\mathcal {X})$, so we propose to alternately maximize $\mathcal {W}$ and $\mathcal {E}$. Namely, we first fix $\underline{\mathcal {W}}$ and find $\mathcal {E}$ that maximizes $P(\underline{\mathcal {W}},\mathcal {E}|\mathcal {X})$. We then fix $\underline{\mathcal {E}}$ and find $\mathcal {W}$ that maximizes $P(\mathcal {W},\underline{\mathcal {E}}|\mathcal {X})$. By iterating this procedure, $P(\mathcal {W},\mathcal {E}|\mathcal {X})$ can be increased monotonically. Note that it can be said by a simple application of the chain rule that finding $\mathcal {E}$ that maximizes $P(\underline{\mathcal {W}},\mathcal {E}|\mathcal {X})$ with a fixed $\underline{\mathcal {W}}$ is equivalent to finding $\mathcal {E}$ that maximizes $P(\mathcal {E}|\underline{\mathcal {W}},\mathcal {X})$. The same thing can be said for the estimation of $\mathcal {W}$ with a fixed $\underline{\mathcal {E}}$.
+
+For the $(i)$-th iteration of the maximization ($i\in \mathbb {Z}^{\ge 0}$), we first find the most plausible estimation of $\mathcal {E}$ given the $(i-1)$-th speech-recognition hypothesis $\tilde{\mathcal {W}}^{(i-1)}$ as follows.
+
+Here, the estimation of $\tilde{\mathcal {E}}^{(i)}$ is dependent on $\tilde{\mathcal {W}}^{(i-1)}$ for $i \ge 1$. Assume that the overlapped speech corresponds to a “third person” who is different from any person in the recording, Eq. DISPLAY_FORM5 can be achieved by estimating the speaker embeddings only from non-overlapped regions (upper part of Figure FIGREF1 (right)). In this study, we used i-vector BIBREF18 as the representation of speaker embeddings, and estimated i-vector based only on the non-overlapped region given $\tilde{\mathcal {W}}^{(i-1)}$ for each speaker. Note that, since we do not have an estimation of $\mathcal {W}$ for the first iteration, $\tilde{\mathcal {E}}^{(0)}$ is initialized only by $\mathcal {X}$. In this study, we estimated the i-vector for each speaker given the speech region that was estimated by the clustering-based speaker diarization method. More precicely, we estimated the i-vector for each ${\bf X}_u$ then applied $J$-cluster K-means clustering. The center of each cluster was used for the initial speaker embeddings $\tilde{\mathcal {E}}^{(0)}$.
+
+We then update $\mathcal {W}$ given speaker embeddings $\tilde{\mathcal {E}}^{(i)}$.
+
+Here, we estimate the most plausible hypotheses $\mathcal {W}$ given estimated embeddings $\tilde{\mathcal {E}}^{(i)}$ and observation $\mathcal {X}$ (Eq. DISPLAY_FORM8). We then assume the conditional independence of ${\bf W}_u$ given ${\bf X}_u$ for each segment $u$ (Eq. ). Finally, we further assume the conditional independence of $W_{j,u}$ given $\tilde{e}_j^{(i)}$ for each speaker $j$ (Eq. ). The final equation can be solved by applying TS-ASR for each segment $u$ for each speaker $j$ (lower part of Figure FIGREF1 (right)). We will review the detail of TS-ASR in the next section.
+
+## TS-ASR: Review ::: Overview of TS-ASR
+
+TS-ASR is a technique to extract and recognize only the speech of a target speaker given a short sample utterance of that speaker BIBREF17, BIBREF21, BIBREF4. Originally, the sample utterance was fed into a special neural network that outputs an averaged embedding to control the weighting of speaker-dependent blocks of the acoustic model (AM). However, to make the problem simpler, we assume that a $d$-dimensional speaker embedding $e_{\rm tgt}\in \mathbb {R}^d$ is extracted from the sample utterance. In this context, TS-ASR can be expressed as the problem to find the best hypothesis $W_{\rm tgt}$ given observation ${\bf X}$ and speaker embedding $e_{\rm tgt}$ as follows.
+
+If we have a well-trained TS-ASR, Eq. can be solved by simply applying the TS-ASR for each segment $u$ for each speaker $j$.
+
+## TS-ASR: Review ::: TS-AM with auxiliary output network ::: Overview
+
+Although any speech recognition architecture can be used for TS-ASR, we adopted a variant of the TS-AM that was recently proposed and has promising accuracy BIBREF5. Figure FIGREF13 describes the TS-AM that we applied for this study. This model has two input branches. One branch accepts acoustic features ${\bf X}$ as a normal AM while the other branch accepts an embedding $e_{\rm tgt}$ that represents the characteristics of the target speaker. In this study, we used a log Mel-filterbank (FBANK) and i-vector BIBREF18, BIBREF22 for the acoustic features and target-speaker embedding, respectively.
+
+A unique component of the model is in its output branch. The model has multiple output branches that produce outputs ${\bf Y}^{\rm tgt}$ and ${\bf Y}^{\rm int}$ for the loss functions for the target and interference speakers, respectively. The loss for the target speaker is defined to maximize the target-speaker ASR accuracy, while the loss for interference speakers is defined to maximize the interference-speaker ASR accuracy. We used lattice-free maximum mutual information (LF-MMI) BIBREF23 for both criteria.
+
+The original motivation of the output branch for interference speakers was the improvement of TS-ASR by achieving a better representation for speaker separation in the shared layers. However, it was also shown that the output branch for interference speakers can be used for the secondary ASR for interference speakers given the embedding of the target speaker BIBREF5. In this paper, we found out that the latter property worked very well for the ASR for dialogue recordings, which will be explained in the evaluation section.
+
+The network is trained with a mixture of multi-speaker speech given their transcriptions. We assume that, for each training sample, (a) transcriptions of at least two speakers are given, (b) the transcription for the target speaker is marked so that we can identify the target speaker's transcription, and (c) a sample for the target speaker can be used to extract speaker embeddings. These assumptions can be easily satisfied by artificially generating training data by mixing the speech of multiple speakers.
+
+## TS-ASR: Review ::: TS-AM with auxiliary output network ::: Loss function
+
+The main loss function for the target speaker is defined as
+
+where $u$ corresponds to the index of training samples in this case. The term $\mathcal {G}^{\rm tgt}_u$ indicates a numerator (or reference) graph that represents a set of possible correct state sequences for the utterance of the target speaker of the $u$-th training sample, ${\bf S}$ denotes a hypothesis state sequence for the $u$-th training sample, and $\mathcal {G}^{D}$ denotes a denominator graph, which represents a possible hypothesis space and normally consists of a 4-gram phone language model in LF-MMI training BIBREF23.
+
+The auxiliary interference speaker loss is then defined to maximize the interference-speaker ASR accuracy, which we expect to enhance the speaker separation ability of the neural network. This loss is defined as
+
+where $\mathcal {G}^{\rm int}_u$ denotes a numerator (or reference) graph that represents a set of possible correct state sequences for the utterance of the interference speaker of the $u$-th training sample.
+
+Finally, the loss function $\mathcal {F}^{\rm comb}$ for training is defined as the combination of the target and interference losses,
+
+where $\alpha $ is the scaling factor for the auxiliary loss. In our evaluation, we set $\alpha =1.0$. Setting $\alpha =0.0$, however, corresponds to normal TS-ASR.
+
+## Evaluation ::: Experimental settings ::: Main evaluation data: real dialogue recordings
+
+We conducted our experiments on the CSJ BIBREF25, which is one of the most widely used evaluation sets for Japanese speech recognition. The CSJ consists of more than 600 hrs of Japanese recordings.
+
+While most of the content is lecture recordings by a single speaker, CSJ also contains 11.5 hrs of 54 dialogue recordings (average 12.8 min per recording) with two speakers, which were the main target of ASR and speaker diarization in this study. During the dialogue recordings, two speakers sat in two adjacent sound proof chambers divided by a glass window. They could talk with each other over voice connection through a headset for each speaker. Therefore, speech was recorded separately for each speaker, and we generated mixed monaural recordings by mixing the corresponding speeches of two speakers. When mixing two recordings, we did not apply any normalization of speech volume. Due to this recording procedure, we were able to use non-overlapped speech to evaluate the oracle WERs.
+
+It should be noted that, although the dialogue consisted of only two speakers, the speaker overlap ratio of the recordings was very high due to many backchannels and natural turn-taking. Among all recordings, 16.7% of the region was overlapped speech while 66.4% was spoken by a single speaker. The remaining 16.9% was silence. Therefore, 20.1% (=16.7/(16.7+66.4)) of speech regions was speaker overlap. From the viewpoint of ASR, 33.5% (= (16.7*2)/(16.7*2+66.4)) of the total duration to be recognized was overlapped. These values were even higher than those reported for meetings with more than two speakers BIBREF26, BIBREF2. Therefore, these dialogue recordings are very challenging for both ASR and speaker diarization. We observed significantly high WER and DER, which is discussed in the next section.
+
+## Evaluation ::: Experimental settings ::: Sub evaluation data: simulated 2-speaker mixture
+
+To evaluate TS-ASR, we also used the simulated 2-speaker-mixed data by mixing the three official single-speaker evaluation sets of CSJ, i.e., E1, E2, and E3 BIBREF27. Each set includes different groups of 10 lectures (5.6 hrs, 30 lectures in total). The E1 set consists of 10 lectures of 10 male speakers, and E2 and E3 each consists of 10 lectures of 5 female and 5 male speakers. We generate two-speaker mixed speech by adding randomly selected speech (= interference-speaker speech) to the original speech (= target-speaker speech) with the constraint that the target and interference speakers were different, and each interference speaker was selected only once from the dataset. When we mixed the two speeches, we configured them to have the same power level, and shorter speech was mixed with the longer speech from a random starting point selected to ensure the end point of the shorter one did not exceed that of the longer one.
+
+## Evaluation ::: Experimental settings ::: Training data and training settings
+
+The rest of the 571 hrs of 3,207 lecture recordings (excluding the same speaker's lectures in the evaluation sets) were used for AM and language model (LM) training. We generated two-speaker mixed speech for training data in accordance with the following protocol.
+
+Prepare a list of speech samples (= main list).
+
+Shuffle the main list to create a second list under the constraint that the same speaker does not appear in the same line in the main and second lists.
+
+Mix the audio in the main and second lists one-by-one with a specific signal-to-interference ratio (SIR). For training data, we randomly sampled an SIR as follows.
+
+In 1/3 probability, sample the SIR from a uniform distribution between -10 and 10 dB.
+
+In 1/3 probability, sample the SIR from a uniform distribution between 10 and 60 dB. The transcription of the interference speaker was set to null.
+
+In 1/3 probability, sample the SIR from a uniform distribution between -60 and -10 dB. The transcription of the target speaker was set to null.
+
+The volume of each mixed speech was randomly changed to enhance robustness against volume difference.
+
+A speech for extracting a speaker embedding was also randomly selected for each speech mixture from the main list. Note that the random perturbation of volume was applied only for the training data, not for evaluation data.
+
+We trained a TS-AM consisting of a convolutional neural network (CNN), time-delay NN (TDNN) BIBREF28, and long short-term memory (LSTM) BIBREF29, as shown in fig:ts-am. The input acoustic feature for the network was a 40-dimensional FBANK without normalization. A 100-dimensional i-vector was also extracted and used for the target-speaker embedding to indicate the target speaker. For extracting this i-vector, we randomly selected an utterance of the same speaker. We conducted 8 epochs of training on the basis of LF-MMI, where the initial learning rate was set to 0.001 and exponentially decayed to 0.0001 by the end of the training. We applied $l2$-regularization and CE-regularization BIBREF23 with scales of 0.00005 and 0.1, respectively. The leaky hidden Markov model coefficient was set to 0.1. A backstitch technique BIBREF30 with a backstitch scale of 1.0 and backstitch interval of 4 was also used.
+
+For comparison, we trained another TS-AM without the auxiliary loss. We also trained a “clean AM” using clean, non-speaker-mixed speech. For this clean model, we used a model architecture without the auxiliary output branch, and an i-vector was extracted every 100 msec for online speaker/environment adaptation.
+
+In decoding, we used a 4-gram LM trained using the transcription of the training data. All our experiments were conducted on the basis of the Kaldi toolkit BIBREF31.
+
+## Evaluation ::: Preliminary experiment with simulated 2-speaker mixture ::: Evaluation of TS-ASR
+
+We first evaluated the TS-AM with two-speaker mixture of the E1, E2, and E3 evaluation sets. For each test utterance, a sample of the target speaker was randomly selected from the other utterances in the test set. We used the same random seed over all experiments, so that they could be conducted under the same conditions.
+
+The results are listed in Table TABREF32. Although the clean AM produced a WER of 7.90% for the original clean dataset, the WER severely degraded to 88.03% by mixing two speakers. The TS-AM then significantly recovered the WER to 20.78% ($\alpha =0.0$). Although the improvement was not so significant compared with that reported in BIBREF5, the auxiliary loss further improved the WER to 20.53% ($\alpha =1.0$). Note that E1 contains only male speakers while E2 and E3 contain both female and male speakers. Because of this, E1 showed larger degradation of WER when 2 speakers were mixed.

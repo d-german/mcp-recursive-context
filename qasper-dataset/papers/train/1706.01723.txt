@@ -1,0 +1,91 @@
+# A General-Purpose Tagger with Convolutional Neural Networks
+
+**Paper ID:** 1706.01723
+
+## Abstract
+
+We present a general-purpose tagger based on convolutional neural networks (CNN), used for both composing word vectors and encoding context information. The CNN tagger is robust across different tagging tasks: without task-specific tuning of hyper-parameters, it achieves state-of-the-art results in part-of-speech tagging, morphological tagging and supertagging. The CNN tagger is also robust against the out-of-vocabulary problem, it performs well on artificially unnormalized texts.
+
+## Introduction
+
+Recently, character composition models have shown great success in many NLP tasks, mainly because of their robustness in dealing with out-of-vocabulary (OOV) words by capturing sub-word informations. Among the character composition models, bidirectional long short-term memory (LSTM) models and convolutional neural networks (CNN) are widely applied in many tasks, e.g. part-of-speech (POS) tagging BIBREF0 , BIBREF1 , named entity recognition BIBREF2 , language modeling BIBREF3 , BIBREF4 , machine translation BIBREF5 and dependency parsing BIBREF6 , BIBREF7 .
+
+In this paper, we present a state-of-the-art general-purpose tagger that uses CNNs both to compose word representations from characters and to encode context information for tagging. We show that the CNN model is more capable than the LSTM model for both functions, and more stable for unseen or unnormalized words, which is the main benefit of character composition models.
+
+Yu:2017 compared the performance of CNN and LSTM as character composition model for dependency parsing, and concluded that CNN performs better than LSTM. In this paper, we show that this is also the case for POS tagging. Furthermore, we extend the scope to morphological tagging and supertagging, in which the tag set is much larger and long-distance dependencies between words are more important.
+
+In these three tagging tasks, we compare our tagger with the bilstm-aux tagger BIBREF1 and the CRF-based morphological tagger MarMot BIBREF8 . The CNN tagger shows robust performance accross the three tasks, and achieves the highest average accuracy in all tasks. It (significantly) outperforms LSTM in morphological tagging, and outperforms both baselines in supertagging by a large margin.
+
+To test the robustness of the taggers against the OOV problem, we also conduct experiments using artificially constructed unnormalized text by corrupting words in the normal dev set. Again, the CNN tagger outperforms the two baselines by a very large margin.
+
+Therefore we conclude that our CNN tagger is a robust state-of-the-art general-purpose tagger that can effectively compose word representation from characters and encode context information.
+
+## Model
+
+Our proposed CNN tagger has two main components: the character composition model and the context encoding model. Both components are essentially CNN models, capturing different levels of information: the first CNN captures morphological information from character n-grams, the second one captures contextual information from word n-grams. Figure FIGREF2 shows a diagram of both models of the tagger.
+
+## Character Composition Model
+
+The character composition model is similar to Yu:2017, where several convolution filters are used to capture character n-grams of different sizes. The outputs of each convolution filter are fed through a max pooling layer, and the pooling outputs are concatenated to represent the word.
+
+## Context Encoding Model
+
+The context encoding model captures the context information of the target word by scanning through the word representations of its context window. The word representation could be only word embeddings ( INLINEFORM0 ), only composed vectors ( INLINEFORM1 ) or the concatenation of both ( INLINEFORM2 )
+
+A context window consists of N words to both sides of the target word and the target word itself. To indicate the target word, we concatenate a binary feature to each of the word representations with 1 indicating the target and 0 otherwise, similar to Vu:2016. Additional to the binary feature, we also concatenate a position embedding to encode the relative position of each context word, similar to Gehring:2017.
+
+## Hyper-parameters
+
+For the character composition model, we take a fixed input size of 32 characters for each word, with padding on both sides or cutting from the middle if needed. We apply four convolution filters with sizes of 3, 5, 7, and 9. Each filter has an output channel of 25 dimensions, thus the composed vector is 100-dimensional. We apply Gaussian noise with standard deviation of 0.1 is applied on the composed vector during training.
+
+For the context encoding model, we take a context window of 15 (7 words to both sides of the target word) as input and predict the tag of the target word. We also apply four convolution filters with sizes of 2, 3, 4 and 5, each filter is stacked by another filter with the same size, and the output has 128 dimensions, thus the context representation is 512-dimensional. We apply one 512-dimensional hidden layer with ReLU non-linearity before the prediction layer. We apply dropout with probability of 0.1 after the hidden layer during training.
+
+The model is trained with averaged stochastic gradient descent with a learning rate of 0.1, momentum of 0.9 and mini-batch size of 100. We apply L2 regularization with a rate of INLINEFORM0 on all the parameters of the network except the embeddings.
+
+## Data
+
+We use treebanks from version 1.2 of Universal Dependencies (UD), and in the case of several treebanks for one language, we only use the canonical treebank. There are in total 22 treebanks, as in Plank:2016. Each treebank splits into train, dev, and test sets, we use the dev sets for early stop, and test on the test sets.
+
+## Tasks
+
+We evaluate our method on three tagging tasks: POS tagging (Pos), morphological tagging (Morph) and supertagging (Stag).
+
+For POS tagging we use Universal POS tags, which is an extension of Petrov:2012. The universal tag set tries to capture the “universal” properties of words and facilitate cross-lingual learning. Therefore the tag set is very coarse and leaves out most of the language-specific properties to morphological features.
+
+Morphological tags encode the language-specific morphological features of the words, e.g., number, gender, case. They are represented in the UD treebanks as one string which contains several key-value pairs of morphological features.
+
+Supertags BIBREF9 are tags that encode more syntactic information than standard POS tags, e.g. the head direction or the subcategorization frame. We use dependency-based supertags BIBREF10 which are extracted from the dependency treebanks. Adding such tags into feature models of statistical dependency parsers significantly improves their performance BIBREF11 , BIBREF12 . Supertags can be designed with different levels of granularity. We use the standard Model 1 from Ouchi:2014, where each tag consists of head direction, dependency label and dependent direction. Even with the basic supertag model, the Stag task is more difficult than Pos and Morph because it generally requires taking long-distance dependencies between words into consideration.
+
+We select these tasks as examples for tagging applications because they differ strongly in tag set sizes. Generally, the Pos set sizes for all the languages are no more than 17 and Stag set sizes are around 200. When treating morphological features as a string (i.e. not splitting into key-value pairs), the sizes of the Morph tag sets range from about 100 up to 2000.
+
+## Setups
+
+As baselines to our models, we take the two state-of-the-art taggers MarMot (denoted as CRF) and bilstm-aux (denoted as LSTM). We train the taggers with the recommended hyper-parameters from the documentation.
+
+To ensure a fair comparison (especially between LSTM and CNN), we generally treat the three tasks equally, and do not apply task-specific tuning on them, i.e., using the same features and same model hyper-parameters in each single task. Also, we do not use any pre-trained word embeddings.
+
+For the LSTM tagger, we use the recommended hyper-parameters in the documentation including 64-dimensional word embeddings ( INLINEFORM0 ) and 100-dimensional composed vectors ( INLINEFORM1 ). We train the INLINEFORM2 , INLINEFORM3 and INLINEFORM4 models as in Plank:2016. We train the CNN taggers with the same dimensionalities for word representations.
+
+For the CRF tagger, we predict Pos and Morph jointly as in the standard setting for MarMot, which performs much better than with separate predictions, as shown in Mueller:2013 and in our preliminary experiments. Also, it splits the morphological tags into key-value pairs, whereas the neural taggers treat the whole string as a tag. We predict Stag as a separate task.
+
+## Results
+
+The test results for the three tasks are shown in Table TABREF17 in three groups. The first group of seven columns are the results for Pos, where both LSTM and CNN have three variations of input features: word only ( INLINEFORM0 ), character only ( INLINEFORM1 ) and both ( INLINEFORM2 ). For Morph and Stag, we only use the INLINEFORM3 setting for both LSTM and CNN.
+
+On macro-average, three taggers perform close in the Pos task, with the CNN tagger being slightly better. In the Morph task, CNN is again slightly ahead of CRF, while LSTM is about 2 points behind. In the Stag task, CNN outperforms both taggers by a large margin: 2 points higher than LSTM and 8 points higher than CRF.
+
+While considering the input features of the LSTM and CNN taggers, both taggers perform close with only INLINEFORM0 as input, which suggests that the two taggers are comparable in encoding context for tagging Pos. However, with only INLINEFORM1 , CNN performs much better than LSTM (95.54 vs. 92.61), and close to INLINEFORM2 (96.18). Also, INLINEFORM3 consistently outperforms INLINEFORM4 for all languages. This suggests that the CNN model alone is capable of learning most of the information that the word-level model can learn, while the LSTM model is not.
+
+The more interesting cases are Morph and Stag, where CNN performs much higher than LSTM. We hypothesize three possible reasons to explain the considerably large difference. First, the LSTM tagger may be more sensitive to hyper-parameters and requires task specific tuning. We use the same setting which is tuned for the Pos task, thus it underperforms in the other tasks. Second, the LSTM tagger may not deal well with large tag sets. The tag set size for Morph are larger than Pos in orders of magnitudes, especially for Czech, Basque, Finnish and Slovene, all of which have more than 1000 distinct Morph tags in the training data, and the LSTM performs poorly on these languages. Third, the LSTM has theoretically unlimited access to all the tokens in the sentence, but in practice it might not learn the context as good as the CNN. In the LSTM model, the information of long-distance contexts will gradually fade away during the recurrence, whereas in the CNN model, all words are treated equally as long as they are in the context window. Therefore the LSTM underperforms in the Stag task, where the information from long-distance context is more important.
+
+## Unnormalized Text
+
+It is a common scenario to use a model trained with news data to process text from social media, which could include intentional or unintentional misspellings. Unfortunately, we do not have social media data to test the taggers. However, we design an experiment to simulate unnormalized text, by systematically editing the words in the dev sets with three operations: insertion, deletion and substitution. For example, if we modify a word abcdef at position 2 (0-based), the modified words would be abxcdef, abdef, and abxdef, where x is a random character from the alphabet of the language.
+
+For each operation, we create a group of modified dev sets, where all words longer than two characters are edited by the operation with a probability of 0.25, 0.5, 0.75, or 1. For each language, we use the models trained on the normal training sets and predict Pos for the three groups of modified dev set. The average accuracies are shown in Figure FIGREF19 .
+
+Generally, all models suffer from the increasing degrees of unnormalized texts, but CNN always suffers the least. In the extreme case where almost all words are unnormalized, CNN performs 4 to 8 points higher than LSTM and 4 to 11 points higher than CRF. This suggests that the CNN is more robust to misspelt words. While looking into the specific cases of misspelling, CNN is more sensitive to insertion and deletion, while CRF and LSTM are more sensitive to substitution.
+
+## Conclusion
+
+In this paper, we propose a general-purpose tagger that uses two CNNs for both character composition and context encoding. On the universal dependency treebanks (v1.2), the tagger achieves state-of-the-art results for POS tagging and morphological tagging, and to the best of our knowledge, it also performs best for supertagging. The tagger works well across different tagging tasks without tuning the hyper-parameters, and it is also robust against unnormalized text.

@@ -1,0 +1,213 @@
+# Multi-style Generative Reading Comprehension
+
+**Paper ID:** 1901.02262
+
+## Abstract
+
+This study tackles generative reading comprehension (RC), which consists of answering questions based on textual evidence and natural language generation (NLG). We propose a multi-style abstractive summarization model for question answering, called Masque. The proposed model has two key characteristics. First, unlike most studies on RC that have focused on extracting an answer span from the provided passages, our model instead focuses on generating a summary from the question and multiple passages. This serves to cover various answer styles required for real-world applications. Second, whereas previous studies built a specific model for each answer style because of the difficulty of acquiring one general model, our approach learns multi-style answers within a model to improve the NLG capability for all styles involved. This also enables our model to give an answer in the target style. Experiments show that our model achieves state-of-the-art performance on the Q&A task and the Q&A + NLG task of MS MARCO 2.1 and the summary task of NarrativeQA. We observe that the transfer of the style-independent NLG capability to the target style is the key to its success.
+
+## Introduction
+
+Question answering has been a long-standing research problem. Recently, reading comprehension (RC), a challenge to answer a question given textual evidence provided in a document set, has received much attention. Here, current mainstream studies have treated RC as a process of extracting an answer span from one passage BIBREF0 , BIBREF1 or multiple passages BIBREF2 , which is usually done by predicting the start and end positions of the answer BIBREF3 , BIBREF4 .
+
+The demand for answering questions in natural language is increasing rapidly, and this has led to the development of smart devices such as Siri and Alexa. However, in comparison with answer span extraction, the natural language generation (NLG) ability for RC has been less studied. While datasets such as MS MARCO BIBREF5 have been proposed for providing abstractive answers in natural language, the state-of-the-art methods BIBREF6 , BIBREF7 are based on answer span extraction, even for the datasets. Generative models such as S-Net BIBREF8 suffer from a dearth of training data to cover open-domain questions.
+
+Moreover, to satisfy various information needs, intelligent agents should be capable of answering one question in multiple styles, such as concise phrases that do not contain the context of the question and well-formed sentences that make sense even without the context of the question. These capabilities complement each other; however, the methods used in previous studies cannot utilize and control different answer styles within a model.
+
+In this study, we propose a generative model, called Masque, for multi-passage RC. On the MS MARCO 2.1 dataset, Masque achieves state-of-the-art performance on the dataset's two tasks, Q&A and NLG, with different answer styles. The main contributions of this study are that our model enables the following two abilities.
+
+## Problem Formulation
+
+The task considered in this paper, is defined as:
+
+Problem 1 Given a question with $J$ words $x^q = \lbrace x^q_1, \ldots , x^q_J\rbrace $ , a set of $K$ passages, where each $k$ -th passage is composed of $L$ words $x^{p_k} = \lbrace x^{p_k}_1, \ldots , x^{p_k}_{L}\rbrace $ , and an answer style $s$ , an RC system outputs an answer $y = \lbrace y_1, \ldots , y_T \rbrace $ conditioned on the style.
+
+In short, for inference, given a set of 3-tuples $(x^q, \lbrace x^{p_k}\rbrace , s)$ , the system predicts $P(y)$ . The training data is a set of 6-tuples: $(x^q, \lbrace x^{p_k}\rbrace , s, y, a, \lbrace r^{p_k}\rbrace )$ , where $a$ is 1 if the question is answerable with the provided passages and 0 otherwise, and $r^{p_k}$ is 1 if the $k$ -th passage is required to formulate the answer and 0 otherwise.
+
+## Proposed Model
+
+Our proposed model, Masque, is based on multi-source abstractive summarization; the answer our model generates can be viewed as a summary from the question and multiple passages. It is also style-controllable; one model can generate the answer with the target style.
+
+Masque directly models the conditional probability $p(y|x^q, \lbrace x^{p_k}\rbrace , s)$ . In addition to multi-style learning, it considers passage ranking and answer possibility classification together as multi-task learning in order to improve accuracy. Figure 2 shows the model architecture. It consists of the following modules.
+
+ 1 The question-passages reader (§ "Question-Passages Reader" ) models interactions between the question and passages.
+
+ 2 The passage ranker (§ "Passage Ranker" ) finds relevant passages to the question.
+
+ 3 The answer possibility classifier (§ "Answer Possibility Classifier" ) identifies answerable questions.
+
+ 4 The answer sentence decoder (§ "Answer Sentence Decoder" ) outputs a sequence of words conditioned on the style.
+
+## Question-Passages Reader
+
+Given a question and passages, the question-passages reader matches them so that the interactions among the question (passage) words conditioned on the passages (question) can be captured.
+
+Let $x^q$ and $x^{p_k}$ represent one-hot vectors of words in the question and $k$ -th passage. First, this layer projects each of the one-hot vectors (of size $V$ ) into a $d_\mathrm {word}$ -dimensional continuous vector space with a pre-trained weight matrix $W^e \in \mathbb {R}^{d_\mathrm {word} \times V}$ such as GloVe BIBREF15 . Next, it uses contextualized word representations, ELMo BIBREF16 , which is a character-level two-layer bidirectional language model pre-trained on a large-scale corpus. ELMo representations allow our model to use morphological clues to form robust representations for out-of-vocabulary words unseen in training. Then, the concatenation of the word and contextualized embedding vectors is passed to a two-layer highway network BIBREF17 that is shared for the question and passages.
+
+This layer uses a stack of Transformer blocks, which are shared for the question and passages, on top of the embeddings provided by the word embedding layer. The input of the first block is immediately mapped to a $d$ -dimensional vector by a linear transformation. The outputs of this layer are sequences of $d$ -dimensional vectors: $E^{p_k} \in \mathbb {R}^{d \times L}$ for the $k$ -th passage and $E^q \in \mathbb {R}^{d \times J}$ for the question.
+
+It consists of two sub-layers: a self-attention layer and a position-wise feed-forward network. For the self-attention layer, we adopt the multi-head attention mechanism defined in BIBREF12 . The feed-forward network consists of two linear transformations with a GELU BIBREF18 activation in between, following OpenAI GPT BIBREF19 . Each sub-layer is placed inside a residual block BIBREF20 . For an input $x$ and a given sub-layer function $f$ , the output is $\mathrm {LayerNorm}(f(x)+x)$ , where $\mathrm {LayerNorm}$ indicates the layer normalization proposed in BIBREF21 . To facilitate these residual connections, all sub-layers produce outputs of dimension $d$ . Note that our model does not use any position embeddings because ELMo gives the positional information of the words in each sequence.
+
+This layer fuses information from the passages to the question as well as from the question to the passages in a dual mechanism.
+
+It first computes a similarity matrix $U^{p_k} \in \mathbb {R}^{L{\times }J}$ between the question and $k$ -th passage, as is done in BIBREF22 , where 
+
+$$U^{p_k}_{lj} = {w^a}^\top [ E^{p_k}_l; E^q_j; E^{p_k}_l \odot E^q_j ]$$   (Eq. 15) 
+
+ indicates the similarity between the $l$ -th word of the $k$ -th passage and the $j$ -th question word. $w^a \in \mathbb {R}^{3d}$ are learnable parameters. The $\odot $ operator denotes the Hadamard product, and the $[;]$ operator means vector concatenation across the rows. Next, it obtains the row and column normalized similarity matrices $A^{p_k} = \mathrm {softmax}_j({U^{p_k}}^\top ) \in \mathbb {R}^{J\times L}$ and $B^{p_k} = \mathrm {softmax}_{l}(U^{p_k}) \in \mathbb {R}^{L \times J}$ . We use DCN BIBREF23 as the dual attention mechanism to obtain question-to-passage representations $G^{q \rightarrow p_k} \in \mathbb {R}^{5d \times L}$ : 
+
+$$\nonumber [E^{p_k}; \bar{A}^{p_k}; \bar{\bar{A}}^{p_k}; E^{p_k} \odot \bar{A}^{p_k}; E^{p_k} \odot \bar{\bar{A}}^{p_k}]$$   (Eq. 16) 
+
+ and passage-to-question ones $G^{p \rightarrow q} \in \mathbb {R}^{5d \times J}$ : 
+
+$$\begin{split}
+\nonumber & [ E^{q} ; \max _k(\bar{B}^{p_k}); \max _k(\bar{\bar{B}}^{p_k}); \\
+&\hspace{10.0pt} E^{q} \odot \max _k(\bar{B}^{p_k}); E^{q} \odot \max _k(\bar{\bar{B}}^{p_k}) ] \mathrm {\ \ where}
+\end{split}\\
+\nonumber &\bar{A}^{p_k} = E^q A^{p_k}\in \mathbb {R}^{d \times L}, \ \bar{B}^{p_k} = E^{p_k} B^{p_k} \in \mathbb {R}^{d \times J} \\
+\nonumber &\bar{\bar{A}}^{p_k} = \bar{B}^{p_k} A^{p_k} \in \mathbb {R}^{d \times L}, \ \bar{\bar{B}}^{p_k} = \bar{A}^{p_k} B^{p_k} \in \mathbb {R}^{d \times J}.$$   (Eq. 17) 
+
+This layer uses a stack of Transformer encoder blocks for question representations and obtains $M^q \in \mathbb {R}^{d \times J}$ from $G^{p \rightarrow q}$ . It also uses an another stack for passage representations and obtains $M^{p_k} \in \mathbb {R}^{d \times L}$ from $G^{q \rightarrow p_k}$ for each $k$ -th passage. The outputs of this layer, $M^q$ and $\lbrace M^{p_k}\rbrace $ , are passed on to the answer sentence decoder; the $\lbrace M^{p_k}\rbrace $ are also passed on to the passage ranker and answer possibility classifier.
+
+## Passage Ranker
+
+The passage ranker maps the output of the modeling layer, $\lbrace M^{p_k}\rbrace $ , to the relevance score of each passage. To obtain a fixed-dimensional pooled representation of each passage sequence, this layer takes the output for the first passage word, $M^{p_k}_1$ , which corresponds to the beginning-of-sentence token. It calculates the relevance of each $k$ -th passage to the question as: 
+
+$$\beta ^{p_k} = \mathrm {sigmoid}({w^r}^\top M^{p_k}_1),$$   (Eq. 20) 
+
+ where $w^r \in \mathbb {R}^{d}$ are learnable parameters.
+
+## Answer Possibility Classifier
+
+The answer possibility classifier maps the output of the modeling layer, $\lbrace M^{p_k}\rbrace $ , to the probability of the answer possibility. The classifier takes the output for the first word, $M^{p_k}_1$ , for all passages and concatenates them to obtain a fixed-dimensional representation. It calculates the answer possibility to the question as: 
+
+$$P(a) = \mathrm {sigmoid}({w^c}^\top [M^{p_1}_1; \ldots ; M^{p_K}_1]),$$   (Eq. 22) 
+
+ where $w^c \in \mathbb {R}^{Kd}$ are learnable parameters.
+
+## Answer Sentence Decoder
+
+Given the outputs provided by the reader, the decoder generates a sequence of answer words one element at a time. It is auto-regressive BIBREF24 , consuming the previously generated words as additional input at each decoding step.
+
+Let $y = \lbrace y_1, \ldots , y_{T}\rbrace $ represent one-hot vectors of words in the answer. This layer has the same components as the word embedding layer of the question-passages reader, except that it uses a unidirectional ELMo in order to ensure that the predictions for position $t$ depend only on the known outputs at positions less than $t$ .
+
+Moreover, to be able to make use of multiple answer styles within a single system, our model introduces an artificial token corresponding to the target style at the beginning of the answer sentence ( $y_1$ ), like BIBREF14 . At test time, the user can specify the first token to control the answer styles. This modification does not require any changes to the model architecture. Note that introducing the tokens on the decoder side prevents the passage ranker and answer possibility classifier from depending on the answer style.
+
+This layer uses a stack of Transformer decoder blocks on top of the embeddings provided by the word embedding layer. The input is immediately mapped to a $d$ -dimensional vector by a linear transformation, and the output of this layer is a sequence of $d$ -dimensional vectors: $\lbrace s_1, \ldots , s_T\rbrace $ .
+
+In addition to the encoder block, this block consists of second and third sub-layers after the self-attention block and before the feed-forward network, as shown in Figure 2 . As in BIBREF12 , the self-attention sub-layer uses a sub-sequent mask to prevent positions from attending to subsequent positions. The second and third sub-layers perform the multi-head attention over $M^q$ and $M^{p_\mathrm {all}}$ , respectively. The $M^{p_\mathrm {all}}$ is the concatenated outputs of the encoder stack for the passages, 
+
+$$M^{p_\mathrm {all}} = [M^{p_1}, \ldots , M^{p_K}] \in \mathbb {R}^{d \times KL}.$$   (Eq. 27) 
+
+ The $[,]$ operator means vector concatenation across the columns. This attention for the concatenated passages enables our model to produce attention weights that are comparable between passages.
+
+Our extended mechanism allows both words to be generated from a fixed vocabulary and words to be copied from both the question and multiple passages. Figure 3 shows the overview.
+
+Let the extended vocabulary, $V_\mathrm {ext}$ , be the union of the common words (a small subset of the full vocabulary, $V$ , defined by the reader-side word embedding matrix) and all words appearing in the input question and passages. $P^v$ denotes the probability distribution of the $t$ -th answer word, $y_t$ , over the extended vocabulary. It is defined as: 
+
+$$P^v(y_t) =\mathrm {softmax}({W^2}^\top (W^1 s_t + b^1)),$$   (Eq. 31) 
+
+ where the output embedding $W^2 \in \mathbb {R}^{d_\mathrm {word} \times V_\mathrm {ext}}$ is tied with the corresponding part of the input embedding BIBREF25 , and $W^1 \in \mathbb {R}^{d_\mathrm {word} \times d}$ and $b^1 \in \mathbb {R}^{d_\mathrm {word}}$ are learnable parameters. $P^v(y_t)$ is zero if $y_t$ is an out-of-vocabulary word for $V$ .
+
+The copy mechanism used in the original pointer-generator is based on the attention weights of a single-layer attentional RNN decoder BIBREF9 . The attention weights in our decoder stack are the intermediate outputs in multi-head attentions and are not suitable for the copy mechanism. Therefore, our model also uses additive attentions for the question and multiple passages on top of the decoder stack.
+
+The layer takes $s_t$ as the query and outputs $\alpha ^q_t \in \mathbb {R}^J$ ( $\alpha ^p_t \in \mathbb {R}^{KL}$ ) as the attention weights and $c^q_t \in \mathbb {R}^d$ ( $c^p_t \in \mathbb {R}^d$ ) as the context vectors for the question (passages): 
+
+$$e^q_j &= {w^q}^\top \tanh (W^{qm} M_j^q + W^{qs} s_t +b^q), \\
+\alpha ^q_t &= \mathrm {softmax}(e^q), \\
+c^q_t &= \textstyle \sum _j \alpha ^q_{tj} M_j^q, \\
+e^{p_k}_l &= {w^p}^\top \tanh (W^{pm} M_l^{p_k} + W^{ps} s_t +b^p), \\
+\alpha ^p_t &= \mathrm {softmax}([e^{p_1}; \ldots ; e^{p_K}]), \\
+c^p_t &= \textstyle \sum _{l} \alpha ^p_{tl} M^{p_\mathrm {all}}_{l},$$   (Eq. 33) 
+
+ where $w^q$ , $w^p \in \mathbb {R}^d$ , $W^{qm}$ , $W^{qs}$ , $W^{pm}$ , $W^{ps} \in \mathbb {R}^{d \times d}$ , and $b^q$ , $b^p \in \mathbb {R}^d$ are learnable parameters.
+
+ $P^q$ and $P^p$ are the copy distributions over the extended vocabulary, defined as: 
+
+$$P^q(y_t) &= \textstyle \sum _{j: x^q_j = y_t} \alpha ^q_{tj}, \\
+P^p(y_t) &= \textstyle \sum _{l: x^{p_{k(l)}}_{l} = y_t} \alpha ^p_{tl},$$   (Eq. 34) 
+
+ where $k(l)$ means the passage index corresponding to the $l$ -th word in the concatenated passages.
+
+The final distribution of the $t$ -th answer word, $y_t$ , is defined as a mixture of the three distributions: 
+
+$$P(y_t) = \lambda ^v P^v(y_t) + \lambda ^q P^q(y_t) + \lambda ^p P^p(y_t),$$   (Eq. 36) 
+
+ where the mixture weights are given by 
+
+$$\lambda ^v, \lambda ^q, \lambda ^p = \mathrm {softmax}(W^m [s_t; c^q_t; c^p_t] + b^m).$$   (Eq. 37) 
+
+ $W^m \in \mathbb {R}^{3 \times 3d}$ , $b^m \in \mathbb {R}^3$ are learnable parameters.
+
+In order not to use words in irrelevant passages, our model introduces the concept of combined attention BIBREF26 . While the original technique combines the word and sentence level attentions, our model combines the passage-level relevance $\beta ^{p_k}$ and word-level attentions $\alpha ^p_t$ by using simple scalar multiplication and re-normalization. The updated word attention is: 
+
+$$\alpha ^p_{tl} & := \frac{\alpha ^p_{tl} \beta ^{p_{k(l)} }}{\sum _{l^{\prime }} \alpha ^p_{tl^{\prime }} \beta ^{p_{k(l^{\prime })}}}.$$   (Eq. 39) 
+
+## Loss Function
+
+We define the training loss as the sum of losses in 
+
+$$L(\theta ) = L_\mathrm {dec} + \gamma _\mathrm {rank} L_\mathrm {rank} + \gamma _\mathrm {cls} L_\mathrm {cls}$$   (Eq. 41) 
+
+ where $\theta $ is the set of all learnable parameters, and $\gamma _\mathrm {rank}$ and $\gamma _\mathrm {cls}$ are balancing parameters.
+
+The loss of the decoder, $L_\mathrm {dec}$ , is the negative log likelihood of the whole target answer sentence averaged over $N_\mathrm {able}$ answerable examples: 
+
+$$L_\mathrm {dec} = - \frac{1}{N_\mathrm {able}}\sum _{(a,y)\in \mathcal {D}} \frac{a}{T} \sum _t \log P(y_{t}),$$   (Eq. 42) 
+
+ where $\mathcal {D}$ is the training dataset.
+
+The losses of the passage ranker, $L_\mathrm {rank}$ , and the answer possibility classifier, $L_\mathrm {cls}$ , are the binary cross entropy between the true and predicted values averaged over all $N$ examples: 
+
+$$L_\mathrm {rank} = - \frac{1}{NK} \sum _k \sum _{r^{p_k}\in \mathcal {D}}
+\biggl (
+\begin{split}
+&r^{p_k} \log \beta ^{p_k} + \\
+&(1-r^{p_k}) \log (1-\beta ^{p_k})
+\end{split}
+\biggr ),\\
+L_\mathrm {cls} = - \frac{1}{N} \sum _{a \in \mathcal {D}}
+\biggl (
+\begin{split}
+&a \log P(a) + \\
+&(1-a) \log (1-P(a))
+\end{split}
+\biggr ).$$   (Eq. 43) 
+
+## Setup
+
+We conducted experiments on the two tasks of MS MARCO 2.1 BIBREF5 . The answer styles considered in the experiments corresponded to the two tasks. The NLG task requires a well-formed answer that is an abstractive summary of the question and ten passages, averaging 16.6 words. The Q&A task also requires an abstractive answer but prefers a more concise answer than the NLG task, averaging 13.1 words, where many of the answers do not contain the context of the question. For instance, for the question “tablespoon in cup”, the answer in the Q&A task will be “16”, and the answer in the NLG task will be “There are 16 tablespoons in a cup.” In addition to the ALL dataset, we prepared two subsets (Table 1 ). The ANS set consists of answerable questions, and the WFA set consists of the answerable questions and well-formed answers, where WFA $\subset $ ANS $\subset $ ALL.
+
+We trained our model on a machine with eight NVIDIA P100 GPUs. Our model was jointly trained with the two answer styles in the ALL set for a total of eight epochs with a batch size of 80. The training took roughly six days. The ensemble model consists of six training runs with the identical architecture and hyperparameters. The hidden size $d$ was 304, and the number of attention heads was 8. The inner state size of the feed-forward networks was 256. The numbers of shared encoding blocks, modeling blocks for question, modeling blocks for passages, and decoder blocks were 3, 2, 5, and 8, respectively. We used the pre-trained uncased 300-dimensional GloVe BIBREF15 and the original 512-dimensional ELMo BIBREF16 . We used the spaCy tokenizer, and all words were lowercased except the input for ELMo. The number of common words in $V_\mathrm {ext}$ was 5,000.
+
+We used the Adam optimization BIBREF27 with $\beta _1 = 0.9$ , $\beta _2 = 0.999$ , and $\epsilon = 10^{-8}$ . Weights were initialized using $N(0, 0.02)$ , except that the biases of all the linear transformations were initialized with zero vectors. The learning rate was increased linearly from zero to $2.5 \times 10^{-4}$ in the first 2,000 steps and annealed to 0 using a cosine schedule. All parameter gradients were clipped to a maximum norm of 1. An exponential moving average was applied to all trainable variables with a decay rate 0.9995. The balancing factors of joint learning, $\lambda _\mathrm {rank}$ and $\lambda _\mathrm {cls}$ , were set to 0.5 and 0.1.
+
+We used a modified version of the L $_2$ regularization proposed in BIBREF28 , with $w = 0.01$ . We additionally used a dropout BIBREF29 rate of 0.3 for all highway networks and residual and scaled dot-product attention operations in the multi-head attention mechanism. We also used one-sided label smoothing BIBREF30 for the passage relevance and answer possibility labels. We smoothed only the positive labels to 0.9.
+
+## Results
+
+Table 2 shows that our ensemble model, controlled with the NLG and Q&A styles, achieved state-of-the-art performance on the NLG and Q&A tasks in terms of Rouge-L. In particular, for the NLG task, our single model outperformed competing models in terms of both Rouge-L and Bleu-1. The capability of creating abstractive summaries from the question and passages contributed to its improvements over the state-of-the-art extractive approaches BIBREF6 , BIBREF7 .
+
+Table 3 shows the results of the ablation test for our model (controlled with the NLG style) on the well-formed answers of the WFA dev. set. Our model, which was trained with the ALL set consisting of the two styles, outperformed the model trained with the WFA set consisting of the single style. Multi-style learning allowed our model to improve NLG performance by also using non-sentence answers.
+
+Table 3 shows that our model outperformed the model that used RNNs and self-attentions instead of Transformer blocks as in MCAN BIBREF11 . Our deep Transformer decoder captured the interaction among the question, the passages, and the answer better than a single-layer LSTM decoder.
+
+Table 3 shows that our model (jointly trained with the passage ranker and answer possibility classifier) outperformed the model that did not use the ranker and classifier. The joint learning has a regularization effect on the question-passages reader.
+
+We also confirmed that the gold passage ranker, which can predict passage relevances perfectly, improves RC performance significantly. Passage re-ranking will be a key to developing a system that can outperform humans.
+
+Table 4 shows the passage re-ranking performance for the ten given passages on the ANS dev. set. Our ranker improved the initial ranking provided by Bing by a significant margin. Also, the ranker shares the question-passages reader with the answer decoder, and this sharing contributed to the improvements over the ranker trained without the answer decoder. This result is similar to those reported in BIBREF33 . Moreover, the joint learning with the answer possibility classifier and multiple answer styles, which enables our model to learn from a larger number of data, improved the re-ranking.
+
+Figure 4 shows the precision-recall curve of answer possibility classification on the ALL dev. set, where the positive class is the answerable data. Our model identified the answerable questions well. The maximum $F_1$ score was 0.7893. This is the first report on answer possibility classification with MS MARCO 2.1.
+
+Figure 5 shows the lengths of the answers generated by our model, which are broken down by answer style and query type. The generated answers were relatively shorter than the reference answers but well controlled with the target style in every query type.
+
+Also, we should note that our model does not guarantee the consistency in terms of meaning across the answer styles. We randomly selected 100 questions and compared the answers our model generated with the NLG and Q&A styles. The consistency ratio was 0.81, where major errors were due to copying words from different parts of the passages and generating different words, especially yes/no, from a fixed vocabulary.
+
+Appendix "Reading Comprehension Examples generated by Masque from MS MARCO 2.1" shows examples of generated answers. We found (d) style errors; (e) yes/no classification errors; (f) copy errors with respect to numerical values; and (c,e) grammatical errors that were originally contained in the inputs.
+
+## Conclusion
+
+We believe our study makes two contributions to the study of multi-passage RC with NLG. Our model enables 1) multi-source abstractive summarization based RC and 2) style-controllable RC. The key strength of our model is its high accuracy of generating abstractive summaries from the question and passages; our model achieved state-of-the-art performance in terms of Rouge-L on the Q&A and NLG tasks of MS MARCO 2.1 that have different answer styles BIBREF5 .
+
+The styles considered in this paper are only related to the context of the question in the answer sentence; our model will be promising for controlling other styles such as length and speaking styles. Future work will involve exploring the potential of hybrid models combining extractive and abstractive approaches and improving the passage re-ranking and answerable question identification.

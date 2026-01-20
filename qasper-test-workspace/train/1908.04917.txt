@@ -1,0 +1,115 @@
+# A Cascade Sequence-to-Sequence Model for Chinese Mandarin Lip Reading
+
+**Paper ID:** 1908.04917
+
+## Abstract
+
+Lip reading aims at decoding texts from the movement of a speaker's mouth. In recent years, lip reading methods have made great progress for English, at both word-level and sentence-level. Unlike English, however, Chinese Mandarin is a tone-based language and relies on pitches to distinguish lexical or grammatical meaning, which significantly increases the ambiguity for the lip reading task. In this paper, we propose a Cascade Sequence-to-Sequence Model for Chinese Mandarin (CSSMCM) lip reading, which explicitly models tones when predicting sentence. Tones are modeled based on visual information and syntactic structure, and are used to predict sentence along with visual information and syntactic structure. In order to evaluate CSSMCM, a dataset called CMLR (Chinese Mandarin Lip Reading) is collected and released, consisting of over 100,000 natural sentences from China Network Television website. When trained on CMLR dataset, the proposed CSSMCM surpasses the performance of state-of-the-art lip reading frameworks, which confirms the effectiveness of explicit modeling of tones for Chinese Mandarin lip reading.
+
+## Introduction
+
+Lip reading, also known as visual speech recognition, aims to predict the sentence being spoken, given a silent video of a talking face. In noisy environments, where speech recognition is difficult, visual speech recognition offers an alternative way to understand speech. Besides, lip reading has practical potential in improved hearing aids, security, and silent dictation in public spaces. Lip reading is essentially a difficult problem, as most lip reading actuations, besides the lips and sometimes tongue and teeth, are latent and ambiguous. Several seemingly identical lip movements can produce different words.
+
+Thanks to the recent development of deep learning, English-based lip reading methods have made great progress, at both word-level BIBREF0 , BIBREF1 and sentence-level BIBREF2 , BIBREF3 . However, as the language of the most number of speakers, there is only a little work for Chinese Mandarin lip reading in the multimedia community. Yang et al. BIBREF4 present a naturally-distributed large-scale benchmark for Chinese Mandarin lip-reading in the wild, named LRW-1000, which contains 1,000 classes with 718,018 samples from more than 2,000 individual speakers. Each class corresponds to the syllables of a Mandarin word composed of one or several Chinese characters. However, they perform only word classification for Chinese Mandarin lip reading but not at the complete sentence level. LipCH-Net BIBREF5 is the first paper aiming for sentence-level Chinese Mandarin lip reading. LipCH-Net is a two-step end-to-end architecture, in which two deep neural network models are employed to perform the recognition of Picture-to-Pinyin (mouth motion pictures to pronunciations) and the recognition of Pinyin-to-Hanzi (pronunciations to texts) respectively. Then a joint optimization is performed to improve the overall performance.
+
+Belong to two different language families, English and Chinese Mandarin have many differences. The most significant one might be that: Chinese Mandarin is a tone language, while English is not. The tone is the use of pitch in language to distinguish lexical or grammatical meaning - that is, to distinguish or to inflect words . Even two words look the same on the face when pronounced, they can have different tones, thus have different meanings. For example, even though "UTF8gbsn练习" (which means practice) and "UTF8gbsn联系" (which means contact) have different meanings, but they have the same mouth movement. This increases ambiguity when lip reading. So the tone is an important factor for Chinese Mandarin lip reading.
+
+Based on the above considerations, in this paper, we present CSSMCM, a sentence-level Chinese Mandarin lip reading network, which contains three sub-networks. Same as BIBREF5 , in the first sub-network, pinyin sequence is predicted from the video. Different from BIBREF5 , which predicts pinyin characters from video, pinyin is taken as a whole in CSSMCM, also known as syllables. As we know, Mandarin Chinese is a syllable-based language and syllables are their logical unit of pronunciation. Compared with pinyin characters, syllables are a longer linguistic unit, and can reduce the difficulty of syllable choices in the decoder by sequence-to-sequence attention-based models BIBREF6 . Chen et al. BIBREF7 find that there might be a relationship between the production of lexical tones and the visible movements of the neck, head, and mouth. Motivated by this observation, in the second sub-network, both video and pinyin sequence is used as input to predict tone. Then in the third sub-network, video, pinyin, and tone sequence work together to predict the Chinese character sequence. At last, three sub-networks are jointly finetuned to improve overall performance.
+
+As there is no public sentence-level Chinese Mandarin lip reading dataset, we collect a new Chinese Mandarin Lip Reading dataset called CMLR based on China Network Television broadcasts containing talking faces together with subtitles of what is said.
+
+In summary, our major contributions are as follows.
+
+## The Proposed Method
+
+In this section, we present CSSMCM, a lip reading model for Chinese Mandarin. As mention in Section SECREF1 , pinyin and tone are both important for Chinese Mandarin lip reading. Pinyin represents how to pronounce a Chinese character and is related to mouth movement. Tone can alleviate the ambiguity of visemes (several speech sounds that look the same) to some extent and can be inferred from visible movements. Based on this, the lip reading task is defined as follow: DISPLAYFORM0 
+
+The meaning of these symbols is given in Table TABREF5 .
+
+As shown in Equation ( EQREF6 ), the whole problem is divided into three parts, which corresponds to pinyin prediction, tone prediction, and character prediction separately. Each part will be described in detail below.
+
+## Pinyin Prediction Sub-network
+
+The pinyin prediction sub-network transforms video sequence into pinyin sequence, which corresponds to INLINEFORM0 in Equation ( EQREF6 ). This sub-network is based on the sequence-to-sequence architecture with attention mechanism BIBREF8 . We name the encoder and decoder the video encoder and pinyin decoder, for the encoder process video sequence, and the decoder predicts pinyin sequence. The input video sequence is first fed into the VGG model BIBREF9 to extract visual feature. The output of conv5 of VGG is appended with global average pooling BIBREF10 to get the 512-dim feature vector. Then the 512-dim feature vector is fed into video encoder. The video encoder can be denoted as: DISPLAYFORM0 
+
+When predicting pinyin sequence, at each timestep INLINEFORM0 , video encoder outputs are attended to calculate a context vector INLINEFORM1 : DISPLAYFORM0 DISPLAYFORM1 
+
+## Tone Prediction Sub-network
+
+As shown in Equation ( EQREF6 ), tone prediction sub-network ( INLINEFORM0 ) takes video and pinyin sequence as inputs and predict corresponding tone sequence. This problem is modeled as a sequence-to-sequence learning problem too. The corresponding model architecture is shown in Figure FIGREF8 .
+
+In order to take both video and pinyin information into consideration when producing tone, a dual attention mechanism BIBREF3 is employed. Two independent attention mechanisms are used for video and pinyin sequence. Video context vectors INLINEFORM0 and pinyin context vectors INLINEFORM1 are fused when predicting a tone character at each decoder step.
+
+The video encoder is the same as in Section SECREF7 and the pinyin encoder is: DISPLAYFORM0 
+
+The tone decoder takes both video encoder outputs and pinyin encoder outputs to calculate context vector, and then predicts tones: DISPLAYFORM0 DISPLAYFORM1 
+
+## Character Prediction Sub-network
+
+The character prediction sub-network corresponds to INLINEFORM0 in Equation ( EQREF6 ). It considers all the pinyin sequence, tone sequence and video sequence when predicting Chinese character. Similarly, we also use attention based sequence-to-sequence architecture to model this equation. Here the attention mechanism is modified into triplet attention mechanism: DISPLAYFORM0 DISPLAYFORM1 
+
+For the following needs, the formula of tone encoder is also listed as follows: DISPLAYFORM0 
+
+## CSSMCM Architecture
+
+The architecture of the proposed approach is demonstrated in Figure FIGREF32 . For better display, the three attention mechanisms are not shown in the figure. During the training of CSSMCM, the outputs of pinyin decoder are fed into pinyin encoder, the outputs of tone decoder into tone encoder: DISPLAYFORM0 DISPLAYFORM1 
+
+We replace Equation ( EQREF14 ) with Equation ( EQREF28 ), Equation ( EQREF26 ) with Equation ( EQREF29 ). Then, the three sub-networks are jointly trained and the overall loss function is defined as follows: DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 stand for loss of pinyin prediction sub-network, tone prediction sub-network and character prediction sub-network respectively, as defined below. DISPLAYFORM0 
+
+## Training Strategy
+
+To accelerate training and reduce overfitting, curriculum learning BIBREF3 is employed. The sentences are grouped into subsets according to the length of less than 11, 12-17, 18-23, more than 24 Chinese characters. Scheduled sampling proposed by BIBREF11 is used to eliminate the discrepancy between training and inference. At the training stage, the sampling rate from the previous output is selected from 0.7 to 1. Greedy decoder is used for fast decoding.
+
+## Dataset
+
+In this section, a three-stage pipeline for generating the Chinese Mandarin Lip Reading (CMLR) dataset is described, which includes video pre-processing, text acquisition, and data generation. This three-stage pipeline is similar to the method mentioned in BIBREF3 , but considering the characteristics of our Chinese Mandarin dataset, we have optimized some steps and parts to generate a better quality lip reading dataset. The three-stage pipeline is detailed below.
+
+Video Pre-processing. First, national news program "News Broadcast" recorded between June 2009 and June 2018 is obtained from China Network Television website. Then, the HOG-based face detection method is performed BIBREF12 , followed by an open source platform for face recognition and alignment. The video clip set of eleven different hosts who broadcast the news is captured. During the face detection step, using frame skipping can improve efficiency while ensuring the program quality.
+
+Text Acquisition. Since there is no subtitle or text annotation in the original "News Broadcast" program, FFmpeg tools are used to extract the corresponding audio track from the video clip set. Then through the iFLYTEK ASR, the corresponding text annotation of the video clip set is obtained. However, there is some noise in these text annotation. English letters, Arabic numerals, and rare punctuation are deleted to get a more pure Chinese Mandarin lip reading dataset.
+
+Data Generation. The text annotation acquired in the previous step also contains timestamp information. Therefore, video clip set is intercepted according to these timestamp information, and then the corresponding word, phrase, or sentence video segment of the text annotation are obtained. Since the text timestamp information may have a few uncertain errors, some adjustments are made to the start frame and the end frame when intercepting the video segment. It is worth noting that through experiments, we found that using OpenCV can capture clearer video segment than the FFmpeg tools.
+
+Through the three-stage pipeline mentioned above, we can obtain the Chinese Mandarin Lip Reading (CMLR) dataset containing more than 100,000 sentences, 25,000 phrases, 3,500 characters. The dataset is randomly divided into training set, validation set, and test set in a ratio of 7:1:2. Details are listed in Table TABREF37 .
+
+## Implementation Details
+
+The input images are 64 INLINEFORM0 128 in dimension. Lip frames are transformed into gray-scale, and the VGG network takes every 5 lip frames as an input, moving 2 frames at each timestep. For all sub-networks, a two-layer bi-direction GRU BIBREF13 with a cell size of 256 is used for the encoder and a two-layer uni-direction GRU with a cell size of 512 for the decoder. For character and pinyin vocabulary, we keep characters and pinyin that appear more than 20 times. [sos], [eos] and [pad] are also included in these three vocabularies. The final vocabulary size is 371 for pinyin prediction sub-network, 8 for tone prediction sub-network (four tones plus a neutral tone), and 1,779 for character prediction sub-network.
+
+The initial learning rate was 0.0001 and decreased by 50% every time the training error did not improve for 4 epochs. CSSMCM is implemented using pytorch library and trained on a Quadro 64C P5000 with 16GB memory. The total end-to-end model was trained for around 12 days.
+
+## Compared Methods and Evaluation Protocol
+
+WAS: The architecture used in BIBREF3 without the audio input. The decoder output Chinese character at each timestep. Others keep unchanged to the original implementation.
+
+LipCH-Net-seq: For a fair comparison, we use sequence-to-sequence with attention framework to replace the Connectionist temporal classification (CTC) loss BIBREF14 used in LipCH-Net BIBREF5 when converting picture to pinyin.
+
+CSSMCM-w/o video: To evaluate the necessity of video information when predicting tone, the video stream is removed when predicting tone and Chinese characters. In other word, video is only used when predicting the pinyin sequence. The tone is predicted from the pinyin sequence. Tone information and pinyin information work together to predict Chinese character.
+
+We tried to implement the Lipnet architecture BIBREF2 to predict Chinese character at each timestep. However, the model did not converge. The possible reasons are due to the way CTC loss works and the difference between English and Chinese Mandarin. Compared to English, which only contains 26 characters, Chinese Mandarin contains thousands of Chinese characters. When CTC calculates loss, it first adds blank between every character in a sentence, that causes the number of the blank label is far more than any other Chinese character. Thus, when Lipnet starts training, it predicts only the blank label. After a certain epoch, "UTF8gbsn的" character will occasionally appear until the learning rate decays to close to zero.
+
+For all experiments, Character Error Rate (CER) and Pinyin Error Rate (PER) are used as evaluation metrics. CER is defined as INLINEFORM0 , where INLINEFORM1 is the number of substitutions, INLINEFORM2 is the number of deletions, INLINEFORM3 is the number of insertions to get from the reference to the hypothesis and INLINEFORM4 is the number of words in the reference. PER is calculated in the same way as CER. Tone Error Rate (TER) is also included when analyzing CSSMCM, which is calculated in the same way as above.
+
+## Results
+
+Table TABREF40 shows a detailed comparison between various sub-network of different methods. Comparing P2T and VP2T, VP2T considers video information when predicting the pinyin sequence and achieves a lower error rate. This verifies the conjecture of BIBREF7 that the generation of tones is related to the motion of the head. In terms of overall performance, CSSMCM exceeds all the other architecture on the CMLR dataset and achieves 32.48% character error rate. It is worth noting that CSSMCM-w/o video achieves the worst result (42.23% CER) even though its sub-networks perform well when trained separately. This may be due to the lack of visual information to support, and the accumulation of errors. CSSMCM using tone information performs better compared to LipCH-Net-seq, which does not use tone information. The comparison results show that tone is important when lip reading, and when predicting tone, visual information should be considered.
+
+Table TABREF41 shows some generated sentences from different methods. CSSMCM-w/o video architecture is not included due to its relatively lower performance. These are sentences other methods fail to predict but CSSMCM succeeds. The phrase "UTF8gbsn实惠" (which means affordable) in the first example sentence, has a tone of 2, 4 and its corresponding pinyin are shi, hui. WAS predicts it as "UTF8gbsn事会" (which means opportunity). Although the pinyin prediction is correct, the tone is wrong. LipCH-Net-seq predicts "UTF8gbsn实惠" as "UTF8gbsn吃贵" (not a word), which have the same finals "ui" and the corresponding mouth shapes are the same. It's the same in the second example. "UTF8gbsn前, 天, 年" have the same finals and mouth shapes, but the tone is different.
+
+These show that when predicting characters with the same lip shape but different tones, other methods are often unable to predict correctly. However, CSSMCM can leverage the tone information to predict successfully.
+
+Apart from the above results, Table TABREF42 also lists some failure cases of CSSMCM. The characters that CSSMCM predicts wrong are usually homophones or characters with the same final as the ground truth. In the first example, "UTF8gbsn价" and "UTF8gbsn下" have the same final, ia, while "UTF8gbsn一" and "UTF8gbsn医" are homophones in the second example. Unlike English, if one character in an English word is predicted wrong, the understanding of the transcriptions has little effect. However, if there is a character predicted wrong in Chinese words, it will greatly affect the understandability of transcriptions. In the second example, CSSMCM mispredicts "UTF8gbsn医学" ( which means medical) to "UTF8gbsn一水" (which means all). Although their first characters are pronounced the same, the meaning of the sentence changed from Now with the progress of medical science and technology in our country to It is now with the footsteps of China's Yishui Technology.
+
+## Attention Visualisation
+
+Figure FIGREF44 (a) and Figure FIGREF44 (b) visualise the alignment of video frames and Chinese characters predicted by CSSMCM and WAS respectively. The ground truth sequence is "UTF8gbsn同时他还向媒体表示". Comparing Figure FIGREF44 (a) with Figure FIGREF44 (b), the diagonal trend of the video attention map got by CSSMCM is more obvious. The video attention is more focused where WAS predicts wrong, i.e. the area corresponding to "UTF8gbsn还向". Although WAS mistakenly predicts the "UTF8gbsn媒体" as "UTF8gbsn么体", the "UTF8gbsn媒体" and the "UTF8gbsn么体" have the same mouth shape, so the attention concentrates on the correct frame.
+
+It's interesting to mention that in Figure FIGREF47 , when predicting the INLINEFORM0 -th character, attention is concentrated on the INLINEFORM1 -th tone. This may be because attention is applied to the outputs of the encoder, which actually includes all the information from the previous INLINEFORM2 timesteps. The attention to the tone of INLINEFORM3 -th timestep serves as the language model, which reduces the options for generating the character at INLINEFORM4 -th timestep, making prediction more accurate.
+
+## Summary and Extension
+
+In this paper, we propose the CSSMCM, a Cascade Sequence-to-Sequence Model for Chinese Mandarin lip reading. CSSMCM is designed to predicting pinyin sequence, tone sequence, and Chinese character sequence one by one. When predicting tone sequence, a dual attention mechanism is used to consider video sequence and pinyin sequence at the same time. When predicting the Chinese character sequence, a triplet attention mechanism is proposed to take all the video sequence, pinyin sequence, and tone sequence information into consideration. CSSMCM consistently outperforms other lip reading architectures on the proposed CMLR dataset.
+
+Lip reading and speech recognition are very similar. In Chinese Mandarin speech recognition, there have been kinds of different acoustic representations like syllable initial/final approach, syllable initial/final with tone approach, syllable approach, syllable with tone approach, preme/toneme approach BIBREF15 and Chinese Character approach BIBREF16 . In this paper, the Chinese character is chosen as the output unit. However, we find that the wrongly predicted characters severely affect the understandability of transcriptions. Using larger output units, like Chinese words, maybe can alleviate this problem.

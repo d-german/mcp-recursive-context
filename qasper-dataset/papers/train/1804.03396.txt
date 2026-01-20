@@ -1,0 +1,201 @@
+# QA4IE: A Question Answering based Framework for Information Extraction
+
+**Paper ID:** 1804.03396
+
+## Abstract
+
+Information Extraction (IE) refers to automatically extracting structured relation tuples from unstructured texts. Common IE solutions, including Relation Extraction (RE) and open IE systems, can hardly handle cross-sentence tuples, and are severely restricted by limited relation types as well as informal relation specifications (e.g., free-text based relation tuples). In order to overcome these weaknesses, we propose a novel IE framework named QA4IE, which leverages the flexible question answering (QA) approaches to produce high quality relation triples across sentences. Based on the framework, we develop a large IE benchmark with high quality human evaluation. This benchmark contains 293K documents, 2M golden relation triples, and 636 relation types. We compare our system with some IE baselines on our benchmark and the results show that our system achieves great improvements.
+
+## Introduction and Background
+
+Information Extraction (IE), which refers to extracting structured information (i.e., relation tuples) from unstructured text, is the key problem in making use of large-scale texts. High quality extracted relation tuples can be used in various downstream applications such as Knowledge Base Population BIBREF0 , Knowledge Graph Acquisition BIBREF1 , and Natural Language Understanding. However, existing IE systems still cannot produce high-quality relation tuples to effectively support downstream applications.
+
+## Previous IE Systems
+
+Most of previous IE systems can be divided into Relation Extraction (RE) based systems BIBREF2 , BIBREF3 and Open IE systems BIBREF4 , BIBREF5 , BIBREF6 .
+
+Early work on RE decomposes the problem into Named Entity Recognition (NER) and relation classification. With the recent development of neural networks (NN), NN based NER models BIBREF7 , BIBREF8 and relation classification models BIBREF9 show better performance than previous handcrafted feature based methods. The recently proposed RE systems BIBREF10 , BIBREF11 try to jointly perform entity recognition and relation extraction to improve the performance. One limitation of existing RE benchmarks, e.g., NYT BIBREF12 , Wiki-KBP BIBREF13 and BioInfer BIBREF14 , is that they only involve 24, 19 and 94 relation types respectively comparing with thousands of relation types in knowledge bases such as DBpedia BIBREF15 , BIBREF16 . Besides, existing RE systems can only extract relation tuples from a single sentence while the cross-sentence information is ignored. Therefore, existing RE based systems are not powerful enough to support downstream applications in terms of performance or scalability.
+
+On the other hand, early work on Open IE is mainly based on bootstrapping and pattern learning methods BIBREF17 . Recent work incorporates lexical features and sentence parsing results to automatically build a large number of pattern templates, based on which the systems can extract relation tuples from an input sentence BIBREF4 , BIBREF5 , BIBREF6 . An obvious weakness is that the extracted relations are formed by free texts which means they may be polysemous or synonymous and thus cannot be directly used without disambiguation and aggregation. The extracted free-text relations also bring extra manual evaluation cost, and how to automatically evaluate different Open IE systems fairly is an open problem. Stanovsky and Dagan BIBREF18 try to solve this problem by creating an Open IE benchmark with the help of QA-SRL annotations BIBREF19 . Nevertheless, the benchmark only involves 10K golden relation tuples. Hence, Open IE in its current form cannot provide a satisfactory solution to high-quality IE that supports downstream applications.
+
+There are some recently proposed IE approaches which try to incorporate Question Answering (QA) techniques into IE. Levy et al. BIBREF20 propose to reduce the RE problem to answering simple reading comprehension questions. They build a question template for each relation type, and by asking questions with a relevant sentence and the first entity given, they can obtain relation triples from the sentence corresponding to the relation type and the first entity. Roth et al. BIBREF21 further improve the model performance on a similar problem setting. However, these approaches focus on sentence level relation argument extractions and do not provide a full-stack solution to general IE. In particular, they do not provide a solution to extract the first entity and its corresponding relation types before applying QA. Besides, sentence level relation extraction ignores the information across sentences such as coreference and inference between sentences, which greatly reduces the information extracted from the documents.
+
+## QA4IE Framework
+
+To overcome the above weaknesses of existing IE systems, we propose a novel IE framework named QA4IE to perform document level general IE with the help of state-of-the-art approaches in Question Answering (QA) and Machine Reading Comprehension (MRC) area.
+
+The input of QA4IE is a document $D$ with an existing knowledge base $K$ and the output is a set of relation triples $R = \lbrace e_i, r_{ij}, e_j\rbrace $ in $D$ where $e_i$ and $e_j$ are two individual entities and $r_{ij}$ is their relation. We ignore the adverbials and only consider the entity pairs and their relations as in standard RE settings. Note that we process the entire document as a whole instead of processing individual sentences separately as in previous systems. As shown in Figure 1 , our QA4IE framework consists of four key steps:
+
+Recognize all the candidate entities in the input document $D$ according to the knowledge base $K$ . These entities serve as the first entity $e_i$ in the relation triples $R$ .
+
+For each candidate entity $e_i$ , discover the potential relations/properties as $r_{ij}$ from the knowledge base $K$ .
+
+Given a candidate entity-relation or entity-property pair $\lbrace e_i, r_{ij}\rbrace $ as a query, find the corresponding entity or value $e_j$ in the input document $D$ using a QA system. The query here can be directly formed by the word sequence of $\lbrace e_i, r_{ij}\rbrace $ , or built from templates as in BIBREF20 .
+
+Since the results of step 3 are formed by free texts in the input document $D$ , we need to link the results to the knowledge base $K$ .
+
+This framework determines each of the three elements in relation triples step by step. Step 1 is equivalent to named entity recognition (NER), and state-of-the-art NER systems BIBREF22 , BIBREF8 can achieve over 0.91 F1-score on CoNLL'03 BIBREF23 , a well-known NER benchmark. For attribution discovery in step 2, we can take advantage of existing knowledge base ontologies such as Wikipedia Ontology to obtain a candidate relation/property list according to NER results in step 1. Besides, there is also some existing work on attribution discovery BIBREF24 , BIBREF25 and ontology construction BIBREF26 that can be used to solve the problem in step 2. The most difficult part in our framework is step 3 in which we need to find the entity (or value) $e_j$ in document $D$ according to the previous entity-relation (or entity-property) pair $\lbrace e_i, r_{ij}\rbrace $ . Inspired by recent success in QA and MRC BIBREF27 , BIBREF28 , BIBREF29 , we propose to solve step 3 in the setting of SQuAD BIBREF30 which is a very popular QA task. The problem setting of SQuAD is that given a document $\tilde{D}$ and a question $q$ , output a segment of text $a$ in $\tilde{D}$ as the answer to the question. In our framework, we assign the input document $D$ as $\tilde{D}$ and the entity-relation (or entity-property) pair $\lbrace e_i, r_{ij}\rbrace $ as $D$0 , and then we can get the answer $D$1 with a QA model. Finally in step 4, since the QA model can only produce answers formed by input free texts, we need to link the answer $D$2 to an entity $D$3 in the knowledge base $D$4 , and the entity $D$5 will form the target relation triple as $D$6 . Existing Entity Linking (EL) systems BIBREF31 , BIBREF32 directly solve this problem especially when we have high quality QA results from step 3.
+
+As mentioned above, step 1, 2 and 4 in the QA4IE framework can be solved by existing work. Therefore, in this paper, we mainly focus on step 3. According to the recent progress in QA and MRC, deep neural networks are very good at solving this kind of problem with a large-scale dataset to train the network. However, all previous IE benchmarks BIBREF18 are too small to train neural network models typically used in QA, and thus we need to build a large benchmark. Inspired by WikiReading BIBREF33 , a recent large-scale QA benchmark over Wikipedia, we find that the articles in Wikipedia together with the high quality triples in knowledge bases such as Wikidata BIBREF34 and DBpedia can form the supervision we need. Therefore, we build a large scale benchmark named QA4IE benchmark which consists of 293K Wikipedia articles and 2M golden relation triples with 636 different relation types.
+
+Recent success on QA and MRC is mainly attributed to advanced deep learning architectures such as attention-based and memory-augmented neural networks BIBREF35 , BIBREF36 and the availability of large-scale datasets BIBREF37 , BIBREF38 especially SQuAD. The differences between step 3 and SQuAD can be summarized as follows. First, the answer to the question in SQuAD is restricted to a continuous segment of the input text, but in QA4IE, we remove this constraint which may reduce the number of target relation triples. Second, in existing QA and MRC benchmarks, the input documents are not very long and the questions may be complex and difficult to understand by the model, while in QA4IE, the input documents may be longer but the questions formed by entity-relation (or entity-property) pair are much simpler. Therefore, in our model, we incorporate Pointer Networks BIBREF39 to adapt to the answers formed by any words within the document in any order as well as Self-Matching Networks BIBREF29 to enhance the ability on modeling longer input documents.
+
+## Contributions
+
+The contributions of this paper are as follows:
+
+We propose a novel IE framework named QA4IE to overcome the weaknesses of existing IE systems. As we discussed above, the problem of step 1, 2 and 4 can be solved by existing work and we propose to solve the problem of step 3 with QA models.
+
+To train a high quality neural network QA model, we build a large IE benchmark in QA style named QA4IE benchmark which consists of 293K Wikipedia articles and 2 million golden relation triples with 636 different relation types.
+
+To adapt QA models to the IE problem, we propose an approach that enhances existing QA models with Pointer Networks and Self-Matching Networks.
+
+We compare our model with IE baselines on our QA4IE benchmark and achieve a great improvement over previous baselines.
+
+We open source our code and benchmark for repeatable experiments and further study of IE.
+
+## QA4IE Benchmark Construction
+
+This section briefly presents the construction pipeline of QA4IE benchmark to solve the problem of step 3 as in our framework (Figure 1 ). Existing largest IE benchmark BIBREF18 is created with the help of QA-SRL annotations BIBREF19 which consists of 3.2K sentences and 10K golden extractions. Following this idea, we study recent large-scale QA and MRC datasets and find that WikiReading BIBREF33 creates a large-scale QA dataset based on Wikipedia articles and WikiData relation triples BIBREF34 . However, we observe about 11% of QA pairs with errors such as wrong answer locations or mismatch between answer string and answer words. Besides, there are over 50% of QA pairs with the answer involving words out of the input text or containing multiple answers. We consider these cases out of the problem scope of this paper and only focus on the information within the input text.
+
+Therefore, we choose to build the benchmark referring the implementation of WikiReading based on Wikipedia articles and golden triples from Wikidata and DBpedia BIBREF15 , BIBREF16 . Specifically, we build our QA4IE benchmark in the following steps.
+
+Dump and Preprocessing. We dump the English Wikipedia articles with Wikidata knowledge base and match each article with its corresponding relation triples according to its title. After cleaning data by removing low frequency tokens and special characters, we obtain over 4M articles and 18M triples with over 800 relation types.
+
+Clipping. We discard the triples with multiple entities (or values) for $e_j$ (account for about 6%, e.g., a book may have multiple authors). Besides, we discard the triples with any word in $e_j$ out of the corresponding article (account for about 50%). After this step, we obtain about 3.5M articles and 9M triples with 636 relation types.
+
+Incorporating DBpedia. Unlike WikiData, DBpedia is constructed automatically without human verification. Relations and properties in DBpedia are coarse and noisy. Thus we fix the existing 636 relation types in WikiData and build a projection from DBpedia relations to these 636 relation types. We manually find 148 relations which can be projected to a WikiData relation out of 2064 DBpedia relations. Then we gather all the DBpedia triples with the first entity is corresponding to one of the above 3.5M articles and the relation is one of the projected 148 relations. After the same clipping process as above and removing the repetitive triples, we obtain 394K additional triples in 302K existing Wikipedia articles.
+
+Distillation. Since our benchmark is for IE, we prefer the articles with more golden triples involved by assuming that Wikipedia articles with more annotated triples are more informative and better annotated. Therefore, we figure out the distribution of the number of golden triples in articles and decide to discard the articles with less than 6 golden triples (account for about 80%). After this step, we obtain about 200K articles and 1.4M triples with 636 relation types.
+
+Query and Answer Assignment. For each golden triple $\lbrace e_i, r_{ij}, e_j\rbrace $ , we assign the relation/property $r_{ij}$ as the query and the entity $e_j$ as the answer because the Wikipedia article and its corresponding golden triples are all about the same entity $e_i$ which is unnecessary in the queries. Besides, we find the location of each $e_j$ in the corresponding article as the answer location. As we discussed in Section 1, we do not restrict $e_j$ to a continuous segment in the article as required in SQuAD. Thus we first try to detect a matched span for each $e_j$ and assign this span as the answer location. Then for each of the rest $e_j$ which has no matched span, we search a matched sub-sequence in the article and assign the index sequence as the answer location. We name them span-triples and seq-triples respectively. Note that each triple will have an answer location because we have discarded the triples with unseen words in $e_j$ and if we can find multiple answer locations, all of them will be assigned as ground truths.
+
+Dataset Splitting. For comparing the performance on span-triples and seq-triples, we set up two different datasets named QA4IE-SPAN and QA4IE-SEQ. In QA4IE-SPAN, only articles with all span-triples are involved, while in QA4IE-SEQ, articles with seq-triples are also involved. For studying the influence of the article length as longer articles are normally more difficult to model by LSTMs, we split the articles according to the article length. We name the set of articles with lengths shorter than 400 as S, lengths between 400 and 700 as M, lengths greater than 700 as L. Therefore we obtain 6 different datasets named QA4IE-SPAN-S/M/L and QA4IE-SEQ-S/M/L. A 5/1/5 splitting of train/dev/test sets is performed. The detailed statistics of QA4IE benchmark are provided in Table 1 .
+
+We further compare our QA4IE benchmark with some existing IE and QA benchmarks in Table 2 . One can observe that QA4IE benchmark is much larger than previous IE and QA benchmarks except for WikiReading and Zero-Shot Benchmark. However, as we mentioned at the beginning of Section 2, WikiReading is problematic for IE settings. Besides, Zero-Shot Benchmark is a sentence-level dataset and we have described the disadvantage of ignoring information across sentences at Section 1.1. Thus to our best knowledge, QA4IE benchmark is the largest document level IE benchmark and it can be easily extended if we change our distillation strategy.
+
+## Question Answering Model
+
+In this section, we describe our Question Answering model for IE. The model overview is illustrated in Figure 2 .
+
+The input of our model are the words in the input text $x[1], ... , x[n]$ and query $q[1], ... , q[n]$ . We concatenate pre-trained word embeddings from GloVe BIBREF40 and character embeddings trained by CharCNN BIBREF41 to represent input words. The $2d$ -dimension embedding vectors of input text $x_1, ... , x_n$ and query $q_1, ... , q_n$ are then fed into a Highway Layer BIBREF42 to improve the capability of word embeddings and character embeddings as
+
+$$\begin{split}
+g_t &= {\rm sigmoid}(W_gx_t+b_g) \\
+s_t &= {\rm relu } (W_xx_t+b_x) \\
+u_t &= g_t \odot s_t + (1 - g_t) \odot x_t~.
+\end{split}$$   (Eq. 18) 
+
+Here $W_g, W_x \in \mathbb {R}^{d \times 2d}$ and $b_g, b_x \in \mathbb {R}^d$ are trainable weights, $u_t$ is a $d$ -dimension vector. The function relu is the rectified linear units BIBREF43 and $\odot $ is element-wise multiply over two vectors. The same Highway Layer is applied to $q_t$ and produces $v_t$ .
+
+Next, $u_t$ and $v_t$ are fed into a Bi-Directional Long Short-Term Memory Network (BiLSTM) BIBREF44 respectively in order to model the temporal interactions between sequence words:
+
+$$\begin{split}
+u_t^{^{\prime }} &= {\rm BiLSTM}(u^{^{\prime }}_{t-1},u_t) \\
+v_t^{^{\prime }} &= {\rm BiLSTM}(v^{^{\prime }}_{t-1},v_t)~.
+\end{split}$$   (Eq. 19) 
+
+Here we obtain $\mathbf {U} = [u_1^{^{\prime }}, ... , u_n^{^{\prime }}] \in \mathbb {R}^{2d \times n}$ and $\mathbf {V} = [v_1^{^{\prime }}, ... , v_m^{^{\prime }}] \in \mathbb {R}^{2d \times m}$ . Then we feed $\mathbf {U}$ and $\mathbf {V}$ into the attention flow layer BIBREF27 to model the interactions between the input text and query. We obtain the $8d$ -dimension query-aware context embedding vectors $h_1, ... , h_n$ as the result.
+
+After modeling interactions between the input text and queries, we need to enhance the interactions within the input text words themselves especially for the longer text in IE settings. Therefore, we introduce Self-Matching Layer BIBREF29 in our model as
+
+$$\begin{split}
+o_t &= {\rm BiLSTM}(o_{t-1}, [h_t, c_t]) \\
+s_j^t &= w^T {\rm tanh}(W_hh_j+\tilde{W_h}h_t)\\
+\alpha _i^t &= {\rm exp}(s_i^t)/\Sigma _{j=1}^n{\rm exp}(s_j^t)\\
+c_t &= \Sigma _{i=1}^n\alpha _i^th_i ~.
+\end{split}$$   (Eq. 20) 
+
+Here $W_h, \tilde{W_h} \in \mathbb {R}^{d \times 8d}$ and $w \in \mathbb {R}^d$ are trainable weights, $[h, c]$ is vector concatenation across row. Besides, $\alpha _i^t$ is the attention weight from the $t^{th}$ word to the $i^{th}$ word and $c_t$ is the enhanced contextual embeddings over the $t^{th}$ word in the input text. We obtain the $2d$ -dimension query-aware and self-enhanced embeddings of input text after this step. Finally we feed the embeddings $\mathbf {O} = [o_1, ... , o_n]$ into a Pointer Network BIBREF39 to decode the answer sequence as
+
+$$\begin{split}
+p_t &= {\rm LSTM}(p_{t-1}, c_t) \\
+s_j^t &= w^T {\rm tanh}(W_oo_j+W_pp_{t-1})\\
+\beta _i^t &= {\rm exp}(s_i^t)/\Sigma _{j=1}^n{\rm exp}(s_j^t)\\
+c_t &= \Sigma _{i=1}^n\beta _i^to_i~.
+\end{split}$$   (Eq. 21) 
+
+The initial state of LSTM $p_0$ is $o_n$ . We can then model the probability of the $t^{th}$ token $a^t$ by
+
+$$& {\rm P}(a^t | a^1, ... , a^{t-1}, \mathbf {O}) = (\beta _1^t, \beta _2^t, ... , \beta _n^t, \beta _{n+1}^t) \nonumber \\
+& {\rm P}(a^t_i) \triangleq {\rm P}(a^t = i|a^1, ... , a^{t-1}, \mathbf {O}) = \beta _i^t ~.$$   (Eq. 22) 
+
+Here $\beta _{n+1}^t$ denotes the probability of generating the “ ${\rm eos}$ ” symbol since the decoder also needs to determine when to stop. Therefore, the probability of generating the answer sequence $\textbf {a}$ is as follows
+
+$${\rm P}(\textbf {a}|\mathbf {O}) = \prod _t {\rm P}(a^t | a^1, ... , a^{t-1}, \mathbf {O})~.$$   (Eq. 23) 
+
+Given the supervision of answer sequence $\mathbf {y} = (y_1, ... , y_L)$ , we can write down the loss function of our model as
+
+$${\rm L(\theta )} = -\sum _{t=1}^L \log {\rm P} (a^t_{y_t})~.$$   (Eq. 24) 
+
+To train our model, we minimize the loss function ${\rm L(\theta )}$ based on training examples.
+
+## Experimental Setup
+
+We build our QA4IE benchmark following the steps described in Section 2. In experiments, we train and evaluate our QA models on the corresponding train and test sets while the hyper-parameters are tuned on dev sets. In order to make our experiments more informative, we also evaluate our model on SQuAD dataset BIBREF30 .
+
+The preprocessing of our QA4IE benchmark and SQuAD dataset are all performed with the open source code from BIBREF27 . We use 100 1D filters with width 5 to construct the CharCNN in our char embedding layer. We set the hidden size $d=100$ for all the hidden states in our model. The optimizer we use is the AdaDelta optimizer BIBREF45 with an initial learning rate of 2. A dropout BIBREF46 rate of 0.2 is applied in all the CNN, LSTM and linear transformation layers in our model during training. For SQuAD dataset and our small sized QA4IE-SPAN/SEQ-S datasets, we set the max length of input texts as 400 and a mini-batch size of 20. For middle sized (and large sized) QA4IE datasets, we set the max length as 700 (800) and batch size as 7 (5). We introduce an early stopping in training process after 10 epochs. Our model is trained on a GTX 1080 Ti GPU and it takes about 14 hours on small sized QA4IE datasets. We implement our model with TensorFlow BIBREF47 and optimize the computational expensive LSTM layers with LSTMBlockFusedCell.
+
+## Results in QA Settings
+
+We first perform experiments in QA settings to evaluate our QA model on both SQuAD dataset and QA4IE benchmark. Since our goal is to solve IE, not QA, the motivation of this part of experiments is to evaluate the performance of our model and make a comparison between QA4IE benchmark and existing datasets. Two metrics are introduced in the SQuAD dataset: Exact Match (EM) and F1-score. EM measures the percentage that the model prediction matches one of the ground truth answers exactly while F1-score measures the overlap between the prediction and ground truth answers. Our QA4IE benchmark also adopts these two metrics.
+
+Table 3 presents the results of our QA model on SQuAD dataset. Our model outperforms the previous sequence model but is not competitive with span models because it is designed to produce sequence answers in IE settings while baseline span models are designed to produce span answers for SQuAD dataset.
+
+The comparison between our QA model and two baseline QA models on our QA4IE benchmark is shown in Table 4 . For training of both baseline QA models, we use the same configuration of max input length as our model and tune the rest of hyper-parameters on dev sets. Our model outperforms these two baselines on all 6 datasets. The performance is good on S and M datasets but worse for longer documents. As we mentioned in Section 4.1, we set the max input length as 800 and ignore the rest words on L datasets. Actually, there are 11% of queries with no answers in the first 800 words in our benchmark. Processing longer documents is a tough problem BIBREF51 and we leave this to our future work.
+
+To study the improvement of each component in our model, we present model ablation study results in Table 5 . We do not involve Attention Flow Layer and Pointer Network Decoder as they cannot be replaced by other architectures with the model still working. We can observe that the first three components can effectively improve the performance but Self Matching Layer makes the training more computationally expensive by 40%. Besides, the LSTMBlockFusedCell works effectively and accelerates the training process by 6 times without influencing the performance.
+
+## Results in IE Settings
+
+In this subsection, we put our QA model in the entire pipeline of our QA4IE framework (Figure 1 ) and evaluate the framework in IE settings. Existing IE systems are all free-text based Open IE systems, so we need to manually evaluate the free-text based results in order to compare our model with the baselines. Therefore, we conduct experiments on a small dataset, the dev set of QA4IE-SPAN-S which consists of 4393 documents and 28501 ground truth queries.
+
+Our QA4IE benchmark is based on Wikipedia articles and all the ground truth triples of each article have the same first entity (i.e. the title of the article). Thus, we can directly use the title of the article as the first entity of each triple without performing step 1 (entity recognition) in our framework. Besides, all the ground truth triples in our benchmark are from knowledge base where they are disambiguated and aggregated in the first place, and therefore step 4 (entity linking) is very simple and we do not evaluate it in our experiments.
+
+A major difference between QA settings and IE settings is that in QA settings, each query corresponds to an answer, while in the QA4IE framework, the QA model take a candidate entity-relation (or entity-property) pair as the query and it needs to tell whether an answer to the query can be found in the input text. We can consider the IE settings here as performing step 2 and then step 3 in the QA4IE framework.
+
+In step 2, we need to build a candidate query list for each article in the dataset. Instead of incorporating existing ontology or knowledge base, we use a simple but effective way to build the candidate query list of an article. Since we have a ground truth query list with labeled answers of each article, we can add all the neighboring queries of each ground truth query into the query list. The neighboring queries are defined as two queries that co-occur in the same ground truth query list of any articles in the dataset. We transform the dev set of QA4IE-SPAN-S above by adding neighboring queries into the query list. After this step, the number of queries grows to 426336, and only 28501 of them are ground truth queries labeled with an answer.
+
+In step 3, we require our QA model to output a confidence score along with the answer to each candidate query. Our QA model produces no answer to a query when the confidence score is less than a threshold $\delta $ or the output is an “ ${\rm eos}$ ” symbol. For the answers with a confidence score $\ge \delta $ , we evaluate them by the EM measurement with ground truth answers and count the true positive samples in order to calculate the precision and recall under the threshold $\delta $ . Specifically, we try two confidence scores calculated as follows:
+
+$$\begin{split}
+{\rm Score_{mul}} = \prod _{t=1}^L{\rm P}(a^t_{i_t}),~~~{\rm Score_{avg}} = \sum _{t=1}^L{\rm P}(a^t_{i_t}) / L ~,
+\end{split}$$   (Eq. 34) 
+
+where $(a^1_{i_1}, ... , a^L_{i_L})$ is the answer sequence and ${\rm P}(a^t_i)$ is defined in Eq. ( 22 ). ${\rm Score_{mul}}$ is equivalent to the training loss in Eq. ( 24 ) and ${\rm Score_{avg}}$ takes the answer length into account.
+
+The precision-recall curves of our framework based on the two confidence scores are plotted in Figure 3 . We can observe that the EM rate we achieve in QA settings is actually the best recall (91.87) in this curve (by setting $\delta = 0$ ). The best F1-scores of the two curves are 29.97 (precision $= 21.61$ , recall $= 48.85$ , $\delta = 0.91$ ) for ${\rm Score_{mul}}$ and 31.05 (precision $= 23.93$ , recall $= 44.21$ , $\delta = 0.97$ ) for ${\rm Score_{avg}}$ . ${\rm Score_{avg}}$ is better than $= 21.61$0 , which suggests that the answer length should be taken into account.
+
+We then evaluate existing IE systems on the dev set of QA4IE-SPAN-S and empirically compare them with our framework. Note that while BIBREF20 is closely related to our work, we cannot fairly compare our framework with BIBREF20 because their systems are in the sentence level and require additional negative samples for training. BIBREF21 is also related to our work, but their dataset and code have not been published yet. Therefore, we choose to evaluate three popular Open IE systems, Open IE 4 BIBREF6 , Stanford IE BIBREF4 and ClauseIE BIBREF5 .
+
+Since Open IE systems take a single sentence as input and output a set of free-text based triples, we need to find the sentences involving ground truth answers and feed the sentences into the Open IE systems. In the dev set of QA4IE-SPAN-S, there are 28501 queries with 44449 answer locations labeled in the 4393 documents. By feeding the 44449 sentences into the Open IE systems, we obtain a set of extracted triples from each sentence. We calculate the number of true positive samples by first filtering out triples with less than 20% words overlapping with ground truth answers and then asking two human annotators to verify the remaining triples independently. Since in the experiments, our framework is given the ground-truth first entity of each triple (the title of the corresponding Wikipedia article) while the baseline systems do not have this information, we ask our human annotators to ignore the mistakes on the first entities when evaluating triples produced by the baseline systems to offset this disadvantage. For example, the 3rd case of ClauseIE and the 4th case of Open IE 4 in Table 7 are all labeled as correct by our annotators even though the first entities are pronouns. The two human annotators reached an agreement on 191 out of 195 randomly selected cases.
+
+The evaluation results of the three Open IE baselines are shown in Table 6 . We can observe that most of the extracted triples are not related to ground truths and the precision and recall are all very low (around 1%) although we have already helped the baseline systems locate the sentences containing ground truth answers.
+
+## Case Study
+
+In this subsection, we perform case studies of IE settings in Table 7 to better understand the models and benchmarks. The baseline Open IE systems produce triples by analyzing the subjects, predicates and objects in input sentences, and thus our annotators lower the bar of accepting triples. However, the analysis on semantic roles and parsing trees cannot work very well on complicated input sentences like the 2nd and the 3rd cases. Besides, the baseline systems can hardly solve the last two cases which require inference on input sentences.
+
+Our framework works very well on this dataset with the QA measurements EM $= 91.87$ and F1 $= 93.53$ and the IE measurements can be found in Figure 3 . Most of the error cases are the fourth case which is acceptable by human annotators. Note that our framework takes the whole document as the input while the baseline systems take the individual sentence as the input, which means the experiment setting is much more difficult for our framework.
+
+## Human Evaluation on QA4IE Benchmark
+
+Finally, we perform a human evaluation on our QA4IE benchmark to verify the reliability of former experiments. The evaluation metrics are as follows:
+
+Triple Accuracy is to check whether each ground truth triple is accurate (one cannot find conflicts between the ground truth triple and the corresponding article) because the ground truth triples from WikiData and DBpedia may be incorrect or incomplete.
+
+Contextual Consistency is to check whether the context of each answer location is consistent with the corresponding ground truth triple (one can infer from the context to obtain the ground truth triple) because we keep all matched answer locations as ground truths but some of them may be irrelevant with the corresponding triple.
+
+Triple Consistency is to check whether there is at least one answer location that is contextually consistent for each ground truth triple. It can be calculated by counting the results of Contextual Consistency.
+
+We randomly sample 25 articles respectively from the 6 datasets (in total of 1002 ground truth triples with 2691 labeled answer locations) and let two human annotators label the Triple Accuracy for each ground truth triple and the Contextual Consistency for each answer location. The two human annotators reached an agreement on 131 of 132 randomly selected Triple Accuracy cases and on 229 of 234 randomly selected Contextual Consistency cases. The human evaluation results are shown in Table 8 . We can find that the Triple Accuracy and the Triple Consistency is acceptable while the Contextual Consistency still needs to be improved. The Contextual Consistency problem is a weakness of distant supervision, and we leave this to our future work.
+
+## Conclusion
+
+In this paper, we propose a novel QA based IE framework named QA4IE to address the weaknesses of previous IE solutions. In our framework (Figure 1 ), we divide the complicated IE problem into four steps and show that the step 1, 2 and 4 can be solved well enough by existing work. For the most difficult step 3, we transform it to a QA problem and solve it with our QA model. To train this QA model, we construct a large IE benchmark named QA4IE benchmark that consists of 293K documents and 2 million golden relation triples with 636 different relation types. To our best knowledge, our QA4IE benchmark is the largest document level IE benchmark. We compare our system with existing best IE baseline systems on our QA4IE benchmark and the results show that our system achieves a great improvement over baseline systems.
+
+For the future work, we plan to solve the triples with multiple entities as the second entity, which is excluded from problem scope in this paper. Besides, processing longer documents and improving the quality of our benchmark are all challenging problems as we mentioned previously. We hope this work can provide new thoughts for the area of information extraction.
+
+## Acknowledgements
+
+W. Zhang is the corresponding author of this paper. The work done by SJTU is sponsored by National Natural Science Foundation of China (61632017, 61702327, 61772333) and Shanghai Sailing Program (17YF1428200).

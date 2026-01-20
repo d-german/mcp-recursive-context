@@ -1,0 +1,175 @@
+# Modeling Event Background for If-Then Commonsense Reasoning Using Context-aware Variational Autoencoder
+
+**Paper ID:** 1909.08824
+
+## Abstract
+
+Understanding event and event-centered commonsense reasoning are crucial for natural language processing (NLP). Given an observed event, it is trivial for human to infer its intents and effects, while this type of If-Then reasoning still remains challenging for NLP systems. To facilitate this, a If-Then commonsense reasoning dataset Atomic is proposed, together with an RNN-based Seq2Seq model to conduct such reasoning. However, two fundamental problems still need to be addressed: first, the intents of an event may be multiple, while the generations of RNN-based Seq2Seq models are always semantically close; second, external knowledge of the event background may be necessary for understanding events and conducting the If-Then reasoning. To address these issues, we propose a novel context-aware variational autoencoder effectively learning event background information to guide the If-Then reasoning. Experimental results show that our approach improves the accuracy and diversity of inferences compared with state-of-the-art baseline methods.
+
+## Introduction
+
+Recently, event-centered commonsense knowledge has attracted much attention BIBREF0, BIBREF1, BIBREF2, BIBREF3, because of understanding events is an important component of NLP. Given a daily-life event, human can easily understand it and reason about its causes, effects, and so on. However, it still remains a challenging task for NLP systems. This is partly due to most of them are trained for task-specific datasets or objectives, which results in models that are adapt at finding task-specific underlying correlation patterns but have limited capability in simple and explainable commonsense reasoning BIBREF4.
+
+To facilitate this, BIBREF5 (BIBREF5) build the Event2Mind dataset and BIBREF4 (BIBREF4) present the Atomic dataset, mainly focus on nine If-Then reasoning types to describe causes, effects, intents and participant characteristic about events. Together with these datasets, a simple RNN-based encoder-decoder framework is proposed to conduct the If-Then reasoning.
+
+However, there still remains two challenging problems. First, as illustrated in Figure FIGREF1, given an event “PersonX finds a new job”, the plausible feeling of PersonX about that event could be multiple (such as “needy/stressed out” and “relieved/joyful”). Previous work showed that for the one-to-many problem, conventional RNN-based encoder-decoder models tend to generate generic responses, rather than meaningful and specific answers BIBREF6, BIBREF7.
+
+Second, as a commonsense reasoning problem, rich background knowledge is necessary for generating reasonable inferences. For example, as shown in Figure FIGREF1, the feeling of PersonX upon the event “PersonX finds a new job” could be multiple. However, after given a context “PersonX was fired”, the plausible inferences would be narrowed down to “needy” or “stressed out”.
+
+To better solve these problems, we propose a context-aware variational autoencoder (CWVAE) together with a two-stage training procedure. Variational Autoencoder (VAE) based models have shown great potential in modeling the one-to-many problem and generate diversified inferences BIBREF8, BIBREF9.
+
+In addition to the traditional VAE structure, we introduces an extra context-aware latent variable in CWVAE to learn the event background knowledge. In the pretrain stage, CWVAE is trained on an auxiliary dataset (consists of three narrative story corpora and contains rich event background knowledge), to learn the event background information by using the context-aware latent variable. Subsequently, in the finetune stage, CWVAE is trained on the task-specific dataset to adapt the event background information to each specific aspect of If-Then inferential target (e.g., intents, reactions, etc.).
+
+Experiments on the Event2Mind and Atomic dataset show that our proposed approach outperforms baseline methods in both the accuracy and diversity of inferences. The code is released at https://github.com/sjcfr/CWVAE.
+
+## Background
+
+Before specifically describing two dataset —- Event2Mind and Atomic used in this paper as well as the If-Then reasoning task, for clarity, we define the following terminologies:
+
+Base event: the prerequisite event in If-Then reasoning, organized as a verb phrase with a predicate and its arguments, such as the event “PersonX finds a new job” shown in Figure FIGREF1.
+
+Inference dimension: a particular If-Then reasoning type, e.g., intents, effects of the base event. Details are shown in Table TABREF2 and Table TABREF3.
+
+Target: the inferential results. For example, as shown in Figure FIGREF1, given a base event “PersonX finds a new job” and one inference dimension “xReact”, the targets could be “relieved” or “needy”. Notice that each inference dimension can have multiple targets.
+
+Event2Mind Dataset contains 25K base events and 300K targets, annotated through crowdsourcing. Event2Mind is organized in a hierarchical form: each base event has three types of inference dimensions, and given a base event, under one of inference dimensions, several targets may simultaneously exist. Table TABREF2 shows the (base event-inference dimension-target) hierarchical structure through an example from Event2Mind.
+
+Atomic Dataset Inspired by Event2Mind, the Atomic dataset shares the same hierarchical structure as Event2Mind, while scales up the size of dataset and expands the scope to nine types of inference dimensions. Table TABREF3 shows the (base event-inference dimension-target) hierarchical structure through an example from Atomic. Though Atomic covers the inference dimensions of Event2Mind, the base event collection of Event2Mind is nonidentical to that of Atomic.
+
+Problem Definition The If-Then reasoning task could be formally defined as a conditional one-to-many generation problem: given a base event $x$ and one inference dimension $d$, the model is required to generate targets $y=f(x, d)$ as close to the ground truths as possible. Both $x$ and $y$ consist of sequence of words: $x=\lbrace x_1,\dots , x_{m}\rbrace $, and $y=\lbrace y_1,\dots , y_{n}\rbrace $, where $m$ and $n$ denotes the length of $x$ and $y$, respectively.
+
+Conditional Variational Autoencoder The variational autoencoder (VAE) defines a generative framework suited for one-to-many generation problem BIBREF10. While conditional variational autoencoder (CVAE) BIBREF11 is an extension of VAE on the conditional generation problem. As shown in Figure FIGREF5 (a), CVAE characterizes the conditional one-to-many generation problem using three random variables: event $x$, target $y$ and a latent variable $z$, which is used for modeling the latent distribution of semantic over targets given an event. Hence, under a certain inference dimension, with regard to the latent semantic variable $z$, the conditional generation problem could be expressed as $p(y|x)=\int p(y|x,z)p(z|x)dz$. CVAE models $p(y|x,z)$ and $p(z|x)$ using deep neural networks (parameterized by $\theta $) $p_{\theta }(y|x,z)$ and $p_{\theta }(z|x)$. Then as illustrated in Figure FIGREF5 (b), $y$ could be generated from $x$ and $z$.
+
+CVAE is trained to maximize the conditional likelihood $p(y|x)$, which involves an intractable marginalization over the latent variable $z$. Instead, following BIBREF10 (BIBREF10), a practical way is to introduce another deep network (parameterized by $\phi $) $q_{\phi }(z|x,y)$ to approximate the true posterior distribution $p(z|x,y)$ and maximize the evidence lower bound (ELBO) of the log-likelihood function:
+
+Therefore, CVAE is composed of three neural networks in general. We refer to $p_{\theta }(z|x)$ as a prior network, $q_{\phi }(z|x,y)$ as a recognition network, and $p_{\theta }(y|x,z)$ as a neural decoder.
+
+## Context-aware Variational Autoencoder
+
+Traditional CVAE can model the event-target relation. In other words, given an observed event, CVAE can generate its corresponding targets. While in this paper we model the If-Then reasoning as a [(background), event]-target process. It means that in addition to the observed event, we also want to involve the event background knowledge (which can be learned from event contexts) to generate the reasonable targets.
+
+To this end, we propose a context-aware variational autoencoder (CWVAE), with two additional latent variables: a context-acquiring latent variable $z_c$ to directly acquire context information, and a context-aware latent variable $z_{c^{\prime }}$ to learn background knowledge from $z_c$, as shown in Figure FIGREF6 (a). However, the event context information is absent in the Event2Mind and Atomic dataset. To learn from the external event context information, we design the following two-stage training procedure for CWVAE.
+
+Pretrain: Learning Event Background Knowledge from Auxiliary Dataset In the pretrain stage, CWVAE is trained on three narrative story corpora with rich event context information. As shown in Figure FIGREF6 (a), context-acquiring latent variable $z_c$ is directly conditioned on the context $c$. Hence, $z_c$ could be employed for acquiring background knowledge from event contexts. Then, we minimize the distance between $z_c$ and the context-aware latent variable $z_{c^{\prime }}$, by which the event background knowledge is transferred from $z_c$ to $z_{c^{\prime }}$.
+
+Finetune: Adapt Event Background Knowledge to Each Inference Dimension In the finetune stage, as shown in Figure FIGREF6 (b), CWVAE is trained on the Event2Mind and Atomic dataset without the event context information. Pretrained CWVAE is finetuned to learn the specific inferential knowledge of each inference dimension. After the training procedure, as shown in Figure FIGREF6 (c), samples of $z$ is generated based on $x$ and samples of $z_{c^{\prime }}$, where $z_{c^{\prime }}$ contains rich event background knowledge helpful for If-Then reasoning.
+
+## Context-aware Variational Autoencoder ::: Architecture of CWVAE
+
+As shown in Figure FIGREF8, CWVAE is mainly composed of four parts: a neural encoder that provides distributed representations of base events/targets, a recognition network for inferring $q_{\phi }(z|x,y)$, $q_{\phi }(z_c|x,c)$ and $q_{\phi }(z|z_{c^{\prime }}, x)$, a prior network for modeling $p_{\theta }(z_{c^{\prime }}|x)$ and $p_{\theta }(z|x, z_{c^{\prime }})$, and a neural decoder that integrates the information from $z$ and $z_{c^{\prime }}$ to generate targets.
+
+Neural Encoder We employ a bidirectional GRU as neural encoder, which encodes context $c$, event $x$ and target $y$ into distributed representations $h^c=\lbrace h_1^c,\dots ,h_{l_c}^c\rbrace $, $h^x=\lbrace h_1^x,\dots ,h_{l_x}^x\rbrace $ and $h^y=\lbrace h_1^y,\dots ,h_{l_y}^y\rbrace $, where $l_c$, $l_x$ and $l_y$ is the length of $c$, $x$ and $y$, respectively.
+
+Recognition Network The recognition network models $q_{\phi }(z|x,y)$, $q_{\phi }(z_c|x,c)$, $q_{\phi }(z|z_{c^{\prime }}, x)$ based on $h^x$, $h^y$ and $h^c$.
+
+Following traditional VAE, the above-mentioned three distributions are assumed to be multivariate Gaussian distribution with a diagonal covariance structure:
+
+where $\mu $ denotes the mean of the distribution, $\sigma $ denotes the standard deviation of the distribution, and $I$ denotes the identity matrix.
+
+Given $h^x$, $h^y$ and $h^c$, we propose a novel attention-based inferer (ABI) module to estimate the mean and standard deviation of $q_{\phi }(z_{c}|x,c)$, $q_{\phi }(z_{c^{\prime }}|x,y)$ and $q_{\phi }(z|x,y)$:
+
+Briefly, through the attention mechanism, ABI can capture the semantic interaction between input sequences, and estimate the parameters of distributions based on it. We will introduce the specific structure of ABI in below.
+
+Prior Network Prior Network models $p_{\theta }(z_{c^{\prime }}|x)$ and $p_{\theta }(z|x, z_{c^{\prime }})$ based on $h^x$. The distribution of $p_{\theta }(z_{c^{\prime }}|x)$ and $p_{\theta }(z|x, z_{c^{\prime }})$ are still assumed to be multivariate Gaussian, whereas the parameters are different:
+
+where $\mu ^{^{\prime }}$ denotes the mean of the distribution, $\sigma ^{^{\prime }}$ denotes the standard deviation of the distribution and $I$ denotes the identity matrix.
+
+Then the attention-based inferer module is still employed to estimate parameters of distributions:
+
+Neural Decoder Given the base event $x$, the semantic latent variable $z$, and the context-aware latent variable $z_{c^{\prime }}$, the neural decoder defines the generation probability of $y$ as following:
+
+where $p(y_j|y<j, z, z_{c^{\prime }}, x)=g(y_{j-1}, s_{j-1}, e_j)$, $g(\cdot )$ is an attention-based feed forward model, $e_j=\sum _i \alpha _{ji}h_i^{x}$ is the context vector and $s_{j-1}$ is the hidden state of the decoder. We obtain $g(\cdot )$ and $e_j$ the same way as BIBREF12 (BIBREF12). Whereas our decoder differs from BIBREF12 (BIBREF12) in that our model integrates the context-aware latent variable $z_{c^{\prime }}$ and semantic latent variable $z$ in the computation of $s_j=\mathrm {GRU}([E_{yj};s_{j-1},z,z_{j-1}])$, where $E_{yj}$ is the word embeddings of target words.
+
+Note that through concatenating $z$ and $z_{c^{\prime }}$ with $E_{yj}$ and $s_{j-1}$, $s_j$ could be affected by context-aware latent variable $z_{c^{\prime }}$ and semantic latent variable $z$. This allows model to directly access to the event background knowledge from $z_{c^{\prime }}$. In addition, the randomness of $z$ and $z_{c^{\prime }}$ would increase the diversity of model generation.
+
+Attention-based Inferer Attention mechanism has shown strong ability in capturing semantic interactions BIBREF13. Inspired by the co-attention mechanism BIBREF14, we propose an attention-based inferer (ABI) to estimate the mean and standard deviation of a distribution belongs to $p_{\theta }(\cdot )$ or $q_{\phi }(\cdot )$ by capturing semantic interactions of input sequences.
+
+Specifically, given two input sequences (e.g., representations of contexts and events) $a=\lbrace a_1,\dots ,a_{l_a}\rbrace $ and $b=\lbrace b_1,\dots ,b_{l_b}\rbrace $ with length $l_a$ and $l_b$, we first obtain the attention scores from each side through:
+
+where $W_a \in \mathbb {R}^{d\times d_a}$ and $W_b \in \mathbb {R}^{d\times d_b}$ are parameter weights.
+
+With these attention scores, the context vectors of both sequences are given by:
+
+Then we perform a mean pooling operation on context vectors of both sequences:
+
+To obtain the mean and standard deviation, the pooled context vectors $\bar{c^a}$ and $\bar{c^b}$ which carry semantic interaction between two sequences, are concatenated and projected into a latent semantic space through a nonlinear transformation:
+
+Finally the mean and standard deviation are generated through a nonlinear transformation over $h_z$:
+
+## Context-aware Variational Autoencoder ::: Optimizing
+
+With the incorporation of $z_{c^{\prime }}$, the original loglikelihood could be decomposed as:
+
+Then following traditional CVAE, the ELBO of CWVAE is defined as follows:
+
+which is the objective function at the finetune stage.
+
+While in the pretrain stage, as we aim to learn background knowledge through minimizing the distance between $z_c$ and $z_{c^{\prime }}$, in addition to $L^{ELBO}$, a context-aware regulation term is introduced:
+
+where the context aware regularization term is the KL distance between $z$ and $z_{c^{\prime }}$. Through minimizing the context aware regularization term, we aim to pass event context knowledge from $z_c$ to the context aware latent variable $z_{c^{\prime }}$.
+
+## Context-aware Variational Autoencoder ::: Training Details
+
+To test the performance of CWVAE, we split the Event2Mind and Atomic dataset into training, development and test sets (80%, 10%, 10%) in the same way as BIBREF5 (BIBREF5) and BIBREF4 (BIBREF4), respectively. We initialize the embedding layer from 300d GloVe word embeddings. The neural encoder is chosen to be biGRU with 300 hidden units. For the ABI module, size of $W_a$ and $W_b$ is set to be $100 \times d_a$ and $100 \times d_b$ respectively. The dimension of $z_c$, $z_{c^{\prime }}$ and $z$ is all set as 40. The neural decoder is set to be GRU with 300d hidden state. Regulation coefficient $\lambda $ of context-aware regulation term is set to be 0.1. Models are trained using an Adam optimizer BIBREF15 with a learning rate of 0.001.
+
+## Experiments ::: Auxiliary Dataset
+
+The auxiliary dataset is built upon three human-written story corpora: ROCStories BIBREF16, VIST BIBREF17 and WritingPrompts BIBREF18. ROCStories and VIST are composed of short stories with five sentences. We filter out stories of more than 1,000 words in WritingPrompts, and cut the remaining stories into five-sentence-paragraphs.
+
+For each five-sentence-paragraph, we define the first three sentences as contexts of the base event, the fourth sentence as the base event, and the fifth sentence as the inference target. For example, as shown in Table TABREF25, the first three sentences describe a context that Jason was unsatisfied about his job and applied for a new job. Hence, after happening the event “he got the job”, a plausible react about the event could be “jason was much happier at his new job”. In total, the auxiliary dataset contains 192,316 $(context, event, target)$ triples.
+
+## Experiments ::: Baselines
+
+We compared our proposed model with the following four baseline methods:
+
+RNN-based Seq2Seq proposed by BIBREF4 (BIBREF4) for the If-Then reasoning on Atomic.
+
+Variational Seq2Seq combines a latent variable with the encoder-decoder structure through converting the last hidden state of RNN encoder into a Gaussian distributed latent variable BIBREF8.
+
+VRNMT Propose by BIBREF19 (BIBREF19), VRNMT combines CVAE with attention-based encoder-decoder framework through introduces a latent variable to model the semantic distribution of targets.
+
+CWVAE-Unpretrained refers to the CWVAE model without the pretrain stage.
+
+Note that, for each baseline method, we train distinct models for each distinct inference dimension, respectively.
+
+## Experiments ::: Evaluation Metrics ::: Automatic Evaluation
+
+We first compare the perplexity of CWVAE with baseline methods. Perplexity measures the probability of model to regenerate the exact targets, which is particular suitable for evaluating the model performance on one-to-many problem BIBREF20. Further, we employ BLEU score to evaluate the accuracy of generations BIBREF21, and the number of distinct n-gram to evaluate the diversity of generations BIBREF6. The distinct is normalized to $[0, 1]$ by dividing the total number of generated tokens.
+
+## Experiments ::: Evaluation Metrics ::: Human Evaluation
+
+Since automatic evaluation of generations is still a challenging task BIBREF22, we also conduct human evaluations on the model performance. Five human experts are employed to evaluate the coherence, diversity and fluency of generated targets. Experts are asked to vote for if a generation is fluent or coherent for each generated target, and give a 1-5 score for the diversity of generations. For both Event2Mind and Atomic datasets, 100 events are randomly selected from the test set. For each method, top 10 generated targets of each base event are used for evaluation. Finally we report three overall averaged scores of coherence, diversity and fluency on both datasets, respectively.
+
+## Experiments ::: Overall Results
+
+We list the perplexity and BLEU score of CWVAE and baseline methods on Event2Mind and Atomic in Table TABREF31 and Table TABREF33, respectively, and show the distinct-1 and distinct-2 score on Event2Mind and Atomic in Table TABREF32 and Table TABREF34, respectively. We find that:
+
+(1) As shown in Table TABREF32 and Table TABREF34, comparison between RNN-based Seq2Seq and variational-based methods, including Variational Seq2Seq, VRNMT, CWVAE-unpretrained and CWVAE shows that, variational-based methods could increase the diversity of generations. This confirms one of our motivations that variational-based methods could capture the latent semantic distribution within targets and increase the diversity of If-Then reasoning.
+
+(2) Comparing CWVAE-unpretrained with other baseline methods shows that, in general CWVAE improves the accuracy and diversity on both dataset. These results indicate the efficiency of CWVAE in capturing the latent semantic distribution of targets, and generate more reasonable inferential results.
+
+(3) Comparison between CWVAE and CWVAE-unpretrained shows that the pretrain stage could enhance the performance of CWVAE in both the accuracy and diversity. This is mainly because event knowledge could offer the guidance for If-Then reasoning. In the pretrain stage, CWVAE could capture the event background knowledge through context-aware latent variable, and such knowledge could be be adapted to our task through the fintune stage.
+
+To further evaluate the effectiveness of our proposed approach, we also conduct human evaluations, the results of which are shown in Table TABREF39 and Table TABREF40. On both datasets, CWVAE-based methods achieve consistent better coherence, diversity and fluency performances. While comparing with CWVAE-Unpretrained, the pretrain procedure could improves the performance on coherence and fluency. The main reasons are twofold: first, the CWVAE has advantage in capturing the semantic distribution of targets; second, event background learned from the pretrain stage is helpful for the If-Then reasoning.
+
+## Experiments ::: Case Study
+
+Table TABREF41 provides an example of model generations given the base event “PersonX works tirelessly” and the inference dimension “xIntent”. The generations under CWVAE mainly contain four kinds of semantics: (1) be productive, (2) finish his work soon, (3) accomplish goal, (4) earn more money. While the semantics of generations using baseline RNN-based Seq2Seq model is relatively limited. Furthermore, the first three kinds of semantic overlap the three ground truth targets, and the fourth kind of semantic is in accordance with daily-life commonsense. Compared to RNN-based Seq2Seq model, our approach can increase the diversity and rationality of generations, meanwhile keep the accuracy.
+
+## Related Work ::: Event-Centered Commonsense Reasoning
+
+Understanding events and constructing event-centered commonsense knowledge are crucial to many NLP applications, such as intention recognition BIBREF23 and dialog generation BIBREF24. Recently a growing number of studies focus on event-centered commonsense reasoning, which mainly concentrates on two areas, script event prediction and story ending generation/choosing.
+
+Script event prediction concerns with the temporal relationships between script events BIBREF25, which requires models to choose a correct subsequent triple-organized event among the candidates BIBREF2. Prior work mainly focused on modeling event pairs BIBREF25, event chains BIBREF2 and event graph BIBREF3 to predict the subsequent event. Story ending generation focuses on generating plausible story endings BIBREF16, which requires models to understand the story context, and keep generated endings logically consistent with it BIBREF26, BIBREF27. The above tasks mainly investigate the logical orders of events, whereas the If-Then reasoning task focuses on inferring the mental state of event participants.
+
+## Related Work ::: Variational AutoEncoder-Decoder Based Natural Language Generation
+
+VAE BIBREF10 has been widely applied in various of text generation tasks, such as dialogue and machine translation. In dialogue generation, BIBREF9 (BIBREF9) adapts VAE with encoder-decoder framework to model the latent semantic distribution of answers, which can increase the diversity of generations. For the task of machine translation, BIBREF19 (BIBREF19) and BIBREF28 (BIBREF28) employ a latent variable to capture the semantic interaction between the source and target sentence, and regard the latent variable as a supplementation of attention mechanism. While BIBREF29 (BIBREF29) use the latent variable to model topic distributions in text generation. In this paper, we introduce an additional context-aware latent variable to effectively learn background knowledge and conduct If-Then reasoning on the guidance of it.
+
+## Conclusion
+
+In this paper, we propose a novel context-aware VAE (CWVAE) framework with two training stages for If-Then commonsense reasoning. By introducing an additional context-aware latent variable, CWVAE is able to learn external background knowledge, and conduct If-Then reasoning under its guidance. In the pretrain stage, CWVAE learns event background knowledge, then in the finetune stage CWVAE adapts such knowledge to each inference dimension. Experimental results demonstrate that CWVAE outperforms baseline methods in both the accuracy and diversity of generations.
+
+## Acknowledgments
+
+We thank the anonymous reviewers for their constructive comments, and gratefully acknowledge the support of the National Key Research and Development Program of China (SQ2018AAA010010), the National Key Research and Development Program of China (2018YFB1005103), the National Natural Science Foundation of China (NSFC) via Grant 61702137.

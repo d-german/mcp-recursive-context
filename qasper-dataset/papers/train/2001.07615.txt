@@ -1,0 +1,133 @@
+# Improving Interaction Quality Estimation with BiLSTMs and the Impact on Dialogue Policy Learning
+
+**Paper ID:** 2001.07615
+
+## Abstract
+
+Learning suitable and well-performing dialogue behaviour in statistical spoken dialogue systems has been in the focus of research for many years. While most work which is based on reinforcement learning employs an objective measure like task success for modelling the reward signal, we use a reward based on user satisfaction estimation. We propose a novel estimator and show that it outperforms all previous estimators while learning temporal dependencies implicitly. Furthermore, we apply this novel user satisfaction estimation model live in simulated experiments where the satisfaction estimation model is trained on one domain and applied in many other domains which cover a similar task. We show that applying this model results in higher estimated satisfaction, similar task success rates and a higher robustness to noise.
+
+## Introduction
+
+One prominent way of modelling the decision-making component of a spoken dialogue system (SDS) is to use (partially observable) Markov decision processes ((PO)MDPs) BIBREF0, BIBREF1. There, reinforcement learning (RL) BIBREF2 is applied to find the optimal system behaviour represented by the policy $\pi $. Task-oriented dialogue systems model the reward $r$, used to guide the learning process, traditionally with task success as the principal reward component BIBREF3, BIBREF4, BIBREF5, BIBREF6, BIBREF1, BIBREF7, BIBREF8.
+
+An alternative approach proposes user satisfaction as the main reward component BIBREF9. However, the applied statistical user satisfaction estimator heavily relies on handcrafted temporal features. Furthermore, the impact of the estimation performance on the resulting dialogue policy remains unclear.
+
+In this work, we propose a novel LSTM-based user satisfaction reward estimator that is able to learn the temporal dependencies implicitly and compare the performance of the resulting dialogue policy with the initially used estimator.
+
+Optimising the dialogue behaviour to increase user satisfaction instead of task success has multiple advantages:
+
+The user satisfaction is more domain-independent as it can be linked to interaction phenomena independent of the underlying task BIBREF9.
+
+User satisfaction is favourable over task success as it represents more accurately the user's view and thus whether the user is likely to use the system again in the future. Task success has only been used as it has shown to correlate well with user satisfaction BIBREF10.
+
+Based on previous work by BIBREF9, the interaction quality (IQ)—a less subjective version of user satisfaction—will be used for estimating the reward. The estimation model is thus based on domain-independent, interaction-related features which do not have any information available about the goal of the dialogue. This allows the reward estimator to be applicable for learning in unseen domains.
+
+The originally applied IQ estimator heavily relies on handcrafted temporal features. In this work, we will present a deep learning-based IQ estimator that utilises the capabilities of recurrent neural networks to get rid of all handcrafted features that encode temporal effects. By that, these temporal dependencies may be learned instead.
+
+The applied RL framework is shown in Figure FIGREF4. Within this setup, both IQ estimators are used for learning dialogue policies in several domains to analyse their impact on general dialogue performance metrics.
+
+The remainder of the paper is organised as follows: in Section SECREF2, related work is presented focusing on dialogue learning and the type of reward that is applied. In Section SECREF3, the interaction quality is presented and how it is used in the reward model. The deep learning-based interaction quality estimator proposed in this work is then described in detail in Section SECREF4 followed by the experiments and results both of the estimator itself and the resulting dialogue policies in Section SECREF5.
+
+## Relevant Related Work
+
+Most of previous work on dialogue policy learning focuses on employing task success as the main reward signal BIBREF3, BIBREF13, BIBREF4, BIBREF5, BIBREF6, BIBREF1, BIBREF7, BIBREF8. However, task success is usually only computable for predefined tasks e.g., through interactions with simulated or recruited users, where the underlying goal is known in advance. To overcome this, the required information can be requested directly from users at the end of each dialogue BIBREF14. However, this can be intrusive, and users may not always cooperate.
+
+An alternative is to use a task success estimator BIBREF15, BIBREF7, BIBREF8. With the right choice of features, these can also be applied to new and unseen domains BIBREF16. However, these models still attempt to estimate completion of the underlying task, whereas our model evaluates the overall user experience.
+
+In this paper, we show that an interaction quality reward estimator trained on dialogues from a bus information system will result in well-performing dialogues both in terms of success rate and user satisfaction on five other domains, while only using interaction-related, domain-independent information, i.e., not knowing anything about the task of the domain.
+
+Others have previously introduced user satisfaction into the reward BIBREF17, BIBREF18, BIBREF19, BIBREF20 by using the PARADISE framework BIBREF21. However, PARADISE relies on the existence of explicit task success information which is usually hard to obtain.
+
+Furthermore, to derive user ratings within that framework, users have to answer a questionnaire which is usually not feasible in real world settings. To overcome this, PARADISE has been used in conjunction with expert judges instead BIBREF22, BIBREF23 to enable unintrusive acquisition of dialogues. However, the problem of mapping the results of the questionnaire to a scalar reward value still exists.
+
+Therefore, we use interaction quality (Section SECREF3) in this work because it uses scalar values applied by experts and only uses task-independent features that are easy to derive.
+
+## Interaction Quality Reward Estimation
+
+In this work, the reward estimator is based on the interaction quality (IQ) BIBREF11 for learning information-seeking dialogue policies. IQ represents a less subjective variant of user satisfaction: instead of being acquired from users directly, experts annotate pre-recorded dialogues to avoid the large variance that is often encountered when users rate their dialogues directly BIBREF11.
+
+IQ is defined on a five-point scale from five (satisfied) down to one (extremely unsatisfied). To derive a reward from this value, the equation
+
+is used where $R_{IQ}$ describes the final reward. It is applied to the final turn of the dialogue of length $T$ with a final IQ value of $iq$. A per-turn penalty of $-1$ is added to the dialogue outcome. This results in a reward range of 19 down to $-T$ which is consistent with related work BIBREF3, BIBREF16, BIBREF8 in which binary task success (TS) was used to define the reward as:
+
+where $\mathbb {1}_{TS} = 1$ only if the dialogue was successful, $\mathbb {1}_{TS} = 0$ otherwise. $R_{TS}$ will be used as a baseline.
+
+The problem of estimating IQ has been cast as a classification problem where the target classes are the distinct IQ values. The input consists of domain-independent variables called interaction parameters. These parameters incorporate information from the automatic speech recognition (ASR) output and the preceding system action. Most previous approaches used this information, which is available at every turn, to compute temporal features by taking sums, means or counts from the turn-based information for a window of the last 3 system-user-exchanges and the complete dialogue (see Fig. FIGREF8). The baseline IQ estimation approach as applied by BIBREF9 (and originating from BIBREF24) used a feature set of 16 parameters as shown in Table TABREF9 with a support vector machine (SVM) BIBREF25, BIBREF26.
+
+The LEGO corpus BIBREF27 provides data for training and testing and consists of 200 dialogues (4,885 turns) from the Let's Go bus information system BIBREF28. There, users with real needs were able to call the system to get information about the bus schedule. Each turn of these 200 dialogues has been annotated with IQ (representing the quality of the dialogue up to the current turn) by three experts. The final IQ label has been assigned using the median of the three individual labels.
+
+Previous work has used the LEGO corpus with a full IQ feature set (which includes additional partly domain-related information) achieving an unweighted average recall (UAR) of 0.55 using ordinal regression BIBREF29, 0.53 using a two-level SVM approach BIBREF30, and 0.51 using a hybrid-HMM BIBREF31. Human performance on the same task is 0.69 UAR BIBREF11. A deep learning approach using only non-temporal features achieved an UAR of 0.55 BIBREF32.
+
+## LSTM-based Interaction Quality Estimation
+
+The proposed IQ estimation model will be used as a reward estimator as depicted in Figure FIGREF4. With parameters that are collected from the dialogue system modules for each time step $t$, the reward estimator derives the reward $r_t$ that is used for learning the dialogue policy $\pi $.
+
+The architecture of our proposed IQ estimation model is shown in Figure FIGREF11. It is based on the idea that the temporal information that has previously been explicitly encoded with the window and dialogue interaction parameter levels may be learned instead by using recurrent neural networks. Thus, only the exchange level parameters $\mathbf {e}_t$ are considered (see Table TABREF9). Long Short-Term Memory (LSTM) cells are at the core of the model and have originally been proposed by BIBREF33 as a recurrent variant that remedies the vanishing gradient problem BIBREF34.
+
+As shown in Figue FIGREF11, the exchange level parameters form the input vector $\mathbf {e}_t$ for each time step or turn $t$ to a bi-directional LSTM BIBREF35 layer. The input vector $\mathbf {e}_t$ encodes the nominal parameters ASRRecognitionStatus, ActivityType, and Confirmation? as 1-hot representations. In the BiLSTM layer, two hidden states are computed: $\vec{\mathbf {h}}_t$ constitutes the forward pass through the current sub-dialogue and $ \mathchoice{ \hspace{1.66656pt} \scalebox {-1}[1]{\m@th \displaystyle \vec{\scalebox {-1}[1]{ \hspace{-1.66656pt}\m@th \displaystyle \mathbf {h} \hspace{1.66656pt}}}} \hspace{-1.66656pt}}{ \hspace{1.66656pt} \scalebox {-1}[1]{\m@th \textstyle \vec{\scalebox {-1}[1]{ \hspace{-1.66656pt}\m@th \textstyle \mathbf {h} \hspace{1.66656pt}}}} \hspace{-1.66656pt}}{ \hspace{1.111pt} \scalebox {-1}[1]{\m@th \scriptstyle \vec{\scalebox {-1}[1]{ \hspace{-1.111pt}\m@th \scriptstyle \mathbf {h} \hspace{1.111pt}}}} \hspace{-1.111pt}}{ \hspace{1.111pt} \scalebox {-1}[1]{\m@th \scriptscriptstyle \vec{\scalebox {-1}[1]{ \hspace{-1.111pt}\m@th \scriptscriptstyle \mathbf {h} \hspace{1.111pt}}}} \hspace{-1.111pt}}_t$ the backwards pass:
+
+The final hidden layer is then computed by concatenating both hidden states:
+
+Even though information from all time steps may contribute to the final IQ value, not all time steps may be equally important. Thus, an attention mechanism BIBREF36 is used that evaluates the importance of each time step $t^{\prime }$ for estimating the IQ value at time $t$ by calculating a weight vector $\alpha _{t,t^{\prime }}$.
+
+BIBREF37 describe this as follows: “The attention-focused hidden state representation $\mathbf {l}_t$ of an [exchange] at time step $t$ is given by the weighted summation of the hidden state representation $\mathbf {h}_{t^{\prime }}$ of all [exchanges] at time steps $t^{\prime }$, and their similarity $\mathbf {\alpha }_{t,t^{\prime }}$ to the hidden state representation $\mathbf {h}_t$ of the current [exchange]. Essentially, $\mathbf {l}_t$ dictates how much to attend to an [exchange] at any time step conditioned on their neighbourhood context.”
+
+To calculate the final estimate $\mathbf {y}_t$ of the current IQ value at time $t$, a softmax layer is introduced:
+
+For estimating the interaction quality using a BiLSTM, the proposed architecture frames the task as a classification problem where each sequence is labelled with one IQ value. Thus, for each time step $t$, the IQ value needs to be estimated for the corresponding sub-dialogue consisting of all exchanges from the beginning up to $t$. Framing the problem like this is necessary to allow for the application of a BiLSTM-approach and still be able to only use information that would be present at the current time step $t$ in an ongoing dialogue interaction.
+
+To analyse the influence of the BiLSTM, a model with a single forward-LSTM layer is also investigated where
+
+Similarly, a model without attention is also analysed where
+
+## Experiments and Results
+
+The proposed BiLSTM IQ estimator is both trained and evaluated on the LEGO corpus and applied within the IQ reward estimation framework (Fig. FIGREF4) on several domains within a simulated environment.
+
+## Experiments and Results ::: Interaction Quality Estimation
+
+To evaluate the proposed BiLSTM model with attention (BiLSTM+att), it is compared with three of its own variants: a BiLSTM without attention (BiLSTM) as well as a single forward-LSTM layer with attention (LSTM+att) and without attention (LSTM). Additional baselines are defined by BIBREF32 who already proposed an LSTM-based architecture that only uses non-temporal features, and the SVM-based estimation model as originally used for reward estimation by BIBREF24.
+
+The deep neural net models have been implemented with Keras BIBREF38 using the self-attention implementation as provided by BIBREF37. All models were trained against cross-entropy loss using RmsProp BIBREF39 optimisation with a learning rate of 0.001 and a mini-batch size of 16.
+
+As evaluation measures, the unweighted average recall (UAR)—the arithmetic average of all class-wise recalls—, a linearly weighted version of Cohen's $\kappa $, and Spearman's $\rho $ are used. As missing the correct estimated IQ value by only one has little impact for modelling the reward, a measure we call the extended accuracy (eA) is used where neighbouring values are taken into account as well.
+
+All experiments were conducted with the LEGO corpus BIBREF27 in a 10-fold cross-validation setup for a total of 100 epochs per fold. The results are presented in Table TABREF19. Due to the way the task is framed (one label for each sub-dialogue), memorising effects may be observed with the traditional cross-validation setup that has been used in previous work. Hence, the results in Table TABREF19 show very high performance, which is likely to further increase with ongoing training. However, the corresponding models are likely to generalise poorly.
+
+To alleviate this, a dialogue-wise cross-validation setup has been employed also consisting of 10 folds of disjoint sets of dialogues. By that, it can be guaranteed that there are no overlapping sub-dialogues in the training and test sets. All results of these experiments are presented in Table TABREF21 with the absolute improvement of the two main measures UAR and eA over the SVM-based approach of BIBREF24 visualised in Figure FIGREF22.
+
+The proposed BiLSTM+att model outperforms existing models and the baselines in all four performance measures by achieving an UAR of 0.54 and an eA of 0.94 after 40 epochs. Furthermore, both the BiLSTM and the attention mechanism by themselves improve the performance in terms of UAR. Based on this findings, the BiLSTM+att model is selected as reward estimator for the experiments in the dialogue policy learning setup as shown in Figure FIGREF4.
+
+## Experiments and Results ::: Dialogue Policy Learning
+
+To analyse the impact of the IQ reward estimator on the resulting dialogue policy, experiments are conducted comparing three different reward models. The two baselines are in accordance to BIBREF9: having the objective task success as principal reward component ($R_{TS}$) and having the interaction quality estimated by a support vector machine as principal reward component ($R_{IQ}^{s}$). TS can be computed by comparing the outcome of each dialogue with the pre-defined goal. Of course, this is only possible in simulation and when evaluating with paid subjects. This goal information is not available to the IQ estimators, nor is it required. Both baselines are compared to our proposed BiLST model to estimate the interaction quality used as principal reward component ($R_{IQ}^{bi}$).
+
+For learning the dialogue behaviour, a policy model based on the GP-SARSA algorithm BIBREF3 is used. This is a value-based method that uses a Gaussian process to approximate the state-value function. As it takes into account the uncertainty of the approximation, it is very sample efficient and may even be used to learn a policy directly through real human interaction BIBREF14.
+
+The decisions of the policy are based on a summary space representation of the dialogue state tracker. In this work, the focus tracker BIBREF40—an effective rule-based tracker—is used. For each dialogue decision, the policy chooses exactly one summary action out of a set of summary actions which are based on general dialogue acts like request, confirm or inform. The exact number of system actions varies for the domains and ranges from 16 to 25.
+
+To measure the dialogue performance, the task success rate (TSR) and the average interaction quality (AIQ) are measured: the TSR represents the ratio of dialogues for which the system was able to provide the correct result. AIQ is calculated based on the estimated IQ values of the respective model ($AIQ^{bi}$ for the BiLSTM and $AIQ^{s}$ for the SVM) at the end of each dialogue. As there are two IQ estimators, a distinction is made between $AIQ^{s}$ and $AIQ^{bi}$. Additionally, the average dialogue length (ADL) is reported.
+
+For the simulation experiments, the performance of the trained polices on five different domains was evaluated: Cambridge Hotels and Restaurants, San Francisco Hotels and Restaurants, and Laptops. The complexity of each domain is shown in Table TABREF25 and compared to the LetsGo domain (the domain the estimators have been trained on).
+
+The dialogues were created using the publicly available spoken dialogue system toolkit PyDial BIBREF41 which contains an implementation of the agenda-based user simulator BIBREF42 with an additional error model. The error model simulates the required semantic error rate (SER) caused in the real system by the noisy speech channel. For each domain, all three reward models are compared on three SERs: 0%, 15%, and 30%. More specifically, the applied evaluation environments are based on Env. 1, Env. 3, and Env. 6, respectively, as defined by BIBREF43. Hence, for each domain and for each SER, policies have been trained using 1,000 dialogues followed by an evaluation step of 100 dialogues. The task success rates in Figure FIGREF24 with exact numbers shown in Table TABREF26 were computed based on the evaluation step averaged over three train/evaluation cycles with different random seeds.
+
+As already known from the experiments conducted by BIBREF9, the results of the SVM IQ reward estimator show similar results in terms of TSR for $R_{IQ}^{s}$ and $R_{TS}$ in all domains for an SER of 0%. This finding is even stronger when comparing $R_{IQ}^{bi}$ and $R_{TS}$. These high TSRs are achieved while having the dialogues of both IQ-based models result in higher AIQ values compared to $R_{TS}$ throughout the experiments. Of course, only the IQ-based model is aware of the IQ concept and indeed is trained to optimise it.
+
+For higher SERs, the TSRs lightly degrade for the IQ-based reward estimators. However, there seems to be a tendency that the TSR for $R_{IQ}^{bi}$ is more robust against noise compared to $R_{IQ}^{s}$ while still resulting in better AIQ values.
+
+Finally, even though the differences are mostly not significant, there is also a tendency for $R_{IQ}^{bi}$ to result in shorter dialogues compared to both $R_{IQ}^{s}$ and $R_{TS}$.
+
+## Discussion
+
+One of the major questions of this work addresses the impact of an IQ reward estimator on the resulting dialogues where the IQ estimator achieves better performance than previous ones. Analysing the results of the dialogue policy learning experiment leads to the conclusion that the policy learned with $R_{IQ}^{bi}$ performs similar or better than $R_{IQ}^{s}$ through out all experiments while still achieving better average user satisfaction compared to $R_{TS}$. Especially for noisy environments, the improvement is relevant.
+
+The BiLSTM clearly performs better on the LEGO corpus while learning the temporal dependencies instead of using handcrafted ones. However, it entails the risk that these learned temporal dependencies are too specific to the original data so that the model does not generalise well anymore. This would mean that it would be less suitable to be applied to dialogue policy learning for different domains. Luckily, the experiments clearly show that this is not the case.
+
+Obviously, the experiments have only been conducted in a simulated environment and not verified in a user study with real humans. However, the general framework of applying an IQ reward estimator for learning a dialogue policy has already been successfully validated with real user experiments by BIBREF9 and it seems rather unlikely that the changes we induce by changing the reward estimator lead to a fundamentally different result.
+
+## Conclusion
+
+In this work we proposed a novel model for interaction quality estimation based on BiLSTMs with attention mechanism that clearly outperformed the baseline while learning all temporal dependencies implicitly. Furthermore, we analysed the impact of the performance increase on learned polices that use this interaction quality estimator as the principal reward component. The dialogues of the proposed interaction quality estimator show a slightly higher robustness towards noise and shorter dialogues while still yielding good performance in terms of both of task success rate and (estimated) user satisfaction. This has been demonstrated by training the reward estimator on a bus information domain and applying it to learn dialogue policies in five different domains (Cambridge restaurants and hotels, San Francisco restaurants and hotels, Laptops) in a simulated experiment.
+
+For future work, we aim at extending the interaction quality estimator by incorporating domain-independent linguistic data to further improve the estimation performance. Furthermore, the effects of using a user satisfaction-based reward estimator needs to be applied to more complex tasks.

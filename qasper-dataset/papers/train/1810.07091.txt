@@ -1,0 +1,93 @@
+# INFODENS: An Open-source Framework for Learning Text Representations
+
+**Paper ID:** 1810.07091
+
+## Abstract
+
+The advent of representation learning methods enabled large performance gains on various language tasks, alleviating the need for manual feature engineering. While engineered representations are usually based on some linguistic understanding and are therefore more interpretable, learned representations are harder to interpret. Empirically studying the complementarity of both approaches can provide more linguistic insights that would help reach a better compromise between interpretability and performance. We present INFODENS, a framework for studying learned and engineered representations of text in the context of text classification tasks. It is designed to simplify the tasks of feature engineering as well as provide the groundwork for extracting learned features and combining both approaches. INFODENS is flexible, extensible, with a short learning curve, and is easy to integrate with many of the available and widely used natural language processing tools.
+
+## Introduction
+
+Linear classifiers in combination with the right features achieve good performance on text classification tasks BIBREF0 . Those hand-crafted features provide baselines for evaluating deep learning methods and are sometimes difficult to beat BIBREF1 , BIBREF2 . In some cases, hand-crafted features can even be combined with learned features to improve performance on a given task BIBREF3 , BIBREF4 highlighting some complementarity in the information captured by each approach. Conducting empirical experiments to study such complementarity would be beneficial, and the reasons are threefold: Firstly, this enables us to compare the performance of both hand crafted and learned representations and make design decisions regarding the trade-offs between speed and accuracy on a specific dataset. Secondly, it helps in investigating where the performance gaps are and whether these methods can complement each other and how they can be combined to improve performance. Finally, it allows us to derive new linguistic hypotheses as in many cases, deep learning methods are great engineering tools but they operate as black box methods and it is difficult to extract from them linguistic insights.
+
+In this paper we present INFODENS a framework aimed at studying hand-crafted and learned representations. We first explain how INFODENS can be used to simplify the tasks of feature engineering, feature learning, and evaluation. We then validate the framework on sentiment analysis and topic classification tasks and showcase that in many cases, hand-crafted features can be complementary to learned representations.
+
+## Framework Design and Architecture
+
+The framework is designed in a modular and developer-friendly manner to encourage changes and extensions. The source code is accompanied by a user and a developer guide, and we give a brief overview of the architecture in this section, summarized in Figure FIGREF2 . The framework consists of the following frozen and hot spots:
+
+## Frozen spots
+
+These are the modules of the framework that need not be changed for extending the functionality in typical use cases.
+
+is the callable module and centerpiece of the framework. It instantiates the other modules, calls their APIs, and handles the communication between them.
+
+provides the APIs for accessing the input text, preprocessed versions of it, and external resources. It also handles the building of language models and the unsupervised learning of word-embeddings.
+
+dynamically detects the available feature extractors and manages the multi-threaded feature extraction process. It handles merging the extracted and given feature matrices and generating feature descriptors.
+
+is the module that exports the extracted features in a chosen format. This can also be extended with other existing or custom formats via the Format writer. 
+
+manages the training and evaluation of the different classifiers or regressors. Like the feature manager, it also detects the classifiers dynamically at run time.
+
+## Hot spots
+
+These are the modules which developers can modify and extend with their code to add new functionality.
+
+is used to integrate different NLP tools (taggers, tokenizers.. etc) without changing the Preprocessor APIs. It can also be called to do on-the-fly preprocessing of feature-specific input files.
+
+handles the definition and extraction of configuration parameters from configuration files.
+
+extract and return vector representations of text, whether learned or engineered. Researchers can write their own feature extractor methods which are detected dynamically at run-time and called by the feature manager.
+
+are trained on the extracted features to build a model that is then used to evaluate the features. Their design is inspired by the scikit-learn BIBREF7 approach. Similar to the feature extractors, they are detected dynamically by the classifier manager.
+
+implements the feature output formats. It can be extended to support other formats by adding new methods to the class.
+
+## Usage
+
+The framework can be used as a standalone toolkit without any modifications given the implemented features and classifiers. For example, it can be used to extract features for usage with other machine learning tools, or to evaluate given features with the existing classifiers or regressors. Extending the framework with new feature extractors or classifiers is as simple as a drag and drop placement of the new code files into the feature_extractor and classifer directories respectively. The framework will then detect the new extensions dynamically at runtime. In this section we explore how each use case is handled.
+
+## Feature Extraction and Evaluation
+
+The framework is run by invoking the Python script infodens.py with an INI configuration file consisting of five sections specifying the input files, the output parameters, the general settings, the requested features and their arguments, and finally, the classifiers. Figure FIGREF17 shows an example of a configuration file. All the parameters are described in the README file on the repository.
+
+## Feature Development
+
+Since a main use case for the framework is extracting engineered and learned features, it was designed such that developing a new feature extractor would require minimal effort. Figure FIGREF19 demonstrates a simple feature extractor that retrieves the sentence length. More complicated features and learned features are provided in the repository which can be used as a guide for developers. Documentation for adding classifiers and format writers is described in the Wiki of the repository but is left out of this paper due to the limited space.
+
+## Evaluation and Results
+
+In this section, we evaluate the performance of the framework used out of the box. We first detail the datasets used, then the set of hand-crafted and learned representations, along with the classifiers, all of which are available as part of the released code.
+
+## Datasets and External Resources
+
+We use the the datasets provided by Zhang et al. zhang2015character, three of which are topic classification datasets: AG's news, DBpedia, and Yahoo! Answers, and four are for sentiment analysis: Yelp review polarity, Yelp review full, Amazon review polarity, and Amazon review full. We exclude the Sougu News dataset, which is a transliterated Chinese text, as we only utilize English language models and word embeddings for the purposes of this demonstration. The results gathered by BIBREF10 , comparing different convolutional models and the fastText approach, are used as baselines. External resources required to extract INLINEFORM0 -gram probabilities and word embeddings, namely a 5-gram modified Kneser-Ney smoothed language model BIBREF11 and a set of skip-gram based word embeddings with 256 dimensions BIBREF12 , are trained on a subset of the News Shuffle corpus containing approx. 200M sentences and INLINEFORM1 unique tokens BIBREF13 .
+
+## Hand-crafted Features
+
+We extract 5 Surface and Lexical features, namely sequence length in number of tokens, average word length, type-token ratio, and lexical to tokens ratio (ratio of adjectives, verbs, nouns, and adverbs to tokens). Bag of INLINEFORM0 -grams features are extracted on the word and POS level. We use frequency cut-offs of INLINEFORM1 for INLINEFORM2 -grams from 1 to 5 respectively for the smaller datasets and ten times higher for the Yahoo! and Amazon datasets. For POS INLINEFORM3 -grams we use cut-offs 10 for unigrams and 20 for bigrams and higher. For the Yahoo! and Amazon datasets we use cut-offs of INLINEFORM4 . The INLINEFORM5 -grams features are then also extracted using the hashing trick with the same cut-offs to reduce the final feature vector size when combined with other features. scikit-learn's BIBREF14 FeatureHasher is used with output vectors sizes of INLINEFORM6 INLINEFORM7 INLINEFORM8 for ngrams from INLINEFORM9 respectively and INLINEFORM10 INLINEFORM11 INLINEFORM12 are used for POS ngrams. We extract lexical and POS level Language model features based on external language models, namely sentence log probabilities, perplexities, and surprisal in units of bits. Building the language model and extracting the features is done by providing the path to the compiled binaries for kenlm BIBREF15 . Finally we extract N-gram Frequency Quantile Distribution features with the same cut-offs as in the bag of ngrams features, with 4 quantiles and an OOV quantile. NLTK BIBREF16 is used for tokenization and POS tagging.
+
+## Learned Features
+
+We extracted two features that use a learned representation: Firstly, we get a sentence embedding feature that is built by averaging the word embeddings of an input sentence. Secondly, we extract a fastText representation using the fastText library with the same parameters as reported in Joulin et al. joulin2016bag.
+
+## Classifiers
+
+The linear SVC from scikit-learn BIBREF14 which is based on LIBLINEAR BIBREF17 is trained as a baseline for evaluating each feature type as well as the concatenated features. A grid search for INLINEFORM0 is performed with 10 values in the log scale ranging from INLINEFORM1 to INLINEFORM2 . Performance is then also compared to feeding the concatenated features into a feed-forward neural network. We report the results on two settings, a network with a single fully-connected hidden layer of size 100 and another network with two fully-connected hidden layers of sizes 100 and 50 respectively. Both networks use a softmax output layer. The implementation is done using Keras BIBREF18 with the TensorFlow BIBREF19 backend. The two smaller datasets and the Amazon datasets are trained for 2 epochs and the remaining datasets are trained for 5 epochs. We use with the Adam optimizer with a learning rate of INLINEFORM3 , and dropout with rate INLINEFORM4 . A single NVIDIA Titan X GPU is used for all experiments and time per epoch ranges from a few seconds for a small number of features on the smallest datasets to 5 hours on the full feature set on the largest datasets. These settings were not chosen to optimize accuracy, but only for the purpose of evaluating the framework due to the large number of experiments presented. Users are encouraged to experiment with different hyper-parameters values and network sizes, as well as modify the code to build more sophisticated neural network models. Experimenting with the other classifiers available in the framework, such as logistic regression, can provide additional insightful comparisons.
+
+## Results and Discussion
+
+We present the results in Table TABREF20 . In Zhang et al. zhang2015character it was noted that the performance of ngram features degrades for larger datasets. However, we have seen in our baseline experiments that this effect can be reduced by using suitable frequency cut-offs. We have also seen that in many cases, the ngram features can solely outperform the neural approaches. For the two smaller datasets, linear classifiers tend to perform better, while for the larger datasets performance increases with increasing the non-linear layers even for hand-crafted representations. Combining hand-crafted and learned features is often beneficial, but not always, especially with the linear classifier. What is clear is that different datasets benefit from different representations and model parameters and it is difficult to find a representation that consistently performs well across all datasets. This necessitates repeated experimentation to understand which approaches and parameters would provide more consistent improvements.
+
+## Related Work
+
+While there exist toolkits such as FEXTOR BIBREF20 , EDISON BIBREF21 , Learning Based Java BIBREF22 , and NLP frameworks such as GATE BIBREF23 that facilitate feature extraction, INFODENS differs in that it integrates feature learning in the extraction pipeline along with customizable feature evaluation. Additionally, a main design goal of INFODENS is to require little to no programming experience to be used as a standalone toolkit, and minimal programming effort to develop new features and classifiers. This is accomplished as the framework is developed fully in Python, taking advantage of the plethora of libraries available for deep learning and natural language processing. And due to the interpreted nature of Python, extensions to the library require no recompilation and, by design, are discovered dynamically at runtime.
+
+## Conclusions and Future work
+
+We presented INFODENS, a framework aimed at learning text representations and showed how combining hand-crafted and learned representations can be beneficial. The framework provides flexible usage and extension scenarios enabling rapid evaluation of different text representations on different tasks. We aim to integrate more learned representations of text, namely convolutional features, and additionally, the next iteration of the framework will focus on allowing features to be combined differently, for example to be fed into different neural network layers, such as to an embedding or a convolutional layer instead of vanilla fully connected layers. Finally, a module to visualize the learned feature weights will be developed in order to understand which combination of features lead to a better classification decision.
+
+## Acknowledgments
+
+This work is funded by the German Research Foundation (Deutsche Forschungsgemeinschaft) under grant SFB1102: Information Density and Linguistic Encoding.

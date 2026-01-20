@@ -1,0 +1,257 @@
+# What Gets Echoed? Understanding the"Pointers"in Explanations of Persuasive Arguments
+
+**Paper ID:** 1911.00523
+
+## Abstract
+
+Explanations are central to everyday life, and are a topic of growing interest in the AI community. To investigate the process of providing natural language explanations, we leverage the dynamics of the /r/ChangeMyView subreddit to build a dataset with 36K naturally occurring explanations of why an argument is persuasive. We propose a novel word-level prediction task to investigate how explanations selectively reuse, or echo, information from what is being explained (henceforth, explanandum). We develop features to capture the properties of a word in the explanandum, and show that our proposed features not only have relatively strong predictive power on the echoing of a word in an explanation, but also enhance neural methods of generating explanations. In particular, while the non-contextual properties of a word itself are more valuable for stopwords, the interaction between the constituent parts of an explanandum is crucial in predicting the echoing of content words. We also find intriguing patterns of a word being echoed. For example, although nouns are generally less likely to be echoed, subjects and objects can, depending on their source, be more likely to be echoed in the explanations.
+
+## Introduction
+
+Explanations are essential for understanding and learning BIBREF0. They can take many forms, ranging from everyday explanations for questions such as why one likes Star Wars, to sophisticated formalization in the philosophy of science BIBREF1, to simply highlighting features in recent work on interpretable machine learning BIBREF2.
+
+Although everyday explanations are mostly encoded in natural language, natural language explanations remain understudied in NLP, partly due to a lack of appropriate datasets and problem formulations. To address these challenges, we leverage /r/ChangeMyView, a community dedicated to sharing counterarguments to controversial views on Reddit, to build a sizable dataset of naturally-occurring explanations. Specifically, in /r/ChangeMyView, an original poster (OP) first delineates the rationales for a (controversial) opinion (e.g., in Table TABREF1, “most hit music artists today are bad musicians”). Members of /r/ChangeMyView are invited to provide counterarguments. If a counterargument changes the OP's view, the OP awards a $\Delta $ to indicate the change and is required to explain why the counterargument is persuasive. In this work, we refer to what is being explained, including both the original post and the persuasive comment, as the explanandum.
+
+An important advantage of explanations in /r/ChangeMyView is that the explanandum contains most of the required information to provide its explanation. These explanations often select key counterarguments in the persuasive comment and connect them with the original post. As shown in Table TABREF1, the explanation naturally points to, or echoes, part of the explanandum (including both the persuasive comment and the original post) and in this case highlights the argument of “music serving different purposes.”
+
+These naturally-occurring explanations thus enable us to computationally investigate the selective nature of explanations: “people rarely, if ever, expect an explanation that consists of an actual and complete cause of an event. Humans are adept at selecting one or two causes from a sometimes infinite number of causes to be the explanation” BIBREF3. To understand the selective process of providing explanations, we formulate a word-level task to predict whether a word in an explanandum will be echoed in its explanation.
+
+Inspired by the observation that words that are likely to be echoed are either frequent or rare, we propose a variety of features to capture how a word is used in the explanandum as well as its non-contextual properties in Section SECREF4. We find that a word's usage in the original post and in the persuasive argument are similarly related to being echoed, except in part-of-speech tags and grammatical relations. For instance, verbs in the original post are less likely to be echoed, while the relationship is reversed in the persuasive argument.
+
+We further demonstrate that these features can significantly outperform a random baseline and even a neural model with significantly more knowledge of a word's context. The difficulty of predicting whether content words (i.e., non-stopwords) are echoed is much greater than that of stopwords, among which adjectives are the most difficult and nouns are relatively the easiest. This observation highlights the important role of nouns in explanations. We also find that the relationship between a word's usage in the original post and in the persuasive comment is crucial for predicting the echoing of content words. Our proposed features can also improve the performance of pointer generator networks with coverage in generating explanations BIBREF4.
+
+To summarize, our main contributions are:
+
+[itemsep=0pt,leftmargin=*,topsep=0pt]
+
+We highlight the importance of computationally characterizing human explanations and formulate a concrete problem of predicting how information is selected from explananda to form explanations, including building a novel dataset of naturally-occurring explanations.
+
+We provide a computational characterization of natural language explanations and demonstrate the U-shape in which words get echoed.
+
+We identify interesting patterns in what gets echoed through a novel word-level classification task, including the importance of nouns in shaping explanations and the importance of contextual properties of both the original post and persuasive comment in predicting the echoing of content words.
+
+We show that vanilla LSTMs fail to learn some of the features we develop and that the proposed features can even improve performance in generating explanations with pointer networks.
+
+Our code and dataset is available at https://chenhaot.com/papers/explanation-pointers.html.
+
+## Related Work
+
+To provide background for our study, we first present a brief overview of explanations for the NLP community, and then discuss the connection of our study with pointer networks, linguistic accommodation, and argumentation mining.
+
+The most developed discussion of explanations is in the philosophy of science. Extensive studies aim to develop formal models of explanations (e.g., the deductive-nomological model in BIBREF5, see BIBREF1 and BIBREF6 for a review). In this view, explanations are like proofs in logic. On the other hand, psychology and cognitive sciences examine “everyday explanations” BIBREF0, BIBREF7. These explanations tend to be selective, are typically encoded in natural language, and shape our understanding and learning in life despite the absence of “axioms.” Please refer to BIBREF8 for a detailed comparison of these two modes of explanation.
+
+Although explanations have attracted significant interest from the AI community thanks to the growing interest on interpretable machine learning BIBREF9, BIBREF10, BIBREF11, such studies seldom refer to prior work in social sciences BIBREF3. Recent studies also show that explanations such as highlighting important features induce limited improvement on human performance in detecting deceptive reviews and media biases BIBREF12, BIBREF13. Therefore, we believe that developing a computational understanding of everyday explanations is crucial for explainable AI. Here we provide a data-driven study of everyday explanations in the context of persuasion.
+
+In particular, we investigate the “pointers” in explanations, inspired by recent work on pointer networks BIBREF14. Copying mechanisms allow a decoder to generate a token by copying from the source, and have been shown to be effective in generation tasks ranging from summarization to program synthesis BIBREF4, BIBREF15, BIBREF16. To the best of our knowledge, our work is the first to investigate the phenomenon of pointers in explanations.
+
+Linguistic accommodation and studies on quotations also examine the phenomenon of reusing words BIBREF17, BIBREF18, BIBREF19, BIBREF20. For instance, BIBREF21 show that power differences are reflected in the echoing of function words; BIBREF22 find that news media prefer to quote locally distinct sentences in political debates. In comparison, our word-level formulation presents a fine-grained view of echoing words, and puts a stronger emphasis on content words than work on linguistic accommodation.
+
+Finally, our work is concerned with an especially challenging problem in social interaction: persuasion. A battery of studies have done work to enhance our understanding of persuasive arguments BIBREF23, BIBREF24, BIBREF25, BIBREF26, BIBREF27, and the area of argumentation mining specifically investigates the structure of arguments BIBREF28, BIBREF29, BIBREF30. We build on previous work by BIBREF31 and leverage the dynamics of /r/ChangeMyView. Although our findings are certainly related to the persuasion process, we focus on understanding the self-described reasons for persuasion, instead of the structure of arguments or the factors that drive effective persuasion.
+
+## Dataset
+
+Our dataset is derived from the /r/ChangeMyView subreddit, which has more than 720K subscribers BIBREF31. /r/ChangeMyView hosts conversations where someone expresses a view and others then try to change that person's mind. Despite being fundamentally based on argument, /r/ChangeMyView has a reputation for being remarkably civil and productive BIBREF32, e.g., a journalist wrote “In a culture of brittle talking points that we guard with our lives, Change My View is a source of motion and surprise” BIBREF33.
+
+The delta mechanism in /r/ChangeMyView allows members to acknowledge opinion changes and enables us to identify explanations for opinion changes BIBREF34. Specifically, it requires “Any user, whether they're the OP or not, should reply to a comment that changed their view with a delta symbol and an explanation of the change.” As a result, we have access to tens of thousands of naturally-occurring explanations and associated explananda. In this work, we focus on the opinion changes of the original posters.
+
+Throughout this paper, we use the following terminology:
+
+[itemsep=-5pt,leftmargin=*,topsep=0pt]
+
+An original post (OP) is an initial post where the original poster justifies his or her opinion. We also use OP to refer to the original poster.
+
+A persuasive comment (PC) is a comment that directly leads to an opinion change on the part of the OP (i.e., winning a $\Delta $).
+
+A top-level comment is a comment that directly replies to an OP, and /r/ChangeMyView requires the top-level comment to “challenge at least one aspect of OP’s stated view (however minor), unless they are asking a clarifying question.”
+
+An explanation is a comment where an OP acknowledges a change in his or her view and provides an explanation of the change. As shown in Table TABREF1, the explanation not only provides a rationale, it can also include other discourse acts, such as expressing gratitude.
+
+Using https://pushshift.io, we collect the posts and comments in /r/ChangeMyView from January 17th, 2013 to January 31st, 2019, and extract tuples of (OP, PC, explanation). We use the tuples from the final six months of our dataset as the test set, those from the six months before that as the validation set, and the remaining tuples as the training set. The sets contain 5,270, 5,831, and 26,617 tuples respectively. Note that there is no overlap in time between the three sets and the test set can therefore be used to assess generalization including potential changes in community norms and world events.
+
+Preprocessing. We perform a number of preprocessing steps, such as converting blockquotes in Markdown to quotes, filtering explicit edits made by authors, mapping all URLs to a special @url@ token, and replacing hyperlinks with the link text. We ignore all triples that contain any deleted comments or posts. We use spaCy for tokenization and tagging BIBREF35. We also use the NLTK implementation of the Porter stemming algorithm to store the stemmed version of each word, for later use in our prediction task BIBREF36, BIBREF37. Refer to the supplementary material for more information on preprocessing.
+
+Data statistics. Table TABREF16 provides basic statistics of the training tuples and how they compare to other comments. We highlight the fact that PCs are on average longer than top-level comments, suggesting that PCs contain substantial counterarguments that directly contribute to opinion change. Therefore, we simplify the problem by focusing on the (OP, PC, explanation) tuples and ignore any other exchanges between an OP and a commenter.
+
+Below, we highlight some notable features of explanations as they appear in our dataset.
+
+The length of explanations shows stronger correlation with that of OPs and PCs than between OPs and PCs (Figure FIGREF8). This observation indicates that explanations are somehow better related with OPs and PCs than PCs are with OPs in terms of language use. A possible reason is that the explainer combines their natural tendency towards length with accommodating the PC.
+
+Explanations have a greater fraction of “pointers” than do persuasive comments (Figure FIGREF8). We measure the likelihood of a word in an explanation being copied from either its OP or PC and provide a similar probability for a PC for copying from its OP. As we discussed in Section SECREF1, the words in an explanation are much more likely to come from the existing discussion than are the words in a PC (59.8% vs 39.0%). This phenomenon holds even if we restrict ourselves to considering words outside quotations, which removes the effect of quoting other parts of the discussion, and if we focus only on content words, which removes the effect of “reusing” stopwords.
+
+Relation between a word being echoed and its document frequency (Figure FIGREF8). Finally, as a preview of our main results, the document frequency of a word from the explanandum is related to the probability of being echoed in the explanation. Although the average likelihood declines as the document frequency gets lower, we observe an intriguing U-shape in the scatter plot. In other words, the words that are most likely to be echoed are either unusually frequent or unusually rare, while most words in the middle show a moderate likelihood of being echoed.
+
+## Understanding the Pointers in Explanations
+
+To further investigate how explanations select words from the explanandum, we formulate a word-level prediction task to predict whether words in an OP or PC are echoed in its explanation. Formally, given a tuple of (OP, PC, explanation), we extract the unique stemmed words as $\mathcal {V}_{\text{OP}}, \mathcal {V}_{\text{PC}}, \mathcal {V}_{\text{EXP}}$. We then define the label for each word in the OP or PC, $w \in \mathcal {V}_{\text{OP}} \cup \mathcal {V}_{\text{PC}}$, based on the explanation as follows:
+
+Our prediction task is thus a straightforward binary classification task at the word level. We develop the following five groups of features to capture properties of how a word is used in the explanandum (see Table TABREF18 for the full list):
+
+[itemsep=0pt,leftmargin=*,topsep=0pt]
+
+Non-contextual properties of a word. These features are derived directly from the word and capture the general tendency of a word being echoed in explanations.
+
+Word usage in an OP or PC (two groups). These features capture how a word is used in an OP or PC. As a result, for each feature, we have two values for the OP and PC respectively.
+
+How a word connects an OP and PC. These features look at the difference between word usage in the OP and PC. We expect this group to be the most important in our task.
+
+General OP/PC properties. These features capture the general properties of a conversation. They can be used to characterize the background distribution of echoing.
+
+Table TABREF18 further shows the intuition for including each feature, and condensed $t$-test results after Bonferroni correction. Specifically, we test whether the words that were echoed in explanations have different feature values from those that were not echoed. In addition to considering all words, we also separately consider stopwords and content words in light of Figure FIGREF8. Here, we highlight a few observations:
+
+[itemsep=0pt,leftmargin=*,topsep=0pt]
+
+Although we expect more complicated words (#characters) to be echoed more often, this is not the case on average. We also observe an interesting example of Simpson's paradox in the results for Wordnet depth BIBREF38: shallower words are more likely to be echoed across all words, but deeper words are more likely to be echoed in content words and stopwords.
+
+OPs and PCs generally exhibit similar behavior for most features, except for part-of-speech and grammatical relation (subject, object, and other.) For instance, verbs in an OP are less likely to be echoed, while verbs in a PC are more likely to be echoed.
+
+Although nouns from both OPs and PCs are less likely to be echoed, within content words, subjects and objects from an OP are more likely to be echoed. Surprisingly, subjects and objects in a PC are less likely to be echoed, which suggests that the original poster tends to refer back to their own subjects and objects, or introduce new ones, when providing explanations.
+
+Later words in OPs and PCs are more likely to be echoed, especially in OPs. This could relate to OPs summarizing their rationales at the end of their post and PCs putting their strongest points last.
+
+Although the number of surface forms in an OP or PC is positively correlated with being echoed, the differences in surface forms show reverse trends: the more surface forms of a word that show up only in the PC (i.e., not in the OP), the more likely a word is to be echoed. However, the reverse is true for the number of surface forms in only the OP. Such contrast echoes BIBREF31, in which dissimilarity in word usage between the OP and PC was a predictive feature of successful persuasion.
+
+## Predicting Pointers
+
+We further examine the effectiveness of our proposed features in a predictive setting. These features achieve strong performance in the word-level classification task, and can enhance neural models in both the word-level task and generating explanations. However, the word-level task remains challenging, especially for content words.
+
+## Predicting Pointers ::: Experiment setup
+
+We consider two classifiers for our word-level classification task: logistic regression and gradient boosting tree (XGBoost) BIBREF39. We hypothesized that XGBoost would outperform logistic regression because our problem is non-linear, as shown in Figure FIGREF8.
+
+To examine the utility of our features in a neural framework, we further adapt our word-level task as a tagging task, and use LSTM as a baseline. Specifically, we concatenate an OP and PC with a special token as the separator so that an LSTM model can potentially distinguish the OP from PC, and then tag each word based on the label of its stemmed version. We use GloVe embeddings to initialize the word embeddings BIBREF40. We concatenate our proposed features of the corresponding stemmed word to the word embedding; the resulting difference in performance between a vanilla LSTM demonstrates the utility of our proposed features. We scale all features to $[0, 1]$ before fitting the models. As introduced in Section SECREF3, we split our tuples of (OP, PC, explanation) into training, validation, and test sets, and use the validation set for hyperparameter tuning. Refer to the supplementary material for additional details in the experiment.
+
+Evaluation metric. Since our problem is imbalanced, we use the F1 score as our evaluation metric. For the tagging approach, we average the labels of words with the same stemmed version to obtain a single prediction for the stemmed word. To establish a baseline, we consider a random method that predicts the positive label with 0.15 probability (the base rate of positive instances).
+
+## Predicting Pointers ::: Prediction Performance
+
+Overall performance (Figure FIGREF28). Although our word-level task is heavily imbalanced, all of our models outperform the random baseline by a wide margin. As expected, content words are much more difficult to predict than stopwords, but the best F1 score in content words more than doubles that of the random baseline (0.286 vs. 0.116). Notably, although we strongly improve on our random baseline, even our best F1 scores are relatively low, and this holds true regardless of the model used. Despite involving more tokens than standard tagging tasks (e.g., BIBREF41 and BIBREF42), predicting whether a word is going to be echoed in explanations remains a challenging problem.
+
+Although the vanilla LSTM model incorporates additional knowledge (in the form of word embeddings), the feature-based XGBoost and logistic regression models both outperform the vanilla LSTM model. Concatenating our proposed features with word embeddings leads to improved performance from the LSTM model, which becomes comparable to XGBoost. This suggests that our proposed features can be difficult to learn with an LSTM alone.
+
+Despite the non-linearity observed in Figure FIGREF8, XGBoost only outperforms logistic regression by a small margin. In the rest of this section, we use XGBoost to further examine the effectiveness of different groups of features, and model performance in different conditions.
+
+Ablation performance (Table TABREF34). First, if we only consider a single group of features, as we hypothesized, the relation between OP and PC is crucial and leads to almost as strong performance in content words as using all features. To further understand the strong performance of OP-PC relation, Figure FIGREF28 shows the feature importance in the ablated model, measured by the normalized total gain (see the supplementary material for feature importance in the full model). A word's occurrence in both the OP and PC is clearly the most important feature, with distance between its POS tag distributions as the second most important. Recall that in Table TABREF18 we show that words that have similar POS behavior between the OP and PC are more likely to be echoed in the explanation.
+
+Overall, it seems that word-level properties contribute the most valuable signals for predicting stopwords. If we restrict ourselves to only information in either an OP or PC, how a word is used in a PC is much more predictive of content word echoing (0.233 vs 0.191). This observation suggests that, for content words, the PC captures more valuable information than the OP. This finding is somewhat surprising given that the OP sets the topic of discussion and writes the explanation.
+
+As for the effects of removing a group of features, we can see that there is little change in the performance on content words. This can be explained by the strong performance of the OP-PC relation on its own, and the possibility of the OP-PC relation being approximated by OP and PC usage. Again, word-level properties are valuable for strong performance in stopwords.
+
+Performance vs. word source (Figure FIGREF28). We further break down the performance by where a word is from. We can group a word based on whether it shows up only in an OP, a PC, or both OP and PC, as shown in Table TABREF1. There is a striking difference between the performance in the three categories (e.g., for all words, 0.63 in OP & PC vs. 0.271 in PC only). The strong performance on words in both the OP and PC applies to stopwords and content words, even accounting for the shift in the random baseline, and recalls the importance of occurring both in OP and PC as a feature.
+
+Furthermore, the echoing of words from the PC is harder to predict (0.271) than from the OP (0.347) despite the fact that words only in PCs are more likely to be echoed than words only in OPs (13.5% vs. 8.6%). The performance difference is driven by stopwords, suggesting that our overall model is better at capturing signals for stopwords used in OPs. This might relate to the fact that the OP and the explanation are written by the same author; prior studies have demonstrated the important role of stopwords for authorship attribution BIBREF43.
+
+Nouns are the most reliably predicted part-of-speech tag within content words (Table TABREF35). Next, we break down the performance by part-of-speech tags. We focus on the part-of-speech tags that are semantically important, namely, nouns, proper nouns, verbs, adverbs, and adjectives.
+
+Prediction performance can be seen as a proxy for how reliably a part-of-speech tag is reused when providing explanations. Consistent with our expectations for the importance of nouns and verbs, our models achieve the best performance on nouns within content words. Verbs are more challenging, but become the least difficult tag to predict when we consider all words, likely due to stopwords such as “have.” Adjectives turn out to be the most challenging category, suggesting that adjectival choice is perhaps more arbitrary than other parts of speech, and therefore less central to the process of constructing an explanation. The important role of nouns in shaping explanations resonates with the high recall rate of nouns in memory tasks BIBREF44.
+
+## Predicting Pointers ::: The Effect on Generating Explanations
+
+One way to measure the ultimate success of understanding pointers in explanations is to be able to generate explanations. We use the pointer generator network with coverage as our starting point BIBREF4, BIBREF46 (see the supplementary material for details). We investigate whether concatenating our proposed features with word embeddings can improve generation performance, as measured by ROUGE scores.
+
+Consistent with results in sequence tagging for word-level echoing prediction, our proposed features can enhance a neural model with copying mechanisms (see Table TABREF37). Specifically, their use leads to statistically significant improvement in ROUGE-1 and ROUGE-L, while slightly hurting the performance in ROUGE-2 (the difference is not statistically significant). We also find that our features can increase the likelihood of copying: an average of 17.59 unique words get copied to the generated explanation with our features, compared to 14.17 unique words without our features. For comparison, target explanations have an average of 34.81 unique words. We emphasize that generating explanations is a very challenging task (evidenced by the low ROUGE scores and examples in the supplementary material), and that fully solving the generation task requires more work.
+
+## Concluding Discussions
+
+In this work, we conduct the first large-scale empirical study of everyday explanations in the context of persuasion. We assemble a novel dataset and formulate a word-level prediction task to understand the selective nature of explanations. Our results suggest that the relation between an OP and PC plays an important role in predicting the echoing of content words, while a word's non-contextual properties matter for stopwords. We show that vanilla LSTMs fail to learn some of the features we develop and that our proposed features can improve the performance in generating explanations using pointer networks. We also demonstrate the important role of nouns in shaping explanations.
+
+Although our approach strongly outperforms random baselines, the relatively low F1 scores indicate that predicting which word is echoed in explanations is a very challenging task. It follows that we are only able to derive a limited understanding of how people choose to echo words in explanations. The extent to which explanation construction is fundamentally random BIBREF47, or whether there exist other unidentified patterns, is of course an open question. We hope that our study and the resources that we release encourage further work in understanding the pragmatics of explanations.
+
+There are many promising research directions for future work in advancing the computational understanding of explanations. First, although /r/ChangeMyView has the useful property that its explanations are closely connected to its explananda, it is important to further investigate the extent to which our findings generalize beyond /r/ChangeMyView and Reddit and establish universal properties of explanations. Second, it is important to connect the words in explanations that we investigate here to the structure of explanations in pyschology BIBREF7. Third, in addition to understanding what goes into an explanation, we need to understand what makes an explanation effective. A better understanding of explanations not only helps develop explainable AI, but also informs the process of collecting explanations that machine learning systems learn from BIBREF48, BIBREF49, BIBREF50.
+
+## Acknowledgments
+
+We thank Kimberley Buchan, anonymous reviewers, and members of the NLP+CSS research group at CU Boulder for their insightful comments and discussions; Jason Baumgartner for sharing the dataset that enabled this research.
+
+## Supplemental Material ::: Preprocessing.
+
+Before tokenizing, we pass each OP, PC, and explanation through a preprocessing pipeline, with the following steps:
+
+Occasionally, /r/ChangeMyView's moderators will edit comments, prefixing their edits with “Hello, users of CMV” or “This is a footnote” (see Table TABREF46). We remove this, and any text that follows on the same line.
+
+We replace URLs with a “@url@” token, defining a URL to be any string which matches the following regular expression: (https?://[^\s)]*).
+
+We replace “$\Delta $” symbols and their analogues—such as “$\delta $”, “&;#8710;”, and “!delta”—with the word “delta”. We also remove the word “delta” from explanations, if the explanation starts with delta.
+
+Reddit–specific prefixes, such as “u/” (denoting a user) and “r/” (denoting a subreddit) are removed, as we observed that they often interfered with spaCy's ability to correctly parse its inputs.
+
+We remove any text matching the regular expression EDIT(.*?):.* from the beginning of the match to the end of that line, as well as variations, such as Edit(.*?):.*.
+
+Reddit allows users to insert blockquoted text. We extract any blockquotes and surround them with standard quotation marks.
+
+We replace all contiguous whitespace with a single space. We also do this with tab characters and carriage returns, and with two or more hyphens, asterisks, or underscores.
+
+Tokenizing the data. After passing text through our preprocessing pipeline, we use the default spaCy pipeline to extract part-of-speech tags, dependency tags, and entity details for each token BIBREF35. In addition, we use NLTK to stem words BIBREF36. This is used to compute all word level features discussed in Section 4 of the main paper.
+
+## Supplemental Material ::: PC Echoing OP
+
+Figure FIGREF49 shows a similar U-shape in the probability of a word being echoed in PC. However, visually, we can see that rare words seem more likely to have high echoing probability in explanations, while that probability is higher for words with moderate frequency in PCs. As PCs tend to be longer than explanations, we also used the echoing probability of the most frequent words to normalize the probability of other words so that they are comparable. We indeed observed a higher likelihood of echoing the rare words, but lower likelihood of echoing words with moderate frequency in explanations than in PCs.
+
+## Supplemental Material ::: Feature Calculation
+
+Given an OP, PC, and explanation, we calculate a 66–dimensional vector for each unique stem in the concatenated OP and PC. Here, we describe the process of calculating each feature.
+
+Inverse document frequency: for a stem $s$, the inverse document frequency is given by $\log \frac{N}{\mathrm {df}_s}$, where $N$ is the total number of documents (here, OPs and PCs) in the training set, and $\mathrm {df}_s$ is the number of documents in the training data whose set of stemmed words contains $s$.
+
+Stem length: the number of characters in the stem.
+
+Wordnet depth (min): starting with the stem, this is the length of the minimum hypernym path to the synset root.
+
+Wordnet depth (max): similarly, this is the length of the maximum hypernym path.
+
+Stem transfer probability: the percentage of times in which a stem seen in the explanandum is also seen in the explanation. If, during validation or testing, a stem is encountered for the first time, we set this to be the mean probability of transfer over all stems seen in the training data.
+
+OP part–of–speech tags: a stem can represent multiple parts of speech. For example, both “traditions” and “traditional” will be stemmed to “tradit.” We count the percentage of times the given stem appears as each part–of–speech tag, following the Universal Dependencies scheme BIBREF53. If the stem does not appear in the OP, each part–of–speech feature will be $\frac{1}{16}$.
+
+OP subject, object, and other: Given a stem $s$, we calculate the percentage of times that $s$'s surface forms in the OP are classified as subjects, objects, or something else by SpaCy. We follow the CLEAR guidelines, BIBREF51 and use the following tags to indicate a subject: nsubj, nsubjpass, csubj, csubjpass, agent, and expl. Objects are identified using these tags: dobj, dative, attr, oprd. If $s$ does not appear at all in the OP, we let subject, object, and other each equal $\frac{1}{3}$.
+
+OP term frequency: the number of times any surface form of a stem appears in the list of tokens that make up the OP.
+
+OP normalized term frequency: the percentage of the OP's tokens which are a surface form of the given stem.
+
+OP # of surface forms: the number of different surface forms for the given stem.
+
+OP location: the average location of each surface form of the given stem which appears in the OP, where the location of a surface form is defined as the percentage of tokens which appear after that surface form. If the stem does not appear at all in the OP, this value is $\frac{1}{2}$.
+
+OP is in quotes: the number of times the stem appears in the OP surrounded by quotation marks.
+
+OP is entity: the percentage of tokens in the OP that are both a surface form for the given stem, and are tagged by SpaCy as one of the following entities: PERSON, NORP, FAC, ORG, GPE, LOC, PRODUCT, EVENT, WORK_OF_ART, LAW, and LANGUAGE.
+
+PC equivalents of features 6-30.
+
+In both OP and PC: 1, if one of the stem's surface forms appears in both the OP and PC. 0 otherwise.
+
+# of unique surface forms in OP: for the given stem, the number of surface forms that appear in the OP, but not in the PC.
+
+# of unique surface forms in PC: for the given stem, the number of surface forms that appear in the PC, but not in the OP.
+
+Stem part–of–speech distribution difference: we consider the concatenation of features 6-21, along with the concatenation of features 31-46, as two distributions, and calculate the Jensen–Shannon divergence between them.
+
+Stem dependency distribution difference: similarly, we consider the concatenation of features 22-24 (OP dependency labels), and the concatenation of features 47-49 (PC dependency labels), as two distributions, and calculate the Jensen–Shannon divergence between them.
+
+OP length: the number of tokens in the OP.
+
+PC length: the number of tokens in the PC.
+
+Length difference: the absolute value of the difference between OP length and PC length.
+
+Avg. word length difference: the difference between the average number of characters per token in the OP and the average number of characters per token in the PC.
+
+OP/PC part–of–speech tag distribution difference: the Jensen–Shannon divergence between the part–of–speech tag distributions of the OP on the one hand, and the PC on the other.
+
+Depth of the PC in the thread: since there can be many back–and–forth replies before a user awards a delta, we number each comment in a thread, starting at 0 for the OP, and incrementing for each new comment before the PC appears.
+
+## Supplemental Material ::: Word–level Prediction Task
+
+For each non–LSTM classifier, we train 11 models: one full model, and forward and backward models for each of the five feature groups. To train, we fit on the training set and use the validation set for hyperparameter tuning.
+
+For the random model, since the echo rate of the training set is 15%, we simply predict 1 with 15% probability, and 0 otherwise.
+
+For logistic regression, we use the lbfgs solver. To tune hyperparameters, we perform an exhaustive grid search, with $C$ taking values from $\lbrace 10^{x}:x\in \lbrace -1, 0, 1, 2, 3, 4\rbrace \rbrace $, and the respective weights of the negative and positive classes taking values from $\lbrace (x, 1-x): x\in \lbrace 0.25, 0.20, 0.15\rbrace \rbrace $.
+
+We also train XGBoost models. Here, we use a learning rate of $0.1$, 1000 estimator trees, and no subsampling. We perform an exhaustive grid search to tune hyperparameters, with the max tree depth equaling 5, 7, or 9, the minimum weight of a child equaling 3, 5, or 7, and the weight of a positive class instance equaling 3, 4, or 5.
+
+Finally, we train two LSTM models, each with a single 300–dimensional hidden layer. Due to efficiency considerations, we eschewed a full search of the parameter space, but experimented with different values of dropout, learning rate, positive class weight, and batch size. We ultimately trained each model for five epochs with a batch size of 32 and a learning rate of 0.001, using the Adam optimizer BIBREF52. We also weight positive instances four times more highly than negative instances.
+
+## Supplemental Material ::: Generating Explanations
+
+We formulate an abstractive summarization task using an OP concatenated with the PC as a source, and the explanation as target. We train two models, one with the features described above, and one without. A shared vocabulary of 50k words is constructed from the training set by setting the maximum encoding length to 500 words. We set the maximum decoding length to 100. We use a pointer generator network with coverage for generating explanations, using a bidirectional LSTM as an encoder and a unidirectional LSTM as a decoder. Both use a 256-dimensional hidden state. The parameters of this network are tuned using a validation set of five thousand instances. We constrain the batch size to 16 and train the network for 20k steps, using the parameters described in Table TABREF82.

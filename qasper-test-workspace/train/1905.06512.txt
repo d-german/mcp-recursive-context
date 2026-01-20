@@ -1,0 +1,224 @@
+# Incorporating Sememes into Chinese Definition Modeling
+
+**Paper ID:** 1905.06512
+
+## Abstract
+
+Chinese definition modeling is a challenging task that generates a dictionary definition in Chinese for a given Chinese word. To accomplish this task, we construct the Chinese Definition Modeling Corpus (CDM), which contains triples of word, sememes and the corresponding definition. We present two novel models to improve Chinese definition modeling: the Adaptive-Attention model (AAM) and the Self- and Adaptive-Attention Model (SAAM). AAM successfully incorporates sememes for generating the definition with an adaptive attention mechanism. It has the capability to decide which sememes to focus on and when to pay attention to sememes. SAAM further replaces recurrent connections in AAM with self-attention and relies entirely on the attention mechanism, reducing the path length between word, sememes and definition. Experiments on CDM demonstrate that by incorporating sememes, our best proposed model can outperform the state-of-the-art method by +6.0 BLEU.
+
+## Introduction
+
+Chinese definition modeling is the task of generating a definition in Chinese for a given Chinese word. This task can benefit the compilation of dictionaries, especially dictionaries for Chinese as a foreign language (CFL) learners.
+
+In recent years, the number of CFL learners has risen sharply. In 2017, 770,000 people took the Chinese Proficiency Test, an increase of 38% from 2016. However, most Chinese dictionaries are for native speakers. Since these dictionaries usually require a fairly high level of Chinese, it is necessary to build a dictionary specifically for CFL learners. Manually writing definitions relies on the knowledge of lexicographers and linguists, which is expensive and time-consuming BIBREF0 , BIBREF1 , BIBREF2 . Therefore, the study on writing definitions automatically is of practical significance.
+
+Definition modeling was first proposed by BIBREF3 as a tool to evaluate different word embeddings. BIBREF4 extended the work by incorporating word sense disambiguation to generate context-aware word definition. Both methods are based on recurrent neural network encoder-decoder framework without attention. In contrast, this paper formulates the definition modeling task as an automatic way to accelerate dictionary compilation.
+
+In this work, we introduce a new dataset for the Chinese definition modeling task that we call Chinese Definition Modeling Corpus cdm(CDM). CDM consists of 104,517 entries, where each entry contains a word, the sememes of a specific word sense, and the definition in Chinese of the same word sense. Sememes are minimum semantic units of word meanings, and the meaning of each word sense is typically composed of several sememes, as is illustrated in Figure 1 . For a given word sense, CDM annotates the sememes according to HowNet BIBREF5 , and the definition according to Chinese Concept Dictionary (CCD) BIBREF6 . Since sememes have been widely used in improving word representation learning BIBREF7 and word similarity computation BIBREF8 , we argue that sememes can benefit the task of definition modeling.
+
+We propose two novel models to incorporate sememes into Chinese definition modeling: the Adaptive-Attention Model (AAM) and the Self- and Adaptive-Attention Model (SAAM). Both models are based on the encoder-decoder framework. The encoder maps word and sememes into a sequence of continuous representations, and the decoder then attends to the output of the encoder and generates the definition one word at a time. Different from the vanilla attention mechanism, the decoder of both models employs the adaptive attention mechanism to decide which sememes to focus on and when to pay attention to sememes at one time BIBREF9 . Following BIBREF3 , BIBREF4 , the AAM is built using recurrent neural networks (RNNs). However, recent works demonstrate that attention-based architecture that entirely eliminates recurrent connections can obtain new state-of-the-art in neural machine translation BIBREF10 , constituency parsing BIBREF11 and semantic role labeling BIBREF12 . In the SAAM, we replace the LSTM-based encoder and decoder with an architecture based on self-attention. This fully attention-based model allows for more parallelization, reduces the path length between word, sememes and the definition, and can reach a new state-of-the-art on the definition modeling task. To the best of our knowledge, this is the first work to introduce the attention mechanism and utilize external resource for the definition modeling task.
+
+In experiments on the CDM dataset we show that our proposed AAM and SAAM outperform the state-of-the-art approach with a large margin. By efficiently incorporating sememes, the SAAM achieves the best performance with improvement over the state-of-the-art method by +6.0 BLEU.
+
+## Methodology
+
+The definition modeling task is to generate an explanatory sentence for the interpreted word. For example, given the word “旅馆” (hotel), a model should generate a sentence like this: “给旅行者提供食宿和其他服务的地方” (A place to provide residence and other services for tourists). Since distributed representations of words have been shown to capture lexical syntax and semantics, it is intuitive to employ word embeddings to generate natural language definitions.
+
+Previously, BIBREF3 proposed several model architectures to generate a definition according to the distributed representation of a word. We briefly summarize their model with the best performance in Section "Experiments" and adopt it as our baseline model.
+
+Inspired by the works that use sememes to improve word representation learning BIBREF7 and word similarity computation BIBREF8 , we propose the idea of incorporating sememes into definition modeling. Sememes can provide additional semantic information for the task. As shown in Figure 1 , sememes are highly correlated to the definition. For example, the sememe “场所” (place) is related with the word “地方” (place) of the definition, and the sememe “旅游” (tour) is correlated to the word “旅行者” (tourists) of the definition.
+
+Therefore, to make full use of the sememes in CDM dataset, we propose AAM and SAAM for the task, in Section "Adaptive-Attention Model" and Section "Self- and Adaptive-Attention Model" , respectively.
+
+## Baseline Model
+
+The baseline model BIBREF3 is implemented with a recurrent neural network based encoder-decoder framework. Without utilizing the information of sememes, it learns a probabilistic mapping $P(y | x)$ from the word $x$ to be defined to a definition $y = [y_1, \dots , y_T ]$ , in which $y_t$ is the $t$ -th word of definition $y$ .
+
+More concretely, given a word $x$ to be defined, the encoder reads the word and generates its word embedding $\mathbf {x}$ as the encoded information. Afterward, the decoder computes the conditional probability of each definition word $y_t$ depending on the previous definition words $y_{<t}$ , as well as the word being defined $x$ , i.e., $P(y_t|y_{<t},x)$ . $P(y_t|y_{<t},x)$ is given as: 
+
+$$& P(y_t|y_{<t},x) \propto \exp {(y_t;\mathbf {z}_t,\mathbf {x})} & \\
+& \mathbf {z}_t = f(\mathbf {z}_{t-1},y_{t-1},\mathbf {x}) &$$   (Eq. 4) 
+
+where $\mathbf {z}_t$ is the decoder's hidden state at time $t$ , $f$ is a recurrent nonlinear function such as LSTM and GRU, and $\mathbf {x}$ is the embedding of the word being defined. Then the probability of $P(y | x)$ can be computed according to the probability chain rule: 
+
+$$P(y | x) = \prod _{t=1}^{T} P(y_t|y_{<t},x)$$   (Eq. 5) 
+
+We denote all the parameters in the model as $\theta $ and the definition corpus as $D_{x,y}$ , which is a set of word-definition pairs. Then the model parameters can be learned by maximizing the log-likelihood: 
+
+$$\hat{\theta } = \mathop {\rm argmax}_{\theta } \sum _{\langle x, y \rangle \in D_{x,y}}\log P(y | x; \theta ) $$   (Eq. 6) 
+
+## Adaptive-Attention Model
+
+Our proposed model aims to incorporate sememes into the definition modeling task. Given the word to be defined $x$ and its corresponding sememes $s=[s_1, \dots , s_N ]$ , we define the probability of generating the definition $y=[y_1, \dots , y_t ]$ as: 
+
+$$P(y | x, s) = \prod _{t=1}^{T} P(y_t|y_{<t},x,s) $$   (Eq. 8) 
+
+Similar to Eq. 6 , we can maximize the log-likelihood with the definition corpus $D_{x,s,y}$ to learn model parameters: 
+
+$$\hat{\theta } = \mathop {\rm argmax}_{\theta } \sum _{\langle x,s,y \rangle \in D_{x,s,y}}\log P(y | x, s; \theta ) $$   (Eq. 9) 
+
+The probability $P(y | x, s)$ can be implemented with an adaptive attention based encoder-decoder framework, which we call Adaptive-Attention Model (AAM). The new architecture consists of a bidirectional RNN as the encoder and a RNN decoder that adaptively attends to the sememes during decoding a definition.
+
+Similar to BIBREF13 , the encoder is a bidirectional RNN, consisting of forward and backward RNNs. Given the word to be defined $x$ and its corresponding sememes $s=[s_1, \dots , s_N ]$ , we define the input sequence of vectors for the encoder as $\mathbf {v}=[\mathbf {v}_1,\dots ,\mathbf {v}_{N}]$ . The vector $\mathbf {v}_n$ is given as follows: 
+
+$$\mathbf {v}_n = [\mathbf {x}; \mathbf {s}_n ]$$   (Eq. 11) 
+
+where $\mathbf {x}$ is the vector representation of the word $x$ , $\mathbf {s}_n$ is the vector representation of the $n$ -th sememe $s_n$ , and $[\mathbf {a};\mathbf {b}]$ denote concatenation of vector $\mathbf {a}$ and $\mathbf {b}$ .
+
+The forward RNN $\overrightarrow{f}$ reads the input sequence of vectors from $\mathbf {v}_1$ to $\mathbf {v}_N$ and calculates a forward hidden state for position $n$ as: 
+
+$$\overrightarrow{\mathbf {h}_{n}} &=& f(\mathbf {v}_n, \overrightarrow{\mathbf {h}_{n-1}})$$   (Eq. 12) 
+
+where $f$ is an LSTM or GRU. Similarly, the backward RNN $\overleftarrow{f}$ reads the input sequence of vectors from $\mathbf {v}_N$ to $\mathbf {v}_1$ and obtain a backward hidden state for position $n$ as: 
+
+$$\overleftarrow{\mathbf {h}_{n}} &=& f(\mathbf {h}_n, \overleftarrow{\mathbf {h}_{n+1}})$$   (Eq. 13) 
+
+In this way, we obtain a sequence of encoder hidden states $\mathbf {h}=\left[\mathbf {h}_1,...,\mathbf {h}_N\right]$ , by concatenating the forward hidden state $\overrightarrow{\mathbf {h}_{n}}$ and the backward one $\overleftarrow{\mathbf {h}_{n}}$ at each position $n$ : 
+
+$$\mathbf {h}_n=\left[\overrightarrow{\mathbf {h}_{n}}, \overleftarrow{\mathbf {h}_{n}}\right]$$   (Eq. 14) 
+
+The hidden state $\mathbf {h}_n$ captures the sememe- and word-aware information of the $n$ -th sememe.
+
+As attention-based neural encoder-decoder frameworks have shown great success in image captioning BIBREF14 , document summarization BIBREF15 and neural machine translation BIBREF13 , it is natural to adopt the attention-based recurrent decoder in BIBREF13 as our decoder. The vanilla attention attends to the sememes at every time step. However, not all words in the definition have corresponding sememes. For example, sememe “住下” (reside) could be useful when generating “食宿” (residence), but none of the sememes is useful when generating “提供” (provide). Besides, language correlations make the sememes unnecessary when generating words like “和” (and) and “给” (for).
+
+Inspired by BIBREF9 , we introduce the adaptive attention mechanism for the decoder. At each time step $t$ , we summarize the time-varying sememes' information as sememe context, and the language model's information as LM context. Then, we use another attention to obtain the context vector, relying on either the sememe context or LM context.
+
+More concretely, we define each conditional probability in Eq. 8 as: 
+
+$$& P(y_t|y_{<t},x,s) \propto \exp {(y_t;\mathbf {z}_t,\mathbf {c}_t)} &  \\
+& \mathbf {z}_t = f(\mathbf {z}_{t-1},y_{t-1},\mathbf {c}_t) & $$   (Eq. 17) 
+
+where $\mathbf {c}_t$ is the context vector from the output of the adaptive attention module at time $t$ , $\mathbf {z}_t$ is a decoder's hidden state at time $t$ .
+
+To obtain the context vector $\mathbf {c}_t$ , we first compute the sememe context vector $\hat{\mathbf {c}_t}$ and the LM context $\mathbf {o}_t$ . Similar to the vanilla attention, the sememe context $\hat{\mathbf {c}_t}$ is obtained with a soft attention mechanism as: 
+
+$$\hat{\mathbf {c}_t} = \sum _{n=1}^{N} \alpha _{tn} \mathbf {h}_n,$$   (Eq. 18) 
+
+where 
+
+$$\alpha _{tn} &=& \frac{\mathrm {exp}(e_{tn})}{\sum _{i=1}^{N} \mathrm {exp}(e_{ti})} \nonumber \\
+e_{tn} &=& \mathbf {w}_{\hat{c}}^T[\mathbf {h}_n; \mathbf {z}_{t-1}].$$   (Eq. 19) 
+
+Since the decoder's hidden states store syntax and semantic information for language modeling, we compute the LM context $\mathbf {o}_t$ with a gated unit, whose input is the definition word $y_t$ and the previous hidden state $\mathbf {z}_{t-1}$ : 
+
+$$\mathbf {g}_t &=& \sigma (\mathbf {W}_g [y_{t-1}; \mathbf {z}_{t-1}] + \mathbf {b}_g) \nonumber \\
+\mathbf {o}_t &=& \mathbf {g}_t \odot \mathrm {tanh} (\mathbf {z}_{t-1}) $$   (Eq. 20) 
+
+Once the sememe context vector $\hat{\mathbf {c}_t}$ and the LM context $\mathbf {o}_t$ are ready, we can generate the context vector with an adaptive attention layer as: 
+
+$$\mathbf {c}_t = \beta _t \mathbf {o}_t + (1-\beta _t)\hat{\mathbf {c}_t}, $$   (Eq. 21) 
+
+where 
+
+$$\beta _{t} &=& \frac{\mathrm {exp}(e_{to})}{\mathrm {exp}(e_{to})+\mathrm {exp}(e_{t\hat{c}})} \nonumber \\
+e_{to} &=& (\mathbf {w}_c)^T[\mathbf {o}_t;\mathbf {z}_t] \nonumber \\
+e_{t\hat{c}} &=& (\mathbf {w}_c)^T[\hat{\mathbf {c}_t};\mathbf {z}_t] $$   (Eq. 22) 
+
+ $\beta _{t}$ is a scalar in range $[0,1]$ , which controls the relative importance of LM context and sememe context.
+
+Once we obtain the context vector $\mathbf {c}_t$ , we can update the decoder's hidden state and generate the next word according to Eq. and Eq. 17 , respectively.
+
+## Self- and Adaptive-Attention Model
+
+Recent works demonstrate that an architecture entirely based on attention can obtain new state-of-the-art in neural machine translation BIBREF10 , constituency parsing BIBREF11 and semantic role labeling BIBREF12 . SAAM adopts similar architecture and replaces the recurrent connections in AAM with self-attention. Such architecture not only reduces the training time by allowing for more parallelization, but also learns better the dependency between word, sememes and tokens of the definition by reducing the path length between them.
+
+Given the word to be defined $x$ and its corresponding ordered sememes $s=[s_1, \dots , s_{N}]$ , we combine them as the input sequence of embeddings for the encoder, i.e., $\mathbf {v}=[\mathbf {v}_0, \mathbf {v}_1, \dots , \mathbf {v}_{N}]$ . The $n$ -th vector $\mathbf {v}_n$ is defined as: 
+
+$$\mathbf {v}_n =
+{\left\lbrace \begin{array}{ll}
+\mathbf {x}, &n=0 \cr \mathbf {s}_n, &n>0
+\end{array}\right.}$$   (Eq. 25) 
+
+where $\mathbf {x}$ is the vector representation of the given word $x$ , and $\mathbf {s}_n$ is the vector representation of the $n$ -th sememe $s_n$ .
+
+Although the input sequence is not time ordered, position $n$ in the sequence carries some useful information. First, position 0 corresponds to the word to be defined, while other positions correspond to the sememes. Secondly, sememes are sorted into a logical order in HowNet. For example, as the first sememe of the word “旅馆” (hotel), the sememe “场所” (place) describes its most important aspect, namely, the definition of “旅馆” (hotel) should be “…… 的地方” (a place for ...). Therefore, we add learned position embedding to the input embeddings for the encoder: 
+
+$$\mathbf {v}_n = \mathbf {v}_n + \mathbf {p}_n$$   (Eq. 26) 
+
+where $\mathbf {p}_n$ is the position embedding that can be learned during training.
+
+Then the vectors $\mathbf {v}=[\mathbf {v}_0, \mathbf {v}_1, \dots , \mathbf {v}_{N}]$ are transformed by a stack of identical layers, where each layers consists of two sublayers: multi-head self-attention layer and position-wise fully connected feed-forward layer. Each of the layers are connected by residual connections, followed by layer normalization BIBREF16 . We refer the readers to BIBREF10 for the detail of the layers. The output of the encoder stack is a sequence of hidden states, denoted as $\mathbf {h}=[\mathbf {h}_0, \mathbf {h}_1, \dots , \mathbf {h}_{N}]$ .
+
+The decoder is also composed of a stack of identical layers. In BIBREF10 , each layer includes three sublayers: masked multi-head self-attention layer, multi-head attention layer that attends over the output of the encoder stack and position-wise fully connected feed-forward layer. In our model, we replace the two multi-head attention layers with an adaptive multi-head attention layer. Similarly to the adaptive attention layer in AAM, the adaptive multi-head attention layer can adaptivelly decide which sememes to focus on and when to attend to sememes at each time and each layer. Figure 2 shows the architecture of the decoder.
+
+Different from the adaptive attention layer in AAM that uses single head attention to obtain the sememe context and gate unit to obtain the LM context, the adaptive multi-head attention layer utilizes multi-head attention to obtain both contexts. Multi-head attention performs multiple single head attentions in parallel with linearly projected keys, values and queries, and then combines the outputs of all heads to obtain the final attention result. We omit the detail here and refer the readers to BIBREF10 . Formally, given the hidden state $\mathbf {z}_t^{l-1}$ at time $t$ , layer $l-1$ of the decoder, we obtain the LM context with multi-head self-attention: 
+
+$$\mathbf {o}_t^l = \textit {MultiHead}(\mathbf {z}_t^{l-1},\mathbf {z}_{\le t}^{l-1},\mathbf {z}_{\le t}^{l-1})$$   (Eq. 28) 
+
+where the decoder's hidden state $\mathbf {z}_t^{l-1}$ at time $t$ , layer $l-1$ is the query, and $\mathbf {z}_{\le t}^{l-1}=[\mathbf {z}_1^{l-1},...,\mathbf {z}_t^{l-1}]$ , the decoder's hidden states from time 1 to time $t$ at layer $l-1$ , are the keys and values. To obtain better LM context, we employ residual connection and layer normalization after the multi-head self-attention. Similarly, the sememe context can be computed by attending to the encoder's outputs with multi-head attention: 
+
+$$\hat{\mathbf {c}_t}^l = \textit {MultiHead}(\mathbf {o}_t^l,\mathbf {h},\mathbf {h})$$   (Eq. 29) 
+
+where $\mathbf {o}_t^l$ is the query, and the output from the encoder stack $\mathbf {h}=[\mathbf {h}_0, \mathbf {h}_1, \dots , \mathbf {h}_{N}]$ , are the values and keys.
+
+Once obtaining the sememe context vector $\hat{\mathbf {c}_t}^l$ and the LM context $\mathbf {o}_t^l$ , we compute the output from the adaptive attention layer with: 
+
+$$\mathbf {c}_t^l = \beta _t^l \mathbf {o}_t^l + (1-\beta _t^l)\hat{\mathbf {c}_t}^l, $$   (Eq. 30) 
+
+where 
+
+$$\beta _{t}^l &=& \frac{\mathrm {exp}(e_{to})}{\mathrm {exp}(e_{to})+\mathrm {exp}(e_{t\hat{c}})} \nonumber \\
+e_{to}^l &=& (\mathbf {w}_c^l)^T[\mathbf {o}_t^l;\mathbf {z}_t^{l-1}] \nonumber \\
+e_{t\hat{c}}^l &=& (\mathbf {w}_c^l)^T[\hat{\mathbf {c}_t}^l;\mathbf {z}_t^{l-1}] $$   (Eq. 31) 
+
+## Experiments
+
+In this section, we will first introduce the construction process of the CDM dataset, then the experimental results and analysis.
+
+## Dataset
+
+To verify our proposed models, we construct the CDM dataset for the Chinese definition modeling task. cdmEach entry in the dataset is a triple that consists of: the interpreted word, sememes and a definition for a specific word sense, where the sememes are annotated with HowNet BIBREF5 , and the definition are annotated with Chinese Concept Dictionary (CCD) BIBREF6 .
+
+Concretely, for a common word in HowNet and CCD, we first align its definitions from CCD and sememe groups from HowNet, where each group represents one word sense. We define the sememes of a definition as the combined sememes associated with any token of the definition. Then for each definition of a word, we align it with the sememe group that has the largest number of overlapping sememes with the definition's sememes. With such aligned definition and sememe group, we add an entry that consists of the word, the sememes of the aligned sememe group and the aligned definition. Each word can have multiple entries in the dataset, especially the polysemous word. To improve the quality of the created dataset, we filter out entries that the definition contains the interpreted word, or the interpreted word is among function words, numeral words and proper nouns.
+
+After processing, we obtain the dataset that contains 104,517 entries with 30,052 unique interpreted words. We divide the dataset according to the unique interpreted words into training set, validation set and test set with a ratio of 18:1:1. Table 1 shows the detailed data statistics.
+
+## Settings
+
+We show the effectiveness of all models on the CDM dataset. All the embeddings, including word and sememe embedding, are fixed 300 dimensional word embeddings pretrained on the Chinese Gigaword corpus (LDC2011T13). All definitions are segmented with Jiaba Chinese text segmentation tool and we use the resulting unique segments as the decoder vocabulary. To evaluate the difference between the generated results and the gold-standard definitions, we compute BLEU score using a script provided by Moses, following BIBREF3 . We implement the Baseline and AAM by modifying the code of BIBREF9 , and SAAM with fairseq-py .
+
+We use two-layer LSTM network as the recurrent component. We set batch size to 128, and the dimension of the hidden state to 300 for the decoder. Adam optimizer is employed with an initial learning rate of $1\times 10^{-3}$ . Since the morphemes of the word to be defined can benefit definition modeling, BIBREF3 obtain the model with the best performance by adding a trainable embedding from character-level CNN to the fixed word embedding. To obtain the state-of-the-art result as the baseline, we follow BIBREF3 and experiment with the character-level CNN with the same hyperparameters.
+
+To be comparable with the baseline, we also use two-layer LSTM network as the recurrent component.We set batch size to 128, and the dimension of the hidden state to 300 for both the encoder and the decoder. Adam optimizer is employed with an initial learning rate of $1\times 10^{-3}$ .
+
+We have the same hyperparameters as BIBREF10 , and set these hyperparameters as $(d_{\text{model}}=300, d_{\text{hidden}}=2048, n_{\text{head}}=5, n_{\text{layer}}=6)$ . To be comparable with AAM, we use the same batch size as 128. We also employ label smoothing technique BIBREF17 with a smoothing value of 0.1 during training.
+
+## Results
+
+We report the experimental results on CDM test set in Figure 3 . It shows that both of our proposed models, namely AAM and SAAM, achieve good results and outperform the baseline by a large margin. With sememes, AAM and SAAM can improve over the baseline with +3.1 BLEU and +6.65 BLEU, respectively.
+
+We also find that sememes are very useful for generating the definition. The incorporation of sememes improves the AAM with +3.32 BLEU and the SAAM with +3.53 BLEU. This can be explained by that sememes help to disambiguate the word sense associated with the target definition.
+
+Among all models, SAAM which incorporates sememes achieves the new state-of-the-art, with a BLEU score of 36.36 on the test set, demonstrating the effectiveness of sememes and the architecture of SAAM.
+
+Table 2 lists some example definitions generated with different models. For each word-sememes pair, the generated three definitions are ordered according to the order: Baseline, AAM and SAAM. For AAM and SAAM, we use the model that incorporates sememes. These examples show that with sememes, the model can generate more accurate and concrete definitions. For example, for the word “旅馆” (hotel), the baseline model fails to generate definition containing the token “旅行者”(tourists). However, by incoporating sememes' information, especially the sememe “旅游” (tour), AAM and SAAM successfully generate “旅行者”(tourists). Manual inspection of others examples also supports our claim.
+
+We also conduct an ablation study to evaluate the various choices we made for SAAM. We consider three key components: position embedding, the adaptive attention layer, and the incorporated sememes. As illustrated in table 3 , we remove one of these components and report the performance of the resulting model on validation set and test set. We also list the performance of the baseline and AAM for reference.
+
+It demonstrates that all components benefit the SAAM. Removing position embedding is 0.31 BLEU below the SAAM on the test set. Removing the adaptive attention layer is 0.43 BLEU below the SAAM on the test set. Sememes affects the most. Without incoporating sememes, the performance drops 3.53 BLEU on the test set.
+
+## Definition Modeling
+
+Distributed representations of words, or word embeddings BIBREF18 were widely used in the field of NLP in recent years. Since word embeddings have been shown to capture lexical semantics, BIBREF3 proposed the definition modeling task as a more transparent and direct representation of word embeddings. This work is followed by BIBREF4 , who studied the problem of word ambiguities in definition modeling by employing latent variable modeling and soft attention mechanisms. Both works focus on evaluating and interpreting word embeddings. In contrast, we incorporate sememes to generate word sense aware word definition for dictionary compilation.
+
+## Knowledge Bases
+
+Recently many knowledge bases (KBs) are established in order to organize human knowledge in structural forms. By providing human experiential knowledge, KBs are playing an increasingly important role as infrastructural facilities of natural language processing.
+
+HowNet BIBREF19 is a knowledge base that annotates each concept in Chinese with one or more sememes. HowNet plays an important role in understanding the semantic meanings of concepts in human languages, and has been widely used in word representation learning BIBREF7 , word similarity computation BIBREF20 and sentiment analysis BIBREF21 . For example, BIBREF7 improved word representation learning by utilizing sememes to represent various senses of each word and selecting suitable senses in contexts with an attention mechanism.
+
+Chinese Concept Dictionary (CCD) is a WordNet-like semantic lexicon BIBREF22 , BIBREF23 , where each concept is defined by a set of synonyms (SynSet). CCD has been widely used in many NLP tasks, such as word sense disambiguation BIBREF23 .
+
+In this work, we annotate the word with aligned sememes from HowNet and definition from CCD.
+
+## Self-Attention
+
+Self-attention is a special case of attention mechanism that relates different positions of a single sequence in order to compute a representation for the sequence. Self-attention has been successfully applied to many tasks recently BIBREF24 , BIBREF25 , BIBREF26 , BIBREF10 , BIBREF12 , BIBREF11 .
+
+ BIBREF10 introduced the first transduction model based on self-attention by replacing the recurrent layers commonly used in encoder-decoder architectures with multi-head self-attention. The proposed model called Transformer achieved the state-of-the-art performance on neural machine translation with reduced training time. After that, BIBREF12 demonstrated that self-attention can improve semantic role labeling by handling structural information and long range dependencies. BIBREF11 further extended self-attention to constituency parsing and showed that the use of self-attention helped to analyze the model by making explicit the manner in which information is propagated between different locations in the sentence.
+
+Self-attention has many good properties. It reduces the computation complexity per layer, allows for more parallelization and reduces the path length between long-range dependencies in the network. In this paper, we use self-attention based architecture in SAAM to learn the relations of word, sememes and definition automatically.
+
+## Conclusion
+
+We introduce the Chinese definition modeling task that generates a definition in Chinese for a given word and sememes of a specific word sense. This task is useful for dictionary compilation. To achieve this, we constructed the CDM dataset with word-sememes-definition triples. We propose two novel methods, AAM and SAAM, to generate word sense aware definition by utilizing sememes. In experiments on the CDM dataset we show that our proposed AAM and SAAM outperform the state-of-the-art approach with a large margin. By efficiently incorporating sememes, the SAAM achieves the best performance with improvement over the state-of-the-art method.

@@ -1,0 +1,67 @@
+# Attention Optimization for Abstractive Document Summarization
+
+**Paper ID:** 1910.11491
+
+## Abstract
+
+Attention plays a key role in the improvement of sequence-to-sequence-based document summarization models. To obtain a powerful attention helping with reproducing the most salient information and avoiding repetitions, we augment the vanilla attention model from both local and global aspects. We propose an attention refinement unit paired with local variance loss to impose supervision on the attention model at each decoding step, and a global variance loss to optimize the attention distributions of all decoding steps from the global perspective. The performances on the CNN/Daily Mail dataset verify the effectiveness of our methods.
+
+## Introduction
+
+Abstractive document summarization BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4 attempts to produce a condensed representation of the most salient information of the document, aspects of which may not appear as parts of the original input text. One popular framework used in abstractive summarization is the sequence-to-sequence model introduced by BIBREF5. The attention mechanism BIBREF6 is proposed to enhance the sequence-to-sequence model by allowing salient features to dynamically come to the forefront as needed to make up for the incapability of memorizing the long input source.
+
+However, when it comes to longer documents, basic attention mechanism may lead to distraction and fail to attend to the relatively salient parts. Therefore, some works focus on designing various attentions to tackle this issue BIBREF2, BIBREF7. We follow this line of research and propose an effective attention refinement unit (ARU). Consider the following case. Even with a preliminary idea of which parts of source document should be focused on (attention), sometimes people may still have trouble in deciding which exact part should be emphasized for the next word (the output of the decoder). To make a more correct decision on what to write next, people always adjust the concentrated content by reconsidering the current state of what has been summarized already. Thus, ARU is designed as an update unit based on current decoding state, aiming to retain the attention on salient parts but weaken the attention on irrelevant parts of input.
+
+The de facto standard attention mechanism is a soft attention that assigns attention weights to all input encoder states, while according to previous work BIBREF8, BIBREF9, a well-trained hard attention on exact one input state is conducive to more accurate results compared to the soft attention. To maintain good performance of hard attention as well as the advantage of end-to-end trainability of soft attention, we introduce a local variance loss to encourage the model to put most of the attention on just a few parts of input states at each decoding step. Additionally, we propose a global variance loss to directly optimize the attention from the global perspective by preventing assigning high weights to the same locations multiple times. The global variance loss is somewhat similar with the coverage mechanism BIBREF10, BIBREF11, which is also designed for solving the repetition problem. The coverage mechanism introduces a coverage vector to keep track of previous decisions at each decoding step and adds it into the attention calculation. However, when the high attention on certain position is wrongly assigned during previous timesteps, the coverage mechanism hinders the correct assignment of attention in later steps.
+
+We conduct our experiments on the CNN/Daily Mail dataset and achieve comparable results on ROUGE BIBREF12 and METEOR BIBREF13 with the state-of-the-art models. Our model surpasses the strong pointer-generator baseline (w/o coverage) BIBREF11 on all ROUGE metrics by a large margin. As far as we know, we are the first to introduce explicit loss functions to optimize the attention. More importantly, the idea behind our model is simple but effective. Our proposal could be applied to improve other attention-based models, which we leave these explorations for the future work.
+
+## Proposed model ::: Model Architecture
+
+We adopt the Pointer-Generator Network (PGN) BIBREF11 as our baseline model, which augments the standard attention-based seq2seq model with a hybrid pointer network BIBREF14. An input document is firstly fed into a Bi-LSTM encoder, then an uni-directional LSTM is used as the decoder to generate the summary word by word. At each decoding step, the attention distribution $a_t$ and the context vector $c_t$ are calculated as follows:
+
+where $h_i$ and $s_t$ are the hidden states of the encoder and decoder, respectively. Then, the token-generation softmax layer reads the context vector $c_t$ and current hidden state $s_t$ as inputs to compute the vocabulary distribution. To handle OOVs, we inherit the pointer mechanism to copy rare or unseen words from the input document (refer to BIBREF11 for more details).
+
+To augment the vanilla attention model, we propose the Attention Refinement Unit (ARU) module to retain the attention on the salient parts while weakening the attention on the irrelevant parts of input. As illustrated in Figure FIGREF5, the attention weight distribution $a_t$ at timestep $t$ (the first red histogram) is fed through the ARU module. In the ARU module, current decoding state $s_t$ and attention distribution $a_t$ are combined to calculate a refinement gate $r_t$:
+
+where $\sigma $ is the sigmoid activation function, $W_{s}^{r}$, $W_{a}^r$ and $b_r$ are learnable parameters. $r_t$ represents how much degree of the current attention should be updated. Small value of $r_{ti}$ indicates that the content of $i$-th position is not much relevant to current decoding state $s_t$, and the attention on $i$-th position should be weakened to avoid confusing the model. The attention distribution is updated as follows (the symbol $\odot $ means element-wise product):
+
+## Proposed model ::: Local Variance Loss
+
+As discussed in section SECREF1, the attention model putting most of attention weight on just a few parts of the input tends to achieve good performance. Mathematically, when only a small number of values are large, the shape of the distribution is sharp and the variance of the attention distribution is large. Drawing on the concept of variance in mathematics, local variance loss is defined as the reciprocal of its variance expecting the attention model to be able to focus on more salient parts. The standard variance calculation is based on the mean of the distribution. However, as previous work BIBREF15, BIBREF16 mentioned that the median value is more robust to outliers than the mean value, we use the median value to calculate the variance of the attention distribution. Thus, local variance loss can be calculated as:
+
+where $\hat{\cdot }$ is a median operator and $\epsilon $ is utilized to avoid zero in the denominator.
+
+## Proposed model ::: Global Variance Loss
+
+To avoid the model attending to the same parts of the input states repeatedly, we propose another variance loss to adjust the attention distribution globally. Ideally, the same locations should be assigned a relatively high attention weight once at most. Different from the coverage mechanism BIBREF11, BIBREF10 tracking attention distributions of previous timesteps, we maintain the sum of attention distributions over all decoder timesteps, denoted as $A$. The $i$-th value of $A$ represents the accumulated attention that the input state at $i$-th position has received throughout the whole decoding process. Without repeated high attention being paid to the same location, the difference between the sum of attention weight and maximum attention weight of $i$-th input state among all timesteps should be small. Moreover, the whole distribution of the difference over all input positions should have a flat shape. Similar to the definition of local variance loss, the global variance loss is formulated as:
+
+where $g_i$ represents the difference between the accumulated attention weight and maximum attention weight at $i$-th position.
+
+## Proposed model ::: Model Training
+
+The model is firstly pre-trained to minimize the maximum-likelihood loss, which is widely used in sequence generation tasks. We define $y^* = \lbrace y^*_1, \cdots , y_T^*\rbrace $ as the ground-truth output sequence for a given input sequence $x$, then the loss function is formulated as:
+
+After converging, the model is further optimized with local variance loss and global variance loss. The mix of loss functions is:
+
+where $\lambda _1$ and $\lambda _2$ are hyper-parameters.
+
+-0.13cm
+
+## Experiments ::: Preliminaries ::: Dataset and Metrics.
+
+We conduct our model on the large-scale dataset CNN/Daily Mail BIBREF19, BIBREF1, which is widely used in the task of abstractive document summarization with multi-sentences summaries. We use the scripts provided by BIBREF11 to obtain the non-anonymized version of the dataset without preprocessing to replace named entities. The dataset contains 287,226 training pairs, 13,368 validation pairs and 11,490 test pairs in total. We use the full-length ROUGE F1 and METEOR as our main evaluation metrics.
+
+## Experiments ::: Preliminaries ::: Implementation Details.
+
+The data preprocessing is the same as PGN BIBREF11, and we randomly initialize the word embeddings. The hidden states of the encoder and the decoder are both 256-dimensional and the embedding size is also 256. Adagrad with learning rate 0.15 and an accumulator with initial value 0.1 are used to train the model. We conduct experiments on a single Tesla P100 GPU with a batch size of 64 and it takes about 50000 iterations for pre-training and 10000 iterations for fine-tuning. Beam search size is set to 4 and trigram avoidance BIBREF17 is used to avoid trigram-level repetition. Tuned on validation set, $\lambda _1$ and $\lambda _2$ in the loss function (Equation. DISPLAY_FORM12) is set to 0.3 and 0.1, respectively.
+
+## Experiments ::: Automatic Evaluation Result
+
+As shown in Table TABREF13 (the performance of other models is collected from their papers), our model exceeds the PGN baseline by 3.85, 2.1 and 3.37 in terms of R-1, R-2 and R-L respectively and receives over 3.23 point boost on METEOR. FastAbs BIBREF3 regards ROUGE scores as reward signals with reinforcement learning, which brings a great performance gain. DCA BIBREF4 proposes deep communicating agents with reinforcement setting and achieves the best results on CNN/Daily Mail. Although our experimental results have not outperformed the state-of-the-art models, our model has a much simpler structure with fewer parameters. Besides, these simple methods do yield a boost in performance compared with PGN baseline and may be applied on other models with attention mechanism.
+
+We further evaluate how these optimization approaches work. The results at the bottom of Table TABREF13 verify the effectiveness of our proposed methods. The ARU module has achieved a gain of 0.97 ROUGE-1, 0.35 ROUGE-2, and 0.64 ROUGE-L points; the local variance loss boosts the model by 3.01 ROUGE-1, 1.6 ROUGE-2, and 2.58 ROUGE-L. As shown in Figure FIGREF22, the global variance loss helps with eliminating n-gram repetitions, which verifies its effectiveness.
+
+## Experiments ::: Human Evaluation and Case Study
+
+We also conduct human evaluation on the generated summaries. Similar to the previous work BIBREF3, BIBREF20, we randomly select 100 samples from the test set of CNN/Daily Mail dataset and ask 3 human testers to measure relevance and readability of each summary. Relevance is based on how much salient information does the summary contain, and readability is based on how fluent and grammatical the summary is. Given an article, different people may have different understandings of the main content of the article, the ideal situation is that more than one reference is paired with the articles. However, most of summarization datasets contain the pairs of article with a single reference summary due to the cost of annotating multi-references. Since we use the reference summaries as target sequences to train the model and assume that they are the gold standard, we give both articles and reference summaries to the annotator to score the generated summaries. In other words, we compare the generated summaries against the reference ones and the original article to obtain the (relative) scores in Table 3. Each perspective is assessed with a score from 1 (worst) to 5 (best). The result in Table TABREF21 demonstrate that our model performs better under both criteria w.r.t. BIBREF11. Additionally, we show the example of summaries generated by our model and baseline model in Table TABREF23. As can be seen from the table, PGN suffers from repetition and fails to obtain the salient information. Though with coverage mechanism solving saliency and repetition problem, it generates many trivial facts. With ARU, the model successfully concentrates on the salient information, however, it also suffers from serious repetition problem. Further optimized by the variance loss, our model can avoid repetition and generate summary with salient information. Besides, our generated summary contains fewer trivial facts compared to the PGN+Coverage model.

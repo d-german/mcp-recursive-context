@@ -1,0 +1,193 @@
+# Joint Event and Temporal Relation Extraction with Shared Representations and Structured Prediction
+
+**Paper ID:** 1909.05360
+
+## Abstract
+
+We propose a joint event and temporal relation extraction model with shared representation learning and structured prediction. The proposed method has two advantages over existing work. First, it improves event representation by allowing the event and relation modules to share the same contextualized embeddings and neural representation learner. Second, it avoids error propagation in the conventional pipeline systems by leveraging structured inference and learning methods to assign both the event labels and the temporal relation labels jointly. Experiments show that the proposed method can improve both event extraction and temporal relation extraction over state-of-the-art systems, with the end-to-end F1 improved by 10% and 6.8% on two benchmark datasets respectively.
+
+## Introduction
+
+The extraction of temporal relations among events is an important natural language understanding (NLU) task that can benefit many downstream tasks such as question answering, information retrieval, and narrative generation. The task can be modeled as building a graph for a given text, whose nodes represent events and edges are labeled with temporal relations correspondingly. Figure FIGREF1 illustrates such a graph for the text shown therein. The nodes assassination, slaughtered, rampage, war, and Hutu are the candidate events, and different types of edges specify different temporal relations between them: assassination is BEFORE rampage, rampage INCLUDES slaughtered, and the relation between slaughtered and war is VAGUE. Since “Hutu” is actually not an event, a system is expected to annotate the relations between “Hutu” and all other nodes in the graph as NONE (i.e., no relation).
+
+As far as we know, all existing systems treat this task as a pipeline of two separate subtasks, i.e., event extraction and temporal relation classification, and they also assume that gold events are given when training the relation classifier BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5. Specifically, they built end-to-end systems that extract events first and then predict temporal relations between them (Fig. FIGREF1). In these pipeline models, event extraction errors will propagate to the relation classification step and cannot be corrected afterwards. Our first contribution is the proposal of a joint model that extracts both events and temporal relations simultaneously (see Fig. FIGREF1). The motivation is that if we train the relation classifier with NONE relations between non-events, then it will potentially have the capability of correcting event extraction mistakes. For instance in Fig. FIGREF1, if the relation classifier predicts NONE for (Hutu, war) with a high confidence, then this is a strong signal that can be used by the event classifier to infer that at least one of them is not an event.
+
+Our second contribution is that we improve event representations by sharing the same contextualized embeddings and neural representation learner between the event extraction and temporal relation extraction modules for the first time. On top of the shared embeddings and neural representation learner, the proposed model produces a graph-structured output representing all the events and relations in the given sentences. A valid graph prediction in this context should satisfy two structural constraints. First, the temporal relation should always be NONE between two non-events or between one event and one non-event. Second, for those temporal relations among events, no loops should exist due to the transitive property of time (e.g., if A is before B and B is before C, then A must be before C). The validity of a graph is guaranteed by solving an integer linear programming (ILP) optimization problem with those structural constraints, and our joint model is trained by structural support vector machines (SSVM) in an end-to-end fashion.
+
+Results show that, according to the end-to-end $F_1$ score for temporal relation extraction, the proposed method improves CAEVO BIBREF3 by 10% on TB-Dense, and improves CogCompTime BIBREF6 by 6.8% on MATRES. We further show ablation studies to confirm that the proposed joint model with shared representations and structured learning is very effective for this task.
+
+## Related Work
+
+In this section we briefly summarize the existing work on event extraction and temporal relation extraction. To the best of our knowledge, there is no prior work on joint event and relation extraction, so we will review joint entity and relation extraction works instead.
+
+Existing event extraction methods in the temporal relation domain, as in the TempEval3 workshop BIBREF2, all use conventional machine learning models (logistic regression, SVM, or Max-entropy) with hand-engineered features (e.g., ClearTK BIBREF7 and NavyTime BIBREF8). While other domains have shown progress on event extraction using neural methods BIBREF9, BIBREF10, BIBREF11, recent progress in the temporal relation domain is focused more on the setting where gold events are provided. Therefore, we first show the performance of a neural event extractor on this task, although it is not our main contribution.
+
+Early attempts on temporal relation extraction use local pair-wise classification with hand-engineered features BIBREF12, BIBREF0, BIBREF13, BIBREF14. Later efforts, such as ClearTK BIBREF7, UTTime BIBREF15, NavyTime BIBREF8, and CAEVO BIBREF3 improve earlier work with better linguistic and syntactic rules. BIBREF16, BIBREF4, BIBREF17 explore structured learning for this task, and more recently, neural methods have also been shown effective BIBREF18, BIBREF19, BIBREF20, BIBREF5.
+
+In practice, we need to extract both events and those temporal relations among them from raw text. All the works above treat this as two subtasks that are solved in a pipeline. To the best of our knowledge, there has been no existing work on joint event-temporal relation extraction. However, the idea of “joint” has been studied for entity-relation extraction in many works. BIBREF21 frame their joint model as table filling tasks, map tabular representation into sequential predictions with heuristic rules, and construct global loss to compute the best joint predictions. BIBREF22 define a global structure for joint entity and relation extraction, encode local and global features based on domain and linguistic knowledge. and leverage beam-search to find global optimal assignments for entities and relations. BIBREF23 leverage LSTM architectures to jointly predict both entity and relations, but fall short on ensuring prediction consistency. BIBREF24 combine the benefits of both neural net and global optimization with beam search. Motivated by these works, we propose an end-to-end trainable neural structured support vector machine (neural SSVM) model to simultaneously extract events and their relations from text and ensure the global structure via ILP constraints. Next, we will describe in detail our proposed method.
+
+## Joint Event-Relation Extraction Model
+
+In this section we first provide an overview of our neural SSVM model, and then describe each component in our framework in detail (i.e., the multi-tasking neural scoring module, and how inference and learning are performed). We denote the set of all possible relation labels (including NONE) as $\mathcal {R}$, all event candidates (both events and non-events) as $\mathcal {E}$, and all relation candidates as $\mathcal {E}\mathcal {E}$.
+
+## Joint Event-Relation Extraction Model ::: Neural SSVM
+
+Our neural SSVM adapts the SSVM loss as:
+
+where $\bar{S}^n_{\mathcal {E}} = S(\hat{y}^n_\mathcal {E}; x^n) - S(y^n_\mathcal {E};x^n)$ and $\bar{S}^n_{\mathcal {R}} = S(\hat{y}^n_\mathcal {R}; x^n) - S(y^n_\mathcal {R};x^n)$ ; $\Phi $ denotes model parameters, $n$ indexes instances, $M^n = |\mathcal {E}|^n + |\mathcal {E}\mathcal {E}|^n$ denotes the total number of relations $|\mathcal {E}|^n$ and events $|\mathcal {E}\mathcal {E}|^n$ in instance $n$. $y^n,\hat{y}^n$ denote the gold and predicted global assignments of events and relations for instance $n$—each of which consists of either one hot vector representing true and predicted relation labels $y_{\mathcal {R}}^n, \hat{y}_{\mathcal {R}}^n \in \lbrace 0, 1\rbrace ^{|\mathcal {E}\mathcal {E}|}$, or entity labels $y_{\mathcal {E}}^n, \hat{y}_{\mathcal {E}}^n \in \lbrace 0, 1\rbrace ^{|\mathcal {E}|}$. A maximum a posteriori probability (MAP) inference is needed to find $\hat{y}^n$, which we formulate as an interger linear programming (ILP) problem and describe more details in Section SECREF12. $\Delta (y^n, \hat{y}^n)$ is a distance measurement between the gold and the predicted assignments; we simply use the Hamming distance. $C$ and $C_{\mathcal {E}}$ are the hyper-parameters to balance the losses between event, relation and the regularizer, and $S(y^n_\mathcal {E};x^n), S(y^n_\mathcal {R};x^n)$ are scoring functions, which we design a multi-tasking neural architecture to learn. The intuition behind the SSVM loss is that it requires the score of gold output structure $y^n$ to be greater than the score of the best output structure under the current model $\hat{y}^n$ with a margin $\Delta (y^n, \hat{y}^n)$ or else there will be some loss. The training objective is to minimize the loss.
+
+The major difference between our neural-SSVM and the traditional SSVM model is the scoring function. Traditional SSVM uses a linear function over hand-crafted features to compute the scores, whereas we propose to use a recurrent neural network to estimate the scoring function and train the entire architecture end-to-end.
+
+## Joint Event-Relation Extraction Model ::: Multi-Tasking Neural Scoring Function
+
+The recurrent neural network (RNN) architecture has been widely adopted by prior temporal extraction work to encode context information BIBREF18, BIBREF19, BIBREF20. Motivated by these works, we adopt a RNN-based scoring function for both event and relation prediction in order to learn features in a data driven way and capture long-term contexts in the input. In Fig. FIGREF6, we skip the input layer for simplicity.
+
+The bottom layer corresponds to contextualized word representations denoted as $v_k$. We use ($i, j$) $\in \mathcal {E}\mathcal {E}$ to denote a candidate relation and $i \in \mathcal {E}$ to indicate a candidate event in the input sentences of length N. We fix word embeddings computed by a pre-trained BERT-base model BIBREF27. They are then fed into a BiLSTM layer to further encode task-specific contextual information. Both event and relation tasks share this layer.
+
+The event scorer is illustrated by the left two branches following the BiLSTM layer. We simply concatenate both forward and backward hidden vectors to encode the context of each token. As for the relation scorer shown in the right branches, for each pair ($i,j$) we take the forward and backward hidden vectors corresponding to them, $f_i, b_i, f_j, b_j$, and concatenate them with linguistic features as in previous event relation prediction research. We denote linguistic features as $L_{i,j}$ and only use simple features provided in the original datasets: token distance, tense, and polarity of events.
+
+Finally, all hidden vectors and linguistic features are concatenated to form the input to compute the probability of being an event or a softmax distribution over all possible relation labels—which we refer to as the RNN-based scoring function in the following sections.
+
+## Joint Event-Relation Extraction Model ::: MAP Inference
+
+A MAP inference is needed both during training to obtain $\hat{y}^n$ in the loss function (Equation DISPLAY_FORM8), as well as during the test time to get globally coherent assignments. We formulate the inference problem as an ILP problem. The inference framework is established by constructing a global objective function using scores from local scorers and imposing several global constraints: 1) one-label assignment, 2) event-relation consistency, and 3) symmetry and transitivity as in BIBREF28, BIBREF29, BIBREF30, BIBREF31, BIBREF4.
+
+## Joint Event-Relation Extraction Model ::: MAP Inference ::: Objective Function
+
+The objective function of the global inference is to find the global assignment that has the highest probability under the current model, as specified in Equation DISPLAY_FORM14:
+
+where $y^e_k$ is a binary indicator of whether the $k$-th candidate is an event or not, and $y^r_{i,j}$ is a binary indicator specifying whether the global prediction of the relation between $(i,j)$ is $r \in \mathcal {R}$. $S(y^e_k,x), \forall e \in \lbrace 0, 1\rbrace $ and $S(y^r_{i,j},x), \forall r \in \mathcal {R}$ are the scoring functions obtained from the event and relation scoring functions, respectively. The output of the global inference $\bf {\hat{y}}$ is a collection of optimal label assignments for all events and relation candidates in a fixed context. $C_{\mathcal {E}}$ is a hyper-parameter controlling weights between relation and event. The constraint that follows immediately from the objective function is that the global inference should only assign one label for all entities and relations.
+
+## Joint Event-Relation Extraction Model ::: MAP Inference ::: Constraints
+
+We introduce several additional constraints to ensure the resulting optimal output graph forms a valid and plausible event graph.
+
+## Joint Event-Relation Extraction Model ::: MAP Inference ::: Constraints ::: Event-Relation Consistency.
+
+Event and relation prediction consistency is defined with the following property: a pair of input tokens have a positive temporal relation if and only if both tokens are events. The following global constraints will satisfy this property,
+
+where $e^P_i$ denotes an event and $e^N_i$ denotes a non-event token. $r^P_{i,j}$ indicates positive relations: BEFORE, AFTER, SIMULTANEOUS, INCLUDES, IS_INCLUDED, VAGUE and $r^N_{i,j}$ indicate a negative relation, i.e., NONE. A formal proof of this property can be found in Appendix A.
+
+## Joint Event-Relation Extraction Model ::: MAP Inference ::: Constraints ::: Symmetry and Transitivity Constraint.
+
+We also explore the symmetry and transitivity constraints of relations. They are specified as follows:
+
+Intuitively, the symmetry constraint forces two pairs of events with flipping orders to have reversed relations. For example, if $r_{i,j}$ = BEFORE, then $r_{j,i}$ = AFTER. The transitivity constraint rules that if ($i,j$), ($j,k$) and ($i,k$) pairs exist in the graph, the label (relation) prediction of ($i,k$) pair has to fall into the transitivity set specifyed by ($i,j$) and ($j,k$) pairs. The full transitivity table can be found in BIBREF25.
+
+## Joint Event-Relation Extraction Model ::: Learning
+
+We begin by experimenting with optimizing SSVM loss directly, but model performance degrades. Therefore, we develop a two-state learning approach which first trains a pipeline version of the joint model without feedback from global constraints. In other words, the local neural scoring functions are optimized with cross-entropy loss using gold events and relation candidates that are constructed directly from the outputs of the event model. During the second stage, we switch to the global SSVM loss function in Equation DISPLAY_FORM8 and re-optimize the network to adjust for global properties. We will provide more details in Section SECREF4.
+
+## Implementation Details
+
+In this section we describe implementation details of the baselines and our four models to build an end-to-end event temporal relation extraction system with an emphasis on the structured joint model. In Section SECREF6 we will compare and contrast them and show why our proposed structured joint model works the best.
+
+## Implementation Details ::: Baselines
+
+We run two event and relation extraction systems, CAEVO BIBREF3 and CogCompTime BIBREF6, on TB-Dense and MATRES, respectively. These two methods both leverage conventional learning algorithms (i.e., MaxEnt and averaged perceptron, respectively) based on manually designed features to obtain separate models for events and temporal relations, and conduct end-to-end relation extraction as a pipeline. Note BIBREF3 does not report event and end-to-end temporal relation extraction performances, so we calculate the scores per our implementation.
+
+## Implementation Details ::: End-to-End Event Temporal Relation Extraction ::: Single-Task Model.
+
+The most basic way to build an end-to-end system is to train separate event detection and relation prediction models with gold labels, as we mentioned in our introduction. In other words, the BiLSTM layer is not shared as in Fig. FIGREF6. During evaluation and test time, we use the outputs from the event detection model to construct relation candidates and apply the relation prediction model to make the final prediction.
+
+## Implementation Details ::: End-to-End Event Temporal Relation Extraction ::: Multi-Task Model.
+
+This is the same as the single-task model except that the BiLSTM layer is now shared for both event and relation tasks. Note that both single-task and multi-task models are not trained to tackle the NONE relation directly. They both rely on the predictions of the event model to annotate relations as either positive pairs or NONE.
+
+## Implementation Details ::: End-to-End Event Temporal Relation Extraction ::: Pipeline Joint Model.
+
+This shares the same architecture as the multi-task model, except that during training, we use the predictions of the event model to construct relation candidates to train the relation model. This strategy will generate NONE pairs during training if one argument of the relation candidate is not an event. These NONE pairs will help the relation model to distinguish negative relations from positive ones, and thus become more robust to event prediction errors. We train this model with gold events and relation candidates during the first several epochs in order to obtain a relatively accurate event model and switch to a pipeline version afterwards inspired by BIBREF23.
+
+## Implementation Details ::: End-to-End Event Temporal Relation Extraction ::: Structured Joint Model.
+
+This is described in detail in Section SECREF3. However, we experience difficulties in training the model with SSVM loss from scratch. This is due to large amounts of non-event tokens, and the model is not capable of distinguishing them in the beginning. We thus adopt a two-stage learning procedure where we take the best pipeline joint model and re-optimize it with the SSVM loss.
+
+To restrict the search space for events in the ILP inference of the SSVM loss, we use the predicted probabilities from the event detection model to filter out non-events since the event model has a strong performance, as shown in Section SECREF6. Note that this is very different from the pipeline model where events are first predicted and relations are constructed with predicted events. Here, we only leverage an additional hyper-parameter $T_{evt}$ to filter out highly unlikely event candidates. Both event and relation labels are assigned simutaneously during the global inference with ILP, as specified in Section SECREF12. We also filter out tokens with POS tags that do not appear in the training set as most of the events are either nouns or verbs in TB-Dense, and all events are verbs in MATRES.
+
+## Implementation Details ::: End-to-End Event Temporal Relation Extraction ::: Hyper-Parameters.
+
+All single-task, multi-task and pipeline joint models are trained by minimizing cross-entropy loss. We observe that model performances vary significantly with dropout ratio, hidden layer dimensions of the BiLSTM model and entity weight in the loss function (with relation weight fixed at 1.0). We leverage a pre-trained BERT model to compute word embedding and all MLP scoring functions have one hidden layer. In the SSVM loss function, we fix the value of $C = 1$, but fine-tune $C_\mathcal {E}$ in the objective function in Equation DISPLAY_FORM14. Hyper-parameters are chosen using a standard development set for TB-Dense and a random holdout-set based on an 80/20 split of training data for MATRES. To solve ILP in the inference process, we leverage an off-the-shelf solver provided by Gurobi optimizer; i.e. the best solutions from the Gurobi optimizer are inputs to the global training. The best combination of hyper-parameters can be found in Table 9 in our appendix.
+
+## Experimental Setup
+
+In this section we first provide a brief overview of temporal relation data and describe the specific datasets used in this paper. We also explain the evaluation metrics at the end.
+
+## Experimental Setup ::: Temporal Relation Data
+
+Temporal relation corpora such as TimeBank BIBREF32 and RED BIBREF33 facilitate the research in temporal relation extraction. The common issue in these corpora is missing annotations. Collecting densely annotated temporal relation corpora with all events and relations fully annotated is reported to be a challenging task as annotators could easily overlook some facts BIBREF34, BIBREF35, BIBREF3, BIBREF4, which made both modeling and evaluation extremely difficult in previous event temporal relation research.
+
+The TB-Dense dataset mitigates this issue by forcing annotators to examine all pairs of events within the same or neighboring sentences, and it has been widely evaluated on this task BIBREF3, BIBREF4, BIBREF19, BIBREF5. Recent data construction efforts such as MATRES BIBREF25 further enhance the data quality by using a multi-axis annotation scheme and adopting a start-point of events to improve inter-annotator agreements. We use TB-Dense and MATRES in our experiments and briefly summarize the data statistics in Table TABREF33.
+
+## Experimental Setup ::: Evaluation Metrics
+
+To be consistent with previous research, we adopt two different evaluation metrics. The first one is the standard micro-average scores. For densely annotated data, the micro-average metric should share the same precision, recall and F1 scores. However, since our joint model includes NONE pairs, we follow the convention of IE tasks and exclude them from evaluation. The second one is similar except that we exclude both NONE and VAGUE pairs following BIBREF6. Please refer to Figure 4 in the appendix for a visualizations of the two metrics.
+
+## Results and Analysis
+
+The main results of this paper can be found in Table TABREF34. All best-recall and F1 scores are achieved by our structured joint model, and the results outperform the baseline systems by 10.0% and 6.8% on end-to-end relation extraction per F1 scores and 3.5% and 2.6% on event extraction per F1 scores. The best precision score for the TB-Dense dataset is achieved by CAEVO, which indicates that the linguistic rule-based system can make highly precise predictions by being conservative.
+
+Table TABREF35 shows a more detailed analysis, in which we can see that our single-task models with BERT embeddings and a BiLSTM encoder already outperform the baseline systems on end-to-end relation extraction tasks by 4.9% and 4.4% respectively. In the following sections we discuss step-by-step improvement by adopting multi-task, pipeline joint, and structured joint models on end-to-end relation extraction, event extraction, and relation extraction on gold event pairs.
+
+## Results and Analysis ::: End-to-End Relation Extraction ::: TB-Dense.
+
+The improvements over the single-task model per F1 score are 4.1% and 4.2% for the multi-task and pipeline joint model respectively. This indicates that the pipeline joint model is helpful only marginally. Table TABREF46 shows that the structured joint model improves both precision and recall scores for BEFORE and AFTER and achieves the best end-to-end relation extraction performance at 49.4%—which outperforms the baseline system by 10.0% and the single-task model by 5.1%.
+
+## Results and Analysis ::: End-to-End Relation Extraction ::: MATRES.
+
+Compared to the single-task model, the multi-task model improves F1 scores by 1.5%, while the pipeline joint model improves F1 scores by 1.3%—which means that pipeline joint training does not bring any gains for MATRES. The structured joint model reaches the best end-to-end F1 score at 59.6%, which outperforms the baseline system by 6.8% and the single-task model by 2.4%. We speculate that the gains come from the joint model's ability to help deal with NONE pairs, since recall scores for BEFORE and AFTER increase by 1.5% and 1.1% respectively (Table 10 in our appendix).
+
+## Results and Analysis ::: Event Extraction ::: TB-Dense.
+
+Our structured joint model out-performs the CAEVO baseline by 3.5% and the single-task model by 1.3%. Improvements on event extraction can be difficult because our single-task model already works quite well with a close-to 89% F1 score, while the inter-annotator agreement for events in TimeBank documents is merely 87% BIBREF2.
+
+## Results and Analysis ::: Event Extraction ::: MATRES.
+
+The structured model outperforms the the baseline model and the single-task model by 2.6% and 0.9% respectively. However, we observe that the multi-task model has a slight drop in event extraction performance over the single-task model (86.4% vs. 86.9%). This indicates that incorporating relation signals are not particularly helpful for event extraction on MATRES. We speculate that one of the reasons could be the unique event characteristics in MATERS. As we described in Section SECREF32, all events in MATRES are verbs. It is possible that a more concentrated single-task model works better when events are homogeneous, whereas a multi-task model is more powerful when we have a mixture of event types, e.g., both verbs and nouns as in TB-Dense.
+
+## Results and Analysis ::: Relation Extraction with Gold Events ::: TB-Dense.
+
+There is much prior work on relation extraction based on gold events in TB-Dense. meng2018context proposed a neural model with global information that achieved the best results as far as we know. The improvement of our single-task model over that baseline is mostly attributable to the adoption of BERT embedding. We show that sharing the LSTM layer for both events and relations can help further improve performance of the relation classification task by 2.6%. For the joint models, since we do not train them on gold events, the evaluation would be meaningless. We simply skip this evaluation.
+
+## Results and Analysis ::: Relation Extraction with Gold Events ::: MATRES.
+
+Both single-task and multi-task models outperform the baseline by nearly 10%, while the improvement of multi-task over single task is marginal. In MATRES, a relation pair is equivalent to a verb pair, and thus the event prediction task probably does not provide much more information for relation extraction.
+
+In Table TABREF46 we further show the breakdown performances for each positive relation on TB-Dense. The breakdown on MATRES is shown in Table 10 in the appendix. BEFORE, AFTER and VAGUE are the three dominant label classes in TB-Dense. We observe that the linguistic rule-based model, CAEVO, tends to have a more evenly spread-out performance, whereas our neural network-based models are more likely to have concentrated predictions due to the imbalance of the training sample across different label classes.
+
+## Results and Analysis ::: Discussion ::: Label Imbalance.
+
+One way to mitigate the label imbalance issue is to increase the sample weights for small classes during model training. We investigate the impact of class weights by refitting our single-task model with larger weights on INCLUDES, IS_INCLUDED and VAGUE in the cross-entropy loss.
+
+Figure FIGREF50 shows that increasing class weights up to 4 times can significantly improve the F1 scores of INCLUDES and IS_INCLUDED classes with a decrease less than 2% for the overall F1 score. Performance of INCLUDES and IS_INCLUDED eventually degrades when class weights are too large. These results seem to suggest that more labels are needed in order to improve the performance on both of these two classes and the overall model. For SIMULTANEOUS, our model does not make any correct predictions for both TB-DENSE and MATRES by increasing class weight up to 10 times, which implies that SIMULTANEOUS could be a hard temporal relation to predict in general.
+
+## Results and Analysis ::: Discussion ::: Global Constraints.
+
+In Table TABREF51 we conduct an ablation study to understand the contributions from the event-relation prediction consistency constraint and the temporal relation transitivity constraint for the structured joint model. As we can see, the event-relation consistency help s improve the F1 scores by 0.9% and 1% for TB-Dense and MATRES, respectively, but the gain by using transitivity is either non-existing or marginal. We hypothesize two potential reasons: 1) We leveraged BERT contextualized embedding as word representation, which could tackle transitivity in the input context; 2) NONE pairs could make transitivity rule less useful, as positive pairs can be predicted as NONE and transitivity rule does not apply to NONE pairs.
+
+## Results and Analysis ::: Discussion ::: Error Analysis.
+
+By comparing gold and predicted labels for events and temporal relations and examining predicted probabilities for events, we identified three major sources of mistakes made by our structured model, as illustrated in Table TABREF57 with examples.
+
+## Results and Analysis ::: Discussion ::: Type 1.
+
+Both events in Ex 1 are assigned low scores by the event module ($<< 0.01$). Although the structured joint model is designed to predict events and relations jointly, we leverage the event module to filter out tokens with scores lower than a threshold. Consequently, some true events can be mistakenly predicted as non-events, and the relation pairs including them are automatically assigned NONE.
+
+## Results and Analysis ::: Discussion ::: Type 2.
+
+In Ex 2 the event module assigns high scores to tokens happened (0.97) and according (0.89), but according is not an event. When the structured model makes inference jointly, the decision will weigh heavily towards assigning 1 (event) to both tokens. With the event-relation consistency constraint, this pair is highly likely to be predicted as having a positive temporal relation. Nearly all mistakes made in this category follow the same pattern illustrated by this example.
+
+## Results and Analysis ::: Discussion ::: Type 3.
+
+The existence of VAGUE makes temporal relation prediction challenging as it can be easily confused with other temporal relations, as shown in Ex 3. This challenge is compounded with NONE in our end-to-end extraction task.
+
+Type 1 and Type 2 errors suggest that building a stronger event detection module will be helpful for both event and temporal relation extraction tasks. To improve the performance on VAGUE pairs, we could either build a stronger model that incorporates both contextual information and commonsense knowledge or create datasets with annotations that better separate VAGUE from other positive temporal relations.
+
+## Conclusion
+
+In this paper we investigate building an end-to-end event temporal relation extraction system. We propose a novel neural structured prediction model with joint representation learning to make predictions on events and relations simultaneously; this can avoid error propagation in previous pipeline systems. Experiments and comparative studies on two benchmark datasets show that the proposed model is effective for end-to-end event temporal relation extraction. Specifically, we improve the performances of previously published systems by 10% and 6.8% on the TB-Dense and MATRES datasets, respectively.
+
+Future research can focus on creating more robust structured constraints between events and relations, especially considering event types, to improve the quality of global assignments using ILP. Since a better event model is generally helpful for relation extraction, another promising direction would be to incorporate multiple datasets to enhance the performance of our event extraction systems.
+
+## Acknowledgements
+
+This work is supported in part by Contracts W911NF-15-1-0543 and HR0011-18-2-0052 with the US Defense Advanced Research Projects Agency (DARPA). Approved for Public Release, Distribution Unlimited. The views expressed are those of the authors and do not reflect the official policy or position of the Department of Defense or the U.S. Government.

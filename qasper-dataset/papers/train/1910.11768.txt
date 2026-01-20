@@ -1,0 +1,161 @@
+# Exploring Multilingual Syntactic Sentence Representations
+
+**Paper ID:** 1910.11768
+
+## Abstract
+
+We study methods for learning sentence embeddings with syntactic structure. We focus on methods of learning syntactic sentence-embeddings by using a multilingual parallel-corpus augmented by Universal Parts-of-Speech tags. We evaluate the quality of the learned embeddings by examining sentence-level nearest neighbours and functional dissimilarity in the embedding space. We also evaluate the ability of the method to learn syntactic sentence-embeddings for low-resource languages and demonstrate strong evidence for transfer learning. Our results show that syntactic sentence-embeddings can be learned while using less training data, fewer model parameters, and resulting in better evaluation metrics than state-of-the-art language models.
+
+## Introduction
+
+Recent success in language modelling and representation learning have largely focused on learning the semantic structures of language BIBREF0. Syntactic information, such as part-of-speech (POS) sequences, is an essential part of language and can be important for tasks such as authorship identification, writing-style analysis, translation, etc. Methods that learn syntactic representations have received relatively less attention, with focus mostly on evaluating the semantic information contained in representations produced by language models.
+
+Multilingual embeddings have been shown to achieve top performance in many downstream tasks BIBREF1, BIBREF2. By training over large corpora, these models have shown to generalize to similar but unseen contexts. However, words contain multiple types of information: semantic, syntactic, and morphologic. Therefore, it is possible that syntactically different passages have similar embeddings due to their semantic properties. On tasks like the ones mentioned above, discriminating using patterns that include semantic information may result in poor generalization, specially when datasets are not sufficiently representative.
+
+In this work, we study methods that learn sentence-level embeddings that explicitly capture syntactic information. We focus on variations of sequence-to-sequence models BIBREF3, trained using a multilingual corpus with universal part-of-speech (UPOS) tags for the target languages only. By using target-language UPOS tags in the training process, we are able to learn sentence-level embeddings for source languages that lack UPOS tagging data. This property can be leveraged to learn syntactic embeddings for low-resource languages.
+
+Our main contributions are: to study whether sentence-level syntactic embeddings can be learned efficiently, to evaluate the structure of the learned embedding space, and to explore the potential of learning syntactic embeddings for low-resource languages.
+
+We evaluate the syntactic structure of sentence-level embeddings by performing nearest-neighbour (NN) search in the embedding space. We show that these embeddings exhibit properties that correlate with similarities between UPOS sequences of the original sentences. We also evaluate the embeddings produced by language models such as BERT BIBREF0 and show that they contain some syntactic information.
+
+We further explore our method in the few-shot setting for low-resource source languages without large, high quality treebank datasets. We show its transfer-learning capabilities on artificial and real low-resource languages.
+
+Lastly, we show that training on multilingual parallel corpora significantly improves the learned syntactic embeddings. This is similar to existing results for models trained (or pre-trained) on multiple languages BIBREF4, BIBREF2 for downstream tasks BIBREF5.
+
+## Related Work
+
+Training semantic embeddings based on multilingual data was studied by MUSE BIBREF1 and LASER BIBREF2 at the word and sentence levels respectively. Multi-task training for disentangling semantic and syntactic information was studied in BIBREF6. This work also used a nearest neighbour method to evaluate the syntactic properties of models, though their focus was on disentanglement rather than embedding quality.
+
+The syntactic content of language models was studied by examining syntax trees BIBREF7, subject-object agreement BIBREF8, and evaluation on syntactically altered datasets BIBREF9, BIBREF10. These works did not examine multilingual models.
+
+Distant supervision BIBREF11, BIBREF12 has been used to learn POS taggers for low-resource languages using cross-lingual corpora. The goal of these works is to learn word-level POS tags, rather than sentence-level syntactic embeddings. Furthermore, our method does not require explicit POS sequences for the low-resource language, which results in a simpler training process than distant supervision.
+
+## Method ::: Architecture
+
+We iterated upon the model architecture proposed in LASER BIBREF2. The model consists of a two-layer Bi-directional LSTM (BiLSTM) encoder and a single-layer LSTM decoder. The encoder is language agnostic as no language context is provided as input. In contrast to LASER, we use the concatenation of last hidden and cell states of the encoder to initialize the decoder through a linear projection.
+
+At each time-step, the decoder takes an embedding of the previous POS target concatenated with an embedding representing the language context, as well as a max-pooling over encoder outputs. Figure FIGREF2 shows the architecture of the proposed model.
+
+The input embeddings for the encoder were created using a jointly learned Byte-Pair-Encoding (BPE) vocabulary BIBREF13 for all languages by using sentencepiece.
+
+## Method ::: Training
+
+Training was performed using an aligned parallel corpus. Given a source-target aligned sentence pair (as in machine translation), we:
+
+Convert the sentence in the source language into BPE
+
+Look up embeddings for BPE as the input to the encoder
+
+Convert the sentence in a target language into UPOS tags, in the tagset of the target language.
+
+Use the UPOS tags in step 3 as the targets for a cross-entropy loss.
+
+Hence, the task is to predict the UPOS sequence computed from the translated input sentence.
+
+The UPOS targets were obtained using StandfordNLP BIBREF14 . Dropout with a drop probability of 0.2 was applied to the encoder. The Adam optimizer BIBREF15 was used with a constant learning rate of $0.0001$. Table TABREF4 shows a full list of the hyperparameters used in the training procedure.
+
+## Method ::: Dataset
+
+To create our training dataset, we followed an approach similar to LASER. The dataset contains 6 languages: English, Spanish, German, Dutch, Korean and Chinese Mandarin. These languages use 3 different scripts, 2 different language orderings, and belong to 4 language families.
+
+English, Spanish, German, and Dutch use a Latin-based script. However, Spanish is a Romantic language while the others are Germanic languages. Chinese Mandarin and Korean are included because they use non-latin based scripts and originate from language families distinct from the other languages. Although the grammatical rules vary between the selected languages, they share a number of key characteristics such as the Subject-Verb-Object ordering, except Korean (which mainly follows the Subject-Object-Verb order). We hope to extend our work to other languages with different scripts and sentence structures, such as Arabic, Japanese, Hindi, etc. in the future.
+
+The dataset was created by using translations provided by Tatoeba and OpenSubtitles BIBREF16. They were chosen for their high availability in multiple languages.
+
+Statistics of the final training dataset are shown in Table TABREF14. Rows and columns correspond to source and target languages respectively.
+
+## Method ::: Dataset ::: Tatoeba
+
+Tatoeba is a freely available crowd-annotated dataset for language learning. We selected all sentences in English, Spanish, German, Dutch, and Korean. We pruned the dataset to contain only sentences with at least one translation to any of the other languages. The final training set contains 1.36M translation sentence pairs from this source.
+
+## Method ::: Dataset ::: OpenSubtitles
+
+We augmented our training data by using the 2018 OpenSubtitles dataset. OpenSubtitles is a publicly available dataset based on movie subtitles BIBREF16. We created our training dataset from selected aligned subtitles by taking the unique translations among the first million sentences, for each aligned parallel corpus. We further processed the data by pruning to remove samples with less than 3 words, multiple sentences, or incomplete sentences. The resulting dataset contains 1.9M translation sentence pairs from this source.
+
+## Experiments
+
+We aim to address the following questions:
+
+Can syntactic structures be embedded? For multiple languages?
+
+Can parallel corpora be used to learn syntactic structure for low-resource languages?
+
+Does multilingual pre-training improve syntactic embeddings?
+
+We address question 1 in Secs. SECREF20 and SECREF28 by evaluating the quality of syntactic and semantic embeddings in several ways. Questions 2 and 3 are addressed in Sec. SECREF30 by studying the transfer-learning performance of syntactic embeddings.
+
+## Experiments ::: Quality of Syntactic Embeddings
+
+We studied the quality of the learned syntactic embeddings by using a nearest-neighbour (NN) method.
+
+First, we calculated the UPOS sequence of all sentences in the Tatoeba dataset by using a tagger. Sentences were then assigned to distinct groups according to their UPOS sequence, i.e., all sentences belonging to the same group had the same UPOS sequence.
+
+For all languages except Korean, a held-out test set was created by randomly sampling groups that contained at least 6 sentences. For Korean, all groups containing at least 6 sentences were kept as the test set since the dataset is small.
+
+During evaluation, we applied max-pooling to the outputs of the encoder to obtain the syntactic embeddings of the held-out sentences.
+
+For each syntactic embedding, we find its top nearest neighbour (1-NN) and top-5 nearest neighbours (5-NN) in the embedding space for the held-out sentences, based on their UPOS group.
+
+Given $n$ sentences $S = \lbrace s_0, \dots , s_{n-1}\rbrace $ and their embeddings $E = \lbrace e_0, \dots , e_{n-1}\rbrace $, for each $s_i$ there is a set of $k$ gold nearest neighbours $G(i, k) = \lbrace g_0, \dots , g_{k-1}\rbrace $, $G(i, k) \subseteq S$ such that $d(s_i, g) \le d(s_i, s) \textrm { for all } g \in G(i, k) \textrm { and } s \in S \setminus G(i, k)$, where $d(\cdot , \cdot )$ is the cosine distance.
+
+Given embedding $e_i$, we calculate cosine distances $\lbrace d(e_i, e_j) \textrm { for } e_j \in E, e_j \ne e_i\rbrace $ and sort them into non-decreasing order $d_{j_0} \le d_{j_1} \le \dots \le d_{j_{n-2}}$. We consider the ordering to be unique as the probability of embedding cosine distances being equal is very small.
+
+The set of embedded $k$-nearest neighbours of $s_i$ is defined as
+
+Finally, the $k$-nearest neighbours accuracy for $s_i$ is given by
+
+A good embedding model should cluster the embeddings for similar inputs in the embedding space. Hence, the 5-NN test can be seen as an indicator of how cohesive the embedding space is.
+
+The results are shown in Table TABREF22. The differences in the number of groups in each language are due to different availabilities of sentences and sentence-types in the Tatoeba dataset.
+
+The high nearest neighbours accuracy indicates that syntax information was successfully captured by the embeddings. Table TABREF22 also shows that the syntactic information of multiple languages was captured by a single embedding model.
+
+## Experiments ::: Quality of Syntactic Embeddings ::: Language Model
+
+A number of recent works BIBREF7, BIBREF8 have probed language models to determine if they contain syntactic information. We applied the same nearest neighbours experiment (with the same test sets) on a number of existing language models: Universal Sentence Encoder (USE) BIBREF17, LASER, and BERT. For USE we used models available from TensorHub. For LASER we used models and created embeddings from the official repository .
+
+For BERT, we report the results using max (BERT$_{max}$) and average-pooling (BERT$_{avg}$), obtained from the BERT embedding toolkit with the multilingual cased model (104 languages, 12-layers, 768-hidden units, 12-heads), and `pooled-output' (BERT$_{output}$) from the TensorHub version of the model with the same parameters.
+
+We computed the nearest neighbours experiment for all languages in the training data for the above models. The results are shown in Table TABREF27. The results show that general purpose language models do capture syntax information, which varies greatly across languages and models.
+
+The nearest neighbours accuracy of our syntactic embeddings in Table TABREF22 significantly outperforms the general purpose language models. Arguably these language models were trained using different training data. However, this is a reasonable comparison because many real-world applications rely on released pre-trained language models for syntactically related information. Hence, we want to show that we can use much smaller models trained with direct supervision, to obtain syntactic embeddings with similar or better quality. Nonetheless, the training method used in this work can certainly be extended to architectures similar to BERT or USE.
+
+## Experiments ::: Functional Dissimilarity
+
+The experiments in the previous section showed that the proposed syntactic embeddings formed cohesive clusters in the embedding space, based on UPOS sequence similarities. We further studied the spatial relationships within the embeddings.
+
+Word2Vec BIBREF18 examined spatial relationships between embeddings and compared them to the semantic relationships between words. Operations on vectors in the embedding space such as $King - Man + Woman = Queen$ created vectors that also correlated with similar operations in semantics. Such semantic comparisons do not directly translate to syntactic embeddings. However, syntax information shifts with edits on POS sequences. Hence, we examined the spatial relationships between syntactic embeddings by comparing their cosine similarities with the edit distances between UPOS sequence pairs.
+
+Given $n$ UPOS sequences $U = \lbrace u_0,...,u_{n-1}\rbrace $, we compute the matrix $L \in \mathbb {R}^{n \times n}$, where $l_{ij} = l(u_i, u_j)$, the complement of the normalized Levenshtein distance between $u_i$ and $u_j$.
+
+Given the set of embedding vectors $\lbrace e_0,...,e_{n-1}\rbrace $ where $e_i$ is the embedding for sentence $s_i$, we also compute $D \in \mathbb {R}^{n \times n}$, where $d_{ij} = d(e_i, e_j)$. We further normalize $d_{ij}$ to be within $[0, 1]$ by min-max normalization to obtain $\hat{D} = \operatorname{minMax}(D)$.
+
+Following BIBREF19, we define the functional dissimilarity score by
+
+Intuitively, UPOS sequences that are similar (smaller edit distance) should be embedded close to each other in the embedding space, and embeddings that are further away should have dissimilar UPOS sequences. Hence, the functional dissimilarity score is low if the relative changes in UPOS sequences are reflected in the embedding space. The score is high if such changes are not reflected.
+
+The functional dissimilarity score was computed using sentences from the test set in CoNLL 2017 Universal Dependencies task BIBREF20 for the relevant languages with the provided UPOS sequences. Furthermore, none of the evaluated models, including the proposed method, were trained with CoNLL2017 data.
+
+We compared the functional dissimilarity scores of our syntactic representations against embeddings obtained from BERT and LASER, to further demonstrate that simple network structures with explicit supervision may be sufficient to capture syntactic structure. All the results are shown in Table TABREF29. We only show the best (lowest) results from BERT.
+
+## Experiments ::: Transfer Performance of Syntactic Embeddings
+
+Many NLP tasks utilize POS as features, but human annotated POS sequences are difficult and expensive to obtain. Thus, it is important to know if we can learn sentences-level syntactic embeddings for low-sources languages without treebanks.
+
+We performed zero-shot transfer of the syntactic embeddings for French, Portuguese and Indonesian. French and Portuguese are simulated low-resource languages, while Indonesian is a true low-resource language. We reported the 1-NN and 5-NN accuracies for all languages using the same evaluation setting as described in the previous section. The results are shown in Table TABREF31 (top).
+
+We also fine-tuned the learned syntactic embeddings on the low-resource language for a varying number of training data and languages. The results are shown in Table TABREF31 (bottom). In this table, the low-resource language is denoted as the `source', while the high-resource language(s) is denoted as the `target'. With this training method, no UPOS tag information was provided to the model for the `source' languages, where supervising information comes solely from parallel sentences and UPOS tags in high-resource languages.
+
+The results show that for a new language (French and Portuguese) that is similar to the family of pre-training languages, there are two ways to achieve higher 1-NN accuracy. If the number of unique sentences in the new language is small, accuracy can be improved by increasing the size of the parallel corpora used to fine-tune. If only one parallel corpus is available, accuracy can be improved by increasing the number of unique sentence-pairs used to fine-tune.
+
+For a new language that is dissimilar to the family of pre-training languages, e.g. Indonesian in Table TABREF31, the above methods only improved nearest neighbours accuracy slightly. This may be caused by differing data distribution or by tagger inaccuracies. The results for Indonesian do indicate that some syntactic structure can be learned by using our method, even for a dissimilar language.
+
+A future direction is to conduct a rigorous analysis of transfer learning between languages from the same versus different language families.
+
+## Conclusion
+
+We examined the possibility of creating syntactic embeddings by using a multilingual method based on sequence-to-sequence models. In contrast to prior work, our method only requires parallel corpora and UPOS tags in the target language.
+
+We studied the quality of learned embeddings by examining nearest neighbours in the embedding space and investigating their functional dissimilarity. These results were compared against recent state-of-the-art language models. We also showed that pre-training with a parallel corpus allowed the syntactic embeddings to be transferred to low-resource languages via few-shot fine-tuning.
+
+Our evaluations indicated that syntactic structure can be learnt by using simple network architectures and explicit supervision. Future directions include improving the transfer performance for low-resource languages, disentangling semantic and syntactic embeddings, and analyzing the effect of transfer learning between languages belong to the same versus different language families.

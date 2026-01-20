@@ -1,0 +1,129 @@
+# Effectiveness of self-supervised pre-training for speech recognition
+
+**Paper ID:** 1911.03912
+
+## Abstract
+
+We present pre-training approaches for self-supervised representation learning of speech data. A BERT, masked language model, loss on discrete features is compared with an InfoNCE-based constrastive loss on continuous speech features. The pre-trained models are then fine-tuned with a Connectionist Temporal Classification (CTC) loss to predict target character sequences. To study impact of stacking multiple feature learning modules trained using different self-supervised loss functions, we test the discrete and continuous BERT pre-training approaches on spectral features and on learned acoustic representations, showing synergitic behaviour between acoustically motivated and masked language model loss functions. In low-resource conditions using only 10 hours of labeled data, we achieve Word Error Rates (WER) of 10.2\% and 23.5\% on the standard test "clean" and "other" benchmarks of the Librispeech dataset, which is almost on bar with previously published work that uses 10 times more labeled data. Moreover, compared to previous work that uses two models in tandem, by using one model for both BERT pre-trainining and fine-tuning, our model provides an average relative WER reduction of 9%.
+
+## Introduction
+
+Representation learning has been an active research area for more than 30 years BIBREF1, with the goal of learning high level representations which separates different explanatory factors of the phenomena represented by the input data BIBREF2, BIBREF3. Disentangled representations provide models with exponentially higher ability to generalize, using little amount of labels, to new conditions by combining multiple sources of variations.
+
+Building Automatic Speech Recognition (ASR) systems, for example, requires a large volume of training data to represent different factors contributing to the creation of speech signals, e.g. background noise, recording channel, speaker identity, accent, emotional state, topic under discussion, and the language used in communication. The practical need for building ASR systems for new conditions with limited resources spurred a lot of work focused on unsupervised speech recognition and representation learning BIBREF4, BIBREF5, BIBREF6, BIBREF7, BIBREF8, BIBREF9, BIBREF10, BIBREF11, in addition to semi- and weakly-supervised learning techniques aiming at reducing the supervised data needed in real-world scenarios BIBREF12, BIBREF13, BIBREF14, BIBREF15, BIBREF16, BIBREF17.
+
+Recently impressive results have been reported for representation learning, that generalizes to different downstream tasks, through self-supervised learning for text and speech BIBREF18, BIBREF19, BIBREF10, BIBREF11, BIBREF0. Self-supervised representation learning is done through tasks to predict masked parts of the input, reconstruct inputs through low bit-rate channels, or contrast similar data points against different ones. Different from BIBREF0 where the a BERT-like model is trained with the masked language model loss, frozen, and then used as a feature extractor in tandem with a final fully supervised convolutional ASR model BIBREF20, in this work, our “Discrete BERT” approach achieves an average relative Word Error Rate (WER) reduction of 9% by pre-training and fine-tuning the same BERT model using a Connectionist Temporal Classification BIBREF21 loss.
+
+In addition, we present a new approach for pre-training bi-directional transformer models on continuous speech data using the InfoNCE loss BIBREF10 – dubbed “continuous BERT”.
+
+To understand the nature of their learned representations, we train models using the continuous and the discrete BERT approaches on spectral features, e.g. Mel-frequency cepstral coefficients (MFCC), as well as on pre-trained Wav2vec features BIBREF22. These comparisons provide insights on how complementary the acoustically motivated contrastive loss function is to the other masked language model one.
+
+The unsupervised and semi-supervised ASR approaches is in need for test suites like the unified downstream tasks available for language representation models BIBREF18. BIBREF23, BIBREF24, BIBREF25 evaluated semi-supervised self-labeling WER performance on the standard test “clean” and test “other” benchmarks of the Librispeech dataset BIBREF26 when using only 100 hour subset as labeled data. BIBREF22, BIBREF0, BIBREF10 use the same 960h Librispeech data as unlabeled pre-training data, however, they use Phone Error Rates (PER) on the 3h TIMIT dataset BIBREF27 as their performance metric. The zero-resource ASR literature BIBREF7, BIBREF28 use the ABX task evaluate the quality of learned features.
+
+To combine the best of these evaluation approaches, we pre-train our models on the unlabeled 960h Librispeech data, with a close-to-zero supervised set of only 1 hour and 10 hours, sampled equally from the “clean” and “other” conditions of Librispeech. Then, we report final WER performance on its standard dev and test sets. Using our proposed approaches we achieve a best WER of 10.2% and 23.5% the clean and other subsets respectively which is competitive with previous work that uses 100h of labeled data.
+
+## Preliminaries ::: BERT
+
+Using self-supervision, BERT BIBREF18, a deep bidirectional transformer model, builds its internal language representation that generalizes to other downstream NLP tasks. Self-attention over the whole input word sequence enables BERT to jointly condition on both the left and right context of data. For training, it uses both a masked language model loss, by randomly removing some input words for the model to predict, and a contrastive loss to distinguish the next sentence in the document from a randomly selected one.
+
+## Preliminaries ::: Wav2Vec
+
+Wav2vec BIBREF22 learns representations of audio data by solving a self-supervised context-prediction task with the same loss function as word2vec BIBREF29, BIBREF10. The model is based on two convolutional neural networks where the encoder $f: \mapsto $ produces a representation $_{i}$ for each time step i at a rate of 100 Hz and the aggregator $g: \mapsto $ combines multiple encoder time steps into a new representation $_i$ for each time step i. Given $_i$, the model is trained to distinguish a sample $_{i+k}$ that is k steps in the future from distractor samples $$ drawn from a distribution $p_n$, by minimizing the contrastive loss for steps $k=1,\dots ,K$:
+
+where $T$ is the sequence length, $\sigma (x) = 1/(1+\exp (-x))$, and where $\sigma (_{i+k}^\top h_k(_i))$ is the probability of $_{i+k}$ being the true sample. A step-specific affine transformation $h_k(_i) = W_k _i + \mathbf {b}_k$ is applied to $_i$ BIBREF10. The loss $\mathcal {L} = \sum _{k=1}^K \mathcal {L}_k$ is optimized by summing (DISPLAY_FORM4) over different step sizes. The learned high level features produced by the context network $_i$ are shown to be better acoustic representations for speech recognition compared to standard spectral features.
+
+## Preliminaries ::: vq-wav2vec
+
+vq-wav2vec BIBREF0 learns vector quantized (VQ) representations of audio data using a future time-step prediction task. Similar to wav2vec, there is a convolutional encoder and decoder networks $f: \mapsto $ and $g: \hat{} \mapsto $ for feature extraction and aggregation. However, in between them there is a quantization module $q: \mapsto \hat{}$ to build discrete representations which are input to the aggregator.
+
+First, 30ms segments of raw speech are mapped to a dense feature representation $$ at a stride of 10ms using the encoder $f$. Next, the quantizer (q) turns these dense representations into discrete indices which are mapped to a reconstruction $$ of the original representation $$. The $$ is fed into the aggregator $g$ and the model is optimized via the same context prediction task as wav2vec (cf. §SECREF3). The quantization module replaces the original representation $$ by $= _i$ from a fixed size codebook $\in \mathbb {R}^{V \times d}$ which contains $V$ representations of size $d$.
+
+## Approach ::: Discrete BERT
+
+Our work builds on the recently proposed work in BIBREF0 where audio is quantized using a contrastive loss, then features learned on top by a BERT model BIBREF18. For the vq-wav2vec quantization, we use the gumbel-softmax vq-wav2vec model with the same setup as described in BIBREF0. This model quantizes the Librispeech dataset into 13.5k unique codes.
+
+To understand the impact of acoustic representations baked into the wav2vec features, as alternatives, we explore quantizing the standard mel-frequency cepstral coefficients (MFCC) and log-mel filterbanks coefficients (FBANK), choosing a subset small enough to fit into GPU memory and running k-means with 13.5k centroids (to match the vq-wav2vec setup) to convergence. We then assign the index of the closest centroid to represent each time-step.
+
+We train a standard BERT model BIBREF18, BIBREF30 with only the masked language modeling task on each set of inputs in the same way as described in BIBREF0, namely by choosing tokens for masking with probability of 0.05, expanding each chosen token to a span of 10 masked tokens (spans may overlap) and then computing a cross-entropy loss which attempts to maximize the likelihood of predicting the true token for each one that was masked (Figure ).
+
+## Approach ::: Continuous BERT
+
+A masked language modeling task cannot be performed with continuous inputs and outputs, as there are no targets to predict in place of the masked tokens. Instead of reconstructing the input as in BIBREF31, we classify the masked positive example among a set of negatives. The inputs to the model are dense wav2vec features BIBREF22, MFCC or FBANK features representing 10ms of audio data. Some of these inputs are replaced with a mask embedding and are then fed into a transformer encoder. We then compute the dot product between the outputs corresponding to each masked input, the true input that was masked, and a set of negatives sampled from other masked inputs within the same batch. The model is optimized with the InfoNCE loss BIBREF10 where given one positive sample $_i$ and $N$ negative samples $\tilde{}$ we minimize:
+
+where each sample $_i$ is computed as a dot product of the output of the model at timestep $i$ and the true unmasked value of positive example at timestep $i$ or a randomly sampled negative example. To stabilize training, we add the squared sum of logits produced by the dot-product to the loss, and then apply a soft clamp $\hat{s_i}=\lambda \tanh (s_i/\lambda )$ for each logit $s_i$ to prevent the model's tendency to continually increase the magnitude of logits during training BIBREF32.
+
+## Approach ::: Supervised fine-tuning
+
+The pre-trained models are fine-tuned to perform the ASR task by adding a randomly initialized linear projection on top of the features computed by the transformer models into $V$ classes representing the vocabulary of the task. The vocabulary is 29 tokens for character targets plus a word boundary token. The models are optimized by minimizing the CTC loss. Fine-tuning requires only a few epochs on a single GPU.
+
+## Experiments
+
+All of our experiments are implemented by extending the fairseq BIBREF33 toolkit.
+
+## Experiments ::: Data
+
+All of our experiments are performed by pre-training on 960 hours of Librispeech BIBREF26 training set, fine-tuning on labeled 10 hours and 1 hour sets sampled equally from the two conditions of the training set, and evaluating on the standard dev and test splits.
+
+## Experiments ::: Models ::: Quantized Inputs Training
+
+We first train the vq-wav2vec quantization model following the gumbel-softmax recipe described in BIBREF0. After training this model on 960h of Librispeech and quantizing the training dataset, we are left with 13.5k unique codewords combinations.
+
+For quantizing MFCC and log-mel filterbanks we first compute dense features using the scripts from the Kaldi BIBREF34 toolkit. We then compute 13.5k K-Means centroids, to match the number of unique tokens produced by the vq-wav2vec model, using 8 32GB Volta GPUs. To fit into GPU memory, we subsample 50% of MFCC features and 25% of FBANK features from the training set before running the K-Means algorithm.
+
+The model we use for the masked language modeling task is a standard BERT model with 12 layers, model dimension 768, inner dimension (FFN) 3072 and 12 attention heads BIBREF18. The learning rate is warmed up over the first 10,000 updates to a peak value of 1e-5, and then linearly decayed over a total of 250k updates. We train on 128 GPUs with a batch size of 3072 tokens per GPU giving a total batch size of 393k tokens BIBREF35. Each token represents 10ms of audio data.
+
+To mask the input sequence, we follow BIBREF0 and randomly sample $p=0.05$ of all tokens to be a starting index, without replacement, and mask $M=10$ consecutive tokens from every sampled index; spans may overlap.
+
+## Experiments ::: Models ::: Continuous Inputs Training
+
+For training on dense features, we use a model similar to a standard BERT model with the same parameterization as the one used for quantized input training, but we use the wav2vec, MFCC or FBANK inputs directly. We add 128 relative positional embeddings at every multi-head attention block as formulated in BIBREF36 instead of fixed positional embeddings to ease handling longer examples. We train this model on only 8 GPUs, with a batch size of 9600 inputs per GPU resulting in a total batch size of 76,800. We find that increasing the number of GPUs (which increases the effective batch size) does not lead to better results with this particular setup.
+
+Wav2vec features are 512-dimensional, while MFCC features have 39 dimensions and Logmel features have 80. We introduce a simple linear projection from the feature dimension to BERT dimension (768) for all models.
+
+Similarly to the approach in SECREF12, we choose time-steps to mask by randomly sampling, without replacement, $p=0.05$ of all time-steps to be a starting index, and mask $M=10$ consecutive time-steps from every sampled index; spans may overlap. We sample 10 negative examples from other masked time-steps from the same example, and an additional 10 negative examples from masked time-steps occurring anywhere in the batch. We compute a dot product between the original features and the output corresponding to the same time-step after they are processed by the BERT model. We add the squared sum of logits from these computations multiplied by $\lambda =0.04$ to the loss, and then apply a smooth clamp by recomputing each logit $\hat{s_i}=20\tanh (s_i/20)$.
+
+The learning rate is warmed up over the first 10,000 updates to a peak value of 1e-5, and then linearly decayed over a total of 250k updates.
+
+## Experiments ::: Methodology
+
+For quantized inputs, we compute token indices using the gumbel-softmax based vq-wav2vec model. For MFCC and FBANK features we take the index of the closest centroid (as measured by finding the minimum Euclidean distance) to each corresponding feature in the Librispeech dataset. We then train a BERT model as descirbed in §SECREF12.
+
+For wav2vec continuous inputs, we use features extracted by the publicly available wav2vec BIBREF22 model which contains 6 convolutional blocks in the feature extractor and 11 convolutional blocks in the aggregator module. We use the outputs of the aggregator as features. For MFCC and FBANK, we use those features directly after applying a single linear projection to upsample them to the model dimensionality.
+
+We fine-tune our pre-trained models on 1 or 10 hours of labelled data sampled from the Librispeech training set. We use the standard CTC loss and train for up to 20k updates. We find that the pre-trained models converge after only around 4k updates, while the models trained from scratch tend to converge much later, around 18k updates. We fine-tune all models with learning rate of $0.0001$ that is linearly warmed up over the first 2k updates and then annealed following a cosine learning rate schedule over the last 18k updates. We set the dropout of the pre-trained BERT models to 0.1 and sweep on dropout of the BERT model outputs before the final projection layer over values between 0.0 and 0.4 in increments of 0.1. For each model, we choose a single best checkpoint that has the best loss on the validation set, which is a combination of dev-clean and dev-other standard Librispeech splits.
+
+We use the publicly available wav2letter++ BIBREF37 decoder integrated into the Fairseq framework with the official Librispeech 4-gram language model. We run a sweep on weights for language model score, word score and silence token weights for each model, where parameters are chosen randomly and evaluated on the dev-other Librispeech set. We use the weights found by these sweeps to evaluate and report results for all other splits. The sweeps are run with beam size of 250, while the final decoding is done with beam size of 1500.
+
+The quantized BERT models have a limit of 2048 source tokens due to their use of fixed positional embeddings. During training we discard longer examples and during evaluation we discard randomly chosen tokens from each example until they are at most 2048 tokens long. We expect that increasing the size of the fixed positional embeddings, or switching to relative positional embeddings will improve performance on longer examples, but in this work we wanted to stay consistent with the setup in BIBREF0.
+
+The tandem model which uses the features extracted from the pre-trained BERT models is a character-based Wav2Letter setup of BIBREF38 which uses seven consecutive blocks of convolutions (kernel size 5 with 1000 channels), followed by a PReLU nonlinearity and a dropout rate of 0.1. The final representation is projected to a 28-dimensional probability over the vocabulary and decoded using the standard 4-gram language model following the same protocol as for the fine-tuned models
+
+## Experiments ::: Results
+
+Table TABREF15 presents WERs of different input features and pre-training methods on the standard Librispeech clean and other subsets using 10 hours and 1 hour of labeled data for fine-tuning. Compared to the two-model tandem system proposed in BIBREF0, which uses a the discrete BERT features to train another ASR system from scratch, our discrete BERT model provides an average of 13% and 6% of WER reduction on clean and other subsets respectively, by pre-training and fine-tuning the same BERT model on the 10h labeled set.
+
+The wav2vec inputs represent one level of unsupervised feature discovery, This is our reproduction of the tandem system in BIBREF0 which trains a convolutional model from scratch on features extracted of the discrete BERT model with Wav2vec input features, and evaluated on the Librispeech standard “clean” and “other” subsets.which provides a better space for quantization compared to raw spectral features. The discrete BERT training augments the wav2vec features with a higher level of representation that captures the sequential structure of the full utterance through the masked language modeling loss. On the other hand, the continuous BERT training, given its contrastive InforNCE loss, can be viewed as another level of acoustic representations that captures longer range regularities.
+
+Using the MFCC and FBANK as inputs to the continuous and discrete BERT models provide insights on the synergies of different levels of acoustic and language model representations. Similar to the observations in BIBREF40, the FBANK features are more friendly to unsupervised local acoustic representation learning methods like continuous BERT, leading to consistent gains compared to MFCC features for both 10h and 1h sets.
+
+When using the MFCC and FBANK features for the discrete BERT training, the naive k-means clustering provides bad input acoustic centroids with nothing to benefit from the FBANK compared to the MFCC features. This shifts the entire representation learning load to the, language modelling, discrete BERT component which is identical for both FBANK and MFCC, leading to almost similar performance for both input features in both the 10h and 1h fine-tuning conditions. Using the quantized wav2vec features instead provides a boost of about 40% relative improvement on average compared to the quantized FBANK features in the 10h fine-tuning case.
+
+In line with our hypotheses that the discrete BERT model plays the role of a language model and input wav2vec features learns high level acoustic representations, in the very low-resource condition of 1h fine-tuning, the average relative improvement between quantized FBANK and Wav2vec inputs is larger in the “clean” subsets – 55%, which require better local acoustic representations, compared to 45% WER reduction for the noisy “other” subsets that rely more on the global language modeling capabilities.
+
+With wav2vec features providing good acoustic representations, the discrete BERT model provides an average of about 28% relative improvement over the continuous BERT model for the 10h fine-tuning condition. We believe the reason is due to the complementary nature of the discrete BERT language modelling loss and the wav2vec acoustically motivated pre-training, as opposed to the relatively redundant acoustic pre-training losses of the continious BERT and wav2vec. In the 1h fine-tuning case, however, better local acoustic features provide more gains in the “clean” subsets compared to the “other” ones, following the same trend of the quantized FBANK and wav2vec features under the same conditions.
+
+Table TABREF16 shows the competitive performance of the discrete BERT approach compared to previously published work which is fine-tuned on more than 10 times the labeled data.
+
+## Experiments ::: Ablations
+
+To understand the value of self-supervision in our setup, Table TABREF18 shows WERs for both continuous and discrete input features fine-tuned from random weights, without BERT pre-training, using 10 hours of labeled data. The performance of the discrete features completely collapses since randomly initialized input embedding tables don't have enough training data for learning meaningful representations. This is not a problem for continuous input features where, understandably, Wav2vec input features show much better WERs compared to the MFCC and FBANK features.
+
+The impact of adding a second layer of acoustic representation is shown by comparing the continuous BERT model trained on top of wav2vec features versus the wav2vec model fine-tuned directly using the CTC loss – only one level of learned representations. Continuous BERT training on top of wav2vec features provides substantial gains (Table TABREF19). Adding a second layer of representation more than halved the WER, with more gains observed in the “clean” subset as also observed in SECREF17.
+
+## Discussion and Related Work
+
+The the success of BERT BIBREF18 and Word2Vec BIBREF29 for NLP tasks motivated more research on self-supervised approaches for acoustic word embedding and unsupervised acoustic feature representation BIBREF41, BIBREF42, BIBREF43, BIBREF44, BIBREF9, BIBREF45, BIBREF22, BIBREF10, BIBREF46, BIBREF0, either by predicting masked discrete or continuous input, or by contrastive prediction of neighboring or similarly sounding segments using distant supervision or proximity in the audio signal as an indication of similarity. In BIBREF47 a dynamic time warping alignment is used to discover similar segment pairs. Our work is inspired by the research efforts in reducing the dependence on labeled data for building ASR systems through unsupervised unit discovery and acoustic representation leaning BIBREF4, BIBREF5, BIBREF6, BIBREF7, BIBREF8, and through multi- and cross-lingual transfer learning in low-resource conditions BIBREF48, BIBREF49, BIBREF50, BIBREF51, BIBREF52, BIBREF53, and semi-supervised learning BIBREF12, BIBREF13, BIBREF14, BIBREF15.
+
+## Conclusion and Future work
+
+We presetned two variations, continuous and discrete, of BERT models that are pre-trained on the librispeech 960h data and fine-tuned for speech recognition rather than used as feature extractor in tandem with another ASR system. Along with the discrete-input BERT model, we used a contrastive loss for training a continuous variant of BERT. The acoustic and language modeling roles in the system are played by the vq-wav2vec and the BERT components respectively. Our ablation experiments showed the contribution and importance of each component for final ASR performance. Our system is able to reach final WER of 10.2% and 23.5% on the standard Librispeech test clean and other sets, respectively, using only 10h of labeled data, almost matching the 100h supervised baselines. Our future directions include testing our model on 1000x larger volume of unlabeled data that is more acoustically challenging, along with multi- and cross-lingual transfer learning extensions.

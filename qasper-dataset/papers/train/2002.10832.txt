@@ -1,0 +1,213 @@
+# BERT Can See Out of the Box: On the Cross-modal Transferability of Text Representations
+
+**Paper ID:** 2002.10832
+
+## Abstract
+
+Pre-trained language models such as BERT have recently contributed to significant advances in Natural Language Processing tasks. Interestingly, while multilingual BERT models have demonstrated impressive results, recent works have shown how monolingual BERT can also be competitive in zero-shot cross-lingual settings. This suggests that the abstractions learned by these models can transfer across languages, even when trained on monolingual data. In this paper, we investigate whether such generalization potential applies to other modalities, such as vision: does BERT contain abstractions that generalize beyond text? We introduce BERT-gen, an architecture for text generation based on BERT, able to leverage on either mono- or multi- modal representations. The results reported under different configurations indicate a positive answer to our research question, and the proposed model obtains substantial improvements over the state-of-the-art on two established Visual Question Generation datasets.
+
+## Introduction
+
+The BERT language model BIBREF0 is a Deep Bidirectional Transformer BIBREF1 pre-trained on textual corpora (BookCorpus and Wikipedia) using a Masked Language Model (MLM) objective – predicting some words that are randomly masked in the sentence, along with a sentence entailment loss. Recent research efforts BIBREF2 have shown how BERT encodes abstractions that generalize across languages, even when trained on monolingual data only. This contradicts the common belief BIBREF3, BIBREF4 that a shared vocabulary and joint training on multiple languages are essential to achieve cross-lingual generalization capabilities. In this work, we further investigate the generalization potentials of large pre-trained LMs, this time moving to a cross-modal setup: does BERT contain abstractions that generalize beyond text?
+
+In the Artificial Intelligence community, several works have investigated the longstanding research question of whether textual representations encode visual information. On the one hand, a large body of research called language grounding considers that textual representations lack visual commonsense BIBREF5, and intend to ground the meaning of words BIBREF6, BIBREF7 and sentences BIBREF8, BIBREF9 in the perceptual world. In another body of work, textual representations have successfully been used to tackle multi-modal tasks BIBREF10 such as Zero-Shot Learning BIBREF11, Visual Question Answering BIBREF12 or Image Captioning BIBREF13. Following the latter line of research, in this paper we evaluate the potential of pre-trained language models to generalize in the context of Visual Question Generation (VQG) BIBREF14.
+
+The Visual Question Generation task allows us to investigate the cross-modal capabilities of BERT: unlike Image Captioning (where the input is only visual) or VQA (where the input is visual and textual), VQG is a multi-modal task where input can be textual and/or visual. VQG data usually includes images and the associated captions, along with corresponding questions about the image; thus, different experimental setups can be designed to analyze the impact of each modality. Indeed, the questions can be generated using i) textual (the caption), ii) visual (the image), or iii) multi-modal (both the caption and the image) input.
+
+From a practical standpoint, the VQG task has several applications: robots or AI assistants could ask questions rooted in multi-modal data (e.g. fusing conversational data with visual information from captors and cameras), in order to refine their interpretation of the situation they are presented with. It could also allow systems relying on knowledge-bases to gain visual common sense and deal with the Human Reporting Bias BIBREF15, which states that the content of images and text are intrinsically different, since visual common sense is rarely explicitly stated in text.
+
+Recently, BERT-based Multi-Modal Language Models have been proposed BIBREF16, BIBREF17, BIBREF18, BIBREF19 to tackle multi-modal tasks, using different approaches to incorporate visual data within BERT. From these works, it is left to explore whether the cross-modal alignment is fully learned, or it is to some extent already encoded in the BERT abstractions. Therefore, in contrast with those approaches, we explicitly avoid using the following complex mechanisms:
+
+Multi-modal supervision: all previous works exploit an explicit multi-modal supervision through a pre-training step; the models have access to text/image pairs as input, to align their representations. In contrast, our model can switch from text-only to image-only mode without any explicit alignment.
+
+Image-specific losses: specific losses such as Masked RoI (Region of Interest) Classification with Linguistic Clues BIBREF19 or sentence-image prediction BIBREF18 have been reported helpful to align visual and text modalities. Instead, we only use the original MLM loss from BERT (and not its entailment loss).
+
+Non-linearities: we explore a scenario in which the only learnable parameters, for aligning image representations to BERT, are those of simple linear projection layer. This allows us to assess whether the representations encoded in BERT can transfer out-of-the-box to another modality.
+
+Furthermore, to the best of our knowledge, this paper is the first attempt to investigate multi-modal text generation using pre-trained language models. We introduce BERT-gen, a text generator based on BERT, that can be applied both in mono and multi-modal settings. We treat images similarly to text: while a sentence is seen as a sequence of (sub)word tokens, an image is seen as a sequence of objects associated to their corresponding positions (bounding boxes). We show how a simple linear mapping, projecting visual embeddings into the first layer, is enough to ground BERT in the visual realm: text and image object representations are found to be effectively aligned, and the attention over words transfers to attention over the relevant objects in the image.
+
+Our contributions can be summarized as follows:
+
+we introduce BERT-gen, a novel method for generating text using BERT, that can be applied in both mono and multi-modal settings;
+
+we show that the semantic abstractions encoded in pre-trained BERT can generalize to another modality;
+
+we report state-of-the art results on the VQG task;
+
+we provide extensive ablation analyses to interpret the behavior of BERT-gen under different configurations (mono- or multi- modal).
+
+## Related Work ::: Unsupervised Pre-trained Language Models
+
+Learning unsupervised textual representations that can be applied to downstream tasks is a widely investigated topic in the literature. Text representations have been learned at different granularities: words with Word2vec BIBREF20, sentences with SkipThought BIBREF21, paragraphs with ParagraphVector BIBREF22 and contextualized word vectors with ELMo BIBREF23. Other methods leverage a transfer-learning approach by fine-tuning all parameters of a pre-trained model on a target task, a paradigm which has become mainstream since the introduction of BERT BIBREF0. BERT alleviates the problem of the uni-directionality of most language models (i.e. where the training objective aims at predicting the next word) by proposing a new objective called Masked Language Model (MLM). Under MLM, some words, that are randomly selected, are masked; the training objective aims at predicting them.
+
+## Related Work ::: Multi-modal Language Models
+
+Following the successful application of BERT BIBREF0, and its derivatives, across a great majority of NLP tasks, several research efforts have focused on the design of multi-modal versions of BERT. VideoBERT BIBREF24, a joint video and text model, is pre-trained on a huge corpus of YouTube videos, and applied to action classification and video captioning tasks on the YouCook II dataset BIBREF25. The video is treated as a “visual sentence" (each frame being a “visual word") that is processed by the BERT Transformer.
+
+Concerning models jointly treating information from images and text, visual features extracted from the image are used as “visual words", and a [SEP] special token is employed to separate textual and visual tokens. In the literature, visual features are object features extracted with a Faster R-CNN BIBREF26 – with the notable exception of BIBREF27 who used pooling layers from a CNN. A first body of work exploit single-stream Transformers in which visual features are incorporated in a BERT-like Transformer: this is the case for VisualBERT BIBREF18, VL-BERT BIBREF19, Unicoder-VL BIBREF28 and B2T2 BIBREF29. Other works, such as ViLBERT BIBREF16 and LXMERT BIBREF17 have investigated two-stream approaches: these models employ modality-specific encoders built on standard Transformer blocks, which are then fused into a cross-modal encoder. Interestingly, none of the aforementioned models have been used for generation tasks such as VQG, tackled in this work.
+
+## Related Work ::: Visual Question Generation
+
+The text-based Question Generation task has been largely studied by the NLP community BIBREF30, BIBREF31, BIBREF32, BIBREF33, BIBREF34, BIBREF35, BIBREF36. However, its visual counterpart, Visual Question Generation (VQG), has been comparatively less explored than standard well-known multi-modal tasks such as Visual Question Answering (VQA) BIBREF37, BIBREF38, BIBREF39, BIBREF40, Visual Dialog BIBREF41, BIBREF42, or Image Captioning BIBREF43, BIBREF44, BIBREF45.
+
+The VQG task was first introduced by BIBREF46 in their Neural Self Talk model: the goal is to gain knowledge about an image by iteratively generating questions (VQG) and answering them (VQA). The authors tackle the task with a simple RNN conditioned on the image, following Image Captioning works such as BIBREF45.
+
+Suitable data for the VQG task can come from standard image datasets on which questions have been manually annotated, such as $VQG_{COCO}$, $VQG_{Flickr}$, $VQG_{Bing}$ BIBREF14 , each consisting of 5000 images with 5 questions per image. Alternatively, VQG samples can be derived from Visual Question Answering datasets, such as $VQA1.0$ BIBREF47, by “reversing" them (taking images as inputs and questions as outputs).
+
+A variety of approaches have been proposed. BIBREF14 use a standard Gated Recurrent Neural Network, i.e. a CNN encoder followed by a GRU decoder to generate questions. BIBREF48 aim at generating, for a given image, multiple visually grounded questions of varying types (what, when, where, etc.); similarly, BIBREF49 generate diverse questions using Variational Autoencoders. In BIBREF50, VQG is jointly tackled along its dual task (VQA), just as BIBREF46. In BIBREF51, BIBREF52, the image (processed by a CNN) and the caption (processed by a LSTM) are combined in a mixture module, followed by a LSTM decoder to generate the question, leading to state-of-the-art results on the VQG task on $VQA1.0$ data. More recently, BIBREF53 incorporate multiple cues – place information obtained from PlaceCNN BIBREF54, caption, tags – and combine them within a deep Bayesian framework where the contribution of each cue is weighted to predict a question, obtaining the current state-of-the-art results on $VQG_{COCO}$.
+
+## Model
+
+In VQG, the objective is to generate a relevant question from an image and/or its caption. The caption $X_{txt}$ is composed of $M$ tokens $txt_1, ..., txt_M$; these tokens can be words or subwords (smaller than word) units depending on the tokenization strategy used. As BERT uses subword tokenization, throughout this paper we will refer to subwords as our tokenization units.
+
+The proposed model is illustrated in Figure FIGREF11. In SECREF12, we detail how images are incorporated in the Transformer framework. In SECREF14, we present BERT-gen, a novel approach to use BERT for text generation.
+
+## Model ::: Representing an Image as Text
+
+In this work, we treat textual and visual inputs similarly, by considering both as sequences. Since an image is not a priori sequential, we consider the image $X_{img}$ as a sequence of object regions $img_1, ..., img_N$, as described below.
+
+The images are first processed as in BIBREF17: a Faster-RCNN BIBREF26, pre-trained on Visual Genome BIBREF55, detects the $N=36$ most salient regions (those likely to include an object) per image. The weights of the Faster-RCNN are fixed during training, as we use the precomputed representations made publicly available by BIBREF56. Each image is thus represented by a sequence of $N=36$ semantic embeddings $f_1, ... f_{N}$ (one for each object region) of dimension 2048, along with the corresponding bounding box coordinates $b_1, ... b_{N}$ of dimension 4. With this approach, the BERT attention can be computed at the level of objects or salient image regions; had we represented images with traditional CNN features, the attention would instead correspond to a uniform grid of image regions without particular semantics, as noted in BIBREF56. To build an object embedding $o_j$ encoding both the object region semantics and its location in the image, we concatenate $f_j$ and $b_j$ ($j\in [1,N]$). Hence, an image is seen as a sequence of $N=36$ visual representations (each corresponding to an object region) $o_1,..., o_N$. Object region representations $o_i$ are ordered by the relevance of the object detected, and the model has access to their relative location in the image through the vectors $b_i$.
+
+To investigate whether our BERT-based model can transfer knowledge beyond language, we consider image features as simple visual tokens that can be presented to the model analogously to textual token embeddings. In order to make the $o_j$ vectors (of dimension $2048+4=2052$) comparable to BERT embeddings (of dimension 768), we use a simple linear cross-modal projection layer $W$ of dimensions $2052\hspace{-1.00006pt}\times \hspace{-1.00006pt}768$. The $N$ object regions detected in an image, are thus represented as $X_{img} = (W.o_1,...,W.o_N)$. Once mapped into the BERT embedding space with $W$, the image is seen by the rest of the model as a sequence of units with no explicit indication if it is a text or an image embedding.
+
+## Model ::: BERT-gen: Text Generation with BERT
+
+We cast the VQG task as a classic sequence-to-sequence BIBREF57 modeling framework:
+
+where the input $X=X_{txt}$ in caption-only mode, $X = X_{img}$ in image-only mode, and $X =X_{img} \oplus X_{txt}$ in a multi-modal setup; $Y = {y_1,..., y_T}$ is the question composed of $T$ tokens. $\Theta $ are the parameters of the BERT model; $W$ represents the weights of the linear layer used for projecting visual input to the BERT embedding layer.
+
+As mentioned earlier, BERT is a Transformer BIBREF1 encoder pre-trained using the Masked Language Model (MLM) objective: tokens within the text are replaced with a [MASK] special token, and the model is trained to predict them. Since BERT was not trained with an unidirectional objective, its usage for text generation is not straightforward.
+
+To generate text, BIBREF58 propose to stack a Transformer decoder, symmetric to BERT. However, the authors report training difficulties since the stacked decoder is not pre-trained, and propose a specific training regime, with the side-effect of doubling the number of parameters. BIBREF59 opt for an intermediate step of self-supervised training, introducing a unidirectional loss. As detailed below, we propose a relatively simpler, yet effective, method to use BERT out-of-the-box for text generation.
+
+## Model ::: BERT-gen: Text Generation with BERT ::: Decoder
+
+We simply use the original BERT decoder as is, initially trained to generate the tokens masked during its pre-training phase. It consists in a feed-forward layer, followed by normalization, transposition of the embedding layer, and a softmax over the vocabulary.
+
+## Model ::: BERT-gen: Text Generation with BERT ::: Next Token Prediction
+
+At inference time, to generate the first token of the question $y_1$, we concatenate [MASK] to the input tokens $X$, then encode $X \oplus \texttt {[MASK]}$ with the BERT encoder, and feed the output of the encoder to the decoder; $y_1$ is the output of the decoder for the [MASK] token. Subsequently, given $y_1$, we concatenate it to the input tokens and encode $X \oplus y_1 \oplus \texttt {[MASK]}$ to predict the next token $y_2$. This procedure is repeated until the generation of a special token [EOS] signaling the end of the sentence.
+
+## Model ::: BERT-gen: Text Generation with BERT ::: Attention Trick
+
+As we iteratively concatenate the generated tokens, the BERT bi-directional self-attention mechanism would impact, at every new token, the representations of the previous tokens. To counter that, we use a left-to-right attention mask, similar to the one employed in the original Transformer decoder BIBREF1. For the input tokens in $X$, we apply such mask to all the target tokens $Y$ that were concatenated to $X$, so that input tokens can only attend to the other input tokens. Conversely, for target tokens $y_t$, we put an attention mask on all tokens $y_{>t}$, allowing target tokens $y_t$ to attend only to the input tokens and the already generated target tokens.
+
+This novel method allows to use pre-trained encoders for text generation. In this work, we initialize our model with the parameters from BERT-base. Nonetheless, the methodology can be applied to any pre-trained Transformer encoders such as RoBERTa BIBREF60, or Ernie BIBREF61.
+
+## Model ::: BERT-gen: Text Generation with BERT ::: Modality-specific setups
+
+The proposed model can be used in either mono- or multi- modal setups. This is accomplished by activating or deactivating specific modules.
+
+## Experimental Protocol
+
+Our main objective is to measure whether the textual knowledge encoded in pre-trained BERT can be beneficial in a cross-modal task. Thus, we define the three following experimental setups, which we refer to as Step 1, 2, and 3:
+
+## Experimental Protocol ::: 1. Caption only
+
+Deactivating the Visual embedding module (see Figure FIGREF11), the model has only access to textual input, i.e. the caption. The model is initialized with the BERT weights and trained according to Equation DISPLAY_FORM15.
+
+## Experimental Protocol ::: 2. Image only
+
+Conversely, deactivating the Textual embedding module (see Figure FIGREF11), the model has only access to the input image, not the caption. To indicate the position $t$ of $img_t$ in the sequence, we sum the BERT positional embedding of $t$ to the visual representation of $img_t$, just as we would do for a text token $txt_t$. The model is initialized with the weights learned during step 1. All BERT-gen $\Theta $ weights are frozen, and only the linear layer $W$ is learnable. Hence, if the model is able to learn to generate contextualized questions w.r.t. the image, it shows that a simple linear layer is enough to bridge the two modalities.
+
+## Experimental Protocol ::: 3. Image + Caption
+
+The full model is given access to both image and caption inputs. In this setup, we separate the two different inputs by a special BERT token [SEP]. Thus, the input sequence for the model takes the form of $\texttt {[CLS]}, img_1,..., img_N, \texttt {[SEP]}, txt_1,..., txt_M$. In step 1, only BERT-gen $\Theta $ parameters are learned, as no image input was given. In step 2, $W$ is trained while keeping $\Theta $ frozen. Finally then, in step 3, we fine-tune the model using both image and text inputs: the model is initialized with the parameters $\Theta $ learned during step 1 and the $W$ learned during step 2, and we unfreeze all parameters.
+
+## Experimental Protocol ::: Ablations
+
+Additionally, we report results obtained with: Image only (unfreeze), where the BERT-gen parameters $\Theta $ are not frozen; and Image+Caption (from scratch) where the model is learned without the intermediate steps 1 and 2: the BERT-gen parameters $\Theta $ are initialized with the weights from pre-trained BERT while $W$ is randomly initialized.
+
+## Experimental Protocol ::: Datasets
+
+We conduct our experiments using two established datasets for Visual Question Generation:
+
+## Experimental Protocol ::: Datasets ::: @!START@$VQG_{COCO}$@!END@
+
+Introduced by BIBREF14, it contains 2500 training images, 1250 validation images and 1250 test images from MS COCO BIBREF62; each image has 5 corresponding questions and 5 ground-truth captions.
+
+## Experimental Protocol ::: Datasets ::: @!START@$VQA$@!END@
+
+The Visual Question Answering BIBREF47 dataset can be used to derive VQG data BIBREF50. The task is reversed: instead of answering the question based on the image (VQA), models are called to generate a relevant question given the image (VQG). Also based on MS COCO, it contains 82783 training images, 40504 validation images and 81434 testing images. In $VQA1.0$, each image has 3 associated questions. Since the test set of MS COCO does not contain ground-truth captions, we generated artificial captions for it using NeuralTalk2 BIBREF45: for fair comparison, we used exactly the same model as BIBREF52 (MDN-Joint).
+
+## Experimental Protocol ::: Baselines
+
+We compare the proposed model to the following:
+
+## Experimental Protocol ::: Baselines ::: Sample
+
+BIBREF46 Questions are generated by a RNN conditioned on the image: at each generation step, the distribution over the vocabulary is computed and used to sample the next generated word. This baseline enables to generate diverse questions over the same image, as the word selection process is non-deterministic.
+
+## Experimental Protocol ::: Baselines ::: Max
+
+BIBREF46 Using the above model, selecting words with maximum probability from the computed distribution.
+
+## Experimental Protocol ::: Baselines ::: MDN-Joint
+
+BIBREF52 State-of-the-art model on $VQA1.0$, based on joint usage of caption and image information.
+
+## Experimental Protocol ::: Baselines ::: MC-SBN
+
+BIBREF53 State-of-the-art on $VQG_{COCO}$. The model jointly leverages on multiple cues (the image, place information, caption, tags) to generate questions.
+
+## Experimental Protocol ::: Metrics
+
+We report the following metrics for all experiments, consistently with previous works:
+
+## Experimental Protocol ::: Metrics ::: BLEU
+
+BIBREF63 A precision-oriented metric, originally proposed to evaluate machine translation. It is based on the counts of overlapping n-grams between the generated sequences and the human references.
+
+## Experimental Protocol ::: Metrics ::: ROUGE
+
+BIBREF64 The recall-oriented counterpart to BLEU metrics, again based on n-gram overlaps.
+
+## Experimental Protocol ::: Metrics ::: METEOR
+
+BIBREF65 The harmonic mean between precision and recall w.r.t. unigrams. As opposed to the other metrics, it also accounts for stemming and synonymy matching.
+
+## Experimental Protocol ::: Metrics ::: CIDEr
+
+BIBREF66 Originally designed for Image Captioning, it uses human consensus among the multiple references, favoring rare words and penalizing frequent words. This feature is particularly relevant for our task, as the automatically generated questions often follow similar patterns such as “What is the [...] ?". Indeed, we verify experimentally (cf Table and Table ) that the CIDEr metric is the most discriminant in our quantitative results.
+
+## Experimental Protocol ::: Implementation details
+
+All models are implemented in PyText BIBREF67. For all our experiments we used a single NVIDIA RTX 2080 Ti GPU, a batch size of 128 and 5 epochs. We used the Adam optimizer with the recommended parameters for BERT: learning rate is set at $2e^{-5}$ with a warmup of $0.1$. The most computationally expensive experiment is the step 3 described above: for this model, completion of one epoch demands 30 seconds and 2 minutes for $VQG_{COCO}$ and $VQA$ datasets, respectively. Metrics were computed using the Python package released by BIBREF33.
+
+## Results
+
+In Table , we report quantitative results for the VQG task on $VQA1.0$. The Caption only model already shows strong improvements for all metrics over state-of-the-art models. For this text-only model, the impressive performance can mostly be attributed to BERT, demonstrating once again the benefits obtained using pre-trained language models. In our second step (Image only), the BERT $\Theta $ parameters are frozen and only those of the cross-modal projection matrix $W$ are learned. Despite using a simple linear layer, the model is found to perform well, generating relevant questions given only visual inputs.
+
+This suggests that the conceptual representations encoded in pre-trained language models such as BERT can effectively be used beyond text. Further, we report an additional Image only experiment, this time unfreezing the BERT parameters $\Theta $ – see Step 2 (unfreeze) in Table . As could be expected, since the model is allowed more flexibility, the performance is found to further improve.
+
+Finally, in our third step (Image + Caption), we obtain the highest scores, for all metrics. This indicates that the model is able to effectively leverage the combination of textual and visual inputs. Indeed, complementary information from both modalities can be exploited by the self-attention mechanism, making visual and textual tokens interact to generate the output sequences. Again, we additionally report the results obtained bypassing the intermediate steps 1 and 2: for the model denoted as Step 3 (from scratch) (last row of Table ), $\Theta $ parameters are initialized with the original weights from pre-trained BERT, while the $W$ matrix is randomly initialized. Under this experimental condition, we observe lower performances, a finding that consolidates the importance of the multi-step training procedure we adopted.
+
+In Table , we report quantitative VQG results on $VQG_{COCO}$. These are globally consistent with the ones above for $VQA1.0$. However, we observe two main differences. First, a bigger relative improvement over the state-of-the-art. As the efficacy of pre-trained models is boosted in small-data scenarios BIBREF68, this difference can be explained by the smaller size of $VQG_{COCO}$. Second, we note that the Caption only model globally outperforms all other models, especially on the discriminant CIDEr metric. This can be explained by the fact that, in $VQG_{COCO}$, the captions are human-written (whereas they are automatically generated for $VQA1.0$) and, thus, of higher quality; moreover, the smaller size of the dataset could play a role hindering the ability to adapt to the visual modality. Nonetheless, the strong performances obtained for Step 2 compared to the baselines highlight the effectiveness of our method to learn a cross-modal projection even with a relatively small number of training images.
+
+## Results ::: Human Evaluation
+
+To get more in-depth understanding of our models, we report human assessment results in Table . We randomly sampled 50 images from the test set of $VQA1.0$. Each image is paired with its caption, the human-written question used as ground-truth, and the output for our three models: Caption only, Image only and Image+Caption. We asked 3 human annotators to assess the quality of each question using a Likert scale ranging from 1 to 5, for the following criteria: readability, measuring how well-written the question is; caption relevance, how relevant the question is w.r.t. to the caption; and, image relevance, how relevant the question is toward the image. For caption and image relevance, the annotators were presented with only the caption and only the image, respectively.
+
+We observe that all evaluated models produce well-written sentences, as readability does not significantly differ compared to human's questions. Unsurprisingly, the Caption only model shows a higher score for caption relevance, while the relatively lower image relevance score can be explained by the automatically generated and thus imperfect captions in the $VQA1.0$ dataset. Comparatively, the Image only model obtains lower caption relevance and higher image relevance scores; this indicates that the cross modal projection is sufficient to bridge modalities, allowing BERT to generate relevant questions toward the image. Finally, the Image + Caption model obtains the best image relevance among our models, consistently the quantitative results reported in Tables and .
+
+## Model Discussion ::: What does the model look at?
+
+To interpret the behavior of attention-based models, it is useful to look at which tokens are given higher attention BIBREF69. In Figure FIGREF44, we present two images $A$ and $B$, along with their captions and the three generated questions corresponding to our three experimental setups (Caption only, Image only and Image + Caption). For this analysis, we average the attention vectors of all the heads in the last layer, and highlight the textual and visual tokens most attended by the models.
+
+For both images, the Caption only model attends to salient words in the caption. The Image only model remains at least as much relevant: on image $A$, it generates a question about a table (with an unclear attention). Interestingly, for image $B$, the Image only model corrects a mistake from step 1: it is a woman holding an umbrella rather than a man, and the attention is indeed focused on the woman in the image. Finally, the Image + Caption model is able to generate fitting questions about the image, with relatively little relevance to the caption: for image $A$, Image + Caption the model generates “What time is it?" while paying attention to the clock; for image $B$, Image + Caption generates “What is the color of the umbrella ?", focusing the attention on the umbrella. The captions of either samples include no mentions of clocks or umbrellas, further indicating effective alignment between visual and textual representations.
+
+## Model Discussion ::: Cross-modal alignment
+
+We carry out an additional experiment to analyze the text/vision alignment for each model. Figure FIGREF46 shows the cross-modal similarity $X_{sim}$ for different model scenarios, computed at each BERT-base layer from 1 to 12. We define the cross-modal similarity $X_{sim}$ as the cosine similarity between the vector representations of both modalities. These vectors are the two continuous space representations from a model when given as input either i) an image, or ii) its corresponding caption. We represent these captions and images vectors with the special BERT token [CLS], following previous works BIBREF70 where [CLS] is used to represent the entire sequence.
+
+The reported values correspond to the average cross-modal similarity calculated for all the examples of $VQG_{COCO}$ test set. In addition to the setups described in Section SECREF4 (Caption-only, Image-only and Image + Caption), we also report $X_{sim}$ for Random Transformer, a BERT architecture with random weights. As expected, its $X_{sim}$ is close to zero.
+
+All the other models are based on BERT. As suggested by BIBREF71, the first layers in BERT tend to encode lower-level language information. This might explain why the models show similar $X_{sim}$ scores up to the 9th layer, and diverge afterwards: the weights for those layers remain very similar between our fine-tuned models.
+
+For the last layer ($l=12$), we observe that $\textit {Caption only} < \textit {Image only} < \textit {Image + Caption}$. The Caption only model has never seen images during training, and therefore is not able to encode semantic information given only images as input. Still, its reported $X_{sim} > 0$ can be attributed to the fact that, when fine-tuned on VQG during Step 1, BERT-gen encodes task-specific information in the [CLS] token embedding (e.g. a question ends with a “?" and often begins with “What/Where/Who"). $\textit {Image only} > \textit {Caption only}$ can be explained by the learning of the cross-modal projection $W$. However, since BERT is not fine-tuned, the model learns a “contortion" allowing it to align text and vision. Finally, Image + Caption $>$ Image only can be attributed to BERT fine-tuning, contributing to an increase in the observed gap, and its emergence in earlier layers.
+
+## Conclusion and Perspectives
+
+We investigated whether the abstractions encoded in a pre-trained BERT model can generalize beyond text. We proposed BERT-gen, a novel methodology that allows to directly generate text from out-of-the-box pre-trained encoders, either in mono- or multi- modal setups. Moreover, we applied BERT-gen to Visual Question Generation, obtaining state-of-the-art results on two established datasets. We showed how a simple linear projection is sufficient to effectively align visual and textual representations.
+
+In future works, we plan to extend BERT-gen to other modalities, such as audio or video, exploring the potential interactions that can emerge in scenarios where more than two modalities are present.

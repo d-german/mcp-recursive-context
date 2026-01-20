@@ -1,0 +1,185 @@
+# Multi-task Learning with Sample Re-weighting for Machine Reading Comprehension
+
+**Paper ID:** 1809.06963
+
+## Abstract
+
+We propose a multi-task learning framework to learn a joint Machine Reading Comprehension (MRC) model that can be applied to a wide range of MRC tasks in different domains. Inspired by recent ideas of data selection in machine translation, we develop a novel sample re-weighting scheme to assign sample-specific weights to the loss. Empirical study shows that our approach can be applied to many existing MRC models. Combined with contextual representations from pre-trained language models (such as ELMo), we achieve new state-of-the-art results on a set of MRC benchmark datasets. We release our code at https://github.com/xycforgithub/MultiTask-MRC.
+
+## Introduction
+
+Machine Reading Comprehension (MRC) has gained growing interest in the research community BIBREF0 , BIBREF1 . In an MRC task, the machine reads a text passage and a question, and generates (or selects) an answer based on the passage. This requires the machine to possess strong comprehension, inference and reasoning capabilities. Over the past few years, there has been much progress in building end-to-end neural network models BIBREF2 for MRC. However, most public MRC datasets (e.g., SQuAD, MS MARCO, TriviaQA) are typically small (less than 100K) compared to the model size (such as SAN BIBREF3 , BIBREF4 with around 10M parameters). To prevent over-fitting, recently there have been some studies on using pre-trained word embeddings BIBREF5 and contextual embeddings in the MRC model training, as well as back-translation approaches BIBREF1 for data augmentation.
+
+Multi-task learning BIBREF6 is a widely studied area in machine learning, aiming at better model generalization by combining training datasets from multiple tasks. In this work, we explore a multi-task learning (MTL) framework to enable the training of one universal model across different MRC tasks for better generalization. Intuitively, this multi-task MRC model can be viewed as an implicit data augmentation technique, which can improve generalization on the target task by leveraging training data from auxiliary tasks.
+
+We observe that merely adding more tasks cannot provide much improvement on the target task. Thus, we propose two MTL training algorithms to improve the performance. The first method simply adopts a sampling scheme, which randomly selects training data from the auxiliary tasks controlled by a ratio hyperparameter; The second algorithm incorporates recent ideas of data selection in machine translation BIBREF7 . It learns the sample weights from the auxiliary tasks automatically through language models. Prior to this work, many studies have used upstream datasets to augment the performance of MRC models, including word embedding BIBREF5 , language models (ELMo) BIBREF8 and machine translation BIBREF1 . These methods aim to obtain a robust semantic encoding of both passages and questions. Our MTL method is orthogonal to these methods: rather than enriching semantic embedding with external knowledge, we leverage existing MRC datasets across different domains, which help make the whole comprehension process more robust and universal. Our experiments show that MTL can bring further performance boost when combined with contextual representations from pre-trained language models, e.g., ELMo BIBREF8 .
+
+To the best of our knowledge, this is the first work that systematically explores multi-task learning for MRC. In previous methods that use language models and word embedding, the external embedding/language models are pre-trained separately and remain fixed during the training of the MRC model. Our model, on the other hand, can be trained with more flexibility on various MRC tasks. MTL is also faster and easier to train than embedding/LM methods: our approach requires no pre-trained models, whereas back translation and ELMo both rely on large models that would need days to train on multiple GPUs BIBREF9 , BIBREF8 .
+
+We validate our MTL framework with two state-of-the-art models on four datasets from different domains. Experiments show that our methods lead to a significant performance gain over single-task baselines on SQuAD BIBREF0 , NewsQA BIBREF10 and Who-Did-What BIBREF11 , while achieving state-of-the-art performance on the latter two. For example, on NewsQA BIBREF10 , our model surpassed human performance by 13.4 (46.5 vs 59.9) and 3.2 (72.6 vs 69.4) absolute points in terms of exact match and F1. The contribution of this work is three-fold. First, we apply multi-task learning to the MRC task, which brings significant improvements over single-task baselines. Second, the performance gain from MTL can be easily combined with existing methods to obtain further performance gain. Third, the proposed sampling and re-weighting scheme can further improve the multi-task learning performance.
+
+## Related Work
+
+Studies in machine reading comprehension mostly focus on architecture design of neural networks, such as bidirectional attention BIBREF2 , dynamic reasoning BIBREF12 , and parallelization BIBREF1 . Some recent work has explored transfer learning that leverages out-domain data to learn MRC models when no training data is available for the target domain BIBREF13 . In this work, we explore multi-task learning to make use of the data from other domains, while we still have access to target domain training data.
+
+Multi-task learning BIBREF6 has been widely used in machine learning to improve generalization using data from multiple tasks. For natural language processing, MTL has been successfully applied to low-level parsing tasks BIBREF14 , sequence-to-sequence learning BIBREF15 , and web search BIBREF16 . More recently, BIBREF17 proposes to cast all tasks from parsing to translation as a QA problem and use a single network to solve all of them. However, their results show that multi-task learning hurts the performance of most tasks when tackling them together. Differently, we focus on applying MTL to the MRC task and show significant improvement over single-task baselines.
+
+Our sample re-weighting scheme bears some resemblance to previous MTL techniques that assign weights to tasks BIBREF18 . However, our method gives a more granular score for each sample and provides better performance for multi-task learning MRC.
+
+## Model Architecture
+
+We call our model Multi-Task-SAN (MT-SAN), which is a variation of SAN BIBREF3 model with two main differences: i) we add a highway network layer after the embedding layer, the encoding layer and the attention layer; ii) we use exponential moving average BIBREF2 during evaluation. The SAN architecture and our modifications are briefly described below and in Section " Experiment Details" , and detailed description can be found in BIBREF3 .
+
+Similar to MT-SAN, we add a highway network after the lexicon encoding layer and the contextual encoding layer and use a different answer module for each dataset. We apply MT-DrQA to a broader range of datasets. For span-detection datasets such as SQuAD, we use the same answer module as DrQA. For cloze-style datasets like Who-Did-What, we use the attention-sum reader BIBREF39 as the answer module. For classification tasks required by SQuAD v2.0 BIBREF42 , we apply a softmax to the last state in the memory layer and use it as the prediction.
+
+## Input Format
+
+For most tasks we consider, our MRC model takes a triplet $(Q,P,A)$ as input, where $Q=(q_1,...,q_m), P=(p_1,...,p_n)$ are the word index representations of a question and a passage, respectively , and $A=(a_{\text{begin}}, a_{\text{end}})$ is the index of the answer span. The goal is to predict $A$ given $(Q,P)$ .
+
+## Lexicon Encoding Layer
+
+We map the word indices of $P$ and $Q$ into their 300-dim Glove vectors BIBREF5 . We also use the following additional information for embedding words: i) 16-dim part-of-speech (POS) tagging embedding; ii) 8-dim named-entity-recognition (NER) embedding; iii) 3-dim exact match embedding: $f_{\text{exact\_match}}(p_i)=\mathbb {I}(p_i\in Q)$ , where matching is determined based on the original word, lower case, and lemma form, respectively; iv) Question enhanced passage word embeddings: $f_{\text{align}}(p_i)=\sum _{j} \gamma _{i,j} h(\text{GloVe}(q_j))$ , where 
+
+$${0.89}{!}{
+\gamma _{i,j}=\frac{\exp (h(\text{GloVe}(p_j)),h(\text{GloVe}(q_i)))}{\sum _{j^{\prime }}\exp (h(\text{GloVe}(p_{j^{\prime }})),h(\text{GloVe}(q_i)))}}$$   (Eq. 3) 
+
+ is the similarity between word $p_j$ and $q_i$ , and $g(\cdot )$ is a 300-dim single layer neural net with Rectified Linear Unit (ReLU) $g(x)=\text{ReLU}(W_1x)$ ; v) Passage-enhanced question word embeddings: the same as iv) but computed in the reverse direction. To reduce the dimension of the input to the next layer, the 624-dim input vectors of passages and questions are passed through a ReLu layer to reduce their dimensions to 125.
+
+After the ReLU network, we pass the 125-dim vectors through a highway network BIBREF19 , to adapt to the multi-task setting: $g_i = \text{sigmoid}(W_2p_i^t), p_i^t=\text{ReLU}(W_3p_i^t)\odot g_i + g_i\odot p_i^t$ , where $p_i^t$ is the vector after ReLU transformation. Intuitively, the highway network here provides a neuron-wise weighting, which can potentially handle the large variation in data introduced by multiple datasets.
+
+## Contextual Encoding Layer
+
+Both the passage and question encodings go through a 2-layer Bidirectional Long-Short Term Memory (BiLSTM, BIBREF20 , BIBREF20 ) network in this layer. We append a 600-dim CoVe vector BIBREF21 to the output of the lexicon encoding layer as input to the contextual encoders. For the experiments with ELMo, we also append a 1024-dim ELMo vector. Similar to the lexicon encoding layer, the outputs of both layers are passed through a highway network for multi-tasking. Then we concatenate the output of the two layers to obtain $H^q\in \mathbb {R}^{2d\times m}$ for the question and $H^p=\mathbb {R}^{2d\times n}$ the passage, where $d$ is the dimension of the BiLSTM.
+
+## Memory/Cross Attention Layer
+
+We fuse $H^p$ and $H^q$ through cross attention and generate a working memory in this layer. We adopt the attention function from BIBREF22 and compute the attention matrix as $C=\text{dropout}\left(f_{\text{attention}}(\hat{H}^q, \hat{H}^p)\right) \in \mathbb {R}^{m\times n}.$ We then use $C$ to compute a question-aware passage representation as $U^p = \text{concat}(H^p, H^qC)$ . Since a passage usually includes several hundred tokens, we use the method of BIBREF23 to apply self attention to the representations of passage to rearrange its information: $ \hat{U}^p = U^p\text{drop}_{\text{diag}}(f_{\text{attention}}(U^p, U^p)),$ where $\text{drop}_{\text{diag}}$ means that we only drop diagonal elements on the similarity matrix (i.e., attention with itself). Then, we concatenate $U^p$ and $\hat{U}^p$ and pass them through a BiLSTM: $M=\text{BiLSTM}([U^p];\hat{U}^p])$ . Finally, output of the BiLSTM (after concatenating two directions) goes through a highway layer to produce the memory.
+
+## Answer Module
+
+The base answer module is the same as SAN, which computes a distribution over spans in the passage. Firstly, we compute an initial state $s_0$ by self attention on $H^q$ : $s_0\leftarrow \text{Highway}\left(\sum _{j} \frac{\exp (w_4H^q_j)}{\sum _{j^{\prime }}\exp {w_4H^q_{j^{\prime }}}}\cdot H^q_j\right)$ . The final answer is computed through $T$ time steps. At step $t\in \lbrace 1,...,T-1\rbrace $ , we compute the new state using a Gated Recurrent Unit (GRU, BIBREF24 , BIBREF24 ) $s_t=\text{GRU}(s_{t-1},x_t)$ , where $x_t$ is computed by attention between $M$ and $s_{t-1}$ : $x_t=\sum _{j} \beta _j M_j, \beta _j=\text{softmax}(s_{t-1}W_5M)$ . Then each step produces a prediction of the start and end of answer spans through a bilinear function: $H^q$0 $H^q$1 The final prediction is the average of each time step: $H^q$2 . We randomly apply dropout on the step level in each time step during training, as done in BIBREF3 . During training, the objective is the log-likelihood of the ground truth: $H^q$3 .
+
+##  Multi-task Learning Algorithms
+
+We describe our MTL training algorithms in this section. We start with a very simple and straightforward algorithm that samples one task and one mini-batch from that task at each iteration. To improve the performance of MTL on a target dataset, we propose two methods to re-weight samples according to their importance. The first proposed method directly lowers the probability of sampling from a particular auxiliary task; however, this probability has to be chosen using grid search. We then propose another method that avoids such search by using a language model.
+
+[h!] Multi-task Learning of MRC [1] k different datasets $\mathcal {D}_1,...,\mathcal {D}_K$ , max_epoch Initialize the model $\mathcal {M}$ epoch $=1,2,...$ , max_epoch Divide each dataset $\mathcal {D}_k$ into $N_k$ mini-batches $\mathcal {D}_k=\lbrace b_1^k,...,b_{N_k}^k\rbrace $ , $1\le k\le K$ Put all mini-batches together and randomly shuffle the order of them, to obtain a sequence $B=(b_1,...,b_L)$ , where $L=\sum _k N_k$ each mini-batch $b\in B$ Perform gradient update on $\mathcal {M}$0 with loss $\mathcal {M}$1 Evaluate development set performance Model with best evaluation performance
+
+Suppose we have $K$ different tasks, the simplest version of our MTL training procedure is shown in Algorithm " Multi-task Learning Algorithms" . In each epoch, we take all the mini-batches from all datasets and shuffle them for model training, and the same set of parameters is used for all tasks. Perhaps surprisingly, as we will show in the experiment results, this simple baseline method can already lead to a considerable improvement over the single-task baselines.
+
+##  Mixture Ratio
+
+One observation is that the performance of our model using Algorithm " Multi-task Learning Algorithms" starts to deteriorate as we add more and more data from other tasks into our training pool. We hypothesize that the external data will inevitably bias the model towards auxiliary tasks instead of the target task.
+
+[h!] Multi-task Learning of MRC with mixture ratio, targeting $\mathcal {D}_1$ [1] K different datasets $\mathcal {D}_1,...,\mathcal {D}_K$ , max_epoch, mixture ratio $\alpha $ Initialize the model $\mathcal {M}$ epoch $=1,2,...$ , max_epoch Divide each dataset $\mathcal {D}_k$ into $N_k$ mini-batches $\mathcal {D}_k=\lbrace b_1^k,...,b_{N_k}^k\rbrace $ , $1\le k\le K$ $S\leftarrow \lbrace b_1^1,...,b_{N_1}^1\rbrace $ Randomly pick $\mathcal {D}_1,...,\mathcal {D}_K$0 mini-batches from $\mathcal {D}_1,...,\mathcal {D}_K$1 and add to $\mathcal {D}_1,...,\mathcal {D}_K$2 Assign mini-batches in $\mathcal {D}_1,...,\mathcal {D}_K$3 in a random order to obtain a sequence $\mathcal {D}_1,...,\mathcal {D}_K$4 , where $\mathcal {D}_1,...,\mathcal {D}_K$5 each mini-batch $\mathcal {D}_1,...,\mathcal {D}_K$6 Perform gradient update on $\mathcal {D}_1,...,\mathcal {D}_K$7 with loss $\mathcal {D}_1,...,\mathcal {D}_K$8 Evaluate development set performance Model with best evaluation performance
+
+To avoid such adverse effect, we introduce a mixture ratio parameter during training. The training algorithm with the mixture ratio is presented in Algorithm "Answer Module for WDW" , with $\mathcal {D}_1$ being the target dataset. In each epoch, we use all mini-batches from $\mathcal {D}_1$ , while only a ratio $\alpha $ of mini-batches from external datasets are used to train the model. In our experiment, we use hyperparameter search to find the best $\alpha $ for each dataset combination. This method resembles previous methods in multi-task learning to weight losses differently (e.g., BIBREF18 , BIBREF18 ), and is very easy to implement. In our experiments, we use Algorithm "Answer Module for WDW" to train our network when we only use 2 datasets for MTL.
+
+##  Sample Re-Weighting
+
+The mixture ratio (Algorithm "Answer Module for WDW" ) dramatically improves the performance of our system. However, it requires to find an ideal ratio by hyperparameter search which is time-consuming. Furthermore, the ratio gives the same weight to every auxiliary data, but the relevance of every data point to the target task can vary greatly.
+
+We develop a novel re-weighting method to resolve these problems, using ideas inspired by data selection in machine translation BIBREF26 , BIBREF7 . We use $(Q^{k},P^{k},A^{k})$ to represent a data point from the $k$ -th task for $1\le k\le K$ , with $k=1$ being the target task. Since the passage styles are hard to evaluate, we only evaluate data points based on $Q^{k}$ and $A^k$ . Note that only data from auxiliary task ( $2\le k\le K$ ) is re-weighted; target task data always have weight 1.
+
+Our scores consist of two parts, one for questions and one for answers. For questions, we create language models (detailed in Section " Experiment Details" ) using questions from each task, which we represent as $LM_k$ for the $k$ -th task. For each question $Q^{k}$ from auxiliary tasks, we compute a cross-entropy score: 
+
+$$H_{C,Q}(Q^{k})=-\frac{1}{m}\sum _{w\in Q^{k}}\log (LM_{C}(w)),$$   (Eq. 10) 
+
+ where $C\in \lbrace 1,k\rbrace $ is the target or auxiliary task, $m$ is the length of question $Q^{k}$ , and $w$ iterates over all words in $Q^{k}$ .
+
+It is hard to build language models for answers since they are typically very short (e.g., answers on SQuAD includes only one or two words in most cases). We instead just use the length of answers as a signal for scores. Let $l_{a}^{k}$ be the length of $A^{k}$ , the cross-entropy answer score is defined as: 
+
+$$H_{C,A}(A^{k})=-\log \text{freq}_C(l_a^{k}),$$   (Eq. 11) 
+
+ where freq $_C$ is the frequency of answer lengths in task $C\in \lbrace 1,k\rbrace $ .
+
+The cross entropy scores are then normalized over all samples in task $C$ to create a comparable metric across all auxiliary tasks: 
+
+$$H_{C,Q}^{\prime }(Q^k)=\frac{H_{C,Q}(Q^k)-\min (H_{C,Q})}{\max (H_{C,Q})-\min (H_{C,Q})} \\
+H_{C,A}^{\prime }(A^k)=\frac{H_{C,A}(A^k)-\min (H_{C,A})}{\max (H_{C,A})-\min (H_{C,A})}$$   (Eq. 12) 
+
+ for $C\in \lbrace 1,2,...,K\rbrace $ . For $C\in \lbrace 2,...,K\rbrace $ , the maximum and minimum are taken over all samples in task $k$ . For $C=1$ (target task), they are taken over all available samples.
+
+Intuitively, $H^{\prime }_{C,Q}$ and $H^{\prime }_{C,A}$ represents the similarity of text $Q,A$ to task $C$ ; a low $H^{\prime }_{C,Q}$ (resp. $H^{\prime }_{C,A}$ ) means that $Q^k$ (resp. $A^k$ ) is easy to predict and similar to $C$ , and vice versa. We would like samples that are most similar from data in the target domain (low $H^{\prime }_1$ ), and most different (informative) from data in the auxiliary task (high $H^{\prime }_{C,A}$0 ). We thus compute the following cross-entropy difference for each external data: 
+
+$$\text{CED}(Q^{k},A^{k})=&(H^{\prime }_{1,Q}(Q^{k})-H^{\prime }_{k,Q}(Q^{k}))+\nonumber \\
+&(H^{\prime }_{1,A}(A^{k})-H^{\prime }_{k,A}(A^{k})) $$   (Eq. 13) 
+
+ for $k\in \lbrace 2,...,K\rbrace $ . Note that a low CED score indicates high importance. Finally, we transform the scores to weights by taking negative, and normalize between $[0,1]$ : 
+
+$${0.89}{!}{\displaystyle \text{CED}^{\prime }(Q^{k},A^{k})
+=1-\frac{\text{CED}(Q^{k},A^{k})-\min (\text{CED})}{\max (\text{CED})-\min (\text{CED})}.}$$   (Eq. 14) 
+
+Here the maximum and minimum are taken over all available samples and task. Our training algorithm is the same as Algorithm 1, but for minibatch $b$ we instead use the loss 
+
+$$l(b)=\sum _{(P,Q,A)\in b} \text{CED}^{\prime }(Q,A)l(P,Q,A)$$   (Eq. 15) 
+
+ in step " Multi-task Learning Algorithms" . We define $\text{CED}^{\prime }(Q^1,A^1)\equiv 1$ for all target samples $(P^1,Q^1,A^1)$ .
+
+## Experiments
+
+Our experiments are designed to answer the following questions on multi-task learning for MRC:
+
+1. Can we improve the performance of existing MRC systems using multi-task learning?
+
+2. How does multi-task learning affect the performance if we combine it with other external data?
+
+3. How does the learning algorithm change the performance of multi-task MRC?
+
+4. How does our method compare with existing MTL methods?
+
+We first present our experiment details and results for MT-SAN. Then, we provide a comprehensive study on the effectiveness of various MTL algorithms in Section " Comparison of Different MTL Algorithms" . At last, we provide some additional results on combining MTL with DrQA BIBREF29 to show the flexibility of our approach .
+
+## Datasets
+
+We conducted experiments on SQuAD ( BIBREF0 , BIBREF0 ), NewsQA BIBREF10 , MS MARCO (v1, BIBREF30 , BIBREF30 ) and WDW BIBREF11 . Dataset statistics is shown in Table 1 . Although similar in size, these datasets are quite different in domains, lengths of text, and types of task. In the following experiments, we will validate whether including external datasets as additional input information (e.g., pre-trained language model on these datasets) helps boost the performance of MRC systems.
+
+##  Experiment Details
+
+We mostly focus on span-based datasets for MT-SAN, namely SQuAD, NewsQA, and MS MARCO. We convert MS MARCO into an answer-span dataset to be consistent with SQuAD and NewsQA, following BIBREF3 . For each question, we search for the best span using ROUGE-L score in all passage texts and use the span to train our model. We exclude questions with maximal ROUGE-L score less than 0.5 during training. For evaluation, we use our model to find a span in all passages. The prediction score is multiplied with the ranking score, trained following BIBREF31 's method to determine the final answer.
+
+We train our networks using algorithms in Section " Multi-task Learning Algorithms" , using SQuAD as the target task. For experiments with two datasets, we use Algorithm "Answer Module for WDW" ; for experiments with three datasets we find the re-weighting mechanism in Section " Sample Re-Weighting" to have a better performance (a detailed comparison will be presented in Section " Comparison of Different MTL Algorithms" ). For generating sample weights, we build a LSTM language model on questions following the implementation of BIBREF32 with the same hyperparameters. We only keep the 10,000 most frequent words, and replace the other words with a special out-of-vocabulary token.
+
+Parameters of MT-SAN are mostly the same as in the original paper BIBREF3 . We utilize spaCy to tokenize the text and generate part-of-speech and named entity labels. We use a 2-layer BiLSTM with 125 hidden units as the BiLSTM throughout the model. During training, we drop the activation of each neuron with 0.3 probability. For optimization, we use Adamax BIBREF33 with a batch size of 32 and a learning rate of 0.002. For prediction, we compute an exponential moving average (EMA, BIBREF2 BIBREF2 ) of model parameters with a decay rate of 0.995 and use it to compute the model performance. For experiments with ELMo, we use the model implemented by AllenNLP . We truncate passage to contain at most 1000 tokens during training and eliminate those data with answers located after the 1000th token. The training converges in around 50 epochs for models without ELMo (similar to the single-task SAN); For models with ELMo, the convergence is much faster (around 30 epochs).
+
+## Performance of MT-SAN
+
+In the following sub-sections, we report our results on SQuAD and MARCO development sets, as well as on the development and test sets of NewsQA . All results are single-model performance unless otherwise noted.
+
+The multi-task learning results of SAN on SQuAD are summarized in Table 2 . By using MTL on SQuAD and NewsQA, we can improve the exact-match (EM) and F1 score by (2%, 1.5%), respectively, both with and without ELMo. The similar gain indicates that our method is orthogonal to ELMo. Note that our single-model performance is slightly higher than the original SAN, by incorporating EMA and highway networks. By incorporating with multi-task learning, it further improves the performance. The performance gain by adding MARCO is relatively smaller, with 1% in EM and 0.5% in F1. We conjecture that MARCO is less helpful due to its differences in both the question and answer style. For example, questions in MS MARCO are real web search queries, which are short and may have typos or abbreviations; while questions in SQuAD and NewsQA are more formal and well written. Using 3 datasets altogether provides another marginal improvement. Our model obtains the best results among existing methods that do not use a large language model (e.g., ELMo). Our ELMo version also outperforms any other models which are under the same setting. We note that BERT BIBREF28 uses a much larger model than ours(around 20x), and we leave the performance of combining BERT with MTL as interesting future work.
+
+The results of multi-task learning on NewsQA are in Table 3 . The performance gain with multi-task learning is even larger on NewsQA, with over 2% in both EM and F1. Experiments with and without ELMo give similar results. What is worth noting is that our approach not only achieves new state-of-art results with a large margin but also surpasses human performance on NewsQA.
+
+Finally we report MT-SAN performance on MS MARCO in Table 4 . Multi-tasking on SQuAD and NewsQA provides a similar performance boost in terms of BLEU-1 and ROUGE-L score as in the case of NewsQA and SQuAD. Our method does not achieve very high performance compared to previous work, probably because we do not apply common techniques like yes/no classification or cross-passage ranking BIBREF36 .
+
+We also test the robustness of our algorithm by performing another set of experiments on SQuAD and WDW. WDW is much more different than the other three datasets (SQuAD, NewsQA, MS MARCO): WDW guarantees that the answer is always a person, whereas the percentage of such questions in SQuAD is 12.9%. Moreover, WDW is a cloze dataset, whereas in SQuAD and NewsQA answers are spans in the passage. We use a task-specific answer layer in this experiment and use Algorithm "Answer Module for WDW" ; the WDW answer module is the same as in AS Reader BIBREF39 , which we describe in the appendix for completeness. Despite these large difference between datasets, our results (Table 5 ) show that MTL can still provide a moderate performance boost when jointly training on SQuAD (around 0.7%) and WDW (around 1%).
+
+Comparison of methods using external data. As a method of data augmentation, we compare our approach to previous methods for MRC in Table 6 . Our model achieves better performance than back translation. We also observe that language models such as ELMo obtain a higher performance gain than multi-task learning, however, combining it with multi-task learning leads to the most significant performance gain. This validates our assumption that multi-task learning is more robust and is different from previous methods such as language modeling.
+
+##  Comparison of Different MTL Algorithms
+
+In this section, we provide ablation studies as well as comparisons with other existing algorithms on the MTL strategy. We focus on MT-SAN without ELMo for efficient training.
+
+Table 7 compares different multi-task learning strategies for MRC. Both the mixture ratio (Sec "Answer Module for WDW" ) and sample re-weighting (Sec " Sample Re-Weighting" ) improves over the naive baseline of simply combining all the data (Algorithm " Multi-task Learning Algorithms" ). On SQuAD+MARCO, they provide around 0.6% performance boost in terms of both EM and F1, and around 1% on all 3 datasets. We note that this accounts for around a half of our overall improvement. Although sample re-weighting performs similar as mixture ratio, it significantly reduces the amount of training time as it eliminates the need for a grid searching the best ratio. Kendal et al., ( BIBREF18 ) use task uncertainty to weight tasks differently for MTL; our experiments show that this has some positive effect, but does not perform as well as our proposed two techniques. We note that Kendal et al. (as well as other previous MTL methods) optimizes the network to perform well for all the tasks, whereas our method focuses on the target domain which we are interested in, e.g., SQuAD.
+
+Sensitivity of mixture ratio. We also investigate the effect of mixture ratio on the model performance. We plot the EM/F1 score on SQuAD dev set vs. mixture ratio in Figure 1 for MT-SAN when trained on all three datasets. The curve peaks at $\alpha =0.4$ ; however if we use $\alpha =0.2$ or $\alpha =0.5$ , the performance drops by around $0.5\%$ , well behind the performance of sample re-weighting. This shows that the performance of MT-SAN is sensitive to changes in $\alpha $ , making the hyperparameter search even more difficult. Such sensitivity suggests a preference for using our sample re-weighting technique. On the other hand, the ratio based approach is pretty straightforward to implement.
+
+Analysis of sample weights. Dataset comparisons in Table 1 and performance in Table 2 suggests that NewsQA share more similarity with SQuAD than MARCO. Therefore, a MTL system should weight NewsQA samples more than MARCO samples for higher performance. We try to verify this in Table 8 by showing examples and statistics of the sample weights. We present the CED $^{\prime }$ scores, as well as normalized version of question and answer scores (resp. $(H^{\prime }_{1,Q}-H^{\prime }_{k,Q})$ and $(H^{\prime }_{1,A}-H^{\prime }_{k,A})$ in ( 13 ), and then negated and normalized over all samples in NewsQA and MARCO in the same way as in ( 14 )). A high $H_Q$ score indicates high importance of the question, and $H_A$ of the answer; CED $^{\prime }$ is a summary of the two. We first show one example from NewsQA and one from MARCO. The NewsQA question is a natural question (similar to SQuAD) with a short answer, leading to high scores both in questions and answers. The MARCO question is a phrase, with a very long answer, leading to lower scores. From overall statistics, we also find samples in NewsQA have a higher score than those in MARCO. However, if we look at MARCO questions that start with “when” or “who” (i.e., probability natural questions with short answers), the scores go up dramatically.
+
+## Conclusion
+
+We proposed a multi-task learning framework to train MRC systems using datasets from different domains and developed two approaches to re-weight the samples for multi-task learning on MRC tasks. Empirical results demonstrated our approaches outperform existing MTL methods and the single-task baselines as well. Interesting future directions include combining with larger language models such as BERT, and MTL with broader tasks such as language inference BIBREF40 and machine translation.
+
+## Acknowledgements
+
+Yichong Xu has been partially supported by DARPA (FA8750-17-2-0130).
+
+## Answer Module for WDW
+
+We describe the answer module for WDW here for completeness. For WDW we need to choose an answer from a list of candidates; the candidates are people names that have appeared in the passage. We use the same way to summary information in questions as in span-based models: $s_0\leftarrow \text{Highway}\left(\sum _{j} \frac{\exp (w_4H^q_j)}{\sum _{j^{\prime }}\exp {w_4H^q_{j^{\prime }}}}\cdot H^q_j\right)$ . We then compute an attention score via simple dot product: $s=\text{softmax}(s_0^TM)$ . The probability of a candidate being the true answer is the aggregation of attention scores for all appearances of the candidate: $\Pr (c|Q,P) \propto \sum _{1\le i\le n} s_i\mathbb {I}(p_i\in C) $ 
+
+for each candidate $C$ . Recall that $n$ is the length of passage $P$ , and $p_i$ is the i-th word; therefore $\mathbb {I}(p_i\in C)$ is the indicator function of $p_i$ appears in candidate $C$ . The candidate with the largest probability is chosen as the predicted answer.
+
+## Experiment Results on DrQA
+
+To demonstrate the flexibility of our approach, we also adapt DrQA BIBREF29 into our MTL framework. We only test DrQA using the basic Algorithm "Answer Module for WDW" , since our goal is mainly to test the MTL framework.

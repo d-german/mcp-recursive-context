@@ -1,0 +1,161 @@
+# QuaRel: A Dataset and Models for Answering Questions about Qualitative Relationships
+
+**Paper ID:** 1811.08048
+
+## Abstract
+
+Many natural language questions require recognizing and reasoning with qualitative relationships (e.g., in science, economics, and medicine), but are challenging to answer with corpus-based methods. Qualitative modeling provides tools that support such reasoning, but the semantic parsing task of mapping questions into those models has formidable challenges. We present QuaRel, a dataset of diverse story questions involving qualitative relationships that characterize these challenges, and techniques that begin to address them. The dataset has 2771 questions relating 19 different types of quantities. For example,"Jenny observes that the robot vacuum cleaner moves slower on the living room carpet than on the bedroom carpet. Which carpet has more friction?"We contribute (1) a simple and flexible conceptual framework for representing these kinds of questions; (2) the QuaRel dataset, including logical forms, exemplifying the parsing challenges; and (3) two novel models for this task, built as extensions of type-constrained semantic parsing. The first of these models (called QuaSP+) significantly outperforms off-the-shelf tools on QuaRel. The second (QuaSP+Zero) demonstrates zero-shot capability, i.e., the ability to handle new qualitative relationships without requiring additional training data, something not possible with previous models. This work thus makes inroads into answering complex, qualitative questions that require reasoning, and scaling to new relationships at low cost. The dataset and models are available at http://data.allenai.org/quarel.
+
+## Introduction
+
+Many natural language tasks require recognizing and reasoning with qualitative relationships. For example, we may read about temperatures rising (climate science), a drug dose being increased (medicine), or the supply of goods being reduced (economics), and want to reason about the effects. Qualitative story problems, of the kind found in elementary exams (e.g., Figure FIGREF1 ), form a natural example of many of these linguistic and reasoning challenges, and is the target of this work.
+
+Understanding and answering such questions is particularly challenging. Corpus-based methods perform poorly in this setting, as the questions ask about novel scenarios rather than facts that can be looked up. Similarly, word association methods struggle, as a single word change (e.g., “more” to “less”) can flip the answer. Rather, the task appears to require knowledge of the underlying qualitative relations (e.g., “more friction implies less speed”).
+
+Qualitative modeling BIBREF0 , BIBREF1 , BIBREF2 provides a means for encoding and reasoning about such relationships. Relationships are expressed in a natural, qualitative way (e.g., if X increases, then so will Y), rather than requiring numeric equations, and inference allows complex questions to be answered. However, the semantic parsing task of mapping real world questions into these models is formidable and presents unique challenges. These challenges must be solved if natural questions involving qualitative relationships are to be reliably answered.
+
+We make three contributions: (1) a simple and flexible conceptual framework for formally representing these kinds of questions, in particular ones that express qualitative comparisons between two scenarios; (2) a challenging new dataset (QuaRel), including logical forms, exemplifying the parsing challenges; and (3) two novel models that extend type-constrained semantic parsing to address these challenges.
+
+Our first model, QuaSP+, addresses the problem of tracking different “worlds” in questions, resulting in significantly higher scores than with off-the-shelf tools (Section SECREF36 ). The second model, QuaSP+Zero, demonstrates zero-shot capability, i.e., the ability to handle new qualitative relationships on unseen properties, without requiring additional training data, something not possible with previous models (Section SECREF44 ). Together these contributions make inroads into answering complex, qualitative questions by linking language and reasoning, and offer a new dataset and models to spur further progress by the community.
+
+## Related Work
+
+There has been rapid progress in question-answering (QA), spanning a wide variety of tasks and phenomena, including factoid QA BIBREF3 , entailment BIBREF4 , sentiment BIBREF5 , and ellipsis and coreference BIBREF6 . Our contribution here is the first dataset specifically targeted at qualitative relationships, an important category of language that has been less explored. While questions requiring reasoning about qualitative relations sometimes appear in other datasets, e.g., BIBREF7 , our dataset specifically focuses on them so their challenges can be studied.
+
+For answering such questions, we treat the problem as mapping language to a structured formalism (semantic parsing) where simple qualitative reasoning can occur. Semantic parsing has a long history BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 , using datasets about geography BIBREF8 , travel booking BIBREF12 , factoid QA over knowledge bases BIBREF10 , Wikipedia tables BIBREF13 , and many more. Our contributions to this line of research are: a dataset that features phenomena under-represented in prior datasets, namely (1) highly diverse language describing open-domain qualitative problems, and (2) the need to reason over entities that have no explicit formal representation; and methods for adapting existing semantic parsers to address these phenomena.
+
+For the target formalism itself, we draw on the extensive body of work on qualitative reasoning BIBREF0 , BIBREF1 , BIBREF2 to create a logical form language that can express the required qualitative knowledge, yet is sufficiently constrained that parsing into it is feasible, described in more detail in Section SECREF3 .
+
+There has been some work connecting language with qualitative reasoning, although mainly focused on extracting qualitative models themselves from text rather than question interpretation, e.g., BIBREF14 , BIBREF15 . Recent work by BIBREF16 crouse2018learning also includes interpreting questions that require identifying qualitative processes in text, in constrast to our setting of interpreting NL story questions that involve qualitative comparisons.
+
+Answering story problems has received attention in the domain of arithmetic, where simple algebra story questions (e.g., “Sue had 5 cookies, then gave 2 to Joe...”) are mapped to a system of equations, e.g., BIBREF17 , BIBREF18 , BIBREF19 , BIBREF20 . This task is loosely analogous to ours (we instead map to qualitative relations) except that in arithmetic the entities to relate are often identifiable (namely, the numbers). Our qualitative story questions lack this structure, adding an extra challenge.
+
+The QuaRel dataset shares some structure with the Winograd Schema Challenge BIBREF21 , being 2-way multiple choice questions invoking both commonsense and coreference. However, they test different aspects of commonsense: Winograd uses coreference resolution to test commonsense understanding of scenarios, while QuaRel tests reasoning about qualitative relationships requiring tracking of coreferent “worlds.”
+
+Finally, crowdsourcing datasets has become a driving force in AI, producing significant progress, e.g., BIBREF3 , BIBREF22 , BIBREF23 . However, for semantic parsing tasks, one obstacle has been the difficulty in crowdsourcing target logical forms for questions. Here, we show how those logical forms can be obtained indirectly from workers without training the workers in the formalism, loosely similar to BIBREF24 .
+
+## Knowledge Representation 
+
+We first describe our framework for representing questions and the knowledge to answer them. Our dataset, described later, includes logical forms expressed in this language.
+
+## Qualitative Background Knowledge
+
+We use a simple representation of qualitative relationships, leveraging prior work in qualitative reasoning BIBREF0 . Let INLINEFORM0 be the set of properties relevant to the question set's domain (e.g., smoothness, friction, speed). Let INLINEFORM1 be a set of qualitative values for property INLINEFORM2 (e.g., fast, slow). For the background knowledge about the domain itself (a qualitative model), following BIBREF0 Forbus1984QualitativePT, we use the following predicates: [vskip=1mm,leftmargin=5mm] q+(property1, property2)
+
+q-(property1, property2) q+ denotes that property1 and property2 are qualitatively proportional, e.g., if property1 goes up, property2 will too, while q- denotes inverse proportionality, e.g., [vskip=1mm,leftmargin=5mm] # If friction goes up, speed goes down.
+
+q-(friction, speed). We also introduce the predicate: [vskip=1mm,leftmargin=5mm] higher-than( INLINEFORM0 , INLINEFORM1 , property INLINEFORM2 ) where INLINEFORM3 , allowing an ordering of property values to be specified, e.g., higher-than(fast, slow, speed). For our purposes here, we simplify to use just two property values, low and high, for all properties. (The parser learns mappings from words to these values, described later).
+
+Given these primitives, compact theories can be authored for a particular domain by choosing relevant properties INLINEFORM0 , and specifying qualitative relationships (q+,q-) and ordinal values (higher-than) for them. For example, a simple theory about friction is sketched graphically in Figure FIGREF3 . Our observation is that these theories are relatively small, simple, and easy to author. Rather, the primary challenge is in mapping the complex and varied language of questions into a form that interfaces with this representation.
+
+This language can be extended to include additional primitives from qualitative modeling, e.g., i+(x,y) (“the rate of change of x is qualitatively proportional to y”). That is, the techniques we present are not specific to our particular qualitative modeling subset. The only requirement is that, given a set of absolute values or qualitative relationships from a question, the theory can compute an answer.
+
+## Representing Questions
+
+A key feature of our representation is the conceptualization of questions as describing events happening in two worlds, world1 and world2, that are being compared. That comparison may be between two different entities, or the same entity at different time points. E.g., in Figure FIGREF1 the two worlds being compared are the car on wood, and the car on carpet. The tags world1 and world2 denote these different situations, and semantic parsing (Section SECREF5 ) requires learning to correctly associate these tags with parts of the question describing those situations. This abstracts away irrelevant details of the worlds, while still keeping track of which world is which.
+
+We define the following two predicates to express qualitative information in questions: [vskip=1mm,leftmargin=5mm] qrel(property, direction, world)
+
+qval(property, value, world) where property ( INLINEFORM0 ) INLINEFORM1 P, value INLINEFORM2 INLINEFORM3 , direction INLINEFORM4 {higher, lower}, and world INLINEFORM5 {world1, world2}. qrel() denotes the relative assertion that property is higher/lower in world compared with the other world, which is left implicit, e.g., from Figure FIGREF1 : [vskip=1mm,leftmargin=5mm] # The car rolls further on wood.
+
+qrel(distance, higher, world1) where world1 is a tag for the “car on wood” situation (hence world2 becomes a tag for the opposite “car on carpet” situation). qval() denotes that property has an absolute value in world, e.g., [vskip=1mm,leftmargin=5mm] # The car's speed is slow on carpet.
+
+qval(speed, low, world2)
+
+## Logical Forms for Questions
+
+Despite the wide variation in language, the space of logical forms (LFs) for the questions that we consider is relatively compact. In each question, the question body establishes a scenario and each answer option then probes an implication. We thus express a question's LF as a tuple: [vskip=1mm,leftmargin=5mm] (setup, answer-A, answer-B) where setup is the predicate(s) describing the scenario, and answer-* are the predicate(s) being queried for. If answer-A follows from setup, as inferred by the reasoner, then the answer is (A); similarly for (B). For readability we will write this as [vskip=1mm,leftmargin=5mm] setup INLINEFORM0 answer-A ; answer-B We consider two styles of LF, covering a large range of questions. The first is: [vskip=1mm,leftmargin=5mm] (1) qrel( INLINEFORM1 ) INLINEFORM2 
+
+ qrel( INLINEFORM0 ) ; qrel( INLINEFORM1 ) which deals with relative values of properties between worlds, and applies when the question setup includes a comparative. An example of this is in Figure FIGREF1 . The second is: [vskip=1mm,leftmargin=5mm] (2) qval( INLINEFORM2 ), qval( INLINEFORM3 ) INLINEFORM4 
+
+ qrel( INLINEFORM0 ) ; qrel( INLINEFORM1 ) which deals with absolute values of properties, and applies when the setup uses absolute terms instead of comparatives. An example is the first question in Figure FIGREF4 , shown simplified below, whose LF looks as follows (colors showing approximate correspondences): [vskip=1mm,leftmargin=5mm] # Does a bar stool orangeslide faster along the redbar surface with tealdecorative raised bumps or the magentasmooth wooden bluefloor? (A) redbar (B) bluefloor
+
+qval(tealsmoothness, low, redworld1),
+
+qval(magentasmoothness, high, blueworld2) INLINEFORM0 
+
+ qrel(orangespeed, higher, redworld1) ;
+
+ qrel(orangespeed, higher, blueworld2)
+
+## Inference
+
+A small set of rules for qualitative reasoning connects these predicates together. For example, (in logic) if the value of P is higher in world1 than the value of P in world2 and q+(P,Q) then the value of Q will be higher in world1 than the value of Q in world2. Given a question's logical form, a qualitative model, and these rules, a Prolog-style inference engine determines which answer option follows from the premise.
+
+## The QuaRel Dataset 
+
+QuaRel is a crowdsourced dataset of 2771 multiple-choice story questions, including their logical forms. The size of the dataset is similar to several other datasets with annotated logical forms used for semantic parsing BIBREF8 , BIBREF25 , BIBREF24 . As the space of LFs is constrained, the dataset is sufficient for a rich exploration of this space.
+
+We crowdsourced multiple-choice questions in two parts, encouraging workers to be imaginative and varied in their use of language. First, workers were given a seed qualitative relation q+/-( INLINEFORM0 ) in the domain, expressed in English (e.g., “If a surface has more friction, then an object will travel slower”), and asked to enter two objects, people, or situations to compare. They then created a question, guided by a large number of examples, and were encouraged to be imaginative and use their own words. The results are a remarkable variety of situations and phrasings (Figure FIGREF4 ).
+
+Second, the LFs were elicited using a novel technique of reverse-engineering them from a set of follow-up questions, without exposing workers to the underlying formalism. This is possible because of the constrained space of LFs. Referring to LF templates (1) and (2) earlier (Section SECREF13 ), these questions are as follows:
+
+From this information, we can deduce the target LF ( INLINEFORM0 is the complement of INLINEFORM1 , INLINEFORM2 , we arbitrarily set INLINEFORM3 =world1, hence all other variables can be inferred). Three independent workers answer these follow-up questions to ensure reliable results.
+
+We also had a human answer the questions in the dev partition (in principle, they should all be answerable). The human scored 96.4%, the few failures caused by occasional annotation errors or ambiguities in the question set itself, suggesting high fidelity of the content.
+
+About half of the dataset are questions about friction, relating five different properties (friction, heat, distance, speed, smoothness). These questions form a meaningful, connected subset of the dataset which we denote QuaRel INLINEFORM0 . The remaining questions involve a wide variety of 14 additional properties and their relations, such as “exercise intensity vs. sweat” or “distance vs. brightness”.
+
+Figure FIGREF4 shows typical examples of questions in QuaRel, and Table TABREF26 provides summary statistics. In particular, the vocabulary is highly varied (5226 unique words), given the dataset size. Figure FIGREF27 shows some examples of the varied phrases used to describe smoothness.
+
+## Baseline Systems 
+
+We use four systems to evaluate the difficulty of this dataset. (We subsequently present two new models, extending the baseline neural semantic parser, in Sections SECREF36 and SECREF44 ). The first two are an information retrieval system and a word-association method, following the designs of BIBREF26 Clark2016CombiningRS. These are naive baselines that do not parse the question, but nevertheless may find some signal in a large corpus of text that helps guess the correct answer. The third is a CCG-style rule-based semantic parser written specifically for friction questions (the QuaRel INLINEFORM0 subset), but prior to data being collected. The last is a state-of-the-art neural semantic parser. We briefly describe each in turn.
+
+## Baseline Experiments
+
+We ran the above systems on the QuaRel dataset. QuaSP was trained on the training set, using the model with highest parse accuracy on the dev set (similarly BiLSTM used highest answer accuracy on the dev set) . The results are shown in Table TABREF34 . The 95% confidence interval is +/- 4% on the full test set. The human score is the sanity check on the dev set (Section SECREF4 ).
+
+As Table TABREF34 shows, the QuaSP model performs better than other baseline approaches which are only slightly above random. QuaSP scores 56.1% (61.7% on the friction subset), indicating the challenges of this dataset.
+
+For the rule-based system, we observe that it is unable to parse the majority (66%) of questions (hence scoring 0.5 for those questions, reflecting a random guess), due to the varied and unexpected vocabulary present in the dataset. For example, Figure FIGREF27 shows some of the ways that the notion of “smoother/rougher” is expressed in questions, many of which are not covered by the hand-written CCG grammar. This reflects the typical brittleness of hand-built systems.
+
+For QuaSP, we also analyzed the parse accuracies, shown in Table TABREF35 , the score reflecting the percentage of times it produced exactly the right logical form. The random baseline for parse accuracy is near zero given the large space of logical forms, while the model parse accuracies are relatively high, much better than a random baseline.
+
+Further analysis of the predicted LFs indicates that the neural model does well at predicting the properties ( INLINEFORM0 25% of errors on dev set), but struggles to predict the worlds in the LFs reliably ( INLINEFORM1 70% of errors on dev set). This helps explain why non-trivial parse accuracy does not necessarily translate into correspondingly higher answer accuracy: If only the world assignment is wrong, the answer will flip and give a score of zero, rather than the average 0.5.
+
+## New Models 
+
+We now present two new models, both extensions of the neural baseline QuaSP. The first, QuaSP+, addresses the leading cause of failure just described, namely the problem of identifying the two worlds being compared, and significantly outperforms all the baseline systems. The second, QuaSP+Zero, addresses the scaling problem, namely the costly requirement of needing many training examples each time a new qualitative property is introduced. It does this by instead using only a small amount of lexical information about the new property, thus achieving “zero shot” performance, i.e., handling properties unseen in the training examples BIBREF34 , a capability not present in the baseline systems. We present the models and results for each.
+
+## QuaSP+: A Model Incorporating World Tracking
+
+We define the world tracking problem as identifying and tracking references to different “worlds” being compared in text, i.e., correctly mapping phrases to world identifiers, a critical aspect of the semantic parsing task. There are three reasons why this is challenging. First, unlike properties, the worlds being compared in questions are distinct in almost every question, and thus there is no obvious, learnable mapping from phrases to worlds. For example, while a property (like speed) has learnable ways to refer to it (“faster”, “moves rapidly”, “speeds”, “barely moves”), worlds are different in each question (e.g., “on a road”, “countertop”, “while cutting grass”) and thus learning to identify them is hard. Second, different phrases may be used to refer to the same world in the same question (see Figure FIGREF43 ), further complicating the task. Finally, even if the model could learn to identify worlds in other ways, e.g., by syntactic position in the question, there is the problem of selecting world1 or world2 consistently throughout the parse, so that the equivalent phrasings are assigned the same world.
+
+This problem of mapping phrases to world identifiers is similar to the task of entity linking BIBREF35 . In prior semantic parsing work, entity linking is relatively straightforward: simple string-matching heuristics are often sufficient BIBREF36 , BIBREF37 , or an external entity linking system can be used BIBREF38 , BIBREF39 . In QuaRel, however, because the phrases denoting world1 and world2 are different in almost every question, and the word “world” is never used, such methods cannot be applied.
+
+To address this, we have developed QuaSP+, a new model that extends QuaSP by adding an extra initial step to identify and delexicalize world references in the question. In this delexicalization process, potentially new linguistic descriptions of worlds are replaced by canonical tokens, creating the opportunity for the model to generalize across questions. For example, the world mentions in the question: [vskip=1mm,leftmargin=5mm] “A ball rolls further on wood than carpet because the (A) carpet is smoother (B) wood is smoother” are delexicalized to: [vskip=1mm,leftmargin=5mm] “A ball rolls further on World1 than World2 because the (A) World2 is smoother (B) World1 is smoother” This approach is analogous to BIBREF40 Herzig2018DecouplingSA, who delexicalized words to POS tags to avoid memorization. Similar delexicalized features have also been employed in Open Information Extraction BIBREF41 , so the Open IE system could learn a general model of how relations are expressed. In our case, however, delexicalizing to World1 and World2 is itself a significant challenge, because identifying phrases referring to worlds is substantially more complex than (say) identifying parts of speech.
+
+To perform this delexicalization step, we use the world annotations included as part of the training dataset (Section SECREF4 ) to train a separate tagger to identify “world mentions” (text spans) in the question using BIO tags (BiLSTM encoder followed by a CRF). The spans are then sorted into World1 and World2 using the following algorithm:
+
+If one span is a substring of another, they are are grouped together. Remaining spans are singleton groups.
+
+The two groups containing the longest spans are labeled as the two worlds being compared.
+
+Any additional spans are assigned to one of these two groups based on closest edit distance (or ignored if zero overlap).
+
+The group appearing first in the question is labeled World1, the other World2.
+
+The result is a question in which world mentions are canonicalized. The semantic parser QuaSP is then trained using these questions. We call the combined system (delexicalization plus semantic parser) QuaSP+.
+
+The results for QuaSP+ are included in Table TABREF34 . Most importantly, QuaSP+ significantly outperforms the baselines by over 12% absolute. Similarly, the parse accuracies are significantly improved from 32.2% to 43.8% (Table TABREF35 ). This suggests that this delexicalization technique is an effective way of making progress on this dataset, and more generally on problems where multiple situations are being compared, a common characteristic of qualitative problems.
+
+## QuaSP+Zero: A Model for the Zero-Shot Task
+
+While our delexicalization procedure demonstrates a way of addressing the world tracking problem, the approach still relies on annotated data; if we were to add new qualitative relations, new training data would be needed, which is a significant scalability obstacle. To address this, we define the zero-shot problem as being able to answer questions involving a new predicate p given training data only about other predicates P different from p. For example, if we add a new property (e.g., heat) to the qualitative model (e.g., adding q+(friction, heat); “more friction implies more heat”), we want to answer questions involving heat without creating new annotated training questions, and instead only use minimal extra information about the new property. A parser that achieved good zero-shot performance, i.e., worked well for new properties unseen at training time, would be a substantial advance, allowing a new qualitative model to link to questions with minimal effort.
+
+QuaRel provides an environment in which methods for this zero-shot theory extension can be devised and evaluated. To do this, we consider the following experimental setting: All questions mentioning a particular property are removed, the parser is trained on the remainder, and then tested on those withheld questions, i.e., questions mentioning a property unseen in the training data.
+
+We present and evaluate a model that we have developed for this, called QuaSP+Zero, that modifies the QuaSP+ parser as follows: During decoding, at points where the parser is selecting which property to include in the LF (e.g., Figure FIGREF31 ), it does not just consider the question tokens, but also the relationship between those tokens and the properties INLINEFORM0 used in the qualitative model. For example, a question token such as “longer” can act as a cue for (the property) length, even if unseen in the training data, because “longer” and a lexical form of length (e.g.,“length”) are similar. This approach follows the entity-linking approach used by BIBREF11 Krishnamurthy2017NeuralSP, where the similarity between question tokens and (words associated with) entities - called the entity linking score - help decide which entities to include in the LF during parsing. Here, we modify their entity linking score INLINEFORM1 , linking question tokens INLINEFORM2 and property “entities” INLINEFORM3 , to be: INLINEFORM4 
+
+where INLINEFORM0 is a diagonal matrix connecting the embedding of the question token INLINEFORM1 and words INLINEFORM2 associated with the property INLINEFORM3 . For INLINEFORM4 , we provide a small list of words for each property (such as “speed”, “velocity”, and “fast” for the speed property), a small-cost requirement.
+
+The results with QuaSP+Zero are in Table TABREF45 , shown in detail on the QuaRel INLINEFORM0 subset and (due to space constraints) summarized for the full QuaRel. We can measure overall performance of QuaSP+Zero by averaging each of the zero-shot test sets (weighted by the number of questions in each set), resulting in an overall parse accuracy of 38.9% and answer accuracy 61.0% on QuaRel INLINEFORM1 , and 25.7% (parse) and 59.5% (answer) on QuaRel, both significantly better than random. These initial results are encouraging, suggesting that it may be possible to parse into modified qualitative models that include new relations, with minimal annotation effort, significantly opening up qualitative reasoning methods for QA.
+
+## Summary and Conclusion
+
+Our goal is to answer questions that involve qualitative relationships, an important genre of task that involves both language and knowledge, but also one that presents significant challenges for semantic parsing. To this end we have developed a simple and flexible formalism for representing these questions; constructed QuaRel, the first dataset of qualitative story questions that exemplifies these challenges; and presented two new models that adapt existing parsing techniques to this task. The first model, QuaSP+, illustrates how delexicalization can help with world tracking (identifying different “worlds” in questions), resulting in state-of-the-art performance on QuaRel. The second model, QuaSP+Zero, illustrates how zero-shot learning can be achieved (i.e., adding new qualitative relationships without requiring new training examples) by using an entity-linking approach applied to properties - a capability not present in previous models.
+
+There are several directions in which this work can be expanded. First, quantitative property values (e.g., “10 mph”) are currently not handled well, as their mapping to “low” or “high” is context-dependent. Second, some questions do not fit our two question templates (Section SECREF13 ), e.g., where two property values are a single answer option (e.g., “....(A) one floor is smooth and the other floor is rough”). Finally, some questions include an additional level of indirection, requiring an inference step to map to qualitative relations. For example, “Which surface would be best for a race? (A) gravel (B) blacktop” requires the additional commonsense inference that “best for a race” implies “higher speed”.
+
+Given the ubiquity of qualitative comparisons in natural text, recognizing and reasoning with qualitative relationships is likely to remain an important task for AI. This work makes inroads into this task, and contributes a dataset and models to encourage progress by others. The dataset and models are publicly available at http://data.allenai.org/quarel.

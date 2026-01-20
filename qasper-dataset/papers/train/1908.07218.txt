@@ -1,0 +1,79 @@
+# CA-EHN: Commonsense Word Analogy from E-HowNet
+
+**Paper ID:** 1908.07218
+
+## Abstract
+
+Word analogy tasks have tended to be handcrafted, involving permutations of hundreds of words with dozens of relations, mostly morphological relations and named entities. Here, we propose modeling commonsense knowledge down to word-level analogical reasoning. We present CA-EHN, the first commonsense word analogy dataset containing 85K analogies covering 5K words and 6K commonsense relations. This was compiled by leveraging E-HowNet, an ontology that annotates 88K Chinese words with their structured sense definitions and English translations. Experiments show that CA-EHN stands out as a great indicator of how well word representations embed commonsense structures, which is crucial for future end-to-end models to generalize inference beyond training corpora. The dataset is publicly available at \url{https://github.com/jacobvsdanniel/CA-EHN}.
+
+## Introduction
+
+Commonsense reasoning is fundamental for natural language agents to generalize inference beyond their training corpora. Although the natural language inference (NLI) task BIBREF0 , BIBREF1 has proved a good pre-training objective for sentence representations BIBREF2 , commonsense coverage is limited and most models are still end-to-end, relying heavily on word representations to provide background world knowledge.
+
+Therefore, we propose modeling commonsense knowledge down to word-level analogical reasoning. In this sense, existing analogy benchmarks are lackluster. For Chinese analogy (CA), the simplified Chinese dataset CA8 BIBREF3 and the traditional Chinese dataset CA-Google BIBREF4 translated from the English BIBREF5 contain only a few dozen relations, most of which are either morphological, e.g., a shared prefix, or about named entities, e.g., capital-country.
+
+However, commonsense knowledge bases such as WordNet BIBREF6 and ConceptNet BIBREF7 have long annotated relations in our lexicon. Among them, E-HowNet BIBREF4 , extended from HowNet BIBREF8 , currently annotates 88K traditional Chinese words with their structured definitions and English translations.
+
+In this paper, we propose an algorithm for the extraction of accurate commonsense analogies from E-HowNet. We present CA-EHN, the first commonsense analogy dataset containing 85,226 analogies covering 5,563 words and 6,490 commonsense relations.
+
+## E-HowNet
+
+E-HowNet 2.0 consists of two major parts: A lexicon of words and concepts with multi-layered annotations, and a taxonomy of concepts with attached word senses.
+
+## Lexicon
+
+The E-HowNet lexicon consists of two types of tokens: 88K words and 4K concepts. Words and concepts are distinguished by whether there is a vertical bar and an English string in the token. For example, UTF8bkai人 (person) and UTF8bkai雞 (chicken) are words, and human $\vert $ UTF8bkai人 and UTF8bkai雞 $\vert $ chicken are concepts. In this work, the order of English and Chinese within a concept does not matter. In addition, E-HowNet also contains dozens of relations, which comes fully in English, e.g., or, theme, telic.
+
+Words and concepts in E-HowNet are annotated with one or more structured definitions consisting of concepts and relations. Table 1 provides several examples with gradually increasing complexity: UTF8bkai人 (person) is defined simply as a human $\vert $ UTF8bkai人; UTF8bkai駿馬 $\vert $ ExcellentSteed is defined as a UTF8bkai馬 $\vert $ horse which has a qualification relation with HighQuality $\vert $ UTF8bkai優質; UTF8bkai實驗室 (laboratory) is defined as a InstitutePlace $\vert $ UTF8bkai場所 used for conducting experiments or research. Each concept has only one definition, but a word may have multiple senses and hence multiple definitions. In this work, we use E-HowNet word sense definitions to extract commonsense analogies (Section "Commonsense Analogy" ). In addition, word senses are annotated with their English translations, which could be used to transfer our extracted analogies to English multi-word expressions (MWE).
+
+## Taxonomy
+
+Concepts in E-HowNet are additionally organized into a taxonomy. Figure 1 shows the partially expanded tree. Each word sense in the E-HowNet lexicon is attached to a taxon in the tree. In this work, we show that infusing E-HowNet taxonomy tree into word embeddings boosts performance across benchmarks (Section "Commonsense Infusing" ).
+
+## Commonsense Analogy
+
+We extract commonsense word analogies with a rich coverage of words and relations by comparing word sense definitions. The extraction algorithm is further refined with multiple filters, including putting the linguist in the loop.
+
+## Analogical Word Pairs
+
+Illustrated in Figure 2 , the extraction algorithm before refinement consists of five steps.
+
+Definition concept expansion. As many words are synonymous with some concepts, many word senses are defined trivially by one concept. For example, the definition of UTF8bkai駿馬 (excellent steed) is simply {UTF8bkai駿馬 $\vert $ ExcellentSteed}. The triviality is resolved by expanding such definitions by one layer, e.g., replacing {UTF8bkai駿馬 $\vert $ ExcellentSteed} with {UTF8bkai馬 $\vert $ horse:qualification={HighQuality $\vert $ UTF8bkai優質}}, i.e., the definition of UTF8bkai駿馬 $\vert $ ExcellentSteed.
+
+Definition string parsing. We parse each definition into a directed graph. Each node in the graph is either a word, a concept, or a function relation, e.g., or() at the bottom of Table 1 . Each edge is either an attribute relation edge, e.g., :telic=, or a dummy argument edge connecting a function node with one of its argument nodes.
+
+Definition graph comparison. For every sense pair of two different words in the E-HowNet lexicon, we determine if their definition graphs differ only in one concept node. If they do, the two (word, concept) pairs are analogical to one another. For example, since the graph of UTF8bkai良材 sense#2 (the good timber) and the expanded graph of UTF8bkai駿馬 sense#1 (an excellent steed) differs only in wood $\vert $ UTF8bkai木 and UTF8bkai馬 $\vert $ horse, we extract the following concept analogy: UTF8bkai良材:wood $\vert $ UTF8bkai木=UTF8bkai駿馬:UTF8bkai馬 $\vert $ horse.
+
+Left concept expansion. For each concept analogy, we expand the left concept to those words that have one sense defined trivially by it. For example, there is only one word UTF8bkai木頭 (wood) defined as {wood $\vert $ UTF8bkai木}. Thus after expansion, there is still only one analogy: UTF8bkai良材:UTF8bkai木頭=UTF8bkai駿馬:UTF8bkai馬 $\vert $ horse. Most of the time, this step yields multiple analogies per concept analogy.
+
+Right concept expansion. Finally, the remaining concept in each analogy is again expanded to the list of words with a sense trivially defined by it. However, this time we do not use them to form multiple analogies. Instead, the word list is kept as a synset. For example, as UTF8bkai山馬 (orohippus), UTF8bkai馬 (horse), UTF8bkai馬匹 (horses), UTF8bkai駙 (side horse) all have one sense defined as {UTF8bkai馬 $\vert $ horse}, the final analogy becomes UTF8bkai良材:UTF8bkai木頭=UTF8bkai駿馬:{UTF8bkai山馬,UTF8bkai馬,UTF8bkai馬匹,UTF8bkai駙}. When evaluating embeddings on our benchmark, we consider it a correct prediction as long as it belongs to the synset.
+
+## Accurate Analogy
+
+As the core procedure yields an excessively large benchmark, added to the fact that E-HowNet word sense definitions are sometimes inaccurate, we made several refinements to the extraction process.
+
+Concrete concepts. As we found that E-HowNet tends to provide more accurate definitions for more concrete concepts, we require words and concepts at every step of the process to be under physical $\vert $ UTF8bkai物質, which is one layer below thing $\vert $ UTF8bkai萬物 in Figure 1 . This restriction shrinks the benchmark by half.
+
+Common words. At every step of the process, we require words to occur at least five times in ASBC 4.0 BIBREF9 , a segmented traditional Chinese corpus containing 10M words from articles between 1981 and 2007. This eliminates uncommon, ancient words or words with synonymous but uncommon, ancient characters. As shown in Table 3 , the benchmark size is significantly reduced by this restriction.
+
+Linguist checking. We added two data checks into the extraction process between definition graph comparison and left concept expansion. As shown in Table 3 , each of the 36,100 concept analogies were checked by a linguist, leaving 24,439 accurate ones. Furthermore, each synset needed in the 24,439 concept analogies was checked again to remove words that are not actually synonymous with the defining concept. For example, UTF8bkai花草, UTF8bkai山茶花, UTF8bkai薰衣草, UTF8bkai鳶尾花 are all common words with a sense defined trivially as {FlowerGrass $\vert $ UTF8bkai花草}. However, the last three (camellia, lavender, iris) are not actually synonyms but hyponyms to the concept. This step also helps eliminate words in a synset that are using their rare senses, as we do not expect embeddings to encode those senses without word sense disambiguation (WSD). After the second-pass linguist check, we arrived at 85,226 accurate analogies.
+
+## Analogy Datasets
+
+Table 3 compares Chinese word analogy datasets. Most analogies in existing datasets are morphological (morph.) or named entity (entity) relations. For example, CA8-Morphological BIBREF3 uses 21 shared prefix characters, e.g., UTF8bkai第, to form 2,553 analogies, e.g., UTF8bkai一 : UTF8bkai第一 = UTF8bkai二 : UTF8bkai第二 (one : first = two : second). As for named entities, some 20 word pairs of the capital-country relation can be permuted to form 190 analogies, which require a knowledge base but not commonsense to solve. Only the nature part of CA8 and the man-woman part of CA-Google BIBREF10 contains a handful of relations that requires commonsense world knowledge. In constrast, CA-EHN extracts 85K linguist-checked analogies covering 6,490 concept pairs, e.g., (wood $\vert $ UTF8bkai木, UTF8bkai馬 $\vert $ horse). Table 2 shows a small list of the data, covering such diverse domains as onomatopoeia, disability, kinship, and zoology. Full CA-EHN is available in the supplementary materials.
+
+## Word Embeddings
+
+We trained word embeddings using either GloVe BIBREF11 or SGNS BIBREF12 on a small or a large corpus. The small corpus consists of the traditional Chinese part of Chinese Gigaword BIBREF13 and ASBC 4.0 BIBREF9 . The large corpus additionally includes the Chinese part of Wikipedia.
+
+Table 4 shows embedding performance across analogy benchmarks. Cov denotes the number of analogies of which the first three words exist in the embedding. Analogies that are not covered are excluded from that evaluation. Still, we observe that the larger corpus yields higher accuracy across all benchmarks. In addition, using SGNS instead of GloVe provides universal boosts in performance.
+
+While performance on CA-EHN correlates well to that on other benchmarks, commonsense analogies prove to be much more difficult than morphological or named entity analogies for distributed word representations.
+
+## Commonsense Infusing
+
+E-HowNet comes in two major parts: a lexicon and a taxonomy. For the lexicon, we have used it to extract the CA-EHN commonsense analogies. For the taxonomy, we experiment infusing its hypo-hyper and same-taxon relations to distributed word representations by retrofitting BIBREF14 . For example, in Figure 1 , the word vector of UTF8bkai空間 is optimized to be close to both its distributed representation and the word vectors of UTF8bkai空隙 (same-taxon) and UTF8bkai事物 (hypo-hyper). Table 4 shows that retrofitting embeddings with E-HowNet taxonomy improves performance on most benchmarks, and all three embeddings have doubled accuracies on CA-EHN. This shows that CA-EHN is a great indicator of how well word representations embed commonsense knowledge.
+
+## Conclusion
+
+We have presented CA-EHN, the first commonsense word analogy dataset, by leveraging word sense definitions in E-HowNet. After linguist checking, we have 85,226 Chinese analogies covering 5,563 words and 6,490 commonsense relations. We anticipate that CA-EHN will become an important benchmark testing how well future embedding methods capture commonsense knowledge, which is crucial for models to generalize inference beyond their training corpora. With translations provided by E-HowNet, Chinese words in CA-EHN can be transferred to English MWEs.

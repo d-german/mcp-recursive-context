@@ -1,0 +1,193 @@
+# Contextual Recurrent Units for Cloze-style Reading Comprehension
+
+**Paper ID:** 1911.05960
+
+## Abstract
+
+Recurrent Neural Networks (RNN) are known as powerful models for handling sequential data, and especially widely utilized in various natural language processing tasks. In this paper, we propose Contextual Recurrent Units (CRU) for enhancing local contextual representations in neural networks. The proposed CRU injects convolutional neural networks (CNN) into the recurrent units to enhance the ability to model the local context and reducing word ambiguities even in bi-directional RNNs. We tested our CRU model on sentence-level and document-level modeling NLP tasks: sentiment classification and reading comprehension. Experimental results show that the proposed CRU model could give significant improvements over traditional CNN or RNN models, including bidirectional conditions, as well as various state-of-the-art systems on both tasks, showing its promising future of extensibility to other NLP tasks as well.
+
+## Introduction
+
+Neural network based approaches have become popular frameworks in many machine learning research fields, showing its advantages over traditional methods. In NLP tasks, two types of neural networks are widely used: Recurrent Neural Network (RNN) and Convolutional Neural Network (CNN).
+
+RNNs are powerful models in various NLP tasks, such as machine translation BIBREF0, sentiment classification BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5, reading comprehension BIBREF6, BIBREF7, BIBREF8, BIBREF9, BIBREF10, BIBREF11, etc. The recurrent neural networks can flexibly model different lengths of sequences into a fixed representation. There are two main implementations of RNN: Long Short-Term Memory (LSTM) BIBREF12 and Gated Recurrent Unit (GRU) BIBREF0, which solve the gradient vanishing problems in vanilla RNNs.
+
+Compared to RNN, the CNN model also shows competitive performances in some tasks, such as text classification BIBREF13, etc. However, different from RNN, CNN sets a pre-defined convolutional kernel to “summarize” a fixed window of adjacent elements into blended representations, showing its ability of modeling local context.
+
+As both global and local information is important in most of NLP tasks BIBREF14, in this paper, we propose a novel recurrent unit, called Contextual Recurrent Unit (CRU). The proposed CRU model adopts advantages of RNN and CNN, where CNN is good at modeling local context, and RNN is superior in capturing long-term dependencies. We propose three variants of our CRU model: shallow fusion, deep fusion and deep-enhanced fusion.
+
+To verify the effectiveness of our CRU model, we utilize it into two different NLP tasks: sentiment classification and reading comprehension, where the former is sentence-level modeling, and the latter is document-level modeling. In the sentiment classification task, we build a standard neural network and replace the recurrent unit by our CRU model. To further demonstrate the effectiveness of our model, we also tested our CRU in reading comprehension tasks with a strengthened baseline system originated from Attention-over-Attention Reader (AoA Reader) BIBREF10. Experimental results on public datasets show that our CRU model could substantially outperform various systems by a large margin, and set up new state-of-the-art performances on related datasets. The main contributions of our work are listed as follows.
+
+[leftmargin=*]
+
+We propose a novel neural recurrent unit called Contextual Recurrent Unit (CRU), which effectively incorporate the advantage of CNN and RNN. Different from previous works, our CRU model shows its excellent flexibility as GRU and provides better performance.
+
+The CRU model is applied to both sentence-level and document-level modeling tasks and gives state-of-the-art performances.
+
+The CRU could also give substantial improvements in cloze-style reading comprehension task when the baseline system is strengthened by incorporating additional features which will enrich the representations of unknown words and make the texts more readable to the machine.
+
+## Related Works
+
+Gated recurrent unit (GRU) has been proposed in the scenario of neural machine translations BIBREF0. It has been shown that the GRU has comparable performance in some tasks compared to the LSTM. Another advantage of GRU is that it has a simpler neural architecture than LSTM, showing a much efficient computation.
+
+However, convolutional neural network (CNN) is not as popular as RNNs in NLP tasks, as the texts are formed temporally. But in some studies, CNN shows competitive performance to the RNN models, such as text classification BIBREF13.
+
+Various efforts have been made on combining CNN and RNN. BIBREF3 proposed an architecture that combines CNN and GRU model with pre-trained word embeddings by word2vec. BIBREF5 proposed to combine asymmetric convolution neural network with the bidirectional LSTM network. BIBREF4 presented Dependency Sensitive CNN, which hierarchically construct text by using LSTMs and extracting features with convolution operations subsequently. BIBREF15 propose to make use of dependency relations information in the shortest dependency path (SDP) by combining CNN and two-channel LSTM units. BIBREF16 build a neural network for dialogue topic tracking where the CNN used to account for semantics at individual utterance and RNN for modeling conversational contexts along multiple turns in history.
+
+The difference between our CRU model and previous works can be concluded as follows.
+
+[leftmargin=*]
+
+Our CRU model could adaptively control the amount of information that flows into different gates, which was not studied in previous works.
+
+Also, the CRU does not introduce a pooling operation, as opposed to other works, such as CNN-GRU BIBREF3. Our motivation is to provide flexibility as the original GRU, while the pooling operation breaks this law (the output length is changed), and it is unable to do exact word-level attention over the output. However, in our CRU model, the output length is the same as the input's and can be easily applied to various tasks where the GRU used to.
+
+We also observed that by only using CNN to conclude contextual information is not strong enough. So we incorporate the original word embeddings to form a "word + context" representation for enhancement.
+
+## Our approach
+
+In this section, we will give a detailed introduction to our CRU model. Firstly, we will give a brief introduction to GRU BIBREF0 as preliminaries, and then three variants of our CRU model will be illustrated.
+
+## Our approach ::: Gated Recurrent Unit
+
+Gated Recurrent Unit (GRU) is a type of recurrent unit that models sequential data BIBREF0, which is similar to LSTM but is much simpler and computationally effective than the latter one. We will briefly introduce the formulation of GRU. Given a sequence $x = \lbrace x_1, x_2, ..., x_n\rbrace $, GRU will process the data in the following ways. For simplicity, the bias term is omitted in the following equations.
+
+where $z_t$ is the update gate, $r_t$ is the reset gate, and non-linear function $\sigma $ is often chosen as $sigmoid$ function. In many NLP tasks, we often use a bi-directional GRU, which takes both forward and backward information into account.
+
+## Our approach ::: Contextual Recurrent Unit
+
+By only modeling word-level representation may have drawbacks in representing the word that has different meanings when the context varies. Here is an example that shows this problem.
+
+There are many fan mails in the mailbox.
+
+There are many fan makers in the factory.
+
+As we can see that, though two sentences share the same beginning before the word fan, the meanings of the word fan itself are totally different when we meet the following word mails and makers. The first fan means “a person that has strong interests in a person or thing", and the second one means “a machine with rotating blades for ventilation". However, the embedding of word fan does not discriminate according to the context. Also, as two sentences have the same beginning, when we apply a recurrent operation (such as GRU) till the word fan, the output of GRU does not change, though they have entirely different meanings when we see the following words.
+
+To enrich the word representation with local contextual information and diminishing the word ambiguities, we propose a model as an extension to the GRU, called Contextual Recurrent Unit (CRU). In this model, we take full advantage of the convolutional neural network and recurrent neural network, where the former is good at modeling local information, and the latter is capable of capturing long-term dependencies. Moreover, in the experiment part, we will also show that our bidirectional CRU could also significantly outperform the bidirectional GRU model.
+
+In this paper, we propose three different types of CRU models: shallow fusion, deep fusion and deep-enhanced fusion, from the most fundamental one to the most expressive one. We will describe these models in detail in the following sections.
+
+## Our approach ::: Contextual Recurrent Unit ::: Shallow Fusion
+
+The most simple one is to directly apply a CNN layer after the embedding layer to obtain blended contextual representations. Then a GRU layer is applied afterward. We call this model as shallow fusion, because the CNN and RNN are applied linearly without changing inner architectures of both.
+
+Formally, when given a sequential data $x = \lbrace x_1, x_2, ..., x_n\rbrace $, a shallow fusion of CRU can be illustrated as follows.
+
+We first transform word $x_t$ into word embeddings through an embedding matrix $W_e$. Then a convolutional operation $\phi $ is applied to the context of $e_t$, denoted as $\widetilde{e_t}$, to obtain contextual representations. Finally, the contextual representation $c_t$ is fed into GRU units.
+
+Following BIBREF13, we apply embedding-wise convolution operation, which is commonly used in natural language processing tasks. Let $e_{i:j} \in \mathbb {R}^{\mathcal {\\}j*d}$ denote the concatenation of $j-i+1$ consecutive $d$-dimensional word embeddings.
+
+The embedding-wise convolution is to apply a convolution filter w $\in \mathbb {R}^{\mathcal {\\}k*d}$ to a window of $k$ word embeddings to generate a new feature, i.e., summarizing a local context of $k$ words. This can be formulated as
+
+where $f$ is a non-linear function and $b$ is the bias.
+
+By applying the convolutional filter to all possible windows in the sentence, a feature map $c$ will be generated. In this paper, we apply a same-length convolution (length of the sentence does not change), i.e. $c \in \mathbb {R}^{\mathcal {\\}n*1}$. Then we apply $d$ filters with the same window size to obtain multiple feature maps. So the final output of CNN has the shape of $C \in \mathbb {R}^{\mathcal {\\}n*d}$, which is exactly the same size as $n$ word embeddings, which enables us to do exact word-level attention in various tasks.
+
+## Our approach ::: Contextual Recurrent Unit ::: Deep Fusion
+
+The contextual information that flows into the update gate and reset gate of GRU is identical in shallow fusion. In order to let the model adaptively control the amount of information that flows into these gates, we can embed CNN into GRU in a deep manner. We can rewrite the Equation 1 to 3 of GRU as follows.
+
+where $\phi _z, \phi _r, \phi $ are three different CNN layers, i.e., the weights are not shared. When the weights share across these CNNs, the deep fusion will be degraded to shallow fusion.
+
+## Our approach ::: Contextual Recurrent Unit ::: Deep-Enhanced Fusion
+
+In shallow fusion and deep fusion, we used the convolutional operation to summarize the context. However, one drawback of them is that the original word embedding might be blurred by blending the words around it, i.e., applying the convolutional operation on its context.
+
+For better modeling the original word and its context, we enhanced the deep fusion model with original word embedding information, with an intuition of “enriching word representation with contextual information while preserving its basic meaning”. Figure FIGREF17 illustrates our motivations.
+
+Formally, the Equation 9 to 11 can be further rewritten into
+
+where we add original word embedding $e_t$ after the CNN operation, to “enhance” the original word information while not losing the contextual information that has learned from CNNs.
+
+## Applications
+
+The proposed CRU model is a general neural recurrent unit, so we could apply it to various NLP tasks. As we wonder whether the CRU model could give improvements in both sentence-level modeling and document-level modeling tasks, in this paper, we applied the CRU model to two NLP tasks: sentiment classification and cloze-style reading comprehension. In the sentiment classification task, we build a simple neural model and applied our CRU. In the cloze-style reading comprehension task, we first present some modifications to a recent reading comprehension model, called AoA Reader BIBREF10, and then replace the GRU part by our CRU model to see if our model could give substantial improvements over strong baselines.
+
+## Applications ::: Sentiment Classification
+
+In the sentiment classification task, we aim to classify movie reviews, where one movie review will be classified into the positive/negative or subjective/objective category. A general neural network architecture for this task is depicted in Figure FIGREF20.
+
+First, the movie review is transformed into word embeddings. And then, a sequence modeling module is applied, in which we can adopt LSTM, GRU, or our CRU, to capture the inner relations of the text. In this paper, we adopt bidirectional recurrent units for modeling sentences, and then the final hidden outputs are concatenated. After that, a fully connected layer will be added after sequence modeling. Finally, the binary decision is made through a single $sigmoid$ unit.
+
+As shown, we employed a straightforward neural architecture to this task, as we purely want to compare our CRU model against other sequential models. The detailed experimental result of sentiment classification will be given in the next section.
+
+## Applications ::: Reading Comprehension
+
+Besides the sentiment classification task, we also tried our CRU model in cloze-style reading comprehension, which is a much complicated task. In this paper, we strengthened the recent AoA Reader BIBREF10 and applied our CRU model to see if we could obtain substantial improvements when the baseline is strengthened.
+
+## Applications ::: Reading Comprehension ::: Task Description
+
+The cloze-style reading comprehension is a fundamental task that explores relations between the document and the query. Formally, a general cloze-style query can be illustrated as a triple $\langle {\mathcal {D}}, {\mathcal {Q}}, {\mathcal {A}} \rangle $, where $\mathcal {D}$ is the document, $\mathcal {Q}$ is the query and the answer $\mathcal {A}$. Note that the answer is a single word in the document, which requires us to exploit the relationship between the document and query.
+
+## Applications ::: Reading Comprehension ::: Modified AoA Reader
+
+In this section, we briefly introduce the original AoA Reader BIBREF10, and illustrate our modifications. When a cloze-style training triple $\langle \mathcal {D}, \mathcal {Q}, \mathcal {A} \rangle $ is given, the Modified AoA Reader will be constructed in the following steps. First, the document and query will be transformed into continuous representations with the embedding layer and recurrent layer. The recurrent layer can be the simple RNN, GRU, LSTM, or our CRU model.
+
+To further strengthen the representation power, we show a simple modification in the embedding layer, where we found strong empirical results in performance. The main idea is to utilize additional sparse features of the word and add (concatenate) these features to the word embeddings to enrich the word representations. The additional features have shown effective in various models BIBREF7, BIBREF17, BIBREF11. In this paper, we adopt two additional features in document word embeddings (no features applied to the query side).
+
+$\bullet $ Document word frequency: Calculate each document word frequency. This helps the model to pay more attention to the important (more mentioned) part of the document.
+
+$\bullet $ Count of query word: Count the number of each document word appeared in the query. For example, if a document word appears three times in the query, then the feature value will be 3. We empirically find that instead of using binary features (appear=1, otherwise=0) BIBREF17, indicating the count of the word provides more information, suggesting that the more a word occurs in the query, the less possible the answer it will be. We replace the Equation 16 with the following formulation (query side is not changed),
+
+where $freq(x)$ and $CoQ(x)$ are the features that introduced above.
+
+Other parts of the model remain the same as the original AoA Reader. For simplicity, we will omit this part, and the detailed illustrations can be found in BIBREF10.
+
+## Experiments: Sentiment Classification ::: Experimental Setups
+
+In the sentiment classification task, we tried our model on the following public datasets.
+
+[leftmargin=*]
+
+MR Movie reviews with one sentence each. Each review is classified into positive or negative BIBREF18.
+
+IMDB Movie reviews from IMDB website, where each movie review is labeled with binary classes, either positive or negative BIBREF19. Note that each movie review may contain several sentences.
+
+SUBJ$^1$ Movie review labeled with subjective or objective BIBREF20.
+
+The statistics and hyper-parameter settings of these datasets are listed in Table TABREF33.
+
+As these datasets are quite small and overfit easily, we employed $l_2$-regularization of 0.0001 to the embedding layer in all datasets. Also, we applied dropout BIBREF21 to the output of the embedding layer and fully connected layer. The fully connected layer has a dimension of 1024. In the MR and SUBJ, the embedding layer is initialized with 200-dimensional GloVe embeddings (trained on 840B token) BIBREF22 and fine-tuned during the training process. In the IMDB condition, the vocabulary is truncated by descending word frequency order. We adopt batched training strategy of 32 samples with ADAM optimizer BIBREF23, and clipped gradient to 5 BIBREF24. Unless indicated, the convolutional filter length is set to 3, and ReLU for the non-linear function of CNN in all experiments. We use 10-fold cross-validation (CV) in the dataset that has no train/valid/test division.
+
+## Experiments: Sentiment Classification ::: Results
+
+The experimental results are shown in Table TABREF35. As we mentioned before, all RNNs in these models are bi-directional, because we wonder if our bi-CRU could still give substantial improvements over bi-GRU which could capture both history and future information. As we can see that, all variants of our CRU model could give substantial improvements over the traditional GRU model, where a maximum gain of 2.7%, 1.0%, and 1.9% can be observed in three datasets, respectively. We also found that though we adopt a straightforward classification model, our CRU model could outperform the state-of-the-art systems by 0.6%, 0.7%, and 0.8% gains respectively, which demonstrate its effectiveness. By employing more sophisticated architecture or introducing task-specific features, we think there is still much room for further improvements, which is beyond the scope of this paper.
+
+When comparing three variants of the CRU model, as we expected, the CRU with deep-enhanced fusion performs best among them. This demonstrates that by incorporating contextual representations with original word embedding could enhance the representation power. Also, we noticed that when we tried a larger window size of the convolutional filter, i.e., 5 in this experiment, does not give a rise in the performance. We plot the trends of MR test set accuracy with the increasing convolutional filter length, as shown in Figure FIGREF36.
+
+As we can see that, using a smaller convolutional filter does not provide much contextual information, thus giving a lower accuracy. On the contrary, the larger filters generally outperform the lower ones, but not always. One possible reason for this is that when the filter becomes larger, the amortized contextual information is less than a smaller filter, and make it harder for the model to learn the contextual information. However, we think the proper size of the convolutional filter may vary task by task. Some tasks that require long-span contextual information may benefit from a larger filter.
+
+We also compared our CRU model with related works that combine CNN and RNN BIBREF3, BIBREF4, BIBREF5. From the results, we can see that our CRU model significantly outperforms previous works, which demonstrates that by employing deep fusion and enhancing the contextual representations with original embeddings could substantially improve the power of word representations.
+
+On another aspect, we plot the trends of IMDB test set accuracy during the training process, as depicted in Figure FIGREF37. As we can see that, after iterating six epochs of training data, all variants of CRU models show faster convergence speed and smaller performance fluctuation than the traditional GRU model, which demonstrates that the proposed CRU model has better training stability.
+
+## Experiments: Reading Comprehension ::: Experimental Setups
+
+We also tested our CRU model in the cloze-style reading comprehension task. We carried out experiments on the public datasets: CBT NE/CN BIBREF25. The CRU model used in these experiments is the deep-enhanced type with the convolutional filter length of 3. In the re-ranking step, we also utilized three features: Global LM, Local LM, Word-class LM, as proposed by BIBREF10, and all LMs are 8-gram trained by SRILM toolkit BIBREF27. For other settings, such as hyperparameters, initializations, etc., we closely follow the experimental setups as BIBREF10 to make the experiments more comparable.
+
+## Experiments: Reading Comprehension ::: Results
+
+The overall experimental results are given in Table TABREF38. As we can see that our proposed models can substantially outperform various state-of-the-art systems by a large margin.
+
+[leftmargin=*]
+
+Overall, our final model (M-AoA Reader + CRU + Re-ranking) could give significant improvements over the previous state-of-the-art systems by 2.1% and 1.4% in test sets, while re-ranking and ensemble bring further improvements.
+
+When comparing M-AoA Reader to the original AoA Reader, 1.8% and 0.4% improvements can be observed, suggesting that by incorporating additional features into embedding can enrich the power of word representation. Incorporating more additional features in the word embeddings would have another boost in the results, but we leave this in future work.
+
+Replacing GRU with our CRU could significantly improve the performance, where 1.6% and 1.5% gains can be obtained when compared to M-AoA Reader. This demonstrates that incorporating contextual information when modeling the sentence could enrich the representations. Also, when modeling an unknown word, except for its randomly initialized word embedding, the contextual information could give a possible guess of the unknown word, making the text more readable to the neural networks.
+
+The re-ranking strategy is an effective approach in this task. We observed that the gains in the common noun category are significantly greater than the named entity. One possible reason is that the language model is much beneficial to CN than NE, because it is much more likely to meet a new named entity that is not covered in the training data than the common noun.
+
+## Qualitative Analysis
+
+In this section, we will give a qualitative analysis on our proposed CRU model in the sentiment classification task. We focus on two categories of the movie reviews, which is quite harder for the model to judge the correct sentiment. The first one is the movie review that contains negation terms, such as “not”. The second type is the one contains sentiment transition, such as “clever but not compelling”. We manually select 50 samples of each category in the MR dataset, forming a total of 100 samples to see if our CRU model is superior in handling these movie reviews. The results are shown in Table TABREF45. As we can see that, our CRU model is better at both categories of movie review classification, demonstrating its effectiveness.
+
+Among these samples, we select an intuitive example that the CRU successfully captures the true meaning of the sentence and gives the correct sentiment label. We segment a full movie review into three sentences, which is shown in Table TABREF46.
+
+Regarding the first and second sentence, both models give correct sentiment prediction. While introducing the third sentence, the GRU baseline model failed to recognize this review as a positive sentiment because there are many negation terms in the sentence. However, our CRU model could capture the local context during the recurrent modeling the sentence, and the phrases such as “not making fun” and “not laughing at” could be correctly noted as positive sentiment which will correct the sentiment category of the full review, suggesting that our model is superior at modeling local context and gives much accurate meaning.
+
+## Conclusion
+
+In this paper, we proposed an effective recurrent model for modeling sequences, called Contextual Recurrent Units (CRU). We inject the CNN into GRU, which aims to better model the local context information via CNN before recurrently modeling the sequence. We have tested our CRU model on the cloze-style reading comprehension task and sentiment classification task. Experimental results show that our model could give substantial improvements over various state-of-the-art systems and set up new records on the respective public datasets. In the future, we plan to investigate convolutional filters that have dynamic lengths to adaptively capture the possible spans of its context.

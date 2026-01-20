@@ -1,0 +1,69 @@
+# Recurrent Deep Stacking Networks for Speech Recognition
+
+**Paper ID:** 1612.04675
+
+## Abstract
+
+This paper presented our work on applying Recurrent Deep Stacking Networks (RDSNs) to Robust Automatic Speech Recognition (ASR) tasks. In the paper, we also proposed a more efficient yet comparable substitute to RDSN, Bi- Pass Stacking Network (BPSN). The main idea of these two models is to add phoneme-level information into acoustic models, transforming an acoustic model to the combination of an acoustic model and a phoneme-level N-gram model. Experiments showed that RDSN and BPsn can substantially improve the performances over conventional DNNs.
+
+## Introduction
+
+Ever since the introduction of Deep Neural Networks (DNNs) to Automatic Speech Recognition (ASR) tasks BIBREF0 , researchers had been trying to use additional inputs to the raw input features. We extracted features that are more representative using the first and second order differentiates of the raw input features. And we utilized features in multiple neighboring frames to make use of the context information.
+
+Efforts had been continuously made in designing and modifying models that are more powerful. We designed Recurrent Neural Networks (RNNs) BIBREF1 for context-sensitive applications, Convolutional Neural Networks (CNNs) BIBREF2 for image pattern classification, and many other variances of conventional DNNs. In addition, we re-introduced Long Short-Term Memory (LSTM) BIBREF3 , making our DNNs more capable of incorporating large amounts of data and making accurate predictions.
+
+In the area of Robust ASR, although it is always helpful to incorporate more data, we still lack a model as well-designed as CNN in Computer Vision (CV). Many methods were proposed on both front-end BIBREF4 and back-end. The models in this paper belong to the back-end methods.
+
+Inspired by recent progresses in Natural Language Processing BIBREF5 , we proposed the Recurrent Deep Stacking Network (RDSN) and successfully applied it to Speech Enhancement tasks. RDSN utilizes the phoneme information in previous frames as additional inputs to the raw features. From another perspective of view, this framework transformed the Acoustic Model into a hybrid model consisted of an Acoustic Model and a simple N-gram Language Model on phoneme level.
+
+In the next section, we will explain the framework of RDSN and tricks to compress the outputs. Then we will show the experimental results and make a conclusion.
+
+## Recurrent Deep Stacking Network
+
+As indicated in its name, Recurrent Deep Stacking Network stacks and concatenates the outputs of previous frames into the input features of the current frame. If we view acoustic models in ASR systems as functions projecting input features to the probability density outputs, we can see the differences between conventional systems and RDSN clearer. Denote the input features at frame $t$ as $x_t$ , and the output as frame $t$ as $y_t$ . We can see that RDSN tries to model 
+
+$$P(y_t | x_{t+k}, ..., x_{t+1}, x_t, x_{t-1}, ..., x_{t-k}, y_t, y_{t-1}, ..., y_{t-k})$$   (Eq. 2) 
+
+while conventional DNNs try to model 
+
+$$P(y_t | x_{t+k}, ..., x_{t+1}, x_t, x_{t-1}, ..., x_{t-k})$$   (Eq. 3) 
+
+Note that if we want the RDSN to be causal, we can simplify it to 
+
+$$P(y_t | x_t, x_{t-1}, ..., x_{t-k}, y_t, y_{t-1}, ..., y_{t-k})$$   (Eq. 4) 
+
+where $k$ 's in the above formula represent the number of recurrent frames. Figure 1 shows the framework of RDSN.
+
+Adding $y_t, y_{t-1}, ..., y_{t-k}$ as additional inputs, we transferred the pure acoustic model into a hybrid model consisted of an acoustic model and a phoneme-level N-gram model representing the relation between current phone and previous phones. The phoneme-level N-gram (or as in the formula above, k-gram) model provides additional information on phoneme-level, trying to make the output of current frame more accurate and robust with respect to noises and reverberations.
+
+## Compressing the Outputs
+
+Since the output dimensions of acoustic models are usually of thousands, adding multiple recurrent outputs will significantly increase the size of the model. We use a compression method based on the correspondence of the DNN output and monophone states. For each output dimension, we find the corresponding monophone and add its value with the other output dimensions that have the same corresponding monophone. This process compresses the dimension from thousands to about forty.
+
+Compressing the output dimensions enables us to add multiple recurrent outputs and keep the input vector dense.
+
+## BiPass Stacking Network
+
+Originated from a similar idea as of RDSN, a BiPass Stacking Network (BPSN) takes as input both conventional features and the outputs of previous frames. But the way BiPass Stacking Network generates the representations of previous frames is through a two-pass scheme similar to Deep Stacking Networks (DSN) BIBREF6 .
+
+During the first pass, BPSN sets all the recurrent inputs to be zeros and concatenates the zeros vector with the extracted features. After getting the outputs, we compress them and use the compresses outputs as the additional inputs to the second pass. The second pass takes as input both the compressed outputs and the extracted features.
+
+The difference between BPSN and DSN is that instead of stacking representations of different levels all from current frame, BPSN utilizes the information from previous frames as well.
+
+Note that we can extend BiPass Stacking Network to networks with more than two passes naturally. To add a third pass, we can take as additional inputs the outputs of the second pass. Stacking the outputs of the previous passes, we can use as many passes as we want.
+
+## Experiments
+
+We conducted experiments on CHiME-4 dataset, using all of the single channel utterances. The total length of the dataset is around 100 hours. The training set is a simple mixture of utterances with different background noise types, with has 8738 utterances. The development set is consisted of 3280 utterances and test set 2640. For GMM-HMM model training and decoding, we used the recipe in Kaldi.
+
+In our preliminary experiments, the baseline was a conventional DNN with 6 hidden layers, exponential Rectified Linear Units (ReLUs), and drop out. Each hidden layer has 1024 nodes. The input features extracted from the utterances were 40 dimensional MFCC features. We concatenated 9 features from previous frames and 9 from the following frames, forming a 760 dimensional input vector. The output has 3161 dimensions.
+
+For both RDSN and BPSN, we took 9 previous outputs as additional inputs, forming a 1138 dimensional vector. The other network settings were all kept the same as the baseline. We used the 15th epoch of the baseline model as the initial models to RDSN and BPSN.
+
+Some preliminary results are shown in figure 2.
+
+We can see from figure 2 that after a short adjustment, the cross entropies of RDSN quickly reduced to values substantially lower than that of the baseline system. The adjustment may be due to the fact that in the first epoch, the weights corresponding to the additional inputs were all random.
+
+## Conclusion
+
+In this paper, we proposed a Recurrent Deep Stacking Network (RDSN) based speech recognition system and an efficient substitute to RDSN, BiPass Stacking Network (BPSN). These two models convert the pure acoustic model into a hybrid structure consisted of both an acoustic model and a phoneme-level N-gram model. Note that both RDSN and BPSN can be extended to other types of neural networks like LSTM RNN. We tested the performances of our models on CHiME-4 dataset and got good results. This performance improvement is of high possibility consistent among all types of acoustic models because it provides additional phoneme-level information on top of the acoustic model. Future work includes using a larger RDSN to compete with the state-of-art models on CHiME challenges and designing recurrent deep stacking networks from LSTM RNNs.

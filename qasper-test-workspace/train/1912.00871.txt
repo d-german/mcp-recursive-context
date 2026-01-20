@@ -1,0 +1,145 @@
+# Solving Arithmetic Word Problems Automatically Using Transformer and Unambiguous Representations
+
+**Paper ID:** 1912.00871
+
+## Abstract
+
+Constructing accurate and automatic solvers of math word problems has proven to be quite challenging. Prior attempts using machine learning have been trained on corpora specific to math word problems to produce arithmetic expressions in infix notation before answer computation. We find that custom-built neural networks have struggled to generalize well. This paper outlines the use of Transformer networks trained to translate math word problems to equivalent arithmetic expressions in infix, prefix, and postfix notations. In addition to training directly on domain-specific corpora, we use an approach that pre-trains on a general text corpus to provide foundational language abilities to explore if it improves performance. We compare results produced by a large number of neural configurations and find that most configurations outperform previously reported approaches on three of four datasets with significant increases in accuracy of over 20 percentage points. The best neural approaches boost accuracy by almost 10% on average when compared to the previous state of the art.
+
+## Introduction
+
+Students are exposed to simple arithmetic word problems starting in elementary school, and most become proficient in solving them at a young age. Automatic solvers of such problems could potentially help educators, as well as become an integral part of general question answering services. However, it has been challenging to write programs to solve even such elementary school level problems well.
+
+Solving a math word problem (MWP) starts with one or more sentences describing a transactional situation to be understood. The sentences are processed to produce an arithmetic expression, which is evaluated to provide an answer. Recent neural approaches to solving arithmetic word problems have used various flavors of recurrent neural networks (RNN) as well as reinforcement learning. Such methods have had difficulty achieving a high level of generalization. Often, systems extract the relevant numbers successfully but misplace them in the generated expressions. More problematic, they get the arithmetic operations wrong. The use of infix notation also requires pairs of parentheses to be placed and balanced correctly, bracketing the right numbers. There have been problems with parentheses placement as well.
+
+Correctly extracting the numbers in the problem is necessary. Figure FIGREF1 gives examples of some infix representations that a machine learning solver can potentially produce from a simple word problem using the correct numbers. Of the expressions shown, only the first one is correct. After carefully observing expressions that actual problem solvers have generated, we want to explore if the use of infix notation may itself be a part of the problem because it requires the generation of additional characters, the open and close parentheses, which must be balanced and placed correctly.
+
+The actual numbers appearing in MWPs vary widely from problem to problem. Real numbers take any conceivable value, making it almost impossible for a neural network to learn representations for them. As a result, trained programs sometimes generate expressions that have seemingly random numbers. For example, in some runs, a trained program could generate a potentially inexplicable expression such as $(25.01 - 4) * 9$ for the problem given in Figure FIGREF1, with one or more numbers not in the problem sentences. We hypothesize that replacing the numbers in the problem statement with generic tags like $\rm \langle n1 \rangle $, $\rm \langle n2 \rangle $, and $\rm \langle n3 \rangle $ and saving their values as a pre-processing step, does not take away from the generality of the solution, but suppresses the problem of fertility in number generation leading to the introduction of numbers not present in the question sentences.
+
+Another idea we want to test is whether a neural network which has been pre-trained to acquire language knowledge is better able to “understand" the problem sentences. Pre-training with a large amount of arithmetic-related text is likely to help develop such knowledge, but due to the lack of large such focused corpora, we want to test whether pre-training with a sufficient general corpus is beneficial.
+
+In this paper, we use the Transformer model BIBREF0 to solve arithmetic word problems as a particular case of machine translation from text to the language of arithmetic expressions. Transformers in various configurations have become a staple of NLP in the past two years. Past neural approaches did not treat this problem as pure translation like we do, and additionally, these approaches usually augmented the neural architectures with various external modules such as parse trees or used deep reinforcement learning, which we do not do. In this paper, we demonstrate that Transformers can be used to solve MWPs successfully with the simple adjustments we describe above. We compare performance on four individual datasets. In particular, we show that our translation-based approach outperforms state-of-the-art results reported by BIBREF1, BIBREF2, BIBREF3, BIBREF4, BIBREF5 by a large margin on three of four datasets tested. On average, our best neural architecture outperforms previous results by almost 10%, although our approach is conceptually more straightforward.
+
+We organize our paper as follows. The second section presents related work. Then, we discuss our approach. We follow by an analysis of experimental results and compare them to those of other recent approaches. We also discuss our successes and shortcomings. Finally, we share our concluding thoughts and end with our direction for future work.
+
+## Related Work
+
+Past strategies have used rules and templates to match sentences to arithmetic expressions. Some such approaches seemed to solve problems impressively within a narrow domain, but performed poorly when out of domain, lacking generality BIBREF6, BIBREF7, BIBREF8, BIBREF9. Kushman et al. BIBREF3 used feature extraction and template-based categorization by representing equations as expression forests and finding a near match. Such methods required human intervention in the form of feature engineering and development of templates and rules, which is not desirable for expandability and adaptability. Hosseini et al. BIBREF2 performed statistical similarity analysis to obtain acceptable results, but did not perform well with texts that were dissimilar to training examples.
+
+Existing approaches have used various forms of auxiliary information. Hosseini et al. BIBREF2 used verb categorization to identify important mathematical cues and contexts. Mitra and Baral BIBREF10 used predefined formulas to assist in matching. Koncel-Kedziorski et al. BIBREF11 parsed the input sentences, enumerated all parses, and learned to match, requiring expensive computations. Roy and Roth BIBREF12 performed searches for semantic trees over large spaces.
+
+Some recent approaches have transitioned to using neural networks. Semantic parsing takes advantage of RNN architectures to parse MWPs directly into equations or expressions in a math-specific language BIBREF9, BIBREF13. RNNs have shown promising results, but they have had difficulties balancing parenthesis, and also, sometimes incorrectly choose numbers when generating equations. Rehman et al. BIBREF14 used POS tagging and classification of equation templates to produce systems of equations from third-grade level MWPs. Most recently, Sun et al. BIBREF13 used a Bi-Directional LSTM architecture for math word problems. Huang et al. BIBREF15 used a deep reinforcement learning model to achieve character placement in both seen and novel equation templates. Wang et al. BIBREF1 also used deep reinforcement learning.
+
+## Approach
+
+We view math word problem solving as a sequence-to-sequence translation problem. RNNs have excelled in sequence-to-sequence problems such as translation and question answering. The recent introduction of attention mechanisms has improved the performance of RNN models. Vaswani et al. BIBREF0 introduced the Transformer network, which uses stacks of attention layers instead of recurrence. Applications of Transformers have achieved state-of-the-art performance in many NLP tasks. We use this architecture to produce character sequences that are arithmetic expressions. The models we experiment with are easy and efficient to train, allowing us to test several configurations for a comprehensive comparison. We use several configurations of Transformer networks to learn the prefix, postfix, and infix notations of MWP equations independently.
+
+Prefix and postfix representations of equations do not contain parentheses, which has been a source of confusion in some approaches. If the learned target sequences are simple, with fewer characters to generate, it is less likely to make mistakes during generation. Simple targets also may help the learning of the model to be more robust. Experimenting with all three representations for equivalent expressions may help us discover which one works best.
+
+We train on standard datasets, which are readily available and commonly used. Our method considers the translation of English text to simple algebraic expressions. After performing experiments by training directly on math word problem corpora, we perform a different set of experiments by pre-training on a general language corpus. The success of pre-trained models such as ELMo BIBREF16, GPT-2 BIBREF17, and BERT BIBREF18 for many natural language tasks, provides reasoning that pre-training is likely to produce better learning by our system. We use pre-training so that the system has some foundational knowledge of English before we train it on the domain-specific text of math word problems. However, the output is not natural language but algebraic expressions, which is likely to limit the effectiveness of such pre-training.
+
+## Approach ::: Data
+
+We work with four individual datasets. The datasets contain addition, subtraction, multiplication, and division word problems.
+
+AI2 BIBREF2. AI2 is a collection of 395 addition and subtraction problems, containing numeric values, where some may not be relevant to the question.
+
+CC BIBREF19. The Common Core dataset contains 600 2-step questions. The Cognitive Computation Group at the University of Pennsylvania gathered these questions.
+
+IL BIBREF4. The Illinois dataset contains 562 1-step algebra word questions. The Cognitive Computation Group compiled these questions also.
+
+MAWPS BIBREF20. MAWPS is a relatively large collection, primarily from other MWP datasets. We use 2,373 of 3,915 MWPs from this set. The problems not used were more complex problems that generate systems of equations. We exclude such problems because generating systems of equations is not our focus.
+
+We take a randomly sampled 95% of examples from each dataset for training. From each dataset, MWPs not included in training make up the testing data used when generating our results. Training and testing are repeated three times, and reported results are an average of the three outcomes.
+
+## Approach ::: Representation Conversion
+
+We take a simple approach to convert infix expressions found in the MWPs to the other two representations. Two stacks are filled by iterating through string characters, one with operators found in the equation and the other with the operands. From these stacks, we form a binary tree structure. Traversing an expression tree in pre-order results in a prefix conversion. Post-order traversal gives us a postfix expression. Three versions of our training and testing data are created to correspond to each type of expression. By training on different representations, we expect our test results to change.
+
+## Approach ::: Pre-training
+
+We pre-train half of our networks to endow them with a foundational knowledge of English. Pre-training models on significant-sized language corpora have been a common approach recently. We explore the pre-training approach using a general English corpus because the language of MWPs is regular English, interspersed with numerical values. Ideally, the corpus for pre-training should be a very general and comprehensive corpus like an English Wikipedia dump or many gigabytes of human-generated text scraped from the internet like GPT-2 BIBREF21 used. However, in this paper, we want to perform experiments to see if pre-training with a smaller corpus can help. In particular, for this task, we use the IMDb Movie Reviews dataset BIBREF22. This set contains 314,041 unique sentences. Since movie reviewers wrote this data, it is a reference to natural language not related to arithmetic. Training on a much bigger and general corpus may make the language model stronger, but we leave this for future work.
+
+We compare pre-trained models to non-pre-trained models to observe performance differences. Our pre-trained models are trained in an unsupervised fashion to improve the encodings of our fine-tuned solvers. In the pre-training process, we use sentences from the IMDb reviews with a target output of an empty string. We leave the input unlabelled, which focuses the network on adjusting encodings while providing unbiased decoding when we later change from IMDb English text to MWP-Data.
+
+## Approach ::: Method: Training and Testing
+
+The input sequence is a natural language specification of an arithmetic word problem. The MWP questions and equations have been encoded using the subword text encoder provided by the TensorFlow Datasets library. The output is an expression in prefix, infix, or postfix notation, which then can be manipulated further and solved to obtain a final answer.
+
+All examples in the datasets contain numbers, some of which are unique or rare in the corpus. Rare terms are adverse for generalization since the network is unlikely to form good representations for them. As a remedy to this issue, our networks do not consider any relevant numbers during training. Before the networks attempt any translation, we pre-process each question and expression by a number mapping algorithm. This algorithm replaces each numeric value with a corresponding identifier (e.g., $\langle n1 \rangle $, $\langle n2 \rangle $, etc.), and remembers the necessary mapping. We expect that this approach may significantly improve how networks interpret each question. When translating, the numbers in the original question are tagged and cached. From the encoded English and tags, a predicted sequence resembling an expression presents itself as output. Since each network's learned output resembles an arithmetic expression (e.g., $\langle n1 \rangle + \langle n2 \rangle * \langle n3 \rangle $), we use the cached tag mapping to replace the tags with the corresponding numbers and return a final mathematical expression.
+
+Three representation models are trained and tested separately: Prefix-Transformer, Postfix-Transformer, and Infix-Transformer. For each experiment, we use representation-specific Transformer architectures. Each model uses the Adam optimizer with $beta_1=0.95$ and $beta_2=0.99$ with a standard epsilon of $1 \times e^{-9}$. The learning rate is reduced automatically in each training session as the loss decreases. Throughout the training, each model respects a 10% dropout rate. We employ a batch size of 128 for all training. Each model is trained on MWP data for 300 iterations before testing. The networks are trained on a machine using 1 Nvidia 1080 Ti graphics processing unit (GPU).
+
+We compare medium-sized, small, and minimal networks to show if network size can be reduced to increase training and testing efficiency while retaining high accuracy. Networks over six layers have shown to be non-effective for this task. We tried many configurations of our network models, but report results with only three configurations of Transformers.
+
+Transformer Type 1: This network is a small to medium-sized network consisting of 4 Transformer layers. Each layer utilizes 8 attention heads with a depth of 512 and a feed-forward depth of 1024.
+
+Transformer Type 2: The second model is small in size, using 2 Transformer layers. The layers utilize 8 attention heads with a depth of 256 and a feed-forward depth of 1024.
+
+Transformer Type 3: The third type of model is minimal, using only 1 Transformer layer. This network utilizes 8 attention heads with a depth of 256 and a feed-forward depth of 512.
+
+## Approach ::: Method: Training and Testing ::: Objective Function
+
+We calculate the loss in training according to a mean of the sparse categorical cross-entropy formula. Sparse categorical cross-entropy BIBREF23 is used for identifying classes from a feature set, which assumes a large target classification set. Evaluation between the possible translation classes (all vocabulary subword tokens) and the produced class (predicted token) is the metric of performance here. During each evaluation, target terms are masked, predicted, and then compared to the masked (known) value. We adjust the model's loss according to the mean of the translation accuracy after predicting every determined subword in a translation.
+
+where $K = |Translation \; Classes|$, $J = |Translation|$, and $I$ is the number of examples.
+
+## Approach ::: Method: Training and Testing ::: Experiment 1: Representation
+
+Some of the problems encountered by prior approaches seem to be attributable to the use of infix notation. In this experiment, we compare translation BLEU-2 scores to spot the differences in representation interpretability. Traditionally, a BLEU score is a metric of translation quality BIBREF24. Our presented BLEU scores represent an average of scores a given model received over each of the target test sets. We use a standard bi-gram weight to show how accurate translations are within a window of two adjacent terms. After testing translations, we calculate an average BLEU-2 score per test set, which is related to the success over that data. An average of the scores for each dataset become the presented value.
+
+where $N$ is the number of test datasets, which is 4.
+
+## Approach ::: Method: Training and Testing ::: Experiment 2: State-of-the-art
+
+This experiment compares our networks to recent previous work. We count a given test score by a simple “correct versus incorrect" method. The answer to an expression directly ties to all of the translation terms being correct, which is why we do not consider partial precision. We compare average accuracies over 3 test trials on different randomly sampled test sets from each MWP dataset. This calculation more accurately depicts the generalization of our networks.
+
+## Approach ::: Method: Training and Testing ::: Effect of Pre-training
+
+We also explore the effect of language pre-training, as discussed earlier. This training occurs over 30 iterations, at the start of the two experiments, to introduce a good level of language understanding before training on the MWP data. The same Transformer architectures are also trained solely on the MWP data. We calculate the reported results as:
+
+where $R$ is the number of test repetitions, which is 3; $N$ is the number of test datasets, which is 4; $P$ is the number of MWPs, and $C$ is the number of correct equation translations.
+
+## Results
+
+We now present the results of our various experiments. We compare the three representations of target equations and three architectures of the Transformer model in each test.
+
+Results of Experiment 1 are given in Table TABREF21. For clarity, the number in parentheses in front of a row is the Transformer type. By using BLEU scores, we assess the translation capability of each network. This test displays how networks transform different math representations to a character summary level.
+
+We compare by average BLEU-2 accuracy among our tests in the Average column of Table TABREF21 to communicate these translation differences. To make it easier to understand the results, Table TABREF22 provides a summary of Table TABREF21.
+
+Looking at Tables TABREF21 and TABREF22, we note that both the prefix and postfix representations of our target language perform better than the generally used infix notation. The non-pre-trained models perform slightly better than the pre-trained models, and the small or Type 2 models perform slightly better than the minimal-sized and medium-sized Transformer models. The non-pre-trained type 2 prefix Transformer arrangement produced the most consistent translations.
+
+Table TABREF23 provides detailed results of Experiment 2. The numbers are absolute accuracies, i.e., they correspond to cases where the arithmetic expression generated is 100% correct, leading to the correct numeric answer. Results by BIBREF1, BIBREF2, BIBREF4, BIBREF5 are sparse but indicate the scale of success compared to recent past approaches. Prefix, postfix, and infix representations in Table TABREF23 show that network capabilities are changed by how teachable the target data is. The values in the last column of Table TABREF23 are summarized in Table TABREF24. How the models compare with respect to accuracy closely resembles the comparison of BLEU scores, presented earlier. Thus, BLEU scores seem to correlate well with accuracy values in our case.
+
+While our networks fell short of BIBREF1 AI2 testing accuracy, we present state-of-the-art results for the remaining three datasets. The AI2 dataset is tricky because it has numeric values in the word descriptions that are extraneous or irrelevant to the actual computation, whereas the other datasets have only relevant numeric values. The type 2 postfix Transformer received the highest testing average of 87.2%.
+
+Our attempt at language pre-training fell short of our expectations in all but one tested dataset. We had hoped that more stable language understanding would improve results in general. As previously mentioned, using more general and comprehensive corpora of language could help grow semantic ability.
+
+## Results ::: Analysis
+
+All of the network configurations used were very successful for our task. The prefix representation overall provides the most stable network performance. To display the capability of our most successful model (type 2 postfix Transformer), we present some outputs of the network in Figure FIGREF26.
+
+The models respect the syntax of math expressions, even when incorrect. For the majority of questions, our translators were able to determine operators based solely on the context of language.
+
+Our pre-training was unsuccessful in improving accuracy, even when applied to networks larger than those reported. We may need to use more inclusive language, or pre-train on very math specific texts to be successful. Our results support our thesis of infix limitation.
+
+## Results ::: Analysis ::: Error Analysis
+
+Our system, while performing above standard, could still benefit from some improvements. One issue originates from the algorithmic pre-processing of our questions and expressions. In Figure FIGREF27 we show an example of one such issue. The excerpt comes from a type 3 non-pre-trained Transformer test. The example shows an overlooked identifier, $\langle n1 \rangle $. The issue is attributed to the identifier algorithm only considering numbers in the problem. Observe in the question that the word “eight" is the number we expect to relate to $\langle n2 \rangle $. Our identifying algorithm could be improved by considering such number words and performing conversion to a numerical value. If our algorithm performed as expected, the identifier $\langle n1 \rangle $ relates with 4 (the first occurring number in the question) and $\langle n2 \rangle $ with 8 (the converted number word appearing second in the question). The overall translation was incorrect whether or not our algorithm was successful, but it is essential to analyze problems like these that may result in future improvements. Had all questions been tagged correctly, our performance would have likely improved.
+
+## Conclusions and Future Work
+
+In this paper, we have shown that the use of Transformer networks improves automatic math word problem-solving. We have also shown that the use of postfix target expressions performs better than the other two expression formats. Our improvements are well-motivated but straightforward and easy to use, demonstrating that the well-acclaimed Transformer architecture for language processing can handle MWPs well, obviating the need to build specialized neural architectures for this task.
+
+Extensive pre-training over much larger corpora of language has extended the capabilities of many neural approaches. For example, networks like BERT BIBREF18, trained extensively on data from Wikipedia, perform relatively better in many tasks. Pre-training on a much larger corpus remains an extension we would like to try.
+
+We want to work with more complex MWP datasets. Our datasets contain basic arithmetic expressions of +, -, * and /, and only up to 3 of them. For example, datasets such as Dolphin18k BIBREF25, consisting of web-answered questions from Yahoo! Answers, require a wider variety of arithmetic operators to be understood by the system.
+
+We have noticed that the presence of irrelevant numbers in the sentences for MWPs limits our performance. We can think of such numbers as a sort of adversarial threat to an MWP solver that stress-test it. It may be interesting to explore how to keep a network's performance high, even in such cases.
+
+With a hope to further advance this area of research and heighten interests, all of the code and data used is available on GitHub.
+
+## Acknowledgement
+
+The National Science Foundation supports the work reported in this paper under Grant No. 1659788. Any opinions, findings any conclusions or recommendations expressed in this work are those of the author(s) and do not necessarily reflect the views of the National Science Foundation.

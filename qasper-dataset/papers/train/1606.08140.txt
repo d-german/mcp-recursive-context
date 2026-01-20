@@ -1,0 +1,86 @@
+# STransE: a novel embedding model of entities and relationships in knowledge bases
+
+**Paper ID:** 1606.08140
+
+## Abstract
+
+Knowledge bases of real-world facts about entities and their relationships are useful resources for a variety of natural language processing tasks. However, because knowledge bases are typically incomplete, it is useful to be able to perform link prediction or knowledge base completion, i.e., predict whether a relationship not in the knowledge base is likely to be true. This paper combines insights from several previous link prediction models into a new embedding model STransE that represents each entity as a low-dimensional vector, and each relation by two matrices and a translation vector. STransE is a simple combination of the SE and TransE models, but it obtains better link prediction performance on two benchmark datasets than previous embedding models. Thus, STransE can serve as a new baseline for the more complex models in the link prediction task.
+
+## Introduction
+
+Knowledge bases (KBs), such as WordNet BIBREF0 , YAGO BIBREF1 , Freebase BIBREF2 and DBpedia BIBREF3 , represent relationships between entities as triples $(\mathrm {head\ entity, relation, tail\ entity})$ . Even very large knowledge bases are still far from complete BIBREF4 , BIBREF5 . Link prediction or knowledge base completion systems BIBREF6 predict which triples not in a knowledge base are likely to be true BIBREF7 , BIBREF8 . A variety of different kinds of information is potentially useful here, including information extracted from external corpora BIBREF9 , BIBREF10 and the other relationships that hold between the entities BIBREF11 , BIBREF12 . For example, toutanova-EtAl:2015:EMNLP used information from the external ClueWeb-12 corpus to significantly enhance performance.
+
+While integrating a wide variety of information sources can produce excellent results BIBREF13 , there are several reasons for studying simpler models that directly optimize a score function for the triples in a knowledge base, such as the one presented here. First, additional information sources might not be available, e.g., for knowledge bases for specialized domains. Second, models that don't exploit external resources are simpler and thus typically much faster to train than the more complex models using additional information. Third, the more complex models that exploit external information are typically extensions of these simpler models, and are often initialized with parameters estimated by such simpler models, so improvements to the simpler models should yield corresponding improvements to the more complex models as well.
+
+Embedding models for KB completion associate entities and/or relations with dense feature vectors or matrices. Such models obtain state-of-the-art performance BIBREF14 , BIBREF8 , BIBREF15 , BIBREF16 , BIBREF4 , BIBREF17 , BIBREF18 and generalize to large KBs BIBREF19 . Table 1 summarizes a number of prominent embedding models for KB completion.
+
+Let $(h, r, t)$ represent a triple. In all of the models discussed here, the head entity $h$ and the tail entity $t$ are represented by vectors $\textbf {h}$ and $\textbf {t}\in \mathbb {R}^{k}$ respectively. The Unstructured model BIBREF15 assumes that $\textbf {h} \approx \textbf {t}$ . As the Unstructured model does not take the relationship $r$ into account, it cannot distinguish different relation types. The Structured Embedding (SE) model BIBREF8 extends the unstructured model by assuming that $h$ and $t$ are similar only in a relation-dependent subspace. It represents each relation $r$ with two matrices $h$0 and $h$1 , which are chosen so that $h$2 . The TransE model BIBREF16 is inspired by models such as Word2Vec BIBREF20 where relationships between words often correspond to translations in latent feature space. The TransE model represents each relation $h$3 by a translation vector r $h$4 , which is chosen so that $h$5 .
+
+The primary contribution of this paper is that two very simple relation-prediction models, SE and TransE, can be combined into a single model, which we call STransE. Specifically, we use relation-specific matrices $\textbf {W}_{r,1}$ and $\textbf {W}_{r,2}$ as in the SE model to identify the relation-dependent aspects of both $h$ and $t$ , and use a vector $\textbf {r}$ as in the TransE model to describe the relationship between $h$ and $t$ in this subspace. Specifically, our new KB completion model STransE chooses $\textbf {W}_{r,1}$ , $\textbf {W}_{r,2}$ and $\textbf {r}$ so that $\textbf {W}_{r,2}$0 . That is, a TransE-style relationship holds in some relation-dependent subspace, and crucially, this subspace may involve very different projections of the head $\textbf {W}_{r,2}$1 and tail $\textbf {W}_{r,2}$2 . So $\textbf {W}_{r,2}$3 and $\textbf {W}_{r,2}$4 can highlight, suppress, or even change the sign of, relation-specific attributes of $\textbf {W}_{r,2}$5 and $\textbf {W}_{r,2}$6 . For example, for the “purchases” relationship, certain attributes of individuals $\textbf {W}_{r,2}$7 (e.g., age, gender, marital status) are presumably strongly correlated with very different attributes of objects $\textbf {W}_{r,2}$8 (e.g., sports car, washing machine and the like).
+
+As we show below, STransE performs better than the SE and TransE models and other state-of-the-art link prediction models on two standard link prediction datasets WN18 and FB15k, so it can serve as a new baseline for KB completion. We expect that the STransE will also be able to serve as the basis for extended models that exploit a wider variety of information sources, just as TransE does.
+
+## Our approach
+
+Let $\mathcal {E}$ denote the set of entities and $\mathcal {R}$ the set of relation types. For each triple $(h, r, t)$ , where $h, t \in \mathcal {E}$ and $r \in \mathcal {R}$ , the STransE model defines a score function $f_r(h, t)$ of its implausibility. Our goal is to choose $f$ such that the score $f_r(h,t)$ of a plausible triple $(h,r,t)$ is smaller than the score $f_{r^{\prime }}(h^{\prime },t^{\prime })$ of an implausible triple $\mathcal {R}$0 . We define the STransE score function $\mathcal {R}$1 as follows:
+
+ $
+f_r(h, t) & = & \Vert  \textbf {W}_{r,1}\textbf {h} + \textbf {r} - \textbf {W}_{r,2}\textbf {t}\Vert _{\ell _{1/2}}
+$ 
+
+using either the $\ell _1$ or the $\ell _2$ -norm (the choice is made using validation data; in our experiments we found that the $\ell _1$ norm gave slightly better results). To learn the vectors and matrices we minimize the following margin-based objective function: $
+\mathcal {L} & = & \sum _{\begin{array}{c}(h,r,t) \in \mathcal {G} \\ (h^{\prime },r,t^{\prime }) \in \mathcal {G}^{\prime }_{(h, r, t)}\end{array}} [\gamma + f_r(h, t) - f_r(h^{\prime }, t^{\prime })]_+
+$ 
+
+where $[x]_+ = \max (0, x)$ , $\gamma $ is the margin hyper-parameter, $\mathcal {G}$ is the training set consisting of correct triples, and $\mathcal {G}^{\prime }_{(h, r, t)} = \lbrace (h^{\prime }, r, t) \mid h^{\prime } \in \mathcal {E}, (h^{\prime }, r, t) \notin \mathcal {G} \rbrace \cup \lbrace (h, r,
+t^{\prime }) \mid t^{\prime } \in \mathcal {E}, (h, r, t^{\prime }) \notin \mathcal {G} \rbrace $ is the set of incorrect triples generated by corrupting a correct triple $(h, r, t)\in \mathcal {G}$ .
+
+We use Stochastic Gradient Descent (SGD) to minimize $\mathcal {L}$ , and impose the following constraints during training: $\Vert \textbf {h}\Vert _2 \leqslant 1$ , $\Vert \textbf {r}\Vert _2 \leqslant 1$ , $\Vert \textbf {t}\Vert _2 \leqslant 1$ , $\Vert  \textbf {W}_{r,1}\textbf {h}\Vert _2
+\leqslant 1$ and $\Vert  \textbf {W}_{r,2}\textbf {t}\Vert _2 \leqslant 1$ .
+
+## Related work
+
+Table 1 summarizes related embedding models for link prediction and KB completion. The models differ in the score functions $f_r(h, t)$ and the algorithms used to optimize the margin-based objective function, e.g., SGD, AdaGrad BIBREF21 , AdaDelta BIBREF22 and L-BFGS BIBREF23 .
+
+DISTMULT BIBREF24 is based on a Bilinear model BIBREF14 , BIBREF15 , BIBREF25 where each relation is represented by a diagonal rather than a full matrix. The neural tensor network (NTN) model BIBREF4 uses a bilinear tensor operator to represent each relation while ProjE BIBREF26 could be viewed as a simplified version of NTN with diagonal matrices. Similar quadratic forms are used to model entities and relations in KG2E BIBREF27 , ComplEx BIBREF28 , TATEC BIBREF29 and RSTE BIBREF30 . In addition, HolE BIBREF31 uses circular correlation—a compositional operator—which could be interpreted as a compression of the tensor product.
+
+The TransH model BIBREF17 associates each relation with a relation-specific hyperplane and uses a projection vector to project entity vectors onto that hyperplane. TransD BIBREF32 and TransR/CTransR BIBREF33 extend the TransH model using two projection vectors and a matrix to project entity vectors into a relation-specific space, respectively. TransD learns a relation-role specific mapping just as STransE, but represents this mapping by projection vectors rather than full matrices, as in STransE. The lppTransD model BIBREF34 extends TransD to additionally use two projection vectors for representing each relation. In fact, our STransE model and TranSparse BIBREF35 can be viewed as direct extensions of the TransR model, where head and tail entities are associated with their own projection matrices, rather than using the same matrix for both, as in TransR and CTransR.
+
+Recently, several authors have shown that relation paths between entities in KBs provide richer information and improve the relationship prediction BIBREF36 , BIBREF37 , BIBREF18 , BIBREF38 , BIBREF39 , BIBREF40 , BIBREF41 , BIBREF42 , BIBREF43 , BIBREF44 . In addition, NickelMTG15 reviews other approaches for learning from KBs and multi-relational data.
+
+## Experiments
+
+For link prediction evaluation, we conduct experiments and compare the performance of our STransE model with published results on the benchmark WN18 and FB15k datasets BIBREF16 . Information about these datasets is given in Table 2 .
+
+## Task and evaluation protocol
+
+The link prediction task BIBREF8 , BIBREF15 , BIBREF16 predicts the head or tail entity given the relation type and the other entity, i.e. predicting $h$ given $(?, r, t)$ or predicting $t$ given $(h, r, ?)$ where $?$ denotes the missing element. The results are evaluated using the ranking induced by the score function $f_r(h,t)$ on test triples.
+
+For each test triple $(h, r, t)$ , we corrupted it by replacing either $h$ or $t$ by each of the possible entities in turn, and then rank these candidates in ascending order of their implausibility value computed by the score function. This is called as the “Raw” setting protocol. For the “Filtered” setting protocol described in BIBREF16 , we removed any corrupted triples that appear in the knowledge base, to avoid cases where a correct corrupted triple might be ranked higher than the test triple. The “Filtered” setting thus provides a clearer view on the ranking performance. Following BIBREF16 , we report the mean rank and the Hits@10 (i.e., the proportion of test triples in which the target entity was ranked in the top 10 predictions) for each model. In addition, we report the mean reciprocal rank, which is commonly used in information retrieval. In both “Raw” and “Filtered” settings, lower mean rank, higher mean reciprocal rank or higher Hits@10 indicates better link prediction performance.
+
+Following TransR BIBREF33 , TransD BIBREF32 , rTransE BIBREF37 , PTransE BIBREF36 , TATEC BIBREF29 and TranSparse BIBREF35 , we used the entity and relation vectors produced by TransE BIBREF16 to initialize the entity and relation vectors in STransE, and we initialized the relation matrices with identity matrices. We applied the “Bernoulli” trick used also in previous work for generating head or tail entities when sampling incorrect triples BIBREF17 , BIBREF33 , BIBREF27 , BIBREF32 , BIBREF36 , BIBREF34 , BIBREF35 . We ran SGD for 2,000 epochs to estimate the model parameters. Following NIPS20135071 we used a grid search on validation set to choose either the $l_1$ or $l_2$ norm in the score function $f$ , as well as to set the SGD learning rate $\lambda \in \lbrace 0.0001, 0.0005, 0.001, 0.005, 0.01 \rbrace $ , the margin hyper-parameter $\gamma \in \lbrace 1, 3, 5 \rbrace $ and the vector size $k\in \lbrace 50, 100 \rbrace $ . The lowest filtered mean rank on the validation set was obtained when using the $l_1$ norm in $f$ on both WN18 and FB15k, and when $\lambda = 0.0005, \gamma = 5,
+\text{ and } k = 50$ for WN18, and $\lambda = 0.0001, \gamma = 1,
+\text{ and } k = 100$ for FB15k.
+
+## Main results
+
+Table 3 compares the link prediction results of our STransE model with results reported in prior work, using the same experimental setup. The first 15 rows report the performance of the models that do not exploit information about alternative paths between head and tail entities. The next 5 rows report results of the models that exploit information about relation paths. The last 3 rows present results for the models which make use of textual mentions derived from a large external corpus.
+
+It is clear that the models with the additional external corpus information obtained best results. In future work we plan to extend the STransE model to incorporate such additional information. Table 3 also shows that the models employing path information generally achieve better results than models that do not use such information. In terms of models not exploiting path information or external information, the STransE model produces the highest filtered mean rank on WN18 and the highest filtered Hits@10 and mean reciprocal rank on FB15k. Compared to the closely related models SE, TransE, TransR, CTransR, TransD and TranSparse, our STransE model does better than these models on both WN18 and FB15k.
+
+Following NIPS20135071, Table 4 analyzes Hits@10 results on FB15k with respect to the relation categories defined as follows: for each relation type $r$ , we computed the averaged number $a_h$ of heads $h$ for a pair $(r, t)$ and the averaged number $a_t$ of tails $t$ for a pair $(h, r)$ . If $a_h < 1.5$ and $a_t
+< 1.5$ , then $r$ is labeled 1-1. If $a_h$0 and $a_h$1 , then $a_h$2 is labeled M-1. If $a_h$3 and $a_h$4 , then $a_h$5 is labeled as 1-M. If $a_h$6 and $a_h$7 , then $a_h$8 is labeled as M-M. 1.4%, 8.9%, 14.6% and 75.1% of the test triples belong to a relation type classified as 1-1, 1-M, M-1 and M-M, respectively.
+
+Table 4 shows that in comparison to prior models not using path information, STransE obtains the second highest Hits@10 result for M-M relation category at $(80.1\% + 83.1\%) / 2 = 81.6\%$ which is 0.5% smaller than the Hits@10 result of TranSparse for M-M. However, STransE obtains 2.5% higher Hits@10 result than TranSparse for M-1. In addition, STransE also performs better than TransD for 1-M and M-1 relation categories. We believe the improved performance of the STransE model is due to its use of full matrices, rather than just projection vectors as in TransD. This permits STransE to model diverse and complex relation categories (such as 1-M, M-1 and especially M-M) better than TransD and other similiar models. However, STransE is not as good as TransD for the 1-1 relations. Perhaps the extra parameters in STransE hurt performance in this case (note that 1-1 relations are relatively rare, so STransE does better overall).
+
+## Conclusion and future work
+
+This paper presented a new embedding model for link prediction and KB completion. Our STransE combines insights from several simpler embedding models, specifically the Structured Embedding model BIBREF8 and the TransE model BIBREF16 , by using a low-dimensional vector and two projection matrices to represent each relation. STransE, while being conceptually simple, produces highly competitive results on standard link prediction evaluations, and scores better than the embedding-based models it builds on. Thus it is a suitable candidate for serving as future baseline for more complex models in the link prediction task.
+
+In future work we plan to extend STransE to exploit relation path information in knowledge bases, in a manner similar to lin-EtAl:2015:EMNLP1, guu-miller-liang:2015:EMNLP or NguyenCoNLL2016.
+
+## Acknowledgments
+
+This research was supported by a Google award through the Natural Language Understanding Focused Program, and under the Australian Research Council's Discovery Projects funding scheme (project number DP160102156).
+
+NICTA is funded by the Australian Government through the Department of Communications and the Australian Research Council through the ICT Centre of Excellence Program. The first author is supported by an International Postgraduate Research Scholarship and a NICTA NRPA Top-Up Scholarship.

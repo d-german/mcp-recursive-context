@@ -1,0 +1,203 @@
+# Cross-Lingual Adaptation Using Universal Dependencies
+
+**Paper ID:** 2003.10816
+
+## Abstract
+
+We describe a cross-lingual adaptation method based on syntactic parse trees obtained from the Universal Dependencies (UD), which are consistent across languages, to develop classifiers in low-resource languages. The idea of UD parsing is to capture similarities as well as idiosyncrasies among typologically different languages. In this paper, we show that models trained using UD parse trees for complex NLP tasks can characterize very different languages. We study two tasks of paraphrase identification and semantic relation extraction as case studies. Based on UD parse trees, we develop several models using tree kernels and show that these models trained on the English dataset can correctly classify data of other languages e.g. French, Farsi, and Arabic. The proposed approach opens up avenues for exploiting UD parsing in solving similar cross-lingual tasks, which is very useful for languages that no labeled data is available for them.
+
+## Introduction
+
+Universal Dependencies (UD) BIBREF0, BIBREF1, BIBREF2 is an ongoing project aiming to develop cross-lingually consistent treebanks for different languages. UD provided a framework for consistent annotation of grammar (parts of speech, morphological features, and syntactic dependencies) across different human languages. The annotation schema relies on Universal Stanford Dependencies BIBREF3 and Google Universal POS tags BIBREF4. The general principle is to provide universal annotation ; meanwhile, each language can add language-specific relations to the universal pool when necessary.
+
+The main goal of UD project is to facilitate multi-lingual parser production and cross-lingual learningFOOTREF1. Cross-lingual learning is the task of gaining advantages from high-resource languages in terms of annotated data to build a model for low-resource languages. This paradigm of learning is now an invaluable tool for improving the performance of natural language processing in low-resource languages.
+
+Based on the universal annotations of the UD project, there are several works on cross-lingual tasks. Most of them focus on grammar-related tasks such as POS tagging BIBREF5 and dependency parsing BIBREF6, BIBREF7, BIBREF8. In this paper, we are going to study the effectiveness of UD in making cross-lingual models for more complex tasks such as semantic relation extraction and paraphrase identification. To the best of our knowledge, no work was done on the application of UD annotations in the mentioned tasks.
+
+Universal dependencies approach for cross-lingual learning is based on the fact that UD captures similarities as well as idiosyncrasies among typologically different languages. The important characteristic of UD annotations is that although the UD parse trees of parallel sentences in different languages may not be completely equivalent, they have many similar sub-trees, in the sense that at least core parts of trees are equal BIBREF9.
+
+In this paper, we study two cross-lingual tasks : semantic relation extraction and paraphrase identification. The former is the task of identifying semantic connections between entities in a sentence ; while the training and test data are in different languages. The latter is defined to determine whether two sentences are paraphrase or not ; while the training' pairs of sentences are in a different language from the test data.
+
+To employ similarities of UD trees of different languages to train cross-lingual models, we propose to use syntactic based methods which ideally can deal with parsing information of data. We found that tree kernels allow to estimate the similarities among texts directly from their parse trees. They are known to operate on dependency parse trees and automatically generate robust prediction models based on the similarities of them. We have made parallel dataset for each task and presented the cross-lingual variant of kernel functions for them. Evaluation by the parallel test data reveals that the accuracy of models trained by a language and tested on the other languages get close to mono-lingual when the syntactic parsers are trained with UD corpora. This suggests that syntactic patterns trained on the UD trees can be invariant with respect to very different languages.
+
+To compare the proposed approach with the cross-lingual variant of neural models, we employed several state-of-the-art deep networks and equipped them with pre-trained bi-lingual word embeddings. English training data are fed into the networks, which create a mapping between the input and output values. Then test set is given to the trained network. Results show that the tree-based models outperform end-to-end neural models in cross-lingual experiments.
+
+Moreover, we employed Tree-LSTM network BIBREF10 with UD parse trees, which is capable to produce semantic representation from tree-ordered input data. Tree-LSTM doesn't directly deal with syntactic features of the input sentence, rather it processes the input tokens in order of placing in a tree, e.g. from bottom to up or vice versa. Experiments show superiority of Tree-LSTM trained by UD trees over sequential models like LSTM in cross-lingual evaluations.
+
+This paper is organized as follows : Section SECREF2 describes how UD approach allows to capture similarities and differences across diverse languages. Section SECREF3 presents tree-based models for cross-lingual learning of PI and RE tasks. Section SECREF4 presents an empirical study on cross-lingual learning using UD. Finally Section SECREF5 gives the analysis and conclusion remarks.
+
+## Transfer Learning via Universal Dependencies
+
+The Universal Dependencies project aims to produce consistent dependency treebanks and parsers for many languages BIBREF0, BIBREF1, BIBREF2. The most important achievements of the project are the cross-lingual annotation guidelines and sets of universal POS and the grammatical relation tags. Consequentially many treebanks have been developed for different languages. The general rule of UD project is to provide a universal tag set ; however each language can add language-specific relations to the universal pool or omit some tags.
+
+To capture similarities and differences across languages, UD uses a representation consisting of three components : (i) dependency relations between lexical words ; (ii) function words modifying lexical words ; and (iii) morphological features associated with words BIBREF9.
+
+The underlying principle of the syntactic annotation schema of the UD project is that dependencies hold between content words, while function words attach to the content word that they further specify BIBREF3. There is an important difference between UD schema and Stanford Typed Dependencies (STD) BIBREF11 as the STD schema chooses function words as heads : prepositions in prepositional phrases, and copula verbs that have a prepositional phrase as their complement.
+
+Although the UD parse graphs of a sentence in different languages may not be completely equal, they have similar core parts. Figure FIGREF5 shows the UD graph of English sentence “The memo presents details about the lineup management" and its translation into French and Farsi. Both the similarities and differences of UD graphs are demonstrated in that figure. Most of the nodes and edges are similar. Farsi has the language-specific relation “compound :lvc", which relates the noun part of the compound verb to the verbal part as depicted in Figure FIGREF5. So far, UD treebanks have been developed for over 70 languages and all of them are freely available for download. UD project released a pipeline, called UDPipe, which is used to train models for UD parsing using the UD treebanks BIBREF12.
+
+UD parsing and similarity of UD structures in different languages provide facilities to train multi-lingual models. In what follows, we focus on two tasks, paraphrase identification and semantic relation extraction, and present cross-learning models for them.
+
+## Cross-Lingual Tree-based Models
+
+To employ UD parsing in cross-lingual learning, there should be a training algorithm that is capable of utilizing similarities of UD parse trees in different languages. Kernel methods such as SVM use a similarity function, which is called kernel function, to assign a similarity score to pairs of data samples. A kernel function $K$ over an object space $X$ is symmetric, positive semi-definite function $K: X \times X \rightarrow [0,\infty )$ that assigns a similarity score to two instances of $X$, where $K(x,y)=\phi (x)\cdot \phi (y)=\sum {\phi _{i}(x)\phi _{i}(y)}$. Here, $\phi (x)$ is a mapping function from the data object in $X$ to the high-dimensional feature space. Using the kernel function, it is not necessary to extract all features one by one and then multiply the feature vectors. Instead, kernel functions compute the final value directly based on the similarity of data examples.
+
+Tree kernels are the most popular kernels for many natural language processing tasks BIBREF13, BIBREF14. Tree Kernels compute the number of common substructures between two trees $T_1$ and $T_2$ without explicitly considering the whole fragment space BIBREF15. Suppose the set $\mathcal {F}=\lbrace f_1,f_2, \dots , f_{|\mathcal {F}|} \rbrace $ be the tree fragment space and $\mathcal {X}_i(n)$ be an indicator function that is 1 if the $f_i$ rooted at node $n$ and equals to 0, otherwise. Now, tree kernel over $T_1$ and $T_2$ is defined as below BIBREF15 :
+
+where $N_{T_1}$ and $N_{T_2}$ are the set of nodes of $T_1$ and $T_2$, respectively and
+
+which shows the number of common fragments rooted in $n_1$ and $n_2$ nodes. Different tree kernels vary in their definition of $\Delta $ function and fragment type.
+
+There are three important characterizations of fragment type BIBREF16 : SubTree, SubSet Tree and Partial Tree. A SubTree is defined by taking a node of a tree along with all its descendants. SubSet Tree is more general and does not necessarily contain all of the descendants. Instead, it must be generated by utilizing the same grammatical rule set of the original trees. A Partial Tree is more general and relaxes SubSet Tree's constraints. Some popular tree kernels are SubSet Tree Kernel (SST), Partial Tree Kernel (PTK) BIBREF17 and Smoothing Partial Tree Kernel (SPTK) BIBREF15. In the next section, we employ the tree kernels along with UD parse trees for solving cross-lingual tasks.
+
+## Cross-Lingual Tree-based Models ::: Cross-Lingual Paraphrase Identification
+
+Paraphrase Identification (PI) is the task of determining whether two sentences are paraphrase or not. It is considered a binary classification task. The best mono-lingual methods often achieve about 85% accuracy over this corpus BIBREF14, BIBREF18. Filice et al. BIBREF14 extended the tree kernels described in the previous section to operate on text pairs. The underlying idea is that this task is characterized by several syntactic/semantic patterns that a kernel machine can automatically capture from the training material. We can assess a text pair as a paraphrase if it shows a valid transformation rule that we observed in the training data. The following example can clarify this concept. A simple paraphrase rewriting rule is the active-passive transformation, such as in “Federer beat Nadal” and “Nadal was defeated by Federer”. The same transformation can be observed in other paraphrases, such as in “Mark studied biology” and “Biology was learned by Mark”. Although these two pairs of paraphrases have completely different topics, they have a very similar syntactic structure.
+
+Tree kernel combinations can capture this inter-pair similarity and allow a learning algorithm such as SVM to learn the syntactic-semantic patterns characterizing valid paraphrases. Given a tree kernel $TK$ and text pairs $p_i = (i_1, i_2)$, the best tree kernel combination for the paraphrase identification task described in BIBREF14 is the following :
+
+SMTK ( pa, pb ) = softmax ( TK(a1,b1)TK(a2, b2), TK(a1,b2)TK(a2,b1) )
+
+where softmax$(x_1,x_2)= \frac{1}{m} \log \left(e^{m x_1} + e^{m x_2}\right)$ is a simple function approximating the max operator, which cannot be directly used in kernel formulations, as it can create non valid kernel functions. In this kernel combination the two different alignments between the trees of the two pairs are tried and the best alignment is chosen. This allows to exploit the inherent symmetry of the Paraphrase Identification task (i.e., if $a$ is a paraphrase of $b$, it also implies that $b$ is a paraphrase of $a$).
+
+When we adopt the universal dependencies, different languages have a common formalism to represent text syntax, and tree kernels, that mostly operate at a syntactical level, can still provide reliable similarity estimations, i.e., $SM_{TK}(p_a, p_b)$ can work even if $p_a$ and $p_b$ have different languages. This allows operating in a cross-lingual setting. For instance, we can use a model trained on a high-resource language for classifying textual data of a poor-resource language. In addition to the syntactic similarity evaluation, the PTK and SPTK which are used in the $SM_{TK}$ formulation also perform a lexical matching among the words of the trees to be compared.
+
+## Cross-Lingual Tree-based Models ::: Cross-Lingual Semantic Relation Extraction
+
+Relation Extraction (RE) is defined as the task of identifying semantic relations between entities in a text. The goal is to determine whether there is a semantic relation between two given entities in a text, and also to specify the type of relationship if present. RE is an important part of Information Extraction BIBREF19. Relation extraction methods often focus on the Shortest Dependency Path (SDP) between entities BIBREF20. However, there are some crucial differences between UD annotation principles and others parse formalisms that causes us to reconsider SDP of UD trees.
+
+Considering the sentence : “The most common $[$audits$]_{e1}$ were about $[$waste$]_{e2}$ and recycling", there is a Message-Topic relation between $e1$ and $e2$. The most informative words of the sentence for the relation are “were" and “about" ; while the other words of the sentence can be ignored and the same relation is still realized. It is a crucial challenge of relation extraction methods that important information may appear at any part of the sentence. Most previous works assume that the words lying in the window surrounding entities are enough to extract the relation governing entities BIBREF21, BIBREF22. However, words of a sentence are often reordered when the sentence is translated into other languages. Therefore, using words in the window surrounding entities may result in an accurate model for mono-lingual experiments, but not necessarily for cross-lingual ones.
+
+Regarding UD parsing, there are several significant differences between universal annotation schema and other schemas for dependency parsing. Two main differences are related to prepositions and copula verbs. According to the UD annotation guidelines, prepositions are attached to the head of a nominal, and copula verbs are attached to the head of a clause. However in other schemas, prepositions are often the root of the nominal, and the clause is attached to the copula.
+
+Figure FIGREF12 shows the parse tree of the example : “The most common $[$audits$]_{e1}$ were about $[$waste$]_{e2}$ and recycling". The tree is produced by the ARK parser, which does not follow universal schema. As mentioned before, “were" and “about" lie on the SDP between $e1$ and $e2$. However, considering the UD parse tree depicted in Figure FIGREF12, there is no word in the SDP ; while both “were" and “about" are attached to $e2$. As a result, we propose that the words which are dependent on the entities be considered to be the informative words in addition to the SDP's words. We use these words for making a cross-lingual model.
+
+Kernel functions have several interesting characteristics. The combination of kernel functions in a linear or polynomial way results in a valid kernel function BIBREF23. Composite kernel functions are built on individual kernels ; each of them captures part of the features of a data object. Tree kernels capture the data's syntactic structure, while a word sequence kernel considers the words of a sequence in a particular order. To define a cross-lingual kernel, we have adopted the composite kernel used by the Nguyen et al. BIBREF16 :
+
+where $K_{P-e}$ is a polynomial kernel. Its base kernel is an entity kernel ($K_E$), which is applied to an entity-related feature vector consisting of (named) entity type, mention type, headword, and POS tag. $K_{SST}$ is the Sub-Set Tree (SST) kernel, which is applied to the Path-Enclosed Tree (PET) of the constituency tree structure. PET is the smallest common subtree including the two entities BIBREF24, BIBREF25. $K_{PT}$ is the Partial Tree kernel BIBREF17, which is applied to the dependency-based tree structures. Parameter $\alpha $ weighs the kernels.
+
+To incorporate the most informative words of the sentence into the model, the feature vector $V_o$ is defined similarly to the work of Hashimoto et al. BIBREF21. They proposed concatenating these vectors to make the $V_o$ : the vector representing $e1$, the vector representing $e2$, the average of vectors representing words between two entities, the average of vectors representing words in a window before $e1$, and the average of vectors representing words in a window after $e2$.
+
+Since $V_o$ is defined based on the position of words in the sentence and thus is not necessary a cross-lingual consistent feature vector, we propose to define feature vector $V_{ud}$ by concatenating these vectors : the vector representing $e1$, the vector representing $e2$, the average of vectors representing words in the shortest path between two entities (instead of words between $e1$ and $e2$), the average of vectors representing words dependent to $e1$ (instead of words before $e1$), and the average of vectors representing words dependent to $e2$ (instead of words after $e2$). $V_{ud}$ is cross-lingually consistent provided that the words are picked up from UD parse trees and represented by multi-lingual embeddings.
+
+Based on the $CK$ defined in formula DISPLAY_FORM13 and the feature vectors $V_o$ and $V_{ud}$, the following composite kernels are proposed :
+
+where $K_{P-o}$ is polynomial kernel applied on a feature vector $V_o$.
+
+where $K_{P-ud}$ is polynomial kernel applied on a feature vector $V_{ud}$.
+
+Constituency parsing of a sentence in a language depends on the syntactic rules governing the position of words. In general, constituency parse trees of a sentence in different languages are different. So, the constituency tree should not be involved in the cross-lingual model. Here, $CK_2$ is our proposed kernel, which is used for CL-RE. However, $CK_1$ and $CK_3$ can also be used for cross-lingual experiments subject to the similarity of syntactic parsing of the source and target languages.
+
+SST kernel works only on the constituency trees and not on the dependency trees BIBREF17. Therefore, for evaluating the similarity of dependency trees, PT kernel is used. The PT kernel cannot process labels on the edges ; so dependency trees are converted to the Lexical Centered Tree (LCT) format BIBREF15 and then PT kernel is applied on the transformed trees. In LCT format, the lexical is kept at the center and the other information related to that lexical, such as POS tag and grammatical relation, is then added as its children.
+
+MultiWord Expression (MWE) is a lexeme made up a sequence of two or more lexemes as each lexeme has its own meaning, but the meaning of the whole expression cannot (or at least can only partially) be computed from the meaning of its parts. MWE displays lexical, syntactic, semantic, pragmatic and/or statistical idiosyncrasies BIBREF26. The nature of MWE leads us to deal with the whole lexemes as a word. Fortunately, MWE can be identified from the parse tree. There are three types of dependency relations for MWE in UD parsing : flat, fixed, and compound. According to UD guidelines, the flat relation is used for exocentric (headless) semi-fixed MWEs like names (Walter Burley Griffin) and dates (20 November). The fixed relation applies to completely fixed grammaticized (function word-like) MWE (like instead of, such as), whereas compound applies to endocentric (headed) MWE (like apple pie).
+
+To produce feature vector $V_{ud}$, it is better to treat MWE as single words, especially MWE with fixed relations between parts because considering each part of the MWE separately and averaging their embedding vectors may result in a meaningless vector. This point matters when the words of low-resource languages are first translated into other languages and then presented by an embedding of that language. Therefore, the procedure of producing feature vector $V_{ud}$ should be modified with a simple heuristic : every node of the UD tree within the shortest path between two entities or dependent to $e1$ or $e2$ which have a child node with fixed dependency type is considered with its child as one word. If the child has also a child with a fixed dependency, all of them are considered as one word. For example, Figure FIGREF17 shows the UD tree of a Farsi sentence which is the translation of the English sentence in Figure FIGREF12. Entities are distinguished from other nodes by putting a circle around them. The 5th and 6th nodes from the left make a multiword expression that means “about". Applying the above heuristic results in them both being considered as a single word and so the correct translation to another language is found. Some other examples of Farsi MWEs are “قبل از آن که/before", “در حالی که/while", “به درون/into", “به جز/except", and “بر روی/on". In French language there are also MWEs, such as “bien que/although", “en tant que/as", “tant de/so many", “afin de/in order to", “prés de/near".
+
+Apart from fixed, flat, and compound, there are grammatical relations which are language-specific and show MWE structures BIBREF27. If the target language has language-specific relations, the above heuristic should be applied to them. For example, compound :lvc relation, which is defined for several languages including Farsi, represents the dependence from the noun part to the light verb part of compound verbs. An example of this relation was shown in Figure FIGREF5. The words “ارائه/presentation" and “می‌دهد/give" together mean “present".
+
+## Experiments
+
+In this section, the experimental analysis of the proposed models is presented. We have implemented the cross-lingual variant of kernel functions for PI and RE tasks as described in section SECREF3 and measured the accuracy of models by testing them on the parallel data set.
+
+The main advantage of the proposed method is that it needs no data of the test language, in the sense that the model trained using the training data of a language, e.g. English, is directly used in the other languages, e.g. Farsi, Arabic, etc. From this point of view, the proposed method can only be compared with those methods that use no data (neither labeled nor un-labeled) of the test language or parallel corpus or machine translators between the training and test languages.
+
+One solution for cross-lingual tasks is to equip the high accurate neural networks proposed for each task with pre-trained multi-lingual word embeddings, without any change in the architecture of the network. Therefore, we re-implemented some deep methods and compared the proposed approach with them for both PI and RE tasks.
+
+## Experiments ::: Paraphrase Identification
+
+For this task, we made a parallel test dataset and implemented PT and SPT kernels and compared the results with two-channel CNN of Wang et al. BIBREF18.
+
+## Experiments ::: Paraphrase Identification ::: Construction of Parallel Dataset
+
+To prepare a multi-language corpus for PI, we employed an existing English corpus with its Arabic translation and made Farsi correspondence. Microsoft Research Paraphrase Corpus (MSRC) BIBREF28 mostly used by the researches for English PI task. It contains 4,076 and 1,725 pairs of sentences for the training and test, respectively. This data has been extracted from news sources on the web, and has been annotated by humans whether each pair captures a paraphrase equivalence relationship.
+
+PI relates to the task of Semantic Textual Similarity (STS), in which the goal is to capture the degree of equivalence of meaning rather than making a binary decision. SemEval-2017 task 1 put the emphasis on multi-lingual STS BIBREF29. They selected 510 pairs from the test part of the MSRC corpus, and translated them into Arabic by Arabic native speakers. All data have been manually tagged with a number from 0 to 5 to show the degree of similarity.
+
+The Arabic part of the STS dataset of SemEval-2017 is parallel to some parts of the MSRC test corpus. So there is a parallel English-Arabic dataset. Because of the similarity between PI and STS tasks, the dataset of STS can also be used in the PI task, just by converting the scores to 0 or 1. So, the original binary scores of the STS dataset have been retrieved from the MSRC corpus. As a result, a corpus with 510 pairs of English sentences and Arabic translation for PI task is ready. In addition to Arabic translation, we produced correspondence Farsi data by translation of parallel English-Arabic dataset into Farsi by a Farsi native speaker.
+
+In the experiments, MSRC corpus was divided as follows : 1) the training part of MSRC corpus for training ; 2) those data from test part of MSRC, which we don't have their Arabic or Farsi counterpart, for tuning hyper-parameters as development set ; and 3) 510 parallel English-Arabic-Farsi from the test part of MSRC for the test. Therefore, our training and test data have 4076 and 510 samples, respectively. Table TABREF21 shows the statistics of our data.
+
+## Experiments ::: Paraphrase Identification ::: Tools and Setup
+
+The classifiers were trained with the C-SVM learning algorithm within KeLP BIBREF30, which is a kernel-based machine learning framework and implemented tree kernels. We employed PT and SPT kernel functions. For evaluating node similarity in SPTK function, we used the same method described in BIBREF14 : if $n_1$ and $n_2$ are two identical syntactic nodes, $\sigma (n_1,n_2)$ denoted the similarity of $n_1$ and $n_2$ and is equal to 1. If $n_1$ and $n_2$ are two lexical nodes with the same POS tag, their similarity is computed as the cosine similarity of the corresponding vectors in a wordspace. In all other cases $\sigma = 0$.
+
+English wordspace was generated by using word2vec tool. In the cross-lingual setup, we need a vocabulary to find the translation of lexical nodes and then compute their similarity in a wordspace. For English-Arabic experiments, we used Almaany dictionary to find the translation of Arabic words into English. For English-Farsi experiments, we used the Aryanpour dictionary to extract the English equivalent of Farsi words. To evaluate the performance of the classifiers we used Accuracy and F$_1$ as the previous works BIBREF31, BIBREF32, BIBREF18.
+
+For dependency parsing, UDPipe was used, which is a trainable pipeline for tokenization, tagging, lemmatization, and dependency parsing. We used version 2.4 of the UD pre-trained models of English, Arabic, and Farsi.
+
+To implement the CNN network of Wang et al. BIBREF18, we used the same word embedding they used. They set the size of the word vector dimension as d =300, and pre-trained the vectors with the word2vec toolkit on the English Gigaword (LDC2011T07). Hyper-parameters of the network are the same as their work.
+
+## Experiments ::: Paraphrase Identification ::: Results
+
+We first examine the tree kernels in the mono-lingual and then in the cross-lingual learning.
+
+## Experiments ::: Paraphrase Identification ::: Results ::: Evaluation of tree-based models in mono-lingual learning
+
+In the first experiment, we benchmark the UD-based models on the monolingual dataset. So, we employed the original split of MSRC corpus and trained models using PT and SPT kernels. These models essentially work based on the lexico-syntactic patterns observed in training sentences. Filice et al. BIBREF14 proposed several kernels including linear, graph and SPT kernels. They showed the best accuracy is obtained using the combination of them. However, we use only tree kernels in cross-lingual experiments, to measure how much we can rely on the similarities of UD parse trees in different languages.
+
+As Table TABREF29 shows, tree kernels including PTK and SPTK show comparable results according to the accuracy and F$_1$ measures. This means that PT and SPT kernels, which are trained by UD parse trees, make accurate models that can be used in solving the PI task. In the next experiment, we use these models to evaluate Arabic and Farsi test data.
+
+## Experiments ::: Paraphrase Identification ::: Results ::: Evaluation of tree-based models with UD in cross-lingual learning
+
+Now, we employ the parallel dataset for cross-lingual evaluation of the UD-based model trained by English data. A baseline for this task is the majority voting in that what we get if we always predict the most frequent label of the training data. A better baseline for cross-lingual PI is to use some neural models and couple them with pre-induced multilingual embeddings. So, we re-run the two-channel CNN model of Wang et al. BIBREF18 by our test data.
+
+Upper bound for the cross-lingual experiment is considered the accuracy of the model when it is evaluated by the data of the same language of the training data, e.g. English. Table TABREF30 shows that using PTK 61.6% of accuracy is obtained for English test data. It is 57.7% and 57.3% for Arabic and Farsi, respectively ; while the accuracy of the majority baseline is 50.6%. CNN model obtained similar accuracy but much lower F$_1$ scores.
+
+Comparing the results of Tables TABREF29 and TABREF30 reveals that the accuracy of both kernels drops significantly when they are tested by our small test data. The reason is that the distribution of MSRC training data over positive and negative classes is significantly different from our test data. Specifically, 67.5% of MSRC's training data are positive ; while 50.5% of our test data are positive.
+
+## Experiments ::: Paraphrase Identification ::: Results ::: Evaluation of tree-based models with parse formalisms rather than UD
+
+In this experiment, we produced dependency parse trees of Farsi data employing Hazm parser which is trained on non-UD tree-bank. Table TABREF30 shows that in this case accuracy of the models significantly drops. Taking a deeper look at the tree kernels, PTK doesn't use the similarity of words and works based on exact matching of them. So, in cross-lingual experiments, it considers only the similarity of trees. In this case, accuracy on Farsi test data is 50.6% which is the same as the majority baseline. This experiment reveals that the trees of parallel sentences that are produced by UD parsers are significantly more similar than the trees generated by other formalisms.
+
+## Experiments ::: Relation Extraction
+
+In this section, we explain the experiments of cross-lingual RE and present the results. Specifically, we compared tree-based methods including combination of tree kernels and TreeLSTM with deep methods of CNN BIBREF33, Bi-LSTM BIBREF34 and RCNN BIBREF35.
+
+## Experiments ::: Relation Extraction ::: Construction of Parallel Dataset
+
+SemEval 2010 released a dataset for relation extraction in task 8 BIBREF36, which is used by many researchers. This dataset contains 8000 samples for the training and 2717 samples for the test. It was annotated with 19 types of relations : 9 semantically different relationships (with two directions) and an undirected Other class. A brief description of these relation types is given in Table TABREF34.
+
+The SemEval-2010 dataset is in English. For cross-lingual experiments, the first 1000 samples of the test part were translated into Farsi and French. Two native Farsi and French speakers with high expertise in English were asked to translate the data.
+
+## Experiments ::: Relation Extraction ::: Tools and Setup
+
+Similar to PI's experiments, KeLP was used to implement the kernel combination. The strategy for dealing with multiple classes is “one versus others”. For constituency parsing, Stanford CoreNLP was used that contains pre-trained models for English and French within the Stanford package. For parsing Farsi data, the University of Tehran’s constituency parser BIBREF37 was used. Parameter $\alpha $ of the formula DISPLAY_FORM14-DISPLAY_FORM16 is 0.23 as the previous works BIBREF16. To obtain bi-lingual word embeddings, the multiCluster method of Ammar et al. BIBREF38 was used and 512-dimensional vectors were trained for English, French, and Farsi.
+
+## Experiments ::: Relation Extraction ::: Result
+
+We first examine the tree kernels in the mono-lingual and then in the cross-lingual learning.
+
+## Experiments ::: Relation Extraction ::: Result ::: Evaluation of tree-based models in mono-lingual learning
+
+There is a huge amount of works on RE, which mainly utilizes neural networks. These methods use different features including lexical, grammatical, and semantic features such as POS, WordNet, and dependency parsing. Table TABREF39 shows the state-of-the-art neural models evaluated by SemEval 2010-task 8 test set (2717 samples). The best proposed method, $CK_1$, obtained 84.0% of F$_1$ which is comparable with the others.
+
+## Experiments ::: Relation Extraction ::: Result ::: Evaluation of tree-based models with UD in cross-lingual learning
+
+Table TABREF40 shows accuracy of 84.2% F$_1$ score for $CK_1$ when tested on the first 1000 samples of English test data. The accuracy of this model for its Farsi and French counterparts is 53.4% and 61.2% respectively. This kernel employs sentence context, and so it didn't show exciting results in the cross-lingual experiment ; especially for Farsi data. This is because Farsi is one of the SOV languages, in contrast to English and French, which are SVO. This means verbs are usually at the end of the sentence in Farsi. When the sentence's verb is highly informative for the relation between two entities, it places outside the window surrounding two entities and so it doesn't contribute to the feature vector $V_o$.
+
+Table TABREF40 show the F$_1$ score of the models trained by $CK_2$ and $CK_3$. These kernels utilize the context words of the UD trees. Comparing three kernels, F$_1$ increased from 53.4% to 65.2% for Farsi, and to 67.5% for the French test data. The best result for Farsi came from kernel $CK_2$ ; whereas $CK_3$ performed better with the French data. Thus, it can be concluded that the constituency-based parse trees of English and French data have more similar sub-trees than English and Farsi. The reason partially relates to the common tool for English and French ; because Stanford CoreNLP has pre-trained models for both of these languages. Therefore, English and French models followed the same schema, while Farsi adopted different schema for constituency parsing.
+
+In addition to the composite kernels, we trained a Tree-LSTM model over the UD parse trees. Tree-LSTM doesn't process the syntactic features of the input sentence, rather it takes the tokens in order of the tree's node. However, to contribute the grammatical features, for each token its word embedding was concatenated to its dependency type embedding and its POS tag embedding. The resulting network obtained 80.0% of F$_1$ when tested by English test data. F$_1$ of this model is 52.0% for Farsi and 55.6% for French.
+
+Although the Tree-LSTM model obtained lower F$_1$ in comparison with the tree kernels, it still does better than deep baselines : we re-implemented the CNN model of Qin et al. BIBREF33, Att-BiLSTM of Zhou et al. BIBREF34, and RCNN of Lai et al. BIBREF35. All networks use bilingual word embeddings in the embedding layer. As Table TABREF40 shows the best F$_1$ scores were obtained by RCNN which utilizes CNN over the LSTM layer. However, the results are significantly lower than the UD-based models, specifically in Farsi. Because word order of Farsi and English sentences are very different ; as Farsi is SOV and English is SVO.
+
+## Experiments ::: Relation Extraction ::: Result ::: Effect of Multi-Word Expressions
+
+Last two rows of Table TABREF40 show the F$_1$ score of the model trained on the English training data using the $CK2$ and $CK3$, in which MWEs were considered to be a single node within the dependency tree, as described at the end of Section SECREF10. The accuracy of $CK_2$ mainly increased for the Farsi data, because Farsi has many multi-word expressions such as compound verbs. Farsi has only about 250 simple verbs and all the other verbs are compound BIBREF43. Considering MWE as a single node causes all the tokens which compose a verb to be treated as a single word, and so the true translation will be found when searching for that word in dictionaries. Figure FIGREF46 shows the F$_1$ scores of best models for different semantic classes.
+
+## Discussion and Conclusion
+
+Taking a deeper look at the proposed method, most of the mis-classifications of the cross-lingual tree models are related to the following issues :
+
+Structural Difference : The main reason for the error of classifiers is structural differences. Although UD tries to produce as most similar trees as it can for parallel sentences, there are many language-specific dependency patterns that could not be neglected.
+
+Lexical Gap : Words mainly convey the meaning of the sentence. A lexical gap between source and target languages usually ruins the accuracy of cross-lingual models.
+
+Confusion of different senses on a surface : Words of different languages usually have multiple senses. Confusion of different senses of words causes incorrect translation of words, because dictionaries translate word to word, but not word-sense to word-sense. On the other hand, Word Sense Disambiguation (WSD) is a difficult task and needs additional resources such as high-quality multi-lingual wordnets BIBREF44.
+
+Incorrect translation of prepositions : Prepositions are very informative for the RE task. Hashimoto et al. presented the five most informative unigrams and three-grams for three types of relations of the SemEval 2010-task 8 dataset BIBREF21, which are shown in Table TABREF47. Wang et al. BIBREF42 also presented the most representative trigrams for different relations on the same data set. Also, Lahbib et al. BIBREF45 presented the most common Arabic prepositions and showed that each one reflects some specific kinds of semantic relations. Confusion of senses for prepositions is a very common issue in word-to-word translation.
+
+Phrasal verbs : Phrasal verbs, which have a metaphorical meaning, often cannot be translated word for word. For example, the Farsi verb “از دست دادن / to give from hand”, means “lose". When the most informative chunk of the sentence is the phrasal verb, the proposed method does not capture the true meaning.
+
+In general, more lexical and structural similarities between the source and target languages increase the accuracy of UD-based transfer learning. As future works, it is proposed that the UD-based approach is studied for other cross-lingual learning tasks and other languages along with different learning algorithms that are capable of dealing with parse trees.

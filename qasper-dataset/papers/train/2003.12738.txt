@@ -1,0 +1,153 @@
+# Variational Transformers for Diverse Response Generation
+
+**Paper ID:** 2003.12738
+
+## Abstract
+
+Despite the great promise of Transformers in many sequence modeling tasks (e.g., machine translation), their deterministic nature hinders them from generalizing to high entropy tasks such as dialogue response generation. Previous work proposes to capture the variability of dialogue responses with a recurrent neural network (RNN)-based conditional variational autoencoder (CVAE). However, the autoregressive computation of the RNN limits the training efficiency. Therefore, we propose the Variational Transformer (VT), a variational self-attentive feed-forward sequence model. The VT combines the parallelizability and global receptive field of the Transformer with the variational nature of the CVAE by incorporating stochastic latent variables into Transformers. We explore two types of the VT: 1) modeling the discourse-level diversity with a global latent variable; and 2) augmenting the Transformer decoder with a sequence of fine-grained latent variables. Then, the proposed models are evaluated on three conversational datasets with both automatic metric and human evaluation. The experimental results show that our models improve standard Transformers and other baselines in terms of diversity, semantic relevance, and human judgment.
+
+## Introduction
+
+Convolutional and fully-attentional feed-forward architectures, such as Transformers BIBREF0, have emerged as effective alternatives to RNNs BIBREF1 in wide range of NLP tasks. These architectures remove the computational temporal dependency during the training and effectively address the long-standing vanishing gradients problem of recurrent models by processing all inputs simultaneously. Notably, transformers apply a fully attention strategy, where each token in the sequence is informed by other tokens via a self-attention mechanism. It acts as an effectively global receptive field across the whole sequences which absence in RNNs. Despite the powerful modeling capability of trasnformers, they often fail to model one-to-many relation in dialogue response generation tasks BIBREF2 due to their deterministic nature. As a result, they generate dull and generic response (e.g., “I am not sure"), especially with greedy and beam search, which are widely used in other sequence modeling tasks. There have been attempts to generate diverse and informative dialogue responses by incorporating latent variable(s) into the RNN encoder-decoder architecture. In particular BIBREF2 adapt a conditional variational autoencoder (CVAE) to capture discourse-level variations of dialogue, while BIBREF3 and BIBREF4 integrates latent variables in the hidden states of the RNN decoder. However, the inherently sequential computation of aforementioned models limit the efficiency for large scale training.
+
+In this paper, we introduce the Variational Transformer (VT) a variational self-attentive feed-forward sequence model to address the aforementioned issues. The VT combine the parallelizability and global receptive field of the transformer with the variational nature of CVAE by incorporating stochastic latent variables into transformers. We explore two types of VT: 1) Global Variational Transformer (GVT), and 2) Sequential Variational Transformer. The GVT is the extension of CVAE in BIBREF2, which modeling the discourse-level diversity with a global latent variable, While SVT, inspired by variational autoregressive models BIBREF3, BIBREF4, incorporates a sequence of latent variables into decoding process by using a novel variational decoder layer. Unlike previous approaches BIBREF2, BIBREF3, BIBREF4, SVT uses Non-causal Multi-head Attention, which attend to future tokens for computing posterior latent variables instead of using an additional encoder.
+
+The proposed VT architectures integrate stochastic latent variables into Transformers. The experimental results on a three conversation dataset demonstrate that our models can generate more informative and coherent responses.
+
+## Related work ::: Neural Conversational Models
+
+Conversational systems has been widely studied BIBREF5, BIBREF6, BIBREF7, BIBREF8. Compare to rule-based systems BIBREF5, BIBREF6, sequence-to-sequence conversation models achieve superior performance in terms of scalable training and generalization ability BIBREF7. However, it has been pointed out that encoder-decoder models tend to generate generic and repetitive responses like “I am sorry" BIBREF9. To address this issue, there have been three main lines of work. The first is adding additional information (e.g., persona) as input to guild model generate more informative responses BIBREF10, BIBREF11. The second modifies the learning objective to promote more diverse generation BIBREF9, and the third integrates stochastic latent variables into Seq2Seq models by using the CVAE framework BIBREF12, BIBREF2. Our work comes within this third line introducing a novel model, the Variational Transformer, to improve dialogue response generation.
+
+## Related work ::: Conditional Variational Autoencoders
+
+Many works have attempted to combine CVAEs with encoder-decoder architectures for sequence generation tasks. BIBREF13 propose a variational encoder-decoder model for neural machine translation, while BIBREF14 apply variational recurrent neural networks (VRNN) BIBREF15 for text summarization. BIBREF2 and BIBREF16 explore incorporating meta features into CVAE framework in dialogue response generation tasks. BIBREF3 and BIBREF4 propose variational autoregressive decoders which enhanced by highly multi-modal latent variables to capture the high variability in dialogue responses. BIBREF17 further augment variational autoregressive decoders with dynamic memory networks for improving generation quality. We unify the previous successful ideas of CVAE, and explore the combinations of CVAE and Transformer.
+
+## Related work ::: Fully Attentional Networks
+
+Taking advantage of the parallel-in-time structure and global receptive field, Transformers BIBREF0 have recently been shown to achieve impressive results on various sequence modeling tasks. Based on this, several follow-up models have been presented. The Image Transformer BIBREF18 has been proposed for image generation, while the MultiModel BIBREF19 integrates convolution, attention and sparsely-gated mixture-of-expert blocks into a single deep-learning model for simultaneously learning multiple tasks from various domains. BIBREF20 proposed a fully attentional mixture-of-expert model (MoEL) for empathetic dialogue modeling. The Universal Transformer BIBREF1 incorporates the recurrent inductive bias of RNNs into the standard Transformer, and achieves better result on a wide range of algorithmic and language understanding tasks. BIBREF21 introduce the Latent Transformer (LT) for non-autoregressive machine translation. During training, the LT first autoencodes a target sequence into a shorter sequence discrete latent variables. Then a parallel decoder decodes the target using discrete latent variables and an input sequence. Different from the LT BIBREF21, the VT generates continuous latent variables during the decoding process.
+
+## Preliminaries ::: Conditional Variational Autoencoder for Dialogue Generation
+
+The CVAE framework BIBREF22 represents a dyadic conversation via three random variables: the input condition $c$, including conversation context and meta features (meta features can be ignored when not available); a latent variable $z$; and the target response $x$. A CVAE can be efficiently trained with Stochastic Gradient Variational Bayes (SGVB) BIBREF23 by maximizing the variational lower bound of $x$ given c, according to:
+
+The typical CVAE consists of a prior network $p_{\theta }(z | c)$, which is used to approximate $p(z | c)$, a recognition network $p_{\phi }(z | c, x)$, which is used to approximate posterior distribution $q(z | c, x)$, and a decoder $p_{\theta }(x | z, c)$, which is used to approximate $p(x | z, c)$. By assuming z follows multivariate Gaussian distribution with a diagonal co-variance matrix, the evidence lower bound (ELBO) can be written as
+
+where $\mathcal {L}_{REC}$ denotes the reconstruction loss and $\mathcal {L}_{KL}$ denotes the Kullback-Leibler (KL) divergence between the posterior and prior.
+
+In dialogue generation tasks, previous works BIBREF2, BIBREF16 apply RNN encoders (with GRU or LSTM cell) to encode dialogue contexts and responses separately. The condition $c$ is represented by the concatenation of the last hidden state of the context encoder and the meta features (e.g., topic, emotion), while the response $x$ is represented by the last hidden state of response encoder. Then the prior network $p_{\theta }(z | c)$ and the recognition network $p_{\phi }(z | c, x)$ parameterized by multi-layer perceptrons (MLPs) are applied to approximate the means and the log variances of the prior latent distribution $\mathcal {N}\left(z ; \mu ^{\prime }, \sigma ^{\prime 2} \mathbf {I}\right)$ and posterior latent distribution $\mathcal {N}\left(z ; \mu , \sigma ^{2} \mathbf {I}\right)$. With the reparameterization trick BIBREF23, we can obtain samples of the prior latent variable (for testing) from $\mathcal {N}\left(z ; \mu ^{\prime }, \sigma ^{\prime 2} \mathbf {I}\right)$ and samples of the posterior latent variable (for training) from $\mathcal {N}\left(z ; \mu , \sigma ^{2} \mathbf {I}\right)$. Finally, an RNN decoder use $z$ and $c$ as the initial state to predicts the response $x$.
+
+The vanishing latent variable problem BIBREF24 is a common issue in RNN-based CVAEs. That is, the powerful autoregressive RNN decoder first learns to ignore the latent variable, and decodes the response by only condition on the previous tokens. Thus the latent variable fails to encode the meaningful information, and the CVAE deteriorates to seq2seq model. To alleviate this issue, KL annealing BIBREF24 and bag-of-word loss BIBREF2 have been proposed, and have shown effectiveness in various dialogue tasks BIBREF2, BIBREF16.
+
+## Preliminaries ::: CVAE with Transformer
+
+The aforementioned RNN-based CVAE framework integrate the latent variable into the initial state of RNN decoder, while in transformer, it is more flexible to incorporate the latent variable embedding into the first input token of the decoder to generate the initial state.
+
+The overall architecture of GVT is depicted in Figure FIGREF9. Different from RNNs, the Transformer encoder maps an input sequence of symbol representations to a sequence of contextualized representations BIBREF0. In order to get fixed dimension representations of the response and context, we add a special token $CLS$ at the beginning of the input sequence as in BERT BIBREF25, to compute the weighted sum of the output representations via self-attention. Thus the output representation of the token $CLS$ is considered as the representation of the whole sequence. Then we introduce a recognition network and a prior network to compute the posterior latent variable and prior latent variable as in BIBREF2, BIBREF16. We add the latent variable sample $z$ and meta features $m$ (can be ignored when not available) into $e_{SOS}$, the embedding of the start-of-sequence token $SOS$:
+
+Finally, the transformer decoder decodes the response $x$ sequentially while attending to the new embedding $e^{\prime }_{SOS}$ of token $SOS$ with latent information.
+
+This design enhances the CVAE framework with the global receptive field, and each position of the GVT can directly access the latent information via the multi-head self-attention mechanism. However, we still observe that the GVT suffers the vanishing latent variable problem as RNN-based CVAE because the decoder can bypass the latent information by paying less attention to the $SOS$ token. Hence, we apply the KL annealing, and bag-of-word auxiliary loss $\mathcal {L}_{bow}$ as in BIBREF2, BIBREF16 to preserve the useful information of the latent variable. Therefore, the learning objective of the GVT is defined as follows:
+
+## Sequential Variational Transformer
+
+In order to augment the capacity of the latent variable with multi-modal distributions and to better utilize the latent information, we further explore incorporating a sequence of latent variables in decoding process. We introduce Sequential Variational Transformer (SVT) with a novel variational decoder layer which generate latent variables for each position: $z=\left(z_{1}, \dots , z_{T}\right)$. Similar to BIBREF3, we interpret the latent variables as a generation plan for the future sequence. Unlike previous CVAE models which use an extra encoder to encode the response separately BIBREF2, BIBREF16 or use a backward RNN to encode the future sequence for each time step BIBREF3, BIBREF4, SVT uses a Non-causal Multi-head Attention which leaks the future information to the recognition network for computing the posterior latent variables.
+
+As shown in Figure FIGREF13, the SVT shares the same encoder as the standard Transformer BIBREF0, while its decoder consists of a variational decoder layer followed by a stack of $N$ standard Transformer decoder layers. The variational decoder layer has two paths for computing the posterior latent variable and prior latent variable respectively. We denote them as Posterior Path and Prior Path.
+
+## Sequential Variational Transformer ::: Prior Path
+
+The Prior Path (solid line in Figure FIGREF13) has a masked multi-head self-attention sub-layer which performs causal attention on the shifted response, followed by a multi-head self-attention sub-layer which performs encoder-decoder multi-head attention on the context encoder. The last sub-layer is composed of a MLP prior network which approximates a sequence of prior latent variable for each position, and a Position-wise Feed-Forward Network (FFN) which fuse the latent information $z$ with the observed information representation $o^P$ before the prior network (shown in Figure FIGREF13). Specifically, we concatenate $o^P$ with $z$ as the input to the FNN, and the FNN pass the fused representation to the next layer. Same as BIBREF0, in the variational decoder layer, each sub-layer is followed by a residual connection and layer normalization. That is, the output of each sub-layer is $LayerNorm(x + Sublayer(x))$.
+
+We decompose the response $x$ as $x = \left(x_1, \cdots , x_T\right)$ and the latent variable $z$ as $z=\left(z_{1}, \dots , z_{T}\right)$. The prior model produces latent variables at each position $z_t$ by not only conditioning on the input condition $c$ (the concatenation of context and meta features), but also conditioning on the observed response tokens $x_{1:t-1}$. By assuming $z_t$ follows a multivariate Gaussian distribution, the prior model becomes:
+
+where
+
+## Sequential Variational Transformer ::: Posterior Path
+
+The only difference between the Posterior Path (dash line in Figure FIGREF13) and Prior Path is that the mask is removed from the masked multi-head attention. Thus the masked (casual) multi-head attention become non-casual multi-head attention, which allows each position to attend to the subsequent positions. Then, the second multi-head attention sub-layer (shared the same weight with prior path) performs posterior attention on the encoder and passes the posterior observed information $o_R$ to the recognition network. The recognition network produces the posterior latent variable for each position $z_t$ as:
+
+where
+
+During the training, the posterior path guides the learning of prior path via KL divergence constraint:
+
+In the training phase, the posterior latent variables from Equation DISPLAY_FORM17 are passed to the FFN, while in the testing phase the Posterior Path will be blocked and the posterior latent variables will be replaced with the prior latent variables from Equation DISPLAY_FORM15.
+
+During the decoding process, each response token $x_t$ is generated by conditioning on observed response tokens $x_{1:t-1}$, latent variables $z_{1:t}$, and the input condition $c$. The decoding process of the SVT is:
+
+## Sequential Variational Transformer ::: Auxiliary Loss
+
+As we expect the latent variables to be a generation plan for the future sequence, we inject such bias into latent variables by using an auxiliary loss: Sequential-Bag-of-Word (SBOW) which proposed by BIBREF4. The idea of the SBOW auxiliary objective is to sequentially predict the bag of succeeding target words $x_{t:T}$ by using latent variable $z_t$. In our case, the succeeding words prediction also leverages the observed information $c$ and $x_{1:t-1}$. Thus the auxiliary loss at each position is computed by:
+
+where $f_{aux}$ is a feed-forward neural network with the softmax output.
+
+## Sequential Variational Transformer ::: Learning
+
+The evidence lower bound (ELBO) objective of SVT is the sum of the reconstruction loss $\mathcal {L}_{REC}(t)$ and Kullback-Leibler divergence loss $\mathcal {L}_{KL}(t)$ at each position:
+
+We regularize the ELBO learning objective with an auxiliary loss $\mathcal {L}_{sbow}$ to enhance the expressiveness of the latent variables. Therefore, the final learning objective is formulated as follows:
+
+where,
+
+## Experiments ::: Dataset
+
+We evaluate the proposed models on three conversationet dataset such as MojiTalk BIBREF16, PersonaChat BIBREF11, Empathetic-Dialogues BIBREF26.
+
+## Experiments ::: Dataset ::: MojiTalk
+
+dataset consists of 596,959 post and response pairs from Twitter. Each response is labeled by one emoji which indicates the response emotion. There are 64 emoji labels in total with unbalanced distribution. We use the preprocessed data and vocabulary released from BIBREF16 and follow the same split of train/validation/test set.
+
+## Experiments ::: Dataset ::: PersonaChat & Empathetic-Dialogues
+
+are one-to-one multi-turn conversation datasets. In PersonaChat (Persona), the conversations are revolve around personas which are established by four to six persona sentences. While in Empathetic-Dialogues (ED), the conversation are mostly about situation that happened to one of the speaker and another speaker is trying to understand the feeling and reply accordingly. Both datasets are about modeling social skills and the goal is to make user more engaging. Therefore, we combine the train/validation/test set of two datasets.
+
+## Experiments ::: Baselines
+
+We compare the proposed models with the following baselines:
+
+## Experiments ::: Baselines ::: Seq2Seq.
+
+An attention-based sequence-to-sequence model with the emoji vector as additional input as discribed in MojiTalk BIBREF16.
+
+## Experiments ::: Baselines ::: CVAE.
+
+An RNN-based conditional variational autoencoder for dialogue response generation BIBREF16, which uses a multivariate Gaussian latent variable to model the response and concatenate it with the last hidden state of the encoder as the initial state of the decoder. KL annealing, early stopping strategy and bag-of-word auxiliary loss are applied during the training. We use the implementation released by BIBREF16.
+
+## Experiments ::: Baselines ::: Transformer.
+
+A transformer BIBREF0 trained by using a Maximum Likelihood Estimation (MLE) objective and can be considered as the base model for both the GVT and SVT.
+
+## Experiments ::: Hyper-parameters and Training Setup
+
+We use a 4-layer Transformer as our base model. The hidden size is set to be 300 everywhere, and the word embedding is initialized with the 300-dimensional pre-trained GloVe embeddings for both encoder and decoder. The multi-head attention sub-layers are made up of 4 attention heads each with embedding dimension 64. The size of latent variable is 300. The recognition network and the prior network are parameterized by 3-layer MLPs with 512 hidden dimension. Following the training setup of BIBREF16, we first train our baseline transformer model with the MLE objective and use it to initialize its counterparts in both GVT and SVT. Then the models are trained end-to-end by the Adam optimizer with the initial learning rate $2\times 10^{-4}$. KL annealing and early stopping strategy are applied as in BIBREF16. In the test time, we use greedy decoding strategy for all models.
+
+## Experiments ::: Automatic Evaluation ::: PPL & KLD.
+
+The evaluation metrics include Perplexity (PPL) and Kullback-Leibler divergence between the posterior and prior (KLD). A well trained model should achieve a low reconstruction and small but non-trivial KL distance BIBREF27.
+
+## Experiments ::: Automatic Evaluation ::: Diversity.
+
+To measure the generation diversity, we calculate Dist-1, Dist-2, and Dist-3, the ratio of the number of distinct n-grams (unigrams, bigrams, and trigrams) over the total number of n-grams. A higher distinct n-grams ratio indicates more diverse generation.
+
+## Experiments ::: Automatic Evaluation ::: Embeddings Similarity.
+
+This metric computes the cosine similarity between the sentence embedding of a generated sequence and that of a ground-truth response. In our experiments, we introduce two different ways to represent sentence embeddings. The first is $\textbf {EMB}_\textbf {FT}$ BIBREF28 that calculates the average of word embeddings in a sentence using FastText BIBREF29 which is trained with Common Crawl and Wikipedia data. We use FastText embeddings instead of other pre-trained word embeddings because it can handle out-of-vocabulary issue. However, representing a sentence by simply taking the average of word embeddings ignores the context information. Therefore, we propose to use a pre-trained language model BERT BIBREF25 to compute the contextualized sentence representation. Specifically, we use a pre-trained BERT to encode a generated sentence and a ground-truth response, and average the output representation of both to obtain the sentence embeddings. We denote such contextualized sentence embedding as $\textbf {EMB}_\textbf {BERT}$.
+
+## Experiments ::: Human Evaluation
+
+In the human evaluation, we prepare multiple-choice questions for human evaluators and the answers are the generation results from the five models (Seq2Seq, CVAE, Transformer, GVT, and SVT). we first randomly sample 100 dialogues and their corresponding responses from our models and the baselines. For each response, we assign three human annotators to select the most coherent (on topic) response to the context (multiple answers are allowed). In addition, annotators also need to choose the best response correlated to the given emoji label in Mojitalk and the most engaging response in PersonaChat and Empathetic-Dialogues. If there is no response that satisfies the evaluators, they can choose “all answers are bad", which means none of the answer is chosen. We compute the rate that each model is chosen to quantify generation quality regarding to the human standard.
+
+## Results ::: Quantitative Analysis
+
+The automatic evaluation results are shown in Table TABREF35. Transformer-based models have significantly lower perplexity compared to RNN-based models which indicate that the global receptive field performed by multi-head self-attention boost the modeling capacity. However, deterministic Seq2Seq and Transformer models tends to generate generic responses which leads to a low diversity score. Meanwhile incorporating a stochastic latent variable into both models (CVAE and GVT) promote more diverse generation results and boost the diversity scores such as Dist-1, Dist-2, and Dist-3.
+
+Compare to baseline models, the GVT achieves relatively lower reconstruction PPL, which suggests that the global latent variable contains rich latent information (e.g., topic) for response generation. Meanwhile, the sequential latent variables of the SVT encode fine-grained latent information and further improve the reconstruction PPL.
+
+On the other hand, SVT achieves the highest score in terms of two semantic relevance-oriented metrics such as $\textbf {EMB}_\textbf {FT}$ and $\textbf {EMB}_\textbf {BERT}$ in MojiTalk dataset, while in the combined dataset of Persona and ED, we observe performance drop of SVT compare to other models. This is because both Persona and ED are well designed and have lower entropy than MojiTalk which collected from Twitter. We hypothesize that the sequential latent variables have no advantage in term of similarity to single, fixed "gold response" when model low entropy response. Indeed, in open domain dialogue response generation, automatic metric is not always aligned with the human judgement BIBREF28. In contrast, human evaluation result reported in Table TABREF35 demonstrates the generations of SVT are closer to the human standard in terms of coherence, invoked emotion and engagedness.
+
+## Results ::: Qualitative Analysis
+
+Table TABREF42 compares the generation of the proposed models with baselines given the same contexts. We observe that the Seq2Seq and vanilla transformer tend to generate generic and repetitive responses (e.g., i am not sure) in MojiTalk due to their deterministic structure fail to capture the variability in dialogue response. By incorporating stochastic latent variables, the CVAE and GVT can generate more diverse responses, but their responses are sometimes digressive (e.g., example 5). Interestingly, GVT and SVT generalize the topic beyong the context which make the dialogue more engaging (e.g., example 4). In general, SVT is able to generate more coherent and informative responses.
+
+## Conclusion
+
+This paper introduces the Variational Transformer (VT), a variational self-attentive feed-forward sequence model that combines the global receptive field of a Transformer with the variational nature of a CVAE. We propose two types of the VT: 1) the Global Variational Transformer (GVT) which incorporates a global latent variable as additional input to the transformer decoder; and 2) the Sequential Variational Transformer (SVT) which generates latent variables for each position during decoding process. Quantitative and qualitative experimental results shows that our models outperform baselines in terms of diversity, semantic relevance, and human judgment. In future work, we will utilize the pre-training language models BIBREF30 as the back-bone to strengthen the language model of the VT for better generation.

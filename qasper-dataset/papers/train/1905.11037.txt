@@ -1,0 +1,71 @@
+# Harry Potter and the Action Prediction Challenge from Natural Language
+
+**Paper ID:** 1905.11037
+
+## Abstract
+
+We explore the challenge of action prediction from textual descriptions of scenes, a testbed to approximate whether text inference can be used to predict upcoming actions. As a case of study, we consider the world of the Harry Potter fantasy novels and inferring what spell will be cast next given a fragment of a story. Spells act as keywords that abstract actions (e.g. 'Alohomora' to open a door) and denote a response to the environment. This idea is used to automatically build HPAC, a corpus containing 82 836 samples and 85 actions. We then evaluate different baselines. Among the tested models, an LSTM-based approach obtains the best performance for frequent actions and large scene descriptions, but approaches such as logistic regression behave well on infrequent actions.
+
+## Introduction
+
+Natural language processing (nlp) has achieved significant advances in reading comprehension tasks BIBREF0 , BIBREF1 . These are partially due to embedding methods BIBREF2 , BIBREF3 and neural networks BIBREF4 , BIBREF5 , BIBREF6 , but also to the availability of new resources and challenges. For instance, in cloze-form tasks BIBREF7 , BIBREF8 , the goal is to predict the missing word given a short context. weston2015towards presented baBI, a set of proxy tasks for reading comprenhension. In the SQuAD corpus BIBREF9 , the aim is to answer questions given a Wikipedia passage. 2017arXiv171207040K introduce NarrativeQA, where answering the questions requires to process entire stories. In a related line, 2017arXiv171011601F use fictional crime scene investigation data, from the CSI series, to define a task where the models try to answer the question: ‘who committed the crime?’.
+
+In an alternative line of work, script induction BIBREF10 has been also a useful approach to evaluate inference and semantic capabilities of nlp systems. Here, a model processes a document to infer new sequences that reflect events that are statistically probable (e.g. go to a restaurant, be seated, check the menu, ...). For example, chambers2008unsupervised introduce narrative event chains, a representation of structured knowledge of a set of events occurring around a protagonist. They then propose a method to learn statistical scripts, and also introduce two different evaluation strategies. With a related aim, Pichotta2014Statistical propose a multi-event representation of statistical scripts to be able to consider multiple entities. These same authors BIBREF11 have also studied the abilities of recurrent neural networks for learning scripts, generating upcoming events given a raw sequence of tokens, using bleu BIBREF12 for evaluation.
+
+This paper explores instead a new task: action prediction from natural language descriptions of scenes. The challenge is addressed as follows: given a natural language input sequence describing the scene, such as a piece of a story coming from a transcript, the goal is to infer which action is most likely to happen next.
+
+## HPAC: The Harry Potter's Action prediction Corpus
+
+To build an action prediction corpus, we need to: (1) consider the set of actions, and (2) collect data where these occur. Data should come from different users, to approximate a real natural language task. Also, it needs to be annotated, determining that a piece of text ends up triggering an action. These tasks are however time consuming, as they require annotators to read vast amounts of large texts. In this context, machine comprehension resources usually establish a compromise between their complexity and the costs of building them BIBREF7 , BIBREF13 .
+
+## Domain motivation
+
+We rely on an intuitive idea that uses transcripts from the Harry Potter world to build up a corpus for textual action prediction. The domain has a set of desirable properties to evaluate reading comprehension systems, which we now review.
+
+Harry Potter novels define a variety of spells. These are keywords cast by witches and wizards to achieve purposes, such as turning on a light (‘Lumos’), unlocking a door (‘Alohomora’) or killing (‘Avada Kedavra’). They abstract complex and non-ambiguous actions. Their use also makes it possible to build an automatic and self-annotated corpus for action prediction. The moment a spell occurs in a text represents a response to the environment, and hence, it can be used to label the preceding text fragment as a scene description that ends up triggering that action. Table 1 illustrates it with some examples from the original books.
+
+This makes it possible to consider texts from the magic world of Harry Potter as the domain for the action prediction corpus, and the spells as the set of eligible actions. Determining the length of the preceding context, namely snippet, that has to be considered as the scene description is however not trivial. This paper considers experiments (§ "Experiments" ) using snippets with the 32, 64, 96 and 128 previous tokens to an action. We provide the needed scripts to rebuild the corpus using arbitrary lengths.
+
+## Data crawling
+
+The number of occurrences of spells in the original Harry Potter books is small (432 occurrences), which makes it difficult to train and test a machine learning model. However, the amount of available fan fiction for this saga allows to create a large corpus. For hpac, we used fan fiction (and only fan fiction texts) from https://www.fanfiction.net/book/Harry-Potter/ and a version of the crawler by milli2016beyond. We collected Harry Potter stories written in English and marked with the status ‘completed’. From these we extracted a total of 82 836 spell occurrences, that we used to obtain the scene descriptions. Table 2 details the statistics of the corpus (see also Appendix "Corpus distribution" ). Note that similar to Twitter corpora, fan fiction stories can be deleted over time by users or admins, causing losses in the dataset.
+
+We tokenized the samples with BIBREF14 and merged the occurrences of multi-word spells into a single token.
+
+## Models
+
+This work addresses the task as a classification problem, and in particular as a sequence to label classification problem. For this reason, we rely on standard models used for this type of task: multinomial logistic regression, a multi-layered perceptron, convolutional neural networks and long short-term memory networks. We outline the essentials of each of these models, but will treat them as black boxes. In a related line, kaushik2018much discuss the need of providing rigorous baselines that help better understand the improvement coming from future and complex models, and also the need of not demanding architectural novelty when introducing new datasets.
+
+Although not done in this work, an alternative (but also natural) way to address the task is as a special case of language modelling, where the output vocabulary is restricted to the size of the `action' vocabulary. Also, note that the performance for this task is not expected to achieve a perfect accuracy, as there may be situations where more than one action is reasonable, and also because writers tell a story playing with elements such as surprise or uncertainty.
+
+The source code for the models can be found in the GitHub repository mentioned above.
+
+## Machine learning models
+
+The input sentence $w_{1:n}$ is encoded as a one-hot vector, $\mathbf {v}$ (total occurrence weighting scheme).
+
+Let mlr $_\theta (\mathbf {v})$ be an abstraction of a multinomial logistic regression parametrized by $\theta $ , the output for an input $\mathbf {v}$ is computed as the $\operatornamewithlimits{arg\,max}_{a \in A}$ $P(y=a|\mathbf {v})$ , where $P(y=a|\mathbf {v})$ is a $softmax$ function, i.e, $P(y=a|\mathbf {v}) = \frac{e^{W_{a} \cdot \mathbf {v}}}{\sum _{a^{\prime }}^{A} e^{W_{a^{\prime }} \cdot \mathbf {v}}}$ .
+
+We use one hidden layer with a rectifier activation function ( $relu(x)$ = $max(0,x)$ ). The output is computed as mlp $_\theta (\mathbf {v})$ = $softmax(W_2 \cdot relu(W \cdot \mathbf {v} + \mathbf {b}) + \mathbf {b_2})$ .
+
+## Sequential models
+
+The input sequence is represented as a sequence of word embeddings, $\mathbf {w}_{1:n}$ , where $\mathbf {w}_i$ is a concatenation of an internal embedding learned during the training process for the word $w_i$ , and a pre-trained embedding extracted from GloVe BIBREF15 , that is further fine-tuned.
+
+ BIBREF5 : The output for an element $\mathbf {w}_i$ also depends on the output of $\mathbf {w}_{i-1}$ . The lstm $_\theta (\mathbf {w}_{1:n})$ takes as input a sequence of word embeddings and produces a sequence of hidden outputs, $\mathbf {h}_{1:n}$ ( $\mathbf {h}_{i}$ size set to 128). The last output of the lstm $_\theta $ , $\mathbf {h}_n$ , is fed to a mlp $_\theta $ .
+
+ BIBREF16 , BIBREF17 . It captures local properties over continuous slices of text by applying a convolution layer made of different filters. We use a wide convolution, with a window slice size of length 3 and 250 different filters. The convolutional layer uses a $\mathit {relu}$ as the activation function. The output is fed to a max pooling layer, whose output vector is passed again as input to a mlp $_\theta $ .
+
+## Conclusion
+
+We explored action prediction from written stories. We first introduced a corpus set in the world of Harry Potter's literature. Spells in these novels act as keywords that abstract actions. This idea was used to label a collection of fan fiction. We then evaluated standard nlp approaches, from logistic regression to sequential models such as lstms. The latter performed better in general, although vanilla models achieved a higher performance for actions that occurred a few times in the training set. An analysis over the output of the lstm approach also revealed difficulties to discriminate among semantically related actions.
+
+The challenge here proposed corresponded to a fictional domain. A future line of work we are interested in is to test whether the knowledge learned with this dataset could be transferred to real-word actions (i.e. real-domain setups), or if such transfer is not possible and a model needs to be trained from scratch.
+
+## Acknowlegments
+
+This work has received support from the TELEPARES-UDC project (FFI2014-51978-C2-2-R) and the ANSWER-ASAP project (TIN2017-85160-C2-1-R) from MINECO, and from Xunta de Galicia (ED431B 2017/01), and from the European Research Council (ERC), under the European Union's Horizon 2020 research and innovation programme (FASTPARSE, grant agreement No 714150).
+
+## Corpus distribution
+
+Table 6 summarizes the label distribution across the training, development and test sets of the hpac corpus.

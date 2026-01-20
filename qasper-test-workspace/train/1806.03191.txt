@@ -1,0 +1,83 @@
+# Hearst Patterns Revisited: Automatic Hypernym Detection from Large Text Corpora
+
+**Paper ID:** 1806.03191
+
+## Abstract
+
+Methods for unsupervised hypernym detection may broadly be categorized according to two paradigms: pattern-based and distributional methods. In this paper, we study the performance of both approaches on several hypernymy tasks and find that simple pattern-based methods consistently outperform distributional methods on common benchmark datasets. Our results show that pattern-based models provide important contextual constraints which are not yet captured in distributional methods.
+
+## Introduction
+
+Hierarchical relationships play a central role in knowledge representation and reasoning. Hypernym detection, i.e., the modeling of word-level hierarchies, has long been an important task in natural language processing. Starting with BIBREF0 , pattern-based methods have been one of the most influential approaches to this problem. Their key idea is to exploit certain lexico-syntactic patterns to detect is-a relations in text. For instance, patterns like “ INLINEFORM0 such as INLINEFORM1 ”, or “ INLINEFORM2 and other INLINEFORM3 ” often indicate hypernymy relations of the form INLINEFORM4 is-a INLINEFORM5 . Such patterns may be predefined, or they may be learned automatically BIBREF1 , BIBREF2 . However, a well-known problem of Hearst-like patterns is their extreme sparsity: words must co-occur in exactly the right configuration, or else no relation can be detected.
+
+To alleviate the sparsity issue, the focus in hypernymy detection has recently shifted to distributional representations, wherein words are represented as vectors based on their distribution across large corpora. Such methods offer rich representations of lexical meaning, alleviating the sparsity problem, but require specialized similarity measures to distinguish different lexical relationships. The most successful measures to date are generally inspired by the Distributional Inclusion Hypothesis (DIH) BIBREF3 , which states roughly that contexts in which a narrow term INLINEFORM0 may appear (“cat”) should be a subset of the contexts in which a broader term INLINEFORM1 (“animal”) may appear. Intuitively, the DIH states that we should be able to replace any occurrence of “cat” with “animal” and still have a valid utterance. An important insight from work on distributional methods is that the definition of context is often critical to the success of a system BIBREF4 . Some distributional representations, like positional or dependency-based contexts, may even capture crude Hearst pattern-like features BIBREF5 , BIBREF6 .
+
+While both approaches for hypernym detection rely on co-occurrences within certain contexts, they differ in their context selection strategy: pattern-based methods use predefined manually-curated patterns to generate high-precision extractions while DIH methods rely on unconstrained word co-occurrences in large corpora.
+
+Here, we revisit the idea of using pattern-based methods for hypernym detection. We evaluate several pattern-based models on modern, large corpora and compare them to methods based on the DIH. We find that simple pattern-based methods consistently outperform specialized DIH methods on several difficult hypernymy tasks, including detection, direction prediction, and graded entailment ranking. Moreover, we find that taking low-rank embeddings of pattern-based models substantially improves performance by remedying the sparsity issue. Overall, our results show that Hearst patterns provide high-quality and robust predictions on large corpora by capturing important contextual constraints, which are not yet modeled in distributional methods.
+
+## Models
+
+In the following, we discuss pattern-based and distributional methods to detect hypernymy relations. We explicitly consider only relatively simple pattern-based approaches that allow us to directly compare their performance to DIH-based methods.
+
+## Pattern-based Hypernym Detection
+
+First, let INLINEFORM0 denote the set of hypernymy relations that have been extracted via Hearst patterns from a text corpus INLINEFORM1 . Furthermore let INLINEFORM2 denote the count of how often INLINEFORM3 has been extracted and let INLINEFORM4 denote the total number extractions. In the first, most direct application of Hearst patterns, we then simply use the counts INLINEFORM5 or, equivalently, the extraction probability DISPLAYFORM0 
+
+to predict hypernymy relations from INLINEFORM0 .
+
+However, simple extraction probabilities as in eq:prob are skewed by the occurrence probabilities of their constituent words. For instance, it is more likely that we extract (France, country) over (France, republic), just because the word country is more likely to occur than republic. This skew in word distributions is well-known for natural language and also translates to Hearst patterns (see also fig:dist). For this reason, we also consider predicting hypernymy relations based on the Pointwise Mutual Information of Hearst patterns: First, let INLINEFORM0 and INLINEFORM1 denote the probability that INLINEFORM2 occurs as a hyponym and hypernym, respectively. We then define the Positive Pointwise Mutual Information for INLINEFORM3 as DISPLAYFORM0 
+
+While eq:pmi can correct for different word occurrence probabilities, it cannot handle missing data. However, sparsity is one of the main issues when using Hearst patterns, as a necessarily incomplete set of extraction rules will lead inevitably to missing extractions. For this purpose, we also study low-rank embeddings of the PPMI matrix, which allow us to make predictions for unseen pairs. In particular, let INLINEFORM0 denote the number of unique terms in INLINEFORM1 . Furthermore, let INLINEFORM2 be the PPMI matrix with entries INLINEFORM3 and let INLINEFORM4 be its Singular Value Decomposition (SVD). We can then predict hypernymy relations based on the truncated SVD of INLINEFORM5 via DISPLAYFORM0 
+
+where INLINEFORM0 , INLINEFORM1 denote the INLINEFORM2 -th and INLINEFORM3 -th row of INLINEFORM4 and INLINEFORM5 , respectively, and where INLINEFORM6 is the diagonal matrix of truncated singular values (in which all but the INLINEFORM7 largest singular values are set to zero).
+
+eq:spmi can be interpreted as a smoothed version of the observed PPMI matrix. Due to the truncation of singular values, eq:spmi computes a low-rank embedding of INLINEFORM0 where similar words (in terms of their Hearst patterns) have similar representations. Since eq:spmi is defined for all pairs INLINEFORM1 , it allows us to make hypernymy predictions based on the similarity of words. We also consider factorizing a matrix that is constructed from occurrence probabilities as in eq:prob, denoted by INLINEFORM2 . This approach is then closely related to the method of BIBREF7 , which has been proposed to improve precision and recall for hypernymy detection from Hearst patterns.
+
+## Distributional Hypernym Detection
+
+Most unsupervised distributional approaches for hypernymy detection are based on variants of the Distributional Inclusion Hypothesis BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 , BIBREF4 . Here, we compare to two methods with strong empirical results. As with most DIH measures, they are only defined for large, sparse, positively-valued distributional spaces. First, we consider WeedsPrec BIBREF8 which captures the features of INLINEFORM0 which are included in the set of a broader term's features, INLINEFORM1 : DISPLAYFORM0 
+
+ Second, we consider invCL BIBREF11 which introduces a notion of distributional exclusion by also measuring the degree to which the broader term contains contexts not used by the narrower term. In particular, let INLINEFORM0 
+
+denote the degree of inclusion of INLINEFORM0 in INLINEFORM1 as proposed by BIBREF12 . To measure both the inclusion of INLINEFORM2 in INLINEFORM3 and the non-inclusion of INLINEFORM4 in INLINEFORM5 , invCL is then defined as INLINEFORM6 
+
+Although most unsupervised distributional approaches are based on the DIH, we also consider the distributional SLQS model based on on an alternative informativeness hypothesis BIBREF10 , BIBREF4 . Intuitively, the SLQS model presupposes that general words appear mostly in uninformative contexts, as measured by entropy. Specifically, SLQS depends on the median entropy of a term's top INLINEFORM0 contexts, defined as INLINEFORM1 
+
+where INLINEFORM0 is the Shannon entropy of context INLINEFORM1 across all terms, and INLINEFORM2 is chosen in hyperparameter selection. Finally, SLQS is defined using the ratio between the two terms: INLINEFORM3 
+
+Since the SLQS model only compares the relative generality of two terms, but does not make judgment about the terms' relatedness, we report SLQS-cos, which multiplies the SLQS measure by cosine similarity of INLINEFORM0 and INLINEFORM1 BIBREF10 .
+
+For completeness, we also include cosine similarity as a baseline in our evaluation.
+
+## Evaluation
+
+To evaluate the relative performance of pattern-based and distributional models, we apply them to several challenging hypernymy tasks.
+
+## Tasks
+
+Detection: In hypernymy detection, the task is to classify whether pairs of words are in a hypernymy relation. For this task, we evaluate all models on five benchmark datasets: First, we employ the noun-noun subset of bless, which contains hypernymy annotations for 200 concrete, mostly unambiguous nouns. Negative pairs contain a mixture of co-hyponymy, meronymy, and random pairs. This version contains 14,542 total pairs with 1,337 positive examples. Second, we evaluate on leds BIBREF13 , which consists of 2,770 noun pairs balanced between positive hypernymy examples, and randomly shuffled negative pairs. We also consider eval BIBREF14 , containing 7,378 pairs in a mixture of hypernymy, synonymy, antonymy, meronymy, and adjectival relations. eval is notable for its absence of random pairs. The largest dataset is shwartz BIBREF2 , which was collected from a mixture of WordNet, DBPedia, and other resources. We limit ourselves to a 52,578 pair subset excluding multiword expressions. Finally, we evaluate on wbless BIBREF15 , a 1,668 pair subset of bless, with negative pairs being selected from co-hyponymy, random, and hyponymy relations. Previous work has used different metrics for evaluating on BLESS BIBREF11 , BIBREF5 , BIBREF6 . We chose to evaluate the global ranking using Average Precision. This allowed us to use the same metric on all detection benchmarks, and is consistent with evaluations in BIBREF4 .
+
+Direction: In direction prediction, the task is to identify which term is broader in a given pair of words. For this task, we evaluate all models on three datasets described by BIBREF16 : On bless, the task is to predict the direction for all 1337 positive pairs in the dataset. Pairs are only counted correct if the hypernymy direction scores higher than the reverse direction, i.e. INLINEFORM0 . We reserve 10% of the data for validation, and test on the remaining 90%. On wbless, we follow prior work BIBREF17 , BIBREF18 and perform 1000 random iterations in which 2% of the data is used as a validation set to learn a classification threshold, and test on the remainder of the data. We report average accuracy across all iterations. Finally, we evaluate on bibless BIBREF16 , a variant of wbless with hypernymy and hyponymy pairs explicitly annotated for their direction. Since this task requires three-way classification (hypernymy, hyponymy, and other), we perform two-stage classification. First, a threshold is tuned using 2% of the data, identifying whether a pair exhibits hypernymy in either direction. Second, the relative comparison of scores determines which direction is predicted. As with wbless, we report the average accuracy over 1000 iterations.
+
+Graded Entailment: In graded entailment, the task is to quantify the degree to which a hypernymy relation holds. For this task, we follow prior work BIBREF19 , BIBREF18 and use the noun part of hyperlex BIBREF20 , consisting of 2,163 noun pairs which are annotated to what degree INLINEFORM0 is-a INLINEFORM1 holds on a scale of INLINEFORM2 . For all models, we report Spearman's rank correlation INLINEFORM3 . We handle out-of-vocabulary (OOV) words by assigning the median of the scores (computed across the training set) to pairs with OOV words.
+
+## Experimental Setup
+
+Pattern-based models: We extract Hearst patterns from the concatenation of Gigaword and Wikipedia, and prepare our corpus by tokenizing, lemmatizing, and POS tagging using CoreNLP 3.8.0. The full set of Hearst patterns is provided in Table TABREF8 . Our selected patterns match prototypical Hearst patterns, like “animals such as cats,” but also include broader patterns like “New Year is the most important holiday.” Leading and following noun phrases are allowed to match limited modifiers (compound nouns, adjectives, etc.), in which case we also generate a hit for the head of the noun phrase. During postprocessing, we remove pairs which were not extracted by at least two distinct patterns. We also remove any pair INLINEFORM0 if INLINEFORM1 . The final corpus contains roughly 4.5M matched pairs, 431K unique pairs, and 243K unique terms. For SVD-based models, we select the rank from INLINEFORM2 {5, 10, 15, 20, 25, 50, 100, 150, 200, 250, 300, 500, 1000} on the validation set. The other pattern-based models do not have any hyperparameters.
+
+Distributional models: For the distributional baselines, we employ the large, sparse distributional space of BIBREF4 , which is computed from UkWaC and Wikipedia, and is known to have strong performance on several of the detection tasks. The corpus was POS tagged and dependency parsed. Distributional contexts were constructed from adjacent words in dependency parses BIBREF21 , BIBREF22 . Targets and contexts which appeared fewer than 100 times in the corpus were filtered, and the resulting co-occurrence matrix was PPMI transformed. The resulting space contains representations for 218K words over 732K context dimensions. For the SLQS model, we selected the number of contexts INLINEFORM0 from the same set of options as the SVD rank in pattern-based models.
+
+## Results
+
+Table TABREF13 shows the results from all three experimental settings. In nearly all cases, we find that pattern-based approaches substantially outperform all three distributional models. Particularly strong improvements can be observed on bless (0.76 average precision vs 0.19) and wbless (0.96 vs. 0.69) for the detection tasks and on all directionality tasks. For directionality prediction on bless, the SVD models surpass even the state-of-the-art supervised model of BIBREF18 . Moreover, both SVD models perform generally better than their sparse counterparts on all tasks and datasets except on hyperlex. We performed a posthoc analysis of the validation sets comparing the ppmi and spmi models, and found that the truncated SVD improved recall via its matrix completion properties. We also found that the spmi model downweighted many high-scoring outlier pairs composed of rare terms.
+
+When comparing the INLINEFORM0 and ppmi models to distributional models, we observe mixed results. The shwartz dataset is difficult for sparse models due to its very long tail of low frequency words that are hard to cover using Hearst patterns. On eval, Hearst-pattern based methods get penalized by OOV words, due to the large number of verbs and adjectives in the dataset, which are not captured by our patterns. However, in 7 of the 9 datasets, at least one of the sparse models outperforms all distributional measures, showing that Hearst patterns can provide strong performance on large corpora.
+
+## Conclusion
+
+We studied the relative performance of Hearst pattern-based methods and DIH-based methods for hypernym detection. Our results show that the pattern-based methods substantially outperform DIH-based methods on several challenging benchmarks. We find that embedding methods alleviate sparsity concerns of pattern-based approaches and substantially improve coverage. We conclude that Hearst patterns provide important contexts for the detection of hypernymy relations that are not yet captured in DIH models. Our code is available at https://github.com/facebookresearch/hypernymysuite.
+
+## Acknowledgments
+
+We would like to thank the anonymous reviewers for their helpful suggestions. We also thank Vered Shwartz, Enrico Santus, and Dominik Schlechtweg for providing us with their distributional spaces and baseline implementations.

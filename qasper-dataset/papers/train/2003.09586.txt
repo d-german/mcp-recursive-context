@@ -1,0 +1,139 @@
+# Analyzing Word Translation of Transformer Layers
+
+**Paper ID:** 2003.09586
+
+## Abstract
+
+The Transformer translation model is popular for its effective parallelization and performance. Though a wide range of analysis about the Transformer has been conducted recently, the role of each Transformer layer in translation has not been studied to our knowledge. In this paper, we propose approaches to analyze the translation performed in encoder / decoder layers of the Transformer. Our approaches in general project the representations of an analyzed layer to the pre-trained classifier and measure the word translation accuracy. For the analysis of encoder layers, our approach additionally learns a weight vector to merge multiple attention matrices into one and transform the source encoding to the target side with the merged alignment matrix to align source tokens with target translations while bridging different input - output lengths. While analyzing decoder layers, we additionally study the effects of the source context and the decoding history in word prediction through bypassing the corresponding self-attention or cross-attention sub-layers. Our analysis reveals that the translation starts at the very beginning of the"encoding"(specifically at the source word embedding layer), and shows how translation evolves during the forward computation of layers. Based on observations gained in our analysis, we propose that increasing encoder depth while removing the same number of decoder layers can simply but significantly boost the decoding speed. Furthermore, simply inserting a linear projection layer before the decoder classifier which shares the weight matrix with the embedding layer can effectively provide small but consistent and significant improvements in our experiments on the WMT 14 English-German, English-French and WMT 15 Czech-English translation tasks (+0.42, +0.37 and +0.47 respectively).
+
+## Introduction
+
+Neural Machine Translation (NMT) has achieved great success in the last few years BIBREF0, BIBREF1, BIBREF2. The popular Transformer BIBREF2 model, which outperforms previous RNN/CNN based translation models BIBREF0, BIBREF1, is based on multi-layer self-attention networks and can be paralleled effectively.
+
+Recently, a wide range of analysises BIBREF3, BIBREF4, BIBREF5, BIBREF6, BIBREF7, BIBREF8, BIBREF9, BIBREF10 related to the Transformer have been conducted. For example, bisazza2018lazy perform a fine-grained analysis of how various source-side morphological features are captured at different levels of the NMT encoder, they find no correlation between the accuracy of source morphology encoding and translation quality, and morphological features only in context and only to the extent directly transferable to the target words are captured. voita2019bottom study how information flows across Transformer layers and find that representations differ significantly depending on the objectives (MT, LM and MLM). tang2019encoders find that encoder hidden states outperform word embeddings significantly in word sense disambiguation. However, how the Transformer translation model transforms individual source tokens into corresponding target tokens (word translations, as shown in Figure FIGREF1), and specifically, what is the role of each Transformer layer in translation, at which layer a target word is translated has not been studied to our knowledge.
+
+To detect roles of Transformer layers in translation, in this paper, we follow previous probing approaches BIBREF11, BIBREF12, BIBREF13, and propose to measure the word translation accuracy of output representations of individual Transformer layers by probing corresponding target translation tokens in these representations. In addition to analyzing the role of each encoder / decoder layer, we also analyze the contribution of the source context and the decoding history in translation by testing the effects of the self-attention sub-layer and the cross-attention sub-layer in decoder layers.
+
+Our analysis reveals that the translation already starts at the source embedding layer, which offers an explanation for bisazza2018lazy. It also demonstrates how the word translation evolves across encoder / decoder layers and the effects of the source “encoding” and the decoding history on the translation of target tokens.
+
+Based on the observations from our analysis, we find that: 1) the proper use of more encoder layers with fewer decoder layer can significantly boost decoding speed without harming quality; 2) inserting a linear projection layer before the decoder classifier can provide small but significant and consistent improvements in our experiments on the WMT 14 English-German, English-French and WMT 15 Czech-English news translation tasks ($+0.42$, $+0.37$ and $+0.47$ BLEU respectively).
+
+## Word Translation Accuracy Analysis
+
+To analyze word translation accuracy of the Transformer, we first freeze a trained Transformer model so its behavior is consistent in how it performs in translation during our analysis, then we compute the forward pass and extract output representations of the layer analyzed. Finally, we apply a linear projection layer to extract and enhance features related to translation and feed projected representations to the frozen decoder classifier of the converged Transformer. The linear projection layer is the only module trained and updated on the training set with the original Transformer being frozen, thus it will only transform between vector spaces without generating new features for the word translation. An illustration of our analysis approach for encoder / decoder layers is shown in Figure FIGREF2.
+
+## Word Translation Accuracy Analysis ::: Analysis of Encoder Layers
+
+Analyzing word translation accuracy of encoder layers requires us to align source tokens with corresponding target token. We use the alignment matrices computed by cross-attention sub-layers in decoder layers to align source tokens with target tokens. As there are multiple matrices produced by each sub-layer (due to the multi-head attention mechanism) and multiple decoder layers, we have to ensemble them into one matrix of high alignment accuracy using weights. Assume there are $d$ decoder layers with $h$ attention heads in each multi-head attention sub-layer, which results in $d * h$ alignment matrices $A_1, ... A_{d * h}$. We use a $d * h$ dimension weight vector $w$ to combine all these attention matrices. The weight vector is first normalized by softmax to a probability distribution $p$:
+
+where $i$ indicates the $i$th element in $w$.
+
+Then we use $p$ as the weights of corresponding attention matrices and merge them into 1 alignment matrix $A$.
+
+$w$ can be trained during backpropagation together with the linear projection layer.
+
+After we obtain the alignment matrix $A$, instead of selecting the target token with the highest alignment weight as the translation of a source token, we perform matrix multiplication between the encoded source representations $E$ (size: source sentence length $*$ input dimension) and the alignment matrix $A$ (size: source sentence length $*$ target sentence length) to transform / re-order source representations to the target side $T_E$:
+
+where $A^T$ and $\times $ indicate the transpose of $A$ and matrix multiplication.
+
+Thus $T_E$ has the same length as the gold translation sequence, and the target sequence can be used directly as translations representing by $T_E$.
+
+Though source representations are transformed to the target side, we suggest this does not involve any target side information as the pre-trained Transformer is frozen and the transformation does not introduce any representation from the decoder side. We do not retrieve target tokens with highest alignment score as word translations of corresponding source tokens because translation may involve one/none/multiple source token(s) to one/none/multiple target token(s) alignment, and we suggest that using a soft alignment (attention weights) may lead to more reliable gradients than the hard alignment.
+
+## Word Translation Accuracy Analysis ::: Analysis of Decoder Layers
+
+The analysis of predicting accuracy of the decoder is simpler than the encoder, as we can directly use the shifted target sequence without the requirement to bridge the different sequence length of the source sentence and the target while analyzing the encoder. We can simply use the output representations of the analyzed layer, and evaluate its prediction accuracy after projection.
+
+However, as studied by li2019word, the decoder involves 2 kinds of “translation”, one (performed by the self-attention sub-layer) translates the history token sequence to the next token, another (performed by the cross-attention sub-layer) translates by attending source tokens. We additionally analyze the effects of these 2 kinds of translation on predicting accuracy by dropping the corresponding sub-layer of the analyzed decoder layer (i.e. we only compute the other sub-layer and the feed-forward layer with only the residual connection kept as the computation of the skipped sub-layer).
+
+## Analysis Experiments ::: Settings
+
+We conducted experiments based on the Neutron implementation of the Transformer BIBREF14. We first trained a Transformer base model for our analysis following all settings of vaswani2017attention on the WMT 14 English to German news translation task. The input dimension of the model and the hidden dimension of the feed-forward sub-layer were 512 and $2,048$ respectively. We employed a $512 * 512$ parameter matrix as the linear projection layer. The source embedding matrix, the target embedding matrix and the weight of the classifier were bound.
+
+We applied joint Byte-Pair Encoding (BPE) BIBREF15 with $32k$ merge operations to address the unknown word issue. We only kept sentences with a maximum of 256 sub-word tokens for training. We removed repeated data in the training set, and the training set was randomly shuffled in every training epoch. The concatenation of newstest 2012 and newstest 2013 was used for validation and newstest 2014 as the test set.
+
+The number of warm-up steps was set to $8k$ . Each training batch contained at least $25k$ target tokens, and the model was trained for $100k$ training steps. The large batch size is achieved by gradient accumulation. We used a dropout of $0.1$ and employed a label smoothing BIBREF16 value of $0.1$. We used the Adam optimizer BIBREF17 with $0.9$, $0.98$ and $10^{-9}$ as $\beta _{1}$, $\beta _{2}$ and $\epsilon $. Parameters were uniformly initialized under the Lipschitz constraint BIBREF18.
+
+We averaged the last 5 checkpoints saved with an interval of $1,500$ training steps. For decoding, we used a beam size of 4, and evaluated tokenized case-sensitive BLEU . The averaged model achieved a BLEU score of $27.96$ on the test set.
+
+The linear projection layer and the weight vector $w$ of 48 elements for alignment during the analysis of encoder layers were trained on the training set. We monitored the accuracy on the development set during their training, and reported results on the test set.
+
+## Analysis Experiments ::: Analysis
+
+The analysis results of the trained Transformer are shown in Table TABREF8. Layer 0 stands for the embedding layer. “Acc” indicates the prediction accuracy. “-Self attention” and “-Cross attention” in the decoder layer analysis mean bypassing the computation of the self-attention sub-layer and the cross-attention sub-layer respectively of the analyzed decoder layer. In layer analysis of the encoder and decoder, “$\Delta $” indicates improvements in word translation accuracy of the analyzed layer over the previous layer. While analyzing the self-attention and cross-attention sub-layers, “$\Delta $” is the accuracy loss when we remove the computation of the corresponding sub-layer.
+
+The results of encoder layers in Table TABREF8 shows that: 1) surprisingly but reasonably the translation already starts at the embedding layer, and an amazingly sound word translation accuracy is obtained at the source embedding layer! This indicates that the translation already begins at the very beginning of “encoding” (specifically, the source embedding layer) instead of at the decoder. 2) With the stacking of encoder layers, the word translation accuracy improves (i.e. encoder layers gradually fix word translations of the source embedding layer), and improvements brought by different layers are relatively similar.
+
+While analyzing decoder layers, Table TABREF8 shows that: 1) shallow decoder layers (0, 1, 2 and 3) perform significantly worse compared to corresponding encoder layers (until reaching the 4th decoder layer, where a word translation accuracy which surpasses the embedding layer of the encoder is achieved); 2) The improvements brought by different decoder layers are quite different. Specifically, layer 4 and 5 bring more improvements than the others.
+
+While analyzing the effects of the source context (the self-attention sub-layer is responsible for the target language re-ordering, and “-Self attention” prevents using the decoding history in the analyzed decoder layer) and the decoding history (“-Cross attention” prevents copying translation from the source “encoding”), Table TABREF8 shows that in shallow decoder layers (layer 1-3), the decoding history plays a similarly important role like the source “encoding”, while in deep layers, the source “encoding” plays a more vital role than the decoding history. Thus, we suggest our comparison sheds light on the importance of translation performed by the encoder.
+
+## Analysis Experiments ::: Translation from Encoder Layers
+
+Since our approach extracts features for translation from output representations of encoder layers while analyzing them, is it possible to perform word translation with only these features from encoder layers without using the decoder?
+
+To achieve this goal, we feed output representations from an encoder layer to the corresponding linear projection layer, and feed the output of the linear projection layer directly to the decoder classifier, and retrieve tokens with highest probabilities as “translations”. Even though such “translations” from encoder layers have a same length and a same word-order as source sentences, individual source tokens are translated to the target language to some extent. We evaluated BPEized case-insensitive BLEU and BLEU 1 (1-gram BLEU, indicates the word translation quality), and results are shown in Table TABREF13. “FULL” is the performance of the whole Transformer model (decoding with a beam size of 4). “$\Delta $” means the improvements obtained by the introduced layer (or the decoder for “FULL”) over the previous layer.
+
+Table TABREF13 shows that though there is a significant gap in BLEU scores between encoder layers and the full Transformer, the gap in BLEU 1 is relatively smaller than in BLEU. It is reasonable that encoder layers achieve a comparably high BLEU 1 score while a low BLEU score, as they perform word translation in the same order as the source sentence without any word re-ordering of the target language. We suggest the BLEU 1 score achieved by only the source embedding layer (i.e. translating with only embeddings) surprising and worth noting.
+
+## Findings Based on Observations ::: Trade Decoder Layers for Encoder Layers
+
+From our analysis of the 6-layer Transformer base model (Table TABREF8), we find that in contrast to the improvements of the word translation accuracy with increasing depth on the encoder side, some decoder layers contribute significantly fewer improvements than the others (i.e. Layer 4 and 5 bring more word translation accuracy improvements than that from layer 1, 2, 3 and 6 in Table TABREF8). We suggest there might be more “lazy” layers in the decoder than in the encoder, which means that it might be easier to compress the decoder than the encoder, and further conjecture that simply removing some decoder layers while adding the same number of encoder layers may improve the performance of the Transformer. The other motivations for doing so are:
+
+Each decoder layer has one more cross-attention sub-layer than an encoder layer, and increasing encoder layers while decreasing the same number of decoder layers will reduce the number of parameters and computational cost;
+
+The decoder has to compute the forward pass for every decoding step (the decoding of each target token), and the acceleration of reducing decoder layers will be more significant in decoding, which is of productive value.
+
+## Findings Based on Observations ::: Linear Projection Layer before Classifier
+
+We compare the word translation accuracy achieved by the last decoder layer (with the linear projection layer) during analysis and that of the pre-trained standard Transformer (without the projection layer before the decoder classifier), and results are shown in Table TABREF20.
+
+Table TABREF20 shows that feeding the representations from the last decoder layer after the linear projection to the decoder classifier leads to slightly higher word prediction accuracy than feeding them directly to the classifier. We conjecture potential reasons might be:
+
+We follow vaswani2017attention binding the weight matrix of the classifier with the embedding matrix. Processing the inserted linear projection layer followed by the classifier is equivalent to using only a classifier but with a new weight matrix (equivalent to the matrix multiplication of the linear projection layer's weight matrix and the embedding matrix), which indirectly detaches the classifier weight matrix with the embedding matrix;
+
+As described in our analysis approach, the linear projection layer is expected to enhance the part of its input representations which relates to the classification while fading the other parts irrelevant to the word prediction, which may benefit the performance.
+
+Thus, we suggest that inserting a linear projection layer which simply performs matrix multiplication between input representations and a weight matrix before the decoder classifier may help improve the word translation accuracy and further lead to improved translation quality.
+
+## Findings Based on Observations ::: Results and Analysis ::: Effects of Encoder/Decoder Depth
+
+We examine the effects of reducing decoder depth while adding corresponding numbers of encoder layers, and results are shown in Table TABREF24. The decoding speed is measured on the test set which contains $3,003$ sentences with a beam size of 4. “Speed up” stands for the decoding acceleration compared to the 6-layer Transformer.
+
+Table TABREF24 shows that while the acceleration of trading decoder layers for encoding layers in training is small, in decoding is significant. Specifically, the Transformer with 10 encoder layers and 2 decoder layers is $2.32$ times as fast as the 6-layer Transformer while achieving a slightly higher BLEU.
+
+Though the Transformer with 11 encoder layers and only 1 decoder layer fails to achieve a comparable performance comparing with the 6-layer Transformer, our results still suggest that using more encoder layers with fewer but sufficient decoder layers can significantly boost the decoding speed, which is simple but effective and valuable for production applications.
+
+We demonstrate the word accuracy analysis results of the 10 encoder layer 2 decoder layer Transformer in Table TABREF27.
+
+Comparing Table TABREF27 with Table TABREF8, we find that: 1) The differences in improvements ($1.17$ vs. $0.11$) brought by individual layers of the 10-layer encoder are larger than those of the 6-layer encoder ($1.90$ vs. $0.87$), indicating that there might be some “lazy” layers in the 10-layer encoder; 2) Decreasing the depth of the decoder removes those “lazy” decoder layers in the 6-layer decoder and makes decoder layers rely more on the source “encoding” (by comparing the effects of skipping the self-attention sub-layer and cross-attention sub-layer on performance).
+
+## Findings Based on Observations ::: Results and Analysis ::: Effects of the Projection Layer
+
+To study the effects of the linear projection layer on performance, we conducted experiments on the WMT 14 English-French and WMT 15 Czech-English news translation tasks in addition to the WMT 14 English-German task. We also conducted significance tests BIBREF19. Results are tested on newstest 2014 and 2015 respectively and shown in Table TABREF28.
+
+Table TABREF28 shows that the linear projection layer is able to provide small but consistent and significant improvements in all 3 tasks.
+
+## Related Work ::: Analysis of NMT Models.
+
+li2019word analyze the word alignment quality in NMT with prediction difference, and further analyze the effect of alignment errors on translation errors, which demonstrates that NMT captures good word alignment for those words mostly contributed from source, while their word alignment is much worse for those words mostly contributed from target. voita2019analyzing evaluate the contribution of individual attention heads to the overall performance of the model and analyze the roles played by them in the encoder. yang2019assessing propose a word reordering detection task to quantify how well the word order information is learned by Self-Attention Networks (SAN) and RNN, and reveal that although recurrence structure makes the model more universally-effective on learning word order, learning objectives matter more in the downstream tasks such as machine translation. tsai2019transformer regard attention as applying a kernel smoother over the inputs with the kernel scores being the similarities between inputs, and analyze individual components of the Transformer’s attention with the new formulation via the lens of the kernel. tang2019encoders find that encoder hidden states outperform word embeddings significantly in word sense disambiguation. he2019towards measure the word importance by attributing the NMT output to every input word and reveal that words of certain syntactic categories have higher importance while the categories vary across language pairs. voita2019bottom use canonical correlation analysis and mutual information estimators to study how information flows across Transformer layers and find that representations differ significantly depending on the objectives (MT, LM and MLM). An early work BIBREF3 performs a fine-grained analysis of how various source-side morphological features are captured at different levels of the NMT encoder. While they are unable to find any correlation between the accuracy of source morphology encoding and translation quality, they discover that morphological features are only captured in context and only to the extent that they are directly transferable to the target words, thus they suggest encoder layers are “lazy”, while our analysis offers an explanation for their results as the translation already starts at the source embedding layer, and possibly source embeddings already represent linguistic features of their translations more than those of themselves.
+
+## Related Work ::: Analysis of BERT.
+
+BERT BIBREF20 uses the Transformer encoder, and analysis of BERT may provide valuable references for analyzing the Transformer. jawahar2019bert provide novel support that BERT networks capture structural information, and perform a series of experiments to unpack the elements of English language structure learned by BERT. tenney2019bert employ the edge probing task suite to explore how the different layers of the BERT network can resolve syntactic and semantic structure within a sentence, and find that the model represents the steps of the traditional NLP pipeline in an interpretable and localizable way, and that the regions responsible for each step appear in the expected sequence: POS tagging, parsing, NER, semantic roles, then coreference. pires2019multilingual present a large number of probing experiments, and show that Multilingual-BERT’s robust ability to generalize cross-lingually is underpinned by a multilingual representation.
+
+## Related Work ::: Accelerating Decoding.
+
+zhang2018accelerating propose average attention as an alternative to the self-attention network in the Transformer decoder to accelerate its decoding. wu2018pay introduce lightweight convolution and dynamic convolutions which are simpler and more efficient than self-attention. The number of operations required by their approach scales linearly in the input length, whereas self-attention is quadratic. zhang2018speeding apply cube pruning into neural machine translation to speed up the translation. zhang2018exploring propose to adapt an n-gram suffix based equivalence function into beam search decoding, which obtains similar translation quality with a smaller beam size, making NMT decoding more efficient. Non-Autoregressive Translation (NAT) BIBREF21, BIBREF22, BIBREF23, BIBREF24, BIBREF25, BIBREF26, BIBREF27 enables parallelized decoding, while there is still a significant quality drop compared to traditional autoregressive beam search, our findings on using more encoder layers might also be adapted to the NAT.
+
+## Conclusion
+
+We propose approaches for the analysis of word translation accuracy of Transformer layers to investigate how translation is performed. To measure word translation accuracy, our approaches train a linear projection layer which bridges representations from the analyzing layer and the pre-trained classifier. While analyzing encoder layers, our approach additionally learns a weight vector to merge multiple attention matrices into one, and transforms the source “encoding” to the target shape by multiplying the merged alignment matrix. For the analysis of decoder layers, we additionally analyze the effects of the source context and the decoding history in word prediction through bypassing the corresponding sub-layers.
+
+Two main findings of our analysis are: 1) the translation starts at the very beginning of “encoding” (specifically at the source word embedding layer), and evolves further with the forward computation of layers; 2) translation performed by the encoder is very important for the evolution of word translation of decoder layers, especially for Transformers with few decoder layers.
+
+Based on our analysis, we propose to increase encoder depth while removing the same number of decoder layers to boost the decoding speed. We further show that simply inserting a linear projection layer before the decoder classifier which shares the weight matrix with the embedding layer can effectively provide small but consistent and significant improvements.
+
+## Acknowledgments
+
+Hongfei XU acknowledges the support of China Scholarship Council ([2018]3101, 201807040056). This work is also supported by the German Federal Ministry of Education and Research (BMBF) under the funding code 01IW17001 (Deeplee).

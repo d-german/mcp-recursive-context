@@ -1,0 +1,113 @@
+# Learning to Discover, Ground and Use Words with Segmental Neural Language Models
+
+**Paper ID:** 1811.09353
+
+## Abstract
+
+We propose a segmental neural language model that combines the generalization power of neural networks with the ability to discover word-like units that are latent in unsegmented character sequences. In contrast to previous segmentation models that treat word segmentation as an isolated task, our model unifies word discovery, learning how words fit together to form sentences, and, by conditioning the model on visual context, how words' meanings ground in representations of non-linguistic modalities. Experiments show that the unconditional model learns predictive distributions better than character LSTM models, discovers words competitively with nonparametric Bayesian word segmentation models, and that modeling language conditional on visual context improves performance on both.
+
+## Introduction
+
+How infants discover the words of their native languages is a long-standing question in developmental psychology BIBREF0 . Machine learning has contributed much to this discussion by showing that predictive models of language are capable of inferring the existence of word boundaries solely based on statistical properties of the input BIBREF1 , BIBREF2 , BIBREF3 . Unfortunately, the best language models, measured in terms of their ability to model language, segment quite poorly BIBREF4 , BIBREF5 , while the strongest models in terms of word segmentation are far too weak to adequately predict language BIBREF3 , BIBREF6 . Moreover, since language acquisition is ultimately a multimodal process, neural models which simplify working with multimodal data offer opportunities for future research. However, as BIBREF7 have argued, current neural models' inability to discover meaningful words is too far behind the current (non-neural) state-of-the-art to be a useful foundation.
+
+In this paper, we close this gap by introducing a neural model (§ SECREF2 ) of natural language sentences that explicitly discovers and models word-like units from completely unsegmented sequences of characters. The model generates text as a sequence of segments, where each segment is generated either character-by-character from a sequence model or as a single draw from a lexical memory of multi-character units. The segmentation decisions and decisions about the generation mechanism for each segment are latent. In order to efficiently deal with an exponential number of possible segmentations, we use a conditional semi-Markov model. The characters inside each segment are generated using non-Markovian processes, conditional on the previously generated characters (the previous segmentation decisions are forgotten). This conditional independence assumption—forgetting previous segmenation decisions—enables us to calculate and differentiate exact marginal likelihood over all possible discrete segmentation decisions with a dynamic programming algorithm, while letting the model retain the most relevant information about the generation history.
+
+There are two components to make the model work. One is a lexical memory. The memory stores pairs of a vector (key) and a string (value) appearing in the training set and the vector representation of each strings are randomly initialized and learned during training. The other is a regularizer (§ SECREF3 ) to prevent the model from overfitting to the training data. Since the lexical memory stores strings that appeared in the training data, each sentence could be generated as a single unit, thus the model can fit to the training data perfectly while generalizing poorly. The regularizer penalizes based on the expectation of the powered length of each segment. Although the length of each segment is not differentiable, the expectation is differentiable and can be computed efficiently together with the marginal likelihood for each sentence in a single forward pass.
+
+Our evaluation (§ SECREF4 –§ SECREF6 ), therefore, looks at both language modeling performance and the quality of the induced segmentations. First, we look at the segmentations induced by our model. We find that these correspond closely to human intuitions about word segments, competitive with the best existing models. These segments are obtained in models whose hyperparameters are tuned to optimize validation likelihood, whereas tuning the hyperparameters based on likelihood on our benchmark models produces poor segmentations. Second, we confirm findings BIBREF8 , BIBREF9 that show that word segmentation information leads to better language models compared to pure character models. However, in contrast to previous work, we do so without observing the segment boundaries, including in Chinese, where word boundaries are not part of the orthography. Finally, we find that both the lexicon and the regularizer are crucial for good performance, particularly in word segmentation—removing either or both significantly harms performance.
+
+## Model
+
+We now describe the segmental neural language model (SNLM). Refer to Figure FIGREF1 for an illustration. The SNLM generates a character sequence INLINEFORM0 , where each INLINEFORM1 is a character in a finite character set INLINEFORM2 . Each sequence INLINEFORM3 is the concatenation of a sequence of segments INLINEFORM4 where INLINEFORM5 measures the length of the sequence in segments and each segment INLINEFORM6 is a sequence of characters, INLINEFORM7 . Intuitively, each INLINEFORM8 corresponds to one word. Let INLINEFORM9 represent the concatenation of the characters of the segments INLINEFORM10 to INLINEFORM11 , discarding segmentation information; thus INLINEFORM12 . For example if INLINEFORM13 , the underlying segmentation might be INLINEFORM14 (with INLINEFORM15 and INLINEFORM16 ), or INLINEFORM17 , or any of the INLINEFORM18 segmentation possibilities for INLINEFORM19 .
+
+The SNLM defines the distribution over INLINEFORM0 as the marginal distribution over all segmentations that give rise to INLINEFORM1 , i.e., DISPLAYFORM0 
+
+ To define the probability of INLINEFORM0 , we use the chain rule, rewriting this in terms of a product of the series of conditional probabilities, INLINEFORM1 . The process stops when a special end-sequence segment INLINEFORM2 is generated. To ensure that the summation in Eq. EQREF2 is tractable, we assume the following: DISPLAYFORM0 
+
+ which amounts to a conditional semi-Markov assumption—i.e., non-Markovian generation happens inside each segment, but the segment generation probability does not depend on memory of the previous segmentation decisions, only upon the sequence of characters INLINEFORM0 corresponding to the prefix character sequence INLINEFORM1 . This assumption has been employed in a number of related models to permit the use of LSTMs to represent rich history while retaining the convenience of dynamic programming inference algorithms BIBREF5 , BIBREF10 , BIBREF11 .
+
+## Segment generation
+
+We model INLINEFORM0 as a mixture of two models, one that generates the segment using a sequence model and the other that generates multi-character sequences as a single event. Both are conditional on a common representation of the history, as is the mixture proportion.
+
+To represent INLINEFORM0 , we use an LSTM encoder to read the sequence of characters, where each character type INLINEFORM1 has a learned vector embedding INLINEFORM2 . Thus the history representation at time INLINEFORM3 is INLINEFORM4 . This corresponds to the standard history representation for a character-level language model, although in general we assume that our modeled data is not delimitered by whitespace.
+
+The first component model, INLINEFORM0 , generates INLINEFORM1 by sampling a sequence of characters from a LSTM language model over INLINEFORM2 and a two extra special symbols, an end-of-word symbol INLINEFORM3 and the end-of-sequence symbol INLINEFORM4 discussed above. The initial state of the LSTM is a learned transformation of INLINEFORM5 , the initial cell is INLINEFORM6 , and different parameters than the history encoding LSTM are used. During generation, each letter that is sampled (i.e., each INLINEFORM7 ) is fed back into the LSTM in the usual way and the probability of the character sequence decomposes according to the chain rule. The end-of-sequence symbol can never be generated in the initial position.
+
+The second component model, INLINEFORM0 , samples full segments from lexical memory. Lexical memory is a key-value memory containing INLINEFORM1 entries, where each key, INLINEFORM2 , a vector, is associated with a value INLINEFORM3 . The generation probability of INLINEFORM4 is defined as INLINEFORM5 
+
+where INLINEFORM0 is 1 if the INLINEFORM1 th value in memory is INLINEFORM2 and 0 otherwise, and INLINEFORM3 is a matrix obtained by stacking the INLINEFORM4 's. Note that this generation process will assign zero probability to most strings, but the alternate character model can generate anything in INLINEFORM5 .
+
+In this work, we fix the INLINEFORM0 's to be subsequences of at least length 2, and up to a maximum length INLINEFORM1 that are observed at least INLINEFORM2 times in the training data. These values are tuned as hyperparameters (See Appendix SECREF10 for details of the reported experiments).
+
+The mixture proportion, INLINEFORM0 , determines how likely the character generator is to be used at time INLINEFORM1 (the lexicon is used with probability INLINEFORM2 ). It is defined by as INLINEFORM3 .
+
+The total generation probability of INLINEFORM0 is thus: INLINEFORM1 
+
+## Inference
+
+We are interested in two inference questions: first, given a sequence INLINEFORM0 , evaluate its (log) marginal likelihood; second, given INLINEFORM1 , find the most likely decomposition into segments INLINEFORM2 .
+
+To efficiently compute the marginal likelihood, we use a variant of the forward algorithm for semi-Markov models BIBREF12 , which incrementally computes a sequence of probabilities, INLINEFORM0 , where INLINEFORM1 is the marginal likelihood of generating INLINEFORM2 and concluding a segment at time INLINEFORM3 . Although there are an exponential number of segmental decompositions of INLINEFORM4 , these values can be computed using INLINEFORM5 space and INLINEFORM6 time as: DISPLAYFORM0 
+
+ By letting INLINEFORM0 , then INLINEFORM1 .
+
+The most probable segmentation of a sequence INLINEFORM0 can be computed by replacing the summation with a INLINEFORM1 operator in Eq. EQREF12 and maintaining backpointers.
+
+## Expected length regularization
+
+When the lexical memory contains all the substrings in the training data, the model easily overfits by copying the longest continuation from the memory. To prevent overfitting, we introduce a regularizer that penalizes based on the expectation of the exponentiated (by a hyperparameter INLINEFORM0 ) length of each segment: INLINEFORM1 
+
+ This can be understood as a regularizer based on the double exponential prior identified to be effective in previous work BIBREF13 , BIBREF6 . This expectation is a differentiable function of the model parameters. Because of the linearity of the penalty across segments, it can be computed efficiently using the above dynamic programming algorithm under the expectation semiring BIBREF14 . This is particular efficient since the expectation semiring jointly computes the expectation and marginal likelihood.
+
+## Training Objective
+
+The model parameters are trained by minimizing the penalized log likelihood of a training corpus INLINEFORM0 of unsegmented sentences, INLINEFORM1 
+
+## Datasets
+
+We evaluate our model on both English and Chinese segmentation. For both languages we used standard datasets for word segmentation and language modeling. For all datasets, we used train, validation and test splits. Since our model assumes a closed character set, we removed validation and test samples which contain characters that do not appear in the training set. In the English corpora, whitespace characters are removed. In Chinese, they are not present to begin with. Refer to Appendix SECREF9 for dataset statistics.
+
+## English
+
+The Brent corpus is a standard corpus used in statistical modeling of child language acquisition BIBREF15 , BIBREF16 . The corpus contains transcriptions of utterances directed at 13- to 23-month-old children. The corpus has two variants: an orthographic one (BR-text) and a phonemic one (BR-phono), where each character corresponds to a single English phoneme. As the Brent corpus does not have a standard train and test split, and we want to tune the parameters by measuring the fit to held-out data, we used the first 80% of the utterances for training and the next 10% for validation and the rest for test.
+
+We use the commonly used version of the PTB prepared by BIBREF17 . However, since we removed space symbols from the corpus, our cross entropy results cannot be compared to those usually reported on this dataset.
+
+## Chinese
+
+Since Chinese orthography does not mark spaces between words, there have been a number of efforts to annotate word boundaries. We evaluate against two corpora that have been manually segmented according different segmentation standards.
+
+The Beijing University Corpus was one of the corpora used for the International Chinese Word Segmentation Bakeoff BIBREF18 .
+
+We use the Penn Chinese Treebank Version 5.1 BIBREF19 . It generally has a coarser segmentation than PKU (e.g., in CTB a full name, consisting of a given name and family name, is a single token), and it is a larger corpus.
+
+## Experiments
+
+We compare our model to benchmark Bayesian models, which are currently the best known unsupervised word discovery models, as well as to a simple deterministic segmentation criterion based on surprisal peaks BIBREF1 on language modeling and segmentation performance. Although the Bayeisan models are shown to able to discover plausible word-like units, we found that a set of hyper-parameters that provides best performance with such model on language modeling does not produce good structures as reported in previous works. This is problematic since there is no objective criteria to find hyper-parameters in fully unsupervised manner when the model is applied to completely unknown languages or domains. Thus, our experiments are designed to assess how well the models infers word segmentations of unsegmented inputs when they are trained and tuned to maximize the likelihood of the held-out text.
+
+## Results
+
+In this section, we first do a careful comparison of segmentation performance on the phonemic Brent corpus (BR-phono) across several different segmentation baselines, and we find that our model obtains competitive segmentation performance. Additionally, ablation experiments demonstrate that both lexical memory and the proposed expected length regularization are necessary for inferring good segmentations. We then show that also on other corpora, we likewise obtain segmentations better than baseline models. Finally, we also show that our model has superior performance, in terms of held-out perplexity, compared to a character-level LSTM language model. Thus, overall, our results show that we can obtain good segmentations on a variety of tasks, while still having very good language modeling performance.
+
+## Related Work
+
+Learning to discover and represent temporally extended structures in a sequence is a fundamental problem in many fields. For example in language processing, unsupervised learning of multiple levels of linguistic structures such as morphemes BIBREF25 , words BIBREF3 and phrases BIBREF26 have been investigated. Recently, speech recognition have benefited from techniques that enable the discovery of subword units BIBREF27 , BIBREF5 ; however, in this work the optimally discovered substrings look very unlike orthographic words. The model proposed by BIBREF5 is essentially our model without a lexicon or the expected length regularization, i.e., ( INLINEFORM0 memory, INLINEFORM1 length). Beyond language, temporal abstraction in sequential decision making processes has been investigated for a long time in reinforcement learning. Option discovery in hierarchical reinforcement learning is formalized similarly to the approach we take (using semi-Markov decision processes where we use semi-Markov generative models), and the motivation is the same: high level options/words have very different relationships to each other than primitive actions/characters BIBREF28 , BIBREF29 , BIBREF30 .
+
+## Conclusion
+
+We introduced the segmental neural language model which combines a lexicon and a character-level word generator to produce a model that both improves language modeling performance over word-agnostic character LSTMs, and it discovers latent words as well as the best existing approaches for unsupervised word discovering. This constellation of results suggests that structure discovery and predictive modeling need not be at odds with one another: the structures we observe in nature are worth modeling, even with powerful learners.
+
+## Dataset statistics
+
+Table. TABREF34 summarize dataset statistics.
+
+## SNLM Model Configuration
+
+For each RNN based model we used 512 dimensions for the character embeddings and the LSTMs have 512 hidden units. All the parameters, including character projection parameters, are randomly sampled from uniform distribution from INLINEFORM0 to INLINEFORM1 . The initial hidden and memory state of the LSTMs are initialized with zero. A dropout rate of 0.5 was used for all but the recurrent connections.
+
+To restrict the size of memory, we stored substrings which appeared INLINEFORM0 -times in the training corpora and tuned INLINEFORM1 with grid search. The maximum length of subsequences INLINEFORM2 was tuned on the held-out likelihood using a grid search. Tab. TABREF35 summarizes the parameters for each dataset. Note that we did not tune the hyperparameters on segmentation quality to ensure that the models are trained in a purely unsupervised manner assuming no reference segmentations are available.
+
+## Learning
+
+The models were trained with the Adam update rule BIBREF22 with a learning rate of 0.01. The learning rate is divided by 4 if there is no improvement on development data. The maximum norm of the gradients was clipped at 1.0.

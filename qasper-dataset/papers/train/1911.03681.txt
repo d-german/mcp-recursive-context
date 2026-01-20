@@ -1,0 +1,113 @@
+# BERT is Not a Knowledge Base (Yet): Factual Knowledge vs. Name-Based Reasoning in Unsupervised QA
+
+**Paper ID:** 1911.03681
+
+## Abstract
+
+The BERT language model (LM) (Devlin et al., 2019) is surprisingly good at answering cloze-style questions about relational facts. Petroni et al. (2019) take this as evidence that BERT memorizes factual knowledge during pre-training. We take issue with this interpretation and argue that the performance of BERT is partly due to reasoning about (the surface form of) entity names, e.g., guessing that a person with an Italian-sounding name speaks Italian. More specifically, we show that BERT's precision drops dramatically when we filter certain easy-to-guess facts. As a remedy, we propose E-BERT, an extension of BERT that replaces entity mentions with symbolic entity embeddings. E-BERT outperforms both BERT and ERNIE (Zhang et al., 2019) on hard-to-guess queries. We take this as evidence that E-BERT is richer in factual knowledge, and we show two ways of ensembling BERT and E-BERT.
+
+## Introduction
+
+Imagine that you have a friend who claims to know a lot of trivia. During a quiz, you ask them about the native language of actor Jean Marais. They correctly answer French. For a moment you are impressed, until you realize that Jean is a typical French name. So you ask the same question about Daniel Ceccaldi (another French actor, but with an Italian-sounding name). This time your friend says “Italian, I guess.” If this were a Question Answering (QA) benchmark, your friend would have achieved a respectable accuracy of 50%. Yet, their performance does not indicate factual knowledge about the native languages of actors. Rather, it shows that they are able to reason about the likely origins of peoples' names (see Table TABREF1 for more examples).
+
+BIBREF1 argue that the unsupervised BERT LM BIBREF0 memorizes factual knowledge about entities and relations. They base this statement on the unsupervised QA benchmark LAMA (§SECREF2), where BERT rivals a knowledge base (KB) built by relation extraction. They suggest that BERT and similar LMs could become a “viable alternative to traditional knowledge bases extracted from text”. We argue that the impressive performance of BERT is partly due to reasoning about (the surface form of) entity names. In §SECREF4, we construct LAMA-UHN (UnHelpful Names), a more “factual” subset of LAMA-Google-RE and LAMA-T-REx, by filtering out queries that are easy to answer from entity names alone. We show that the performance of BERT decreases dramatically on LAMA-UHN.
+
+In §SECREF3, we propose E-BERT, a simple mapping-based extension of BERT that replaces entity mentions with wikipedia2vec entity embeddings BIBREF3. In §SECREF4, we show that E-BERT rivals BERT and the recently proposed entity-enhanced ERNIE model BIBREF2 on LAMA. E-BERT has a substantial lead over both baselines on LAMA-UHN; furthermore, ensembles of E-BERT and BERT outperform all baselines on original LAMA.
+
+## LAMA
+
+The LAMA (LAnguage Model Analysis) benchmark BIBREF1 is supposed to probe for “factual and commonsense knowledge” inherent in LMs. In this paper, we focus on LAMA-Google-RE and LAMA-T-REx BIBREF5, which are aimed at factual knowledge. Contrary to most previous works on QA, LAMA tests LMs as-is, without supervised finetuning.
+
+The LAMA probing task follows this schema: Given a KB triple of the form (S, R, O), the object is elicited with a relation-specific cloze-style question, e.g., (Jean_Marais, native-language, French) becomes: “The native language of Jean Marais is [MASK].” The LM predicts a distribution over a limited vocabulary to replace [MASK], which is evaluated against the known gold answer.
+
+## LAMA ::: LAMA-UHN
+
+It is often possible to guess properties of an entity from its name, with zero factual knowledge of the entity itself. This is because entities are often named according to implicit or explicit rules (e.g., the cultural norms involved in naming a child, copyright laws for industrial products, or simply a practical need for descriptive names). LAMA makes guessing even easier by its limited vocabulary, which may only contain a few candidates for a particular entity type.
+
+We argue that a QA benchmark that does not control for entity names does not assess whether an LM is good at reasoning about names, good at memorizing facts, or both. In this Section, we describe the creation of LAMA-UHN (UnHelpfulNames), a subset of LAMA-Google-RE and LAMA-T-REx.
+
+Filter 1: The string match filter deletes all KB triples where the correct answer (e.g., Apple) is a case-insensitive substring of the subject entity name (e.g., Apple Watch). This simple heuristic deletes up to 81% of triples from individual relations (see Appendix for statistics and examples).
+
+Filter 2: Of course, entity names can be revealing in ways that are more subtle. As illustrated by our French actor example, a person's name can be a useful prior for guessing their native language and by extension, their nationality, place of birth, etc. Our person name filter uses cloze-style questions to elicit name associations inherent in BERT, and deletes KB triples that correlate with them. Consider our previous example (Jean_Marais, native-language, French). We whitespace-tokenize the subject name into Jean and Marais. If BERT considers either name to be a common French name, then a correct answer is insufficient evidence for factual knowledge about the entity Jean_Marais. On the other hand, if neither Jean nor Marais are considered French, but a correct answer is given nonetheless, then we consider this sufficient evidence for factual knowledge.
+
+We query BERT for answers to “[X] is a common name in the following language: [MASK].” for both [X] = Jean and [X] = Marais. If the correct answer is among the top-3 for either query, we delete the triple. We apply this filter to Google-RE:place-of-birth, Google-RE:place-of-death, T-REx:P19 (place of birth), T-REx:P20 (place of death), T-REx:P27 (nationality), T-REx:P103 (native language) and T-REx:P1412 (language used). See Appendix for statistics. Depending on the relation, we replace “language” with “city” or “country” in the template.
+
+Figure FIGREF5 (blue bars) shows that BERT is strongly affected by filtering, with a drop of 5%–10% mean P@1 from original LAMA to LAMA-UHN. This suggests that BERT does well on LAMA partly because it reasons about (the surface form of) entity names. Of course, name-based reasoning is a useful ability in its own right; however, conflating it with factual knowledge may be misleading.
+
+## E-BERT ::: BERT.
+
+BERT BIBREF0 is a deep bidirectional transformer encoder BIBREF6 pretrained on unlabeled text. It segments text into subword tokens from a vocabulary $\mathbb {L}_b$. During training, some tokens are masked by a special [MASK] token. Tokens are embedded into real-valued vectors by an embedding function $\mathcal {E}_\mathcal {B} : \mathbb {L}_b \rightarrow \mathbb {R}^{d_\mathcal {B}}$. The embedded tokens are contextualized by the BERT encoder $\mathcal {B}$ and the output of $\mathcal {B}$ is fed into a function $\mathcal {M}_\mathcal {B}: \mathbb {R}^{d_\mathcal {B}} \rightarrow \mathbb {L}_b$ that predicts the identity of masked tokens. BERT can thus be used as an LM.
+
+## E-BERT ::: Wikipedia2vec.
+
+Wikipedia2vec BIBREF3 embeds words and wikipedia pages ($\approx $ entities) in a common space. It learns an embedding function for a vocabulary of words $\mathbb {L}_w$ and a set of entities $\mathbb {L}_e$. We denote this function as $\mathcal {F}: \mathbb {L}_w \cup \mathbb {L}_e \rightarrow \mathbb {R}^{d_\mathcal {F}}$. The wikipedia2vec loss has three components: (a) skipgram word2vec BIBREF7 operating on $\mathbb {L}_w$ (b) a graph loss on the wikipedia link graph on $\mathbb {L}_e$ (c) a version of word2vec where words are predicted from entity mentions. Loss (c) ensures that word and entity embeddings share a space. Figure FIGREF5 (black horizontal bars) shows that loss (b) is vital for our use case.
+
+## E-BERT ::: E-BERT.
+
+We want to transform the output space of $\mathcal {F}$ in such a way that $\mathcal {B}$ is fooled into accepting entity embeddings in lieu of its native subword embeddings. We approximate this goal by minimizing the squared distance of transformed wikipedia2vec word vectors and BERT subword vectors:
+
+where $\mathcal {W}$ is a linear projection obtained by least squares. Since $\mathcal {F}$ embeds $\mathbb {L}_w$ and $\mathbb {L}_e$ into the same space, $\mathcal {W}$ is applicable to members of $\mathbb {L}_e$, even though it was learned on members of $\mathbb {L}_w$.
+
+Recall that BERT segments text into subwords, e.g., our previous example is tokenized as: The native language of Jean Mara ##is is [MASK] .
+
+E-BERT replaces the subwords that correspond to the entity mention with the symbolic entity: The native language of Jean_Marais is [MASK] .
+
+The entity (truetype) is embedded by $\mathcal {W} \circ \mathcal {F}$, while other tokens (italics) continue to be embedded by $\mathcal {E}_\mathcal {B}$. The altered embedding sequence is fed into $\mathcal {B}$, where it is treated like any other embedding sequence. Neither $\mathcal {B}$ nor $\mathcal {M}_\mathcal {B}$ are changed.
+
+We ensemble BERT and E-BERT by (a) mean-pooling their outputs (AVG) or (b) concatenating the entity and its name with a slash symbol (CONCAT), e.g.: Jean_Marais / Jean Mara ##is.
+
+## Experiments ::: Systems.
+
+We train cased wikipedia2vec on a recent wikipedia dump (2019-09-02), setting $d_\mathcal {F} = d_\mathcal {B}$. To learn $\mathcal {W}$, we intersect the wikipedia2vec word vocabulary with the cased BERT vocabulary.
+
+Our primary baselines are BERT$_\mathrm {base}$ and BERT$_\mathrm {large}$ as evaluated in BIBREF1. We also test ERNIE BIBREF2, a BERT$_\mathrm {base}$ type model that uses wikidata TransE entity embeddings BIBREF8 as additional input. ERNIE has two transformers, one for tokens and one for entities, which are fused by a trainable feed-forward module. To accommodate the new parameters, ERNIE is pre-trained with (a) standard BERT loss and (b) predicting Wikipedia entities.
+
+Note that wikipedia2vec and TransE have low coverage on LAMA-Google-RE (wikipedia2vec: 54%, TransE: 71%). When an entity embedding is missing, we fall back onto original BERT. Coverage of LAMA-T-REx is $>98$% for both systems.
+
+## Experiments ::: LAMA.
+
+In keeping with BIBREF1, we report P@k macro-averaged over relations. Macro-averaging ensures that every relation has the same impact on the metric before and after filtering.
+
+Figure FIGREF5 shows that E-BERT performs comparable to BERT and ERNIE on unfiltered LAMA. However, E-BERT is less affected by filtering on LAMA-UHN, suggesting that its performance is more strongly due to factual knowledge. Recall that we lack entity embeddings for 46% of Google-RE subjects, i.e., E-BERT cannot improve over BERT on almost half of the Google-RE tuples.
+
+Figure FIGREF15 plots deltas in mean P@1 on unfiltered LAMA-T-REx relations relative to BERT, along with the frequency of tuples whose object entity name is a substring of the subject entity name – i.e., the ratio of queries that would be deleted by the string match filter. We see that E-BERT losses relative to BERT (negative red bars) are mostly on relations with a high percentage of trivial substring answers. By contrast, E-BERT typically outperforms BERT on relations where such trivial answers are rare. The ensembles are able to mitigate the losses of E-BERT on almost all relations, while keeping most of its gains (purple and orange bars). This suggests that they successfully combine BERT's ability to reason about entity names with E-BERT's enhanced factual knowledge.
+
+Figure FIGREF17 shows that the lead of E-BERT and the ensembles over BERT and ERNIE in terms of mean P@k is especially salient for bigger k.
+
+## Experiments ::: FewRel.
+
+We also evaluate on the FewRel relation classification dataset BIBREF9, using the setup and data split from zhang2019ernie (see Appendix for details). Table TABREF19 shows that E-BERT beats BERT, and the ensembles perform comparable to ERNIE despite not having a dedicated entity encoder.
+
+## Related work
+
+Factual QA is typically tackled as a supervised problem (e.g., BIBREF10, BIBREF11). In contrast, LAMA BIBREF1 tests for knowledge learned by LMs without supervision; similar experiments were performed by BIBREF12. Their experiments do not differentiate between factual knowledge of LMs and their ability to reason about entity names.
+
+The E-BERT embedding mapping strategy is inspired by cross-lingual embedding mapping on identical strings BIBREF13. A similar method was recently applied by BIBREF14 to map cross-lingual FastText subword vectors BIBREF15 into the multilingual BERT subword embedding space. BIBREF16 mimick BERT subword embeddings for rare English words from their contexts and form.
+
+Other contextualized models that incorporate entity embeddings are ERNIE BIBREF2 (see §SECREF4) and KnowBert BIBREF17. KnowBert is contemporaneous to our work, and at the time of writing, the model was not available for comparison.
+
+Both ERNIE and KnowBert add new parameters to the BERT architecture, which must be integrated by additional pretraining. By contrast, E-BERT works with the unchanged BERT model, and $\mathcal {W}$ has an efficient closed-form solution. This means that we can update E-BERT to the newest wikipedia dump at little computational cost – the most expensive operation would be training wikipedia2vec, which takes a few hours on CPUs.
+
+## Conclusion
+
+We have presented evidence that the surprising performance of BERT on the recently published LAMA QA benchmark is partly due to reasoning about entity names rather than factual knowledge. We have constructed more “factual” subsets of LAMA-Google-RE and LAMA-T-REx by filtering out easy-to-guess queries. The resulting benchmark, LAMA-UHN, is more difficult for BERT.
+
+As a remedy, we proposed E-BERT, a simple extension of BERT that injects wikipedia2vec entity embeddings into BERT. E-BERT outperforms BERT and ERNIE on LAMA-UHN, which we take as evidence that E-BERT is richer in factual knowledge. Additionally, ensembling yields improvements over both BERT and E-BERT on unfiltered LAMA and on the FewRel relation classification dataset.
+
+## FewRel training
+
+We use the sentence classification setup from BIBREF2. We mark subjects and objects with the symbols # and $, i.e., the inputs to BERT, E-BERT and the CONCAT ensemble look as follows:
+
+[CLS] $ Tang ##ier $ ' s # Ibn Bat ##to ##uta Airport # is the busiest airport in the region . [SEP]
+
+[CLS] $ Tangier $ ' s # Tangier_Ibn_Battouta_Airport # is the busiest airport in the region . [SEP]
+
+[CLS] $ Tangier / Tang ##ier $ ' s # Tangier_Ibn_Battouta_Airport / Ibn Bat ##to ##uta Airport # is the busiest airport in the region . [SEP]
+
+where entities (in truetype) are embedded by $\mathcal {W} \circ \mathcal {F}$ and all other tokens (in italics) are embedded by $\mathcal {E}_\mathcal {B}$. Note that entity IDs are provided by FewRel. If we lack an entity embedding, we fall back onto the standard BERT segmentation.
+
+To predict the relation, we feed the contextualized embedding of the [CLS] token into a linear classifier. During training we finetune all network parameters except for the embeddings. For hyperparameter tuning, we use the ranges from BIBREF2 except for the number of epochs, which we fix at 10. The AVG ensemble averages over BERT's and E-BERT's output distributions. Experiments were run on two GeForce GTX 1080 Ti GPUs with data-parallel training.
+
+## A note on casing
+
+The cased BERT vocabulary is a superset of the LAMA vocabulary. This ensures that BERT can in principle answer all LAMA queries correctly. The uncased ERNIE vocabulary does not have this property. For ERNIE, we therefore lowercase all queries and restrict the model output to the intersection of its vocabulary with the lowercased LAMA vocabulary. As a result, ERNIE selects an answer from $\sim $18K candidates (instead of the standard $\sim $21K), which should work in its favor. We verify that all lowercased object names from LAMA-T-REx and LAMA-Google-RE appear in ERNIE's vocabulary, i.e., ERNIE is in principle able to answer all lowercased queries correctly.

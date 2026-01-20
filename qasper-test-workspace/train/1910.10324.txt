@@ -1,0 +1,105 @@
+# Deja-vu: Double Feature Presentation and Iterated Loss in Deep Transformer Networks
+
+**Paper ID:** 1910.10324
+
+## Abstract
+
+Deep acoustic models typically receive features in the first layer of the network, and process increasingly abstract representations in the subsequent layers. Here, we propose to feed the input features at multiple depths in the acoustic model. As our motivation is to allow acoustic models to re-examine their input features in light of partial hypotheses we introduce intermediate model heads and loss function. We study this architecture in the context of deep Transformer networks, and we use an attention mechanism over both the previous layer activations and the input features. To train this model's intermediate output hypothesis, we apply the objective function at each layer right before feature re-use. We find that the use of such intermediate losses significantly improves performance by itself, as well as enabling input feature re-use. We present results on both Librispeech, and a large scale video dataset, with relative improvements of 10 - 20% for Librispeech and 3.2 - 13% for videos.
+
+## Introduction
+
+In this paper, we propose the processing of features not only in the input layer of a deep network, but in the intermediate layers as well. We are motivated by a desire to enable a neural network acoustic model to adaptively process the features depending on partial hypotheses and noise conditions. Many previous methods for adaptation have operated by linearly transforming either input features or intermediate layers in a two pass process where the transform is learned to maximize the likelihood of some adaptation data BIBREF0, BIBREF1, BIBREF2. Other methods have involved characterizing the input via factor analysis or i-vectors BIBREF3, BIBREF4. Here, we suggest an alternative approach in which adaptation can be achieved by re-presenting the feature stream at an intermediate layer of the network that is constructed to be correlated with the ultimate graphemic or phonetic output of the system.
+
+We present this work in the context of Transformer networks BIBREF5. Transformers have become a popular deep learning architecture for modeling sequential datasets, showing improvements in many tasks such as machine translation BIBREF5, language modeling BIBREF6 and autoregressive image generation BIBREF7. In the speech recognition field, Transformers have been proposed to replace recurrent neural network (RNN) architectures such as LSTMs and GRUs BIBREF8. A recent survey of Transformers in many speech related applications may be found in BIBREF9. Compared to RNNs, Transformers have several advantages, specifically an ability to aggregate information across all the time-steps by using a self-attention mechanism. Unlike RNNs, the hidden representations do not need to be computed sequentially across time, thus enabling significant efficiency improvements via parallelization.
+
+In the context of Transformer module, secondary feature analysis is enabled through an additional mid-network transformer module that has access both to previous-layer activations and the raw features. To implement this model, we apply the objective function several times at the intermediate layers, to encourage the development of phonetically relevant hypotheses. Interestingly, we find that the iterated use of an auxiliary loss in the intermediate layers significantly improves performance by itself, as well as enabling the secondary feature analysis.
+
+This paper makes two main contributions:
+
+We present improvements in the basic training process of deep transformer networks, specifically the iterated use of CTC or CE in intermediate layers, and
+
+We show that an intermediate-layer attention model with access to both previous-layer activations and raw feature inputs can significantly improve performance.
+
+We evaluate our proposed model on Librispeech and a large-scale video dataset. From our experimental results, we observe 10-20% relative improvement on Librispeech and 3.2-11% on the video dataset.
+
+## Transformer Modules
+
+A transformer network BIBREF5 is a powerful approach to learning and modeling sequential data. A transformer network is itself constructed with a series of transformer modules that each perform some processing. Each module has a self-attention mechanism and several feed-forward layers, enabling easy parallelization over time-steps compared to recurrent models such as RNNs or LSTMs BIBREF10. We use the architecture defined in BIBREF5, and provide only a brief summary below.
+
+Assume we have an input sequence that is of length $S$: $X = [x_1,...,x_S]$. Each $x_i$ is itself a vector of activations. A transformer layer encodes $X$ into a corresponding output representation $Z = [z_1,...,z_S]$ as described below.
+
+Transformers are built around the notion of a self-attention mechanism that is used to extract the relevant information for each time-step $s$ from all time-steps $[1..S]$ in the preceding layer. Self attention is defined in terms of a Query, Key, Value triplet $\lbrace {Q}, {K}, {V}\rbrace \in \mathbb {R}^{S \times d_k}$. In self-attention, the queries, keys and values are the columns of the input itself, $[x_1,...,x_S]$. The output activations are computed as:
+
+Transformer modules deploy a multi-headed version of self-attention. As described in BIBREF5, this is done by linearly projecting the queries, keys and values $P$ times with different, learned linear projections. Self-attention is then applied to each of these projected versions of Queries, Keys and Values. These are concatenated and once again projected, resulting in the final values. We refer to the input projection matrices as $W_p^{Q}, W_p^{K}, W_p^{V}$, and to the output projection as $W_O$. Multihead attention is implemented as
+
+Here, $ W_p^Q, W_p^K, W_p^V \in \mathbb {R}^{d_{k} \times d_m}$, $d_m = d_{k} / P$, and $W_O \in \mathbb {R}^{Pd_m \times d_k}$.
+
+After self-attention, a transformer module applies a series of linear layer, RELU, layer-norm and dropout operations, as well as the application of residual connections. The full sequence of processing is illustrated in Figure FIGREF3.
+
+## Iterated Feature Presentation
+
+In this section, we present our proposal for allowing the network to (re)-consider the input features in the light of intermediate processing. We do this by again deploying a self-attention mechanism to combine the information present in the original features with the information available in the activations of an intermediate layer. As described earlier, we calculate the output posteriors and auxiliary loss at the intermediate layer as well. The overall architecture is illustrated in Figure FIGREF6. Here, we have used a 24 layer network, with feature re-presentation after the 12th layer.
+
+In the following subsections, we provide detail on the feature re-presentation mechanism, and iterated loss calculation.
+
+## Iterated Feature Presentation ::: Feature Re-Presentation
+
+We process the features in the intermediate later by concatenating a projection of the original features with a projection of previous hidden layer activations, and then applying self-attention.
+
+First, we project both the the input and intermediate layer features $(Z_0 \in \mathbb {R}^{S \times d_0}, Z_{k} \in \mathbb {R}^{S \times d_{k}} )$, apply layer normalization and concatenate with position encoding:
+
+where $d_0$ is the input feature dimension, $d_k$ is the Transformer output dimension, $W_1 \in \mathbb {R}^{d_0 \times d_c}, W_2 \in \mathbb {R}^{d_{k} \times d_c}$ and $E \in \mathbb {R}^{S \times d_{e}}$ is a sinusoidal position encoding BIBREF5.
+
+After we project both information sources to the same dimensionality, we merge the information by using time-axis concatenation:
+
+Then, we extract relevant features with extra Transformer layer and followed by linear projection and ReLU:
+
+where $W_3 \in \mathbb {R}^{d_{k+1}^{^{\prime }} \times d_{k+1}}$ is a linear projection. All biases in the formula above are omitted for simplicity.
+
+Note that in doing time-axis concatenation, our Key and Value sequences are twice as long as the original input. In the standard self-attention where the Query is the same as the Key and Value, the output preserves the sequence length. Therefore, in order to maintain the necessary sequence length $S$, we select either the first half (split A) or the second half (split B) to represent the combined information. The difference between these two is that the use of split A uses the projected input features as the Query set, while split B uses the projected higher level activations as the Query. In initial experiments, we found that the use of high-level features (split B) as queries is preferable. We illustrates this operation on Figure FIGREF11.
+
+Another way of combining information from the features with an intermediate layer is to concatenate the two along with the feature rather than the time axis. However, in initial experiments, we found that time axis concatenation produces better results, and focus on that in the experimental results.
+
+## Iterated Feature Presentation ::: Iterated Loss
+
+We have found it beneficial to apply the loss function at several intermediate layers of the network. Suppose there are $M$ total layers, and define a subset of these layers at which to apply the loss function: $K = \lbrace k_1, k_2, ..., k_L\rbrace \subseteq \lbrace 1,..,M-1\rbrace $. The total objective function is then defined as
+
+where $Z_{k_l}$ is the $k_l$-th Transformer layer activations, $Y$ is the ground-truth transcription for CTC and context dependent states for hybrid ASR, and $Loss(P, Y)$ can be defined as CTC objective BIBREF11 or cross entropy for hybrid ASR. The coefficient $\lambda $ scales the auxiliary loss and we set $\lambda = 0.3$ based on our preliminary experiments. We illustrate the auxiliary prediction and loss in Figure FIGREF6.
+
+## Experimental results ::: Dataset
+
+We evaluate our proposed module on both the Librispeech BIBREF12 dataset and a large-scale English video dataset. In the Librispeech training set, there are three splits, containing 100 and 360 hours sets of clean speech and 500 hours of other speech. We combined everything, resulting in 960 hours of training data. For the development set, there are also two splits: dev-clean and dev-other. For the test set, there is an analogous split.
+
+The video dataset is a collection of public and anonymized English videos. It consists of a 1000 hour training set, a 9 hour dev set, and a $46.1$ hour test set. The test set comprises an $8.5$ hour curated set of carefully selected very clean videos, a 19 hour clean set and a $18.6$ hour noisy set BIBREF13. For the hybrid ASR experiments on video dataset, alignments were generated with a production system trained with 14k hours.
+
+All speech features are extracted by using log Mel-filterbanks with 80 dimensions, a 25 ms window size and a 10 ms time step between two windows. Then we apply mean and variance normalization.
+
+## Experimental results ::: Target Units
+
+For CTC training, we use word-pieces as our target. During training, the reference is tokenized to 5000 sub-word units using sentencepiece with a uni-gram language model BIBREF14. Neural networks are thus used to produce a posterior distribution for 5001 symbols (5000 sub-word units plus blank symbol) every frame. For decoding, each sub-word is modeled by a HMM with two states where the last states share the same blank symbol probability; the best sub-word segmentation of each word is used to form a lexicon; these HMMs, lexicon are then combined with the standard $n$-gram via FST BIBREF15 to form a static decoding graph. Kaldi decoderBIBREF16 is used to produce the best hypothesis.
+
+We further present results with hybrid ASR systems. In this, we use the same HMM topology, GMM bootstrapping and decision tree building procedure as BIBREF13. Specifically, we use context-dependent (CD) graphemes as modeling units. On top of alignments from a GMM model, we build a decision tree to cluster CD graphemes. This results in 7248 context dependent units for Librispeech, and 6560 units for the video dataset. Training then proceeds with the CE loss function. We also apply SpecAugment BIBREF17 online during training, using the LD policy without time warping. For decoding, a standard Kaldi's WFST decoder BIBREF16 is used.
+
+## Experimental results ::: Deep Transformer Acoustic Model
+
+All neural networks are implemented with the in-house extension of the fairseq BIBREF18 toolkit. Our speech features are produced by processing the log Mel-spectrogram with two VGG BIBREF19 layers that have the following configurations: (1) two 2-D convolutions with 32 output filters, kernel=3, stride=1, ReLU activation, and max-pooling kernel=2, (2) two 2-D convolutions with 64 output filters, kernel=3, stride=1 and max-pooling kernel=2 for CTC or max-pooling kernel=1 for hybrid. After the VGG layers, the total number of frames are subsampled by (i) 4x for CTC, or (ii) 2x for hybrid, thus enabling us to reduce the run-time and memory usage significantly. After VGG processing, we use 24 Transformer layers with $d_k=512$ head dimensions (8 heads, each head has 64 dimensions), 2048 feedforward hidden dimensions (total parameters $\pm $ 80 millions), and dropout $0.15$. For the proposed models, we utilized an auxiliary MLP with two linear layers with 256 hidden units, LeakyReLU activation and softmax (see Sec. SECREF3). We set our position encoding dimensions $d_e=256$ and pre-concatenation projection $d_c=768$ for the feature re-presentation layer. The loss function is either CTC loss or hybrid CE loss.
+
+## Experimental results ::: Results
+
+Table TABREF19 presents CTC based results for the Librispeech dataset, without data augmentation. Our baseline is a 24 layer Transformer network trained with CTC. For the proposed method, we varied the number and placement of iterated loss and the feature re-presentation. The next three results show the effect of using CTC multiple times. We see 12 and 8% relative improvements for test-clean and test-other. Adding feature re-presentation gives a further boost, with net 20 and 18% relative improvements over the baseline.
+
+Table TABREF20 shows results for Librispeech with SpecAugment. We test both CTC and CE/hybrid systems. There are consistent gains first from iterated loss, and then from multiple feature presentation. We also run additional CTC experiments with 36 layers Transformer (total parameters $\pm $120 millions). The baseline with 36 layers has the same performance with 24 layers, but by adding the proposed methods, the 36 layer performance improved to give the best results. This shows that our proposed methods can improve even very deep models.
+
+As shown in Table TABREF21, the proposed methods also provide large performance improvements on the curated video set, up to 13% with CTC, and up to 9% with the hybrid model. We also observe moderate gains of between 3.2 and 8% relative on the clean and noisy video sets.
+
+## Related Work
+
+In recent years, Transformer models have become an active research topic in speech processing. The key features of Transformer networks is self-attention, which produces comparable or better performance to LSTMs when used for encoder-decoder based ASR BIBREF23, as well as when trained with CTC BIBREF9. Speech-Transformers BIBREF24 also produce comparable performance to the LSTM-based attention model, but with higher training speed in a single GPU. Abdelrahman et al.BIBREF8 integrates a convolution layer to capture audio context and reduces WER in Librispeech.
+
+The use of an objective function in intermediate layers has been found useful in several previous works such as image classification BIBREF25 and language modeling BIBREF26. In BIBREF27, the authors did pre-training with an RNN-T based model by using a hierarchical CTC criterion with different target units. In this paper, we don't need additional types of target unit, instead we just use same tokenization and targets for both intermediate and final losses.
+
+The application of the objective function to intermediate layers is also similar in spirit to the use of KL-divergence in BIBREF28, which estimates output posteriors at an intermediate layer and regularizes them towards the distributions at the final layer. In contrast to this approach, the direct application of the objective function does not require the network to have a good output distribution before the new gradient contribution is meaningful.
+
+## Conclusion
+
+In this paper, we have proposed a method for re-processing the input features in light of the information available at an intermediate network layer. We do this in the context of deep transformer networks, via a self-attention mechanism on both features and hidden states representation. To encourage meaningful partial results, we calculate the objective function at intermediate layers of the network as well as the output layer. This improves performance in and of itself, and when combined with feature re-presentation we observe consistent relative improvements of 10 - 20% for Librispeech and 3.2 - 13% for videos.

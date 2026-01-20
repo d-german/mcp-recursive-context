@@ -1,0 +1,79 @@
+# Neural Multi-Step Reasoning for Question Answering on Semi-Structured Tables
+
+**Paper ID:** 1702.06589
+
+## Abstract
+
+Advances in natural language processing tasks have gained momentum in recent years due to the increasingly popular neural network methods. In this paper, we explore deep learning techniques for answering multi-step reasoning questions that operate on semi-structured tables. Challenges here arise from the level of logical compositionality expressed by questions, as well as the domain openness. Our approach is weakly supervised, trained on question-answer-table triples without requiring intermediate strong supervision. It performs two phases: first, machine understandable logical forms (programs) are generated from natural language questions following the work of [Pasupat and Liang, 2015]. Second, paraphrases of logical forms and questions are embedded in a jointly learned vector space using word and character convolutional neural networks. A neural scoring function is further used to rank and retrieve the most probable logical form (interpretation) of a question. Our best single model achieves 34.8% accuracy on the WikiTableQuestions dataset, while the best ensemble of our models pushes the state-of-the-art score on this task to 38.7%, thus slightly surpassing both the engineered feature scoring baseline, as well as the Neural Programmer model of [Neelakantan et al., 2016].
+
+## Introduction
+
+Teaching computers to answer complex natural language questions requires sophisticated reasoning and human language understanding. We investigate generic natural language interfaces for simple arithmetic questions on semi-structured tables. Typical questions for this task are topic independent and may require performing multiple discrete operations such as aggregation, comparison, superlatives or arithmetics.
+
+We propose a weakly supervised neural model that eliminates the need for expensive feature engineering in the candidate ranking stage. Each natural language question is translated using the method of BIBREF0 into a set of machine understandable candidate representations, called logical forms or programs. Then, the most likely such program is retrieved in two steps: i) using a simple algorithm, logical forms are transformed back into paraphrases (textual representations) understandable by non-expert users, ii) next, these strings are further embedded together with their respective questions in a jointly learned vector space using convolutional neural networks over character and word embeddings. Multi-layer neural networks and bilinear mappings are further employed as effective similarity measures and combined to score the candidate interpretations. Finally, the highest ranked logical form is executed against the input data to retrieve the answer. Our method uses only weak-supervision from question-answer-table input triples, without requiring expensive annotations of gold logical forms.
+
+We empirically test our approach on a series of experiments on WikiTableQuestions, to our knowledge the only dataset designed for this task. An ensemble of our best models reached state-of-the-art accuracy of 38.7% at the moment of publication.
+
+## Related Work
+
+We briefly mention here two main types of QA systems related to our task: semantic parsing-based and embedding-based. Semantic parsing-based methods perform a functional parse of the question that is further converted to a machine understandable program and executed on a knowledgebase or database. For QA on semi-structured tables with multi-compositional queries, BIBREF0 generate and rank candidate logical forms with a log-linear model, resorting to hand-crafted features for scoring. As opposed, we learn neural features for each question and the paraphrase of each candidate logical form. Paraphrases and hand-crafted features have successfully facilitated semantic parsers targeting simple factoid BIBREF1 and compositional questions BIBREF2 . Compositional questions are also the focus of BIBREF3 that construct logical forms from the question embedding through operations parametrized by RNNs, thus losing interpretability. A similar fully neural, end-to-end differentiable network was proposed by BIBREF4 .
+
+Embedding-based methods determine compatibility between a question-answer pair using embeddings in a shared vector space BIBREF5 . Embedding learning using deep learning architectures has been widely explored in other domains, e.g. in the context of sentiment classification BIBREF6 .
+
+## Model
+
+We describe our QA system. For every question $q$ : i) a set of candidate logical forms $\lbrace z_i\rbrace _{i = 1, \ldots , n_q}$ is generated using the method of BIBREF0 ; ii) each such candidate program $z_i$ is transformed in an interpretable textual representation $t_i$ ; iii) all $t_i$ 's are jointly embedded with $q$ in the same vector space and scored using a neural similarity function; iv) the logical form $z_i^*$ corresponding to the highest ranked $t_i^*$ is selected as the machine-understandable translation of question $q$ and executed on the input table to retrieve the final answer. Our contributions are the novel models that perform steps ii) and iii), while for step i) we rely on the work of BIBREF0 (henceforth: PL2015).
+
+## Candidate Logical Form Generation
+
+We generate a set of candidate logical forms from a question using the method of BIBREF0 . Only briefly, we review this method. Specifically, a question is parsed into a set of candidate logical forms using a semantic parser that recursively applies deduction rules. Logical forms are represented in Lambda DCS form BIBREF7 and can be executed on a table to yield an answer. An example of a question and its correct logical form are below:
+
+How many people attended the last Rolling Stones concert?
+
+R[ $\lambda x$ [Attendance.Number. $x$ ]].argmax(Act.RollingStones,Index).
+
+## Converting Logical Forms to Text
+
+In Algorithm 1 we describe how logical forms are transformed into interpretable textual representations called "paraphrases". We choose to embed paraphrases in low dimensional vectors and compare these against the question embedding. Working directly with paraphrases instead of logical forms is a design choice, justified by their interpretability, comprehensibility (understandability by non-technical users) and empirical accuracy gains. Our method recursively traverses the tree representation of the logical form starting at the root. For example, the correct candidate logical form for the question mentioned in section "Candidate Logical Form Generation" , namely How many people attended the last Rolling Stones concert?, is mapped to the paraphrase Attendance as number of last table row where act is Rolling Stones.
+
+## Joint Embedding Model
+
+We embed the question together with the paraphrases of candidate logical forms in a jointly learned vector space. We use two convolutional neural networks (CNNs) for question and paraphrase embeddings, on top of which a max-pooling operation is applied. The CNNs receive as input token embeddings obtained as described below.
+
+switch case assert [1](1)SE[SWITCH]SwitchEndSwitch[1] 1 SE[CASE]CaseEndCase[1] 1 *EndSwitch*EndCase Recursive paraphrasing of a Lambda DCS logical form. The + operation means string concatenation with spaces. Lambda DCS language is detailed in BIBREF7 . [1] Paraphrase $z$ $z$ is the root of a Lambda DCS logical form $z$ Aggregation e.g. count, max, min... $t\leftarrow \textsc {Aggregation}(z) + \textsc {Paraphrase}(z.child)$ Join join on relations, e.g. $\lambda x$ .Country( $x$ , Australia) $t\leftarrow \textsc {Paraphrase}(z.relation)$ + $\textsc {Paraphrase}(z.child)$ Reverse reverses a binary relation $t\leftarrow \textsc {Paraphrase}(z.child)$ LambdaFormula lambda expression $\lambda x.[...]$ $z$0 Arithmetic or Merge e.g. plus, minus, union... $z$1 Superlative e.g. argmax(x, value) $z$2 Value i.e. constants $z$3 return $z$4 $z$5 is the textual paraphrase of the Lambda DCS logical form
+
+The embedding of an input word sequence (e.g. question, paraphrase) is depicted in Figure 1 and is similar to BIBREF8 . Every token is parametrized by learnable word and character embeddings. The latter help dealing with unknown tokens (e.g. rare words, misspellings, numbers or dates). Token vectors are then obtained using a CNN (with multiple filter widths) over the constituent characters , followed by a max-over-time pooling layer and concatenation with the word vector.
+
+We map both the question $q$ and the paraphrase $t$ into a joint vector space using sentence embeddings obtained from two jointly trained CNNs. CNNs' filters span a different number of tokens from a width set $L$ . For each filter width $l \in L$ , we learn $n$ different filters, each of dimension $\mathbb {R}^{l\times d}$ , where $d$ is the word embedding size. After the convolution layer, we apply a max-over-time pooling on the resulting feature matrices which yields, per filter-width, a vector of dimension $n$ . Next, we concatenate the resulting max-over-time pooling vectors of the different filter-widths in $L$ to form our sentence embedding. The final sentence embedding size is $n|L|$ .
+
+Let $u,v \in \mathbb {R}^{d}$ be the sentence embeddings of question $q$ and of paraphrase $t$ . We experiment with the following similarity scores: i) DOTPRODUCT : $u^{T}v$ ; ii) BILIN : $u^{T}Sv$ , with $S\in \mathbb {R}^{d\times d}$ being a trainable matrix; iii) FC: u and v concatenated, followed by two sequential fully connected layers with ELU non-linearities; iv) FC-BILIN: weighted average of BILIN and FC. These models define parametrized similarity scoring functions $: Q\times T\rightarrow \mathbb {R}$ , where $Q$ is the set of natural language questions and $T$ is the set of paraphrases of logical forms.
+
+## Training Algorithm
+
+For training, we build two sets $\mathcal {P}$ (positive) and $\mathcal {N}$ (negative) consisting of all pairs $(q,t) \in Q \times T$ of questions and paraphrases of candidate logical forms generated as described in Section "Candidate Logical Form Generation" . A pair is positive or negative if its logical form gives the correct or respectively incorrect gold answer when executed on the corresponding table. During training, we use the ranking hinge loss function (with margin $\theta $ ): $
+{L(\mathcal {P},\mathcal {N})= \sum _{p\in \mathcal {P}}\sum _{n\in \mathcal {N}}\max (0,}\theta -(p)+(n))
+$ 
+
+## Experiments
+
+Dataset: For training and testing we use the train-validation-test split of WikiTableQuestions BIBREF0 , a dataset containing 22,033 pairs of questions and answers based on 2,108 Wikipedia tables. This dataset is also used by our baselines, BIBREF0 , BIBREF3 . Tables are not shared across these splits, which requires models to generalize to unseen data. We obtain about 3.8 million training triples $(q,t,l)$ , where $l$ is a binary indicator of whether the logical form gives the correct gold answer when executed on the corresponding table. 76.7% of the questions have at least one correct candidate logical form when generated with the model of BIBREF0 .
+
+Training Details: Our models are implemented using TensorFlow and trained on a single Tesla P100 GPU. Training takes approximately 6 hours. We initialize word vectors with 200 dimensional GloVe ( BIBREF9 ) pre-trained vectors. For the character CNN we use widths spanning 1, 2 and 3 characters. The sentence embedding CNNs use widths of $L=\lbrace 2,4,6,8\rbrace $ . The fully connected layers in the FC models have 500 hidden neurons, which we regularize using 0.8-dropout. The loss margin $\theta $ is set to 0.2. Optimization is done using Adam BIBREF10 with a learning rate of 7e-4. Hyperparameters are tunned on the development data split of the Wiki-TableQuestions table. We choose the best performing model on the validation set using early stopping.
+
+Results: Experimental results are shown in Table 1 . Our best performing single model is FC-BILIN with CNNs, Intuitively, BILIN and FC are able to extract different interaction features between the two input vectors, while their linear combination retains the best of both models. An ensemble of 15 single CNN-FC-BILIN models was setting (at the moment of publication) a new state-of-the-art precision@1 for this dataset: 38.7%. This shows that the same model initialized differently can learn different features. We also experimented with recurrent neural networks (RNNs) for the sentence embedding since these are known to capture word order better than CNNs. However, RNN-FC-BILIN performs worse than its CNN variant.
+
+There are a few reasons that contributed to the low accuracy obtained on this task by various methods (including ours) compared to other NLP problems: weak supervision, small training size and a high percentage of unanswerable questions.
+
+Error Analysis: The questions our models do not answer correctly can be split into two categories: either a correct logical form is not generated, or our scoring models do not rank the correct one at the top. We perform a qualitative analysis presented in Table 2 to reveal common question types our models often rank incorrectly. The first two examples show questions whose correct logical form depends on the structure of the table. In these cases a bias towards the more general logical form is often exhibited. The third example shows that our model has difficulty distinguishing operands with slight modification (e.g. smaller and smaller equals), which may be due to weak-supervision.
+
+Ablation Studies: For a better understanding of our model, we investigate the usefulness of various components with an ablation study shown in Table 3 . In particular, we emphasize that replacing the paraphrasing stage with the raw strings of the Lambda DCS expressions resulted in lower precision@1, which confirms the utility of this stage.
+
+Analysis of Correct Answers: We analyze how well our best single model performs on various question types. For this, we manually annotate 80 randomly chosen questions that are correctly answered by our model and report statistics in Table 3 .
+
+## Conclusion
+
+In this paper we propose a neural network QA system for semi-structured tables that eliminates the need for manually designed features. Experiments show that an ensemble of our models reaches competitive accuracy on the WikiTableQuestions dataset, thus indicating its capability to answer complex, multi-compositional questions. Our code is available at https://github.com/dalab/neural_qa .
+
+## Acknowledgments
+
+This research was supported by the Swiss National Science Foundation (SNSF) grant number 407540_167176 under the project "Conversational Agent for Interactive Access to Information".

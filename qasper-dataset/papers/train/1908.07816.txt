@@ -1,0 +1,131 @@
+# A Multi-Turn Emotionally Engaging Dialog Model
+
+**Paper ID:** 1908.07816
+
+## Abstract
+
+Open-domain dialog systems (also known as chatbots) have increasingly drawn attention in natural language processing. Some of the recent work aims at incorporating affect information into sequence-to-sequence neural dialog modeling, making the response emotionally richer, while others use hand-crafted rules to determine the desired emotion response. However, they do not explicitly learn the subtle emotional interactions captured in human dialogs. In this paper, we propose a multi-turn dialog system aimed at learning and generating emotional responses that so far only humans know how to do. Compared with two baseline models, offline experiments show that our method performs the best in perplexity scores. Further human evaluations confirm that our chatbot can keep track of the conversation context and generate emotionally more appropriate responses while performing equally well on grammar.
+
+## Introduction
+
+Recent development in neural language modeling has generated significant excitement in the open-domain dialog generation community. The success of sequence-to-sequence learning BIBREF0, BIBREF1 in the field of neural machine translation has inspired researchers to apply the recurrent neural network (RNN) encoder-decoder structure to response generation BIBREF2. Specifically, the encoder RNN reads the input message, encodes it into a fixed context vector, and the decoder RNN uses it to generate the response. Shang et al. BIBREF3 applied the same structure combined with attention mechanism BIBREF4 on Twitter-style microblogging data. Following the vanilla sequence-to-sequence structure, various improvements have been made on the neural conversation model—for example, increasing the diversity of the response BIBREF5, BIBREF6, modeling personalities of the speakers BIBREF7, and developing topic aware dialog systems BIBREF8.
+
+Some of the recent work aims at incorporating affect information into neural conversational models. While making the responses emotionally richer, existing approaches either explicitly require an emotion label as input BIBREF9, or rely on hand-crafted rules to determine the desired emotion responses BIBREF10, BIBREF11, ignoring the subtle emotional interactions captured in multi-turn conversations, which we believe to be an important aspect of human dialogs. For example, Gottman BIBREF12 found that couples are likely to practice the so called emotional reciprocity. When an argument starts, one partner's angry and aggressive utterance is often met with equally furious and negative utterance, resulting in more heated exchanges. On the other hand, responding with complementary emotions (such as reassurance and sympathy) is more likely to lead to a successful relationship. However, to the best of our knowledge, the psychology and social science literature does not offer clear rules for emotional interaction. It seems such social and emotional intelligence is captured in our conversations. This is why we believe that the data driven approach will have an advantage.
+
+In this paper, we propose an end-to-end data driven multi-turn dialog system capable of learning and generating emotionally appropriate and human-like responses with the ultimate goal of reproducing social behaviors that are habitual in human-human conversations. We chose the multi-turn setting because only in such cases is the emotion appropriateness most necessary. To this end, we employ the latest multi-turn dialog model by Xing et al. BIBREF13, but we add an additional emotion RNN to process the emotional information in each history utterance. By leveraging an external text analysis program, we encode the emotion aspects of each utterance into a fixed-sized one-zero vector. This emotion RNN reads and encodes the input affect information, and then uses the final hidden state as the emotion representation vector for the context. When decoding, at each time step, this emotion vector is concatenated with the hidden state of the decoder and passed to the softmax layer to produce the probability distribution over the vocabulary.
+
+Thereby, our contributions are threefold. (1) We propose a novel emotion-tracking dialog generation model that learns the emotional interactions directly from the data. This approach is free of human-defined heuristic rules, and hence, is more robust and fundamental than those described in existing work BIBREF9, BIBREF10, BIBREF11. (2) We apply the emotion-tracking mechanism to multi-turn dialogs, which has never been attempted before. Human evaluation shows that our model produces responses that are emotionally more appropriate than the baselines, while slightly improving the language fluency. (3) We illustrate a human-evaluation approach for judging machine-produced emotional dialogs. We consider factors such as the balance of positive and negative sentiments in test dialogs, a well-chosen range of topics, and dialogs that our human evaluators can relate. It is the first time such an approach is designed with consideration for the human judges. Our main goal is to increase the objectivity of the results and reduce judges' mistakes due to out-of-context dialogs they have to evaluate.
+
+The rest of the paper unfolds as follows. Section SECREF2 discusses some related work. In Section SECREF3, we give detailed description of the methodology. We present experimental results and some analysis in Section SECREF4. The paper is concluded in Section SECREF5, followed by some future work we plan to do.
+
+## Related Work
+
+Many early open-domain dialog systems are rule-based and often require expert knowledge to develop. More recent work in response generation seeks data-driven solutions, leveraging on machine learning techniques and the availability of data. Ritter et al. BIBREF14 first applied statistical machine translation (SMT) methods to this area. However, it turns out that bilingual translation and response generation are different. The source and target sentences in translation share the same meaning; thus the words in the two sentences tend to align well with each other. However, for response generation, one could have many equally good responses for a single input. Later studies use the sequence-to-sequence neural framework to model dialogs, followed by various improving work on the quality of the responses, especially the emotional aspects of the conversations.
+
+The vanilla RNN encoder-decoder is usually applied to single-turn response generation, where the response is generated based on one single input message. In multi-turn settings, where a context with multiple history utterances is given, the same structure often ignores the hierarchical characteristic of the context. Some recent work addresses this problem by adopting a hierarchical recurrent encoder-decoder (HRED) structure BIBREF15, BIBREF16, BIBREF17. To give attention to different parts of the context while generating responses, Xing et al. BIBREF13 proposed the hierarchical recurrent attention network (HRAN) that uses a hierarchical attention mechanism. However, these multi-turn dialog models do not take into account the turn-taking emotional changes of the dialog.
+
+Recent work on incorporating affect information into natural language processing tasks, such as building emotional dialog systems and affect language models, has inspired our current work. For example, the Emotional Chatting Machine (ECM) BIBREF9 takes as input a post and a specified emotional category and generates a response that belongs to the pre-defined emotion category. The main idea is to use an internal memory module to capture the emotion dynamics during decoding, and an external memory module to model emotional expressions explicitly by assigning different probability values to emotional words as opposed to regular words. However, the problem setting requires an emotional label as an input, which might be unpractical in real scenarios. Asghar et al. BIBREF10 proposed to augment the word embeddings with a VAD (valence, arousal, and dominance) affective space by using an external dictionary, and designed three affect-related loss functions, namely minimizing affective dissonance, maximizing affective dissonance, and maximizing affective content. The paper also proposed the affectively diverse beam search during decoding, so that the generated candidate responses are as affectively diverse as possible. However, literature in affective science does not necessarily validate such rules. In fact, the best strategy to speak to an angry customer is the de-escalation strategy (using neutral words to validate anger) rather than employing equally emotional words (minimizing affect dissonance) or words that convey happiness (maximizing affect dissonance). Zhong et al. BIBREF11 proposed a biased attention mechanism on affect-rich words in the input message, also by taking advantage of the VAD embeddings. The model is trained with a weighted cross-entropy loss function, which encourages the generation of emotional words. However, these models only deal with single-turn conversations. More importantly, they all adopt hand-coded emotion responding mechanisms. To our knowledge, we are the first to consider modeling the emotional flow and its appropriateness in a multi-turn dialog system by learning from humans.
+
+## Model
+
+In this paper, we consider the problem of generating response $\mathbf {y}$ given a context $\mathbf {X}$ consisting of multiple previous utterances by estimating the probability distribution $p(\mathbf {y}\,|\,\mathbf {X})$ from a data set $\mathcal {D}=\lbrace (\mathbf {X}^{(i)},\mathbf {y}^{(i)})\rbrace _{i=1}^N$ containing $N$ context-response pairs. Here
+
+is a sequence of $m_i$ utterances, and
+
+is a sequence of $n_{ij}$ words. Similarly,
+
+is the response with $T_i$ words.
+
+Usually the probability distribution $p(\mathbf {y}\,|\,\mathbf {X})$ can be modeled by an RNN language model conditioned on $\mathbf {X}$. When generating the word $y_t$ at time step $t$, the context $\mathbf {X}$ is encoded into a fixed-sized dialog context vector $\mathbf {c}_t$ by following the hierarchical attention structure in HRAN BIBREF13. Additionally, we extract the emotion information from the utterances in $\mathbf {X}$ by leveraging an external text analysis program, and use an RNN to encode it into an emotion context vector $\mathbf {e}$, which is combined with $\mathbf {c}_t$ to produce the distribution. The overall architecture of the model is depicted in Figure FIGREF4. We are going to elaborate on how to obtain $\mathbf {c}_t$ and $\mathbf {e}$, and how they are combined in the decoding part.
+
+## Model ::: Hierarchical Attention
+
+The hierarchical attention structure involves two encoders to produce the dialog context vector $\mathbf {c}_t$, namely the word-level encoder and the utterance-level encoder. The word-level encoder is essentially a bidirectional RNN with gated recurrent units (GRU) BIBREF1. For utterance $\mathbf {x}_j$ in $\mathbf {X}$ ($j=1,2,\dots ,m$), the bidirectional encoder produces two hidden states at each word position $k$, the forward hidden state $\mathbf {h}^\mathrm {f}_{jk}$ and the backward hidden state $\mathbf {h}^\mathrm {b}_{jk}$. The final hidden state $\mathbf {h}_{jk}$ is then obtained by concatenating the two,
+
+The utterance-level encoder is a unidirectional RNN with GRU that goes from the last utterance in the context to the first, with its input at each step as the summary of the corresponding utterance, which is obtained by applying a Bahdanau-style attention mechanism BIBREF4 on the word-level encoder output. More specifically, at decoding step $t$, the summary of utterance $\mathbf {x}_j$ is a linear combination of $\mathbf {h}_{jk}$, for $k=1,2,\dots ,n_j$,
+
+Here $\alpha _{jk}^t$ is the word-level attention score placed on $\mathbf {h}_{jk}$, and can be calculated as
+
+where $\mathbf {s}_{t-1}$ is the previous hidden state of the decoder, $\mathbf {\ell }_{j+1}^t$ is the previous hidden state of the utterance-level encoder, and $\mathbf {v}_a$, $\mathbf {U}_a$, $\mathbf {V}_a$ and $\mathbf {W}_a$ are word-level attention parameters. The final dialog context vector $\mathbf {c}_t$ is then obtained as another linear combination of the outputs of the utterance-level encoder $\mathbf {\ell }_{j}^t$, for $j=1,2,\dots ,m$,
+
+Here $\beta _{j}^t$ is the utterance-level attention score placed on $\mathbf {\ell }_{j}^t$, and can be calculated as
+
+where $\mathbf {s}_{t-1}$ is the previous hidden state of the decoder, and $\mathbf {v}_b$, $\mathbf {U}_b$ and $\mathbf {W}_b$ are utterance-level attention parameters.
+
+## Model ::: Emotion Encoder
+
+In order to capture the emotion information carried in the context $\mathbf {X}$, we utilize an external text analysis program called the Linguistic Inquiry and Word Count (LIWC) BIBREF18. LIWC accepts text files as input, and then compares each word in the input with a user-defined dictionary, assigning it to one or more of the pre-defined psychologically-relevant categories. We make use of five of these categories, related to emotion, namely positive emotion, negative emotion, anxious, angry, and sad. Using the newest version of the program LIWC2015, we are able to map each utterance $\mathbf {x}_j$ in the context to a six-dimensional indicator vector ${1}(\mathbf {x}_j)$, with the first five entries corresponding to the five emotion categories, and the last one corresponding to neutral. If any word in $\mathbf {x}_j$ belongs to one of the five categories, then the corresponding entry in ${1}(\mathbf {x}_j)$ is set to 1; otherwise, $\mathbf {x}_j$ is treated as neutral, with the last entry of ${1}(\mathbf {x}_j)$ set to 1. For example, assuming $\mathbf {x}_j=$ “he is worried about me”, then
+
+since the word “worried” is assigned to both negative emotion and anxious. We apply a dense layer with sigmoid activation function on top of ${1}(\mathbf {x}_j)$ to embed the emotion indicator vector into a continuous space,
+
+where $\mathbf {W}_e$ and $\mathbf {b}_e$ are trainable parameters. The emotion flow of the context $\mathbf {X}$ is then modeled by an unidirectional RNN with GRU going from the first utterance in the context to the last, with its input being $\mathbf {a}_j$ at each step. The final emotion context vector $\mathbf {e}$ is obtained as the last hidden state of this emotion encoding RNN.
+
+## Model ::: Decoding
+
+The probability distribution $p(\mathbf {y}\,|\,\mathbf {X})$ can be written as
+
+We model the probability distribution using an RNN language model along with the emotion context vector $\mathbf {e}$. Specifically, at time step $t$, the hidden state of the decoder $\mathbf {s}_t$ is obtained by applying the GRU function,
+
+where $\mathbf {w}_{y_{t-1}}$ is the word embedding of $y_{t-1}$. Similar to Affect-LM BIBREF19, we then define a new feature vector $\mathbf {o}_t$ by concatenating $\mathbf {s}_t$ with the emotion context vector $\mathbf {e}$,
+
+on which we apply a softmax layer to obtain a probability distribution over the vocabulary,
+
+Each term in Equation (DISPLAY_FORM16) is then given by
+
+We use the cross-entropy loss as our objective function
+
+## Evaluation
+
+We trained our model using two different datasets and compared its performance with HRAN as well as the basic sequence-to-sequence model by performing both offline and online testings.
+
+## Evaluation ::: Datasets
+
+We use two different dialog corpora to train our model—the Cornell Movie Dialogs Corpus BIBREF20 and the DailyDialog dataset BIBREF21.
+
+Cornell Movie Dialogs Corpus. The dataset contains 83,097 dialogs (220,579 conversational exchanges) extracted from raw movie scripts. In total there are 304,713 utterances.
+
+DailyDialog. The dataset is developed by crawling raw data from websites used for language learners to learn English dialogs in daily life. It contains 13,118 dialogs in total.
+
+We summarize some of the basic information regarding the two datasets in Table TABREF25.
+
+In our experiments, the models are first trained on the Cornell Movie Dialogs Corpus, and then fine-tuned on the DailyDialog dataset. We adopted this training pattern because the Cornell dataset is bigger but noisier, while DailyDialog is smaller but more daily-based. To create a training set and a validation set for each of the two datasets, we take segments of each dialog with number of turns no more than six, to serve as the training/validation examples. Specifically, for each dialog $\mathbf {D}=(\mathbf {x}_1,\mathbf {x}_2,\dots ,\mathbf {x}_M)$, we create $M-1$ context-response pairs, namely $\mathbf {U}_i=(\mathbf {x}_{s_i},\dots ,\mathbf {x}_i)$ and $\mathbf {y}_i=\mathbf {x}_{i+1}$, for $i=1,2,\dots ,M-1$, where $s_i=\max (1,i-4)$. We filter out those pairs that have at least one utterance with length greater than 30. We also reduce the frequency of those pairs whose responses appear too many times (the threshold is set to 10 for Cornell, and 5 for DailyDialog), to prevent them from dominating the learning procedure. See Table TABREF25 for the sizes of the training and validation sets. The test set consists of 100 dialogs with four turns. We give more detailed description of how we create the test set in Section SECREF31.
+
+## Evaluation ::: Baselines and Implementation
+
+We compared our multi-turn emotionally engaging dialog model (denoted as MEED) with two baselines—the vanilla sequence-to-sequence model (denoted as S2S) and HRAN. We chose S2S and HRAN as baselines because we would like to evaluate our model's capability to keep track of the multi-turn context and to produce emotionally more appropriate responses, respectively. In order to adapt S2S to the multi-turn setting, we concatenate all the history utterances in the context into one.
+
+For all the models, the vocabulary consists of 20,000 most frequent words in the Cornell and DailyDialog datasets, plus three extra tokens: <unk> for words that do not exist in the vocabulary, <go> indicating the begin of an utterance, and <eos> indicating the end of an utterance. Here we summarize the configurations and parameters of our experiments:
+
+We set the word embedding size to 256. We initialized the word embeddings in the models with word2vec BIBREF22 vectors first trained on Cornell and then fine-tuned on DailyDialog, consistent with the training procedure of the models.
+
+We set the number of hidden units of each RNN to 256, the word-level attention depth to 256, and utterance-level 128. The output size of the emotion embedding layer is 256.
+
+We optimized the objective function using the Adam optimizer BIBREF23 with an initial learning rate of 0.001. We stopped training the models when the lowest perplexity on the validation sets was achieved.
+
+For prediction, we used beam search BIBREF24 with a beam width of 256.
+
+## Evaluation ::: Evaluation Metrics
+
+The evaluation of chatbots remains an open problem in the field. Recent work BIBREF25 has shown that the automatic evaluation metrics borrowed from machine translation such as BLEU score BIBREF26 tend to align poorly with human judgement. Therefore, in this paper, we mainly adopt human evaluation, along with perplexity, following the existing work.
+
+## Evaluation ::: Evaluation Metrics ::: Human evaluation setup
+
+To develop a test set for human evaluation, we first selected the emotionally colored dialogs with exactly four turns from the DailyDialog dataset. In the dataset each dialog turn is annotated with a corresponding emotional category, including the neutral one. For our purposes we filtered out only those dialogs where more than a half of utterances have non-neutral emotional labels. This gave us 78 emotionally positive dialogs and 14 emotionally negative dialogs. In order to have a balanced test set with equal number of positive and negative dialogs, we recruited two English-speaking students from our university without any relationship to the authors' lab and instructed them to create five negative dialogs with four turns, as if they were interacting with another human, according to each of the following topics: relationships, entertainment, service, work and study, and everyday situations. Thus each person produced 25 dialogs, and in total we obtained 50 emotionally negative daily dialogs in addition to the 14 already available. To form the test set, we randomly selected 50 emotionally positive and 50 emotionally negative dialogs from the two pools of dialogs described above (78 positive dialogs from DailyDialog, 64 negative dialogs from DailyDialog and human-generated).
+
+For human evaluation of the models, we recruited another four English-speaking students from our university without any relationship to the authors' lab to rate the responses generated by the models. Specifically, we randomly shuffled the 100 dialogs in the test set, then we used the first three utterances of each dialog as the input to the three models being compared and let them generate the responses. According to the context given, the raters were instructed to evaluate the quality of the responses based on three criteria: (1) grammatical correctness—whether or not the response is fluent and free of grammatical mistakes; (2) contextual coherence—whether or not the response is context sensitive to the previous dialog history; (3) emotional appropriateness—whether or not the response conveys the right emotion and feels as if it had been produced by a human. For each criterion, the raters gave scores of either 0, 1 or 2, where 0 means bad, 2 means good, and 1 indicates neutral.
+
+## Evaluation ::: Results
+
+Table TABREF34 gives the perplexity scores obtained by the three models on the two validation sets and the test set. As shown in the table, MEED achieves the lowest perplexity score on all three sets. We also conducted t-test on the perplexity obtained, and results show significant improvements (with $p$-value $<0.05$).
+
+Table TABREF34, TABREF35 and TABREF35 summarize the human evaluation results on the responses' grammatical correctness, contextual coherence, and emotional appropriateness, respectively. In the tables, we give the percentage of votes each model received for the three scores, the average score obtained with improvements over S2S, and the agreement score among the raters. Note that we report Fleiss' $\kappa $ score BIBREF27 for contextual coherence and emotional appropriateness, and Finn's $r$ score BIBREF28 for grammatical correctness. We did not use Fleiss' $\kappa $ score for grammatical correctness. As agreement is extremely high, this can make Fleiss' $\kappa $ very sensitive to prevalence BIBREF29. On the contrary, we did not use Finn's $r$ score for contextual coherence and emotional appropriateness because it is only reasonable when the observed variance is significantly less than the chance variance BIBREF30, which did not apply to these two criteria. As shown in the tables, we got high agreement among the raters for grammatical correctness, and fair agreement among the raters for contextual coherence and emotional appropriateness. For grammatical correctness, all three models achieved high scores, which means all models are capable of generating fluent utterances that make sense. For contextual coherence and emotional appropriateness, MEED achieved higher average scores than S2S and HRAN, which means MEED keeps better track of the context and can generate responses that are emotionally more appropriate and natural. We conducted Friedman test BIBREF31 on the human evaluation results, showing the improvements of MEED are significant (with $p$-value $<0.01$).
+
+## Evaluation ::: Results ::: Case Study
+
+We present four sample dialogs in Table TABREF36, along with the responses generated by the three models. Dialog 1 and 2 are emotionally positive and dialog 3 and 4 are negative. For the first two examples, we can see that MEED is able to generate more emotional content (like “fun” and “congratulations”) that is appropriate according to the context. For dialog 4, MEED responds in sympathy to the other speaker, which is consistent with the second utterance in the context. On the contrary, HRAN poses a question in reply, contradicting the dialog history.
+
+## Conclusion and Future Work
+
+According to the Media Equation Theory BIBREF32, people respond to computers socially. This means humans expect talking to computers as they talk to other human beings. This is why we believe reproducing social and conversational intelligence will make social chatbots more believable and socially engaging. In this paper, we propose a multi-turn dialog system capable of generating emotionally appropriate responses, which is the first step toward such a goal. We have demonstrated how to do so by (1) modeling utterances with extra affect vectors, (2) creating an emotional encoding mechanism that learns emotion exchanges in the dataset, (3) curating a multi-turn dialog dataset, and (4) evaluating the model with offline and online experiments.
+
+As future work, we would like to investigate the diversity issue of the responses generated, possibly by extending the mutual information objective function BIBREF5 to multi-turn settings. We would also like to evaluate our model on a larger dataset, for example by extracting multi-turn dialogs from the OpenSubtitles corpus BIBREF33.

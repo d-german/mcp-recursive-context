@@ -1,0 +1,197 @@
+# Syntax-Enhanced Self-Attention-Based Semantic Role Labeling
+
+**Paper ID:** 1910.11204
+
+## Abstract
+
+As a fundamental NLP task, semantic role labeling (SRL) aims to discover the semantic roles for each predicate within one sentence. This paper investigates how to incorporate syntactic knowledge into the SRL task effectively. We present different approaches of encoding the syntactic information derived from dependency trees of different quality and representations; we propose a syntax-enhanced self-attention model and compare it with other two strong baseline methods; and we conduct experiments with newly published deep contextualized word representations as well. The experiment results demonstrate that with proper incorporation of the high quality syntactic information, our model achieves a new state-of-the-art performance for the Chinese SRL task on the CoNLL-2009 dataset.
+
+## Introduction
+
+The task of semantic role labeling (SRL) is to recognize arguments for a given predicate in one sentence and assign labels to them, including “who” did “what” to “whom”, “when”, “where”, etc. Figure FIGREF1 is an example sentence with both semantic roles and syntactic dependencies. Since the nature of semantic roles is more abstract than the syntactic dependencies, SRL has a wide range of applications in different areas, e.g., text classification BIBREF0, text summarization BIBREF1, BIBREF2, recognizing textual entailment BIBREF3, BIBREF4, information extraction BIBREF5, question answering BIBREF6, BIBREF7, and so on.
+
+UTF8gbsn
+
+Traditionally, syntax is the bridge to reach semantics. However, along with the popularity of the end-to-end models in the NLP community, various recent studies have been discussing the necessity of syntax in the context of SRL. For instance, BIBREF8 have observed that only good syntax helps with the SRL performance. BIBREF9 have explored what kind of syntactic information or structure is better suited for the SRL model. BIBREF10 have compared syntax-agnostic and syntax-aware approaches and claim that the syntax-agnostic model surpasses the syntax-aware ones.
+
+In this paper, we focus on analyzing the relationship between the syntactic dependency information and the SRL performance. In particular, we investigate the following four aspects: 1) Quality of the syntactic information: whether the performance of the syntactic parser output affects the SRL performance; 2) Representation of the syntactic information: how to represent the syntactic dependencies to better preserve the original structural information; 3) Incorporation of the syntactic information: at which layer of the SRL model and how to incorporate the syntactic information; and 4) the Relationship with other external resources: when we append other external resources into the SRL model, whether their contributions are orthogonal to the syntactic dependencies.
+
+For the main architecture of the SRL model, many neural-network-based models use BiLSTM as the encoder (e.g., BIBREF10, BIBREF11, BIBREF12), while recently self-attention-based encoder becomes popular due to both the effectiveness and the efficiency BIBREF13, BIBREF14, BIBREF15. By its nature, the self-attention-based model directly captures the relation between words in the sentence, which is convenient to incorporate syntactic dependency information. BIBREF15 replace one attention head with pre-trained syntactic dependency information, which can be viewed as a hard way to inject syntax into the neural model. Enlightened by the machine translation model proposed by BIBREF16, we introduce the Relation-Aware method to incorporate syntactic dependencies, which is a softer way to encode richer structural information.
+
+Various experiments for the Chinese SRL on the CoNLL-2009 dataset are conducted to evaluate our hypotheses. From the empirical results, we observe that: 1) The quality of the syntactic information is essential when we incorporate structural information into the SRL model; 2) Deeper integration of the syntactic information achieves better results than the simple concatenation to the inputs; 3) External pre-trained contextualized word representations help to boost the SRL performance further, which is not entirely overlapping with the syntactic information.
+
+In summary, the contributions of our work are:
+
+We present detailed experiments on different aspects of incorporating syntactic information into the SRL model, in what quality, in which representation and how to integrate.
+
+We introduce the relation-aware approach to employ syntactic dependencies into the self-attention-based SRL model.
+
+We compare our approach with previous studies, and achieve state-of-the-art results with and without external resources, i.e., in the so-called closed and open settings.
+
+## Related work
+
+Traditional semantic role labeling task BIBREF17 presumes that the syntactic structure of the sentence is given, either being a constituent tree or a dependency tree, like in the CoNLL shared tasks BIBREF18, BIBREF19, BIBREF20. Recent neural-network-based approaches can be roughly categorized into two classes: 1) making use of the syntactic information BIBREF21, BIBREF22, BIBREF23, BIBREF24, and 2) pure end-to-end learning from tokens to semantic labels, e.g., BIBREF25, BIBREF26.
+
+BIBREF22 utilize an LSTM model to obtain embeddings from the syntactic dependency paths; while BIBREF24 construct Graph Convolutional Networks to encode the dependency structure. Although BIBREF8's approach is a pure end-to-end learning, they have included an analysis of adding syntactic dependency information into English SRL in the discussion section. BIBREF10 have compared syntax-agnostic and syntax-aware approaches and BIBREF9 have compared different ways to represent and encode the syntactic knowledge.
+
+In another line of research, BIBREF14 utilize the Transformer network for the encoder instead of the BiLSTM. BIBREF15 present a novel and effective multi-head self-attention model to incorporate syntax, which is called LISA (Linguistically-Informed Self-Attention). We follow their approach of replacing one attention head with the dependency head information, but use a softer way to capture the pairwise relationship between input elements BIBREF16.
+
+For the datasets and annotations of the SRL task, most of the previous research focuses on 1) PropBank BIBREF27 and NomBank BIBREF28 annotations, i.e., the CoNLL 2005 BIBREF18 and CoNLL 2009 BIBREF20 shared tasks; 2) OntoNotes annotations BIBREF29, i.e., the CoNLL 2005 and CoNLL 2012 datasets and more; 3) and FrameNet BIBREF30 annotations. For the non-English languages, not all of them are widely available. Apart from these, in the broad range of semantic processing, other formalisms non-exhaustively include abstract meaning representation BIBREF31, universal decompositional semantics BIBREF32, and semantic dependency parsing BIBREF33. BIBREF34 give a better overview of various semantic representations. In this paper, we primarily work on the Chinese and English datasets from the CoNLL-2009 shared task and focus on the effectiveness of incorporating syntax into the Chinese SRL task.
+
+## Approaches
+
+In this section, we first introduce the basic architecture of our self-attention-based SRL model, and then present two different ways to encode the syntactic dependency information. Afterwards, we compare three approaches to incorporate the syntax into the base model, concatenation to the input embedding, LISA, and our proposed relation-aware method.
+
+## Approaches ::: The Basic Architecture
+
+Our basic model is a multi-head self-attention-based model, which is effective in SRL task as previous work proves BIBREF35. The model consists of three layers: the input layer, the encoder layer and the prediction layer as shown in Figure FIGREF5.
+
+## Approaches ::: The Basic Architecture ::: Input Layer
+
+The input layer contains three types of embeddings: token embedding, predicate embedding, and positional embedding.
+
+Token Embedding includes word embedding, part-of-speech (POS) tag embedding.
+
+Predicate Embedding has been proposed by BIBREF8, and its binary embedding is used to indicate the predicates indices in each sentence.
+
+Positional Embedding encodes the order of the input word sequence. We follow BIBREF13 to use time positional embedding, which is formulated as follows:
+
+where $t$ is the position, $i$ means the dimension, and $d$ is the dimension of the model input embedding.
+
+## Approaches ::: The Basic Architecture ::: Encoder Layer
+
+The self-attention block is almost the same as Transformer encoder proposed by BIBREF13. Specifically the Transformer encoder contains a feed-forward network (FFN) and a multi-head attention network. The former is followed by the latter. In this work, we exchange their order, so that the multi-head attention module is moved behind the FFN module as Figure FIGREF5 shows.
+
+FFN The FFN module consists of two affine layers with a ReLU activation in the middle. Formally, we have the following equation:
+
+Multi-Head Attention The basic attention mechanism used in the multi-head attention function is called “Scaled Dot-Product Attention”, which is formulated as follows:
+
+where $Q$ is queries, $K$ is keys, and $V$ is values.
+
+In the multi-head attention setting, it first maps the input matrix $X$ into queries, keys and values matrices by using $h$ different learned linear projections. Taking queries $Q$ as an example:
+
+where $0 \le i < h$. Keys and values use similar projections.
+
+On each of these projections, we perform the scaled dot-product attention in parallel. These parallel output values are concatenated and once again projected into the final values. Equation DISPLAY_FORM14 depicts the above operations.
+
+where
+
+More details about multi-head attention can be found in BIBREF13.
+
+Add & Norm We employ a residual connection to each module, followed by a layer normalization BIBREF36 operation. The output of each module is formulated as
+
+where $f(x)$ is implemented by each above module.
+
+## Approaches ::: Representation of the Syntactic Dependencies ::: Dependency Head & Relation
+
+The most intuitive way to represent syntactic information is to use individual dependency relations directly, like dependency head and dependency relation label, denoted as Dep and Rel for short.
+
+Except for LISA, where Dep is a one-hot matrix of dependency head word index described in SECREF25, in other cases, we use the corresponding head word. Rel is the dependency relation between the word and its syntactic head. We take both Dep and Rel as common strings and map them into dense vectors in the similar way of word embedding.
+
+## Approaches ::: Representation of the Syntactic Dependencies ::: Dependency Path & Relation Path
+
+In order to preserve the structural information of dependency trees as much as possible, we take the syntactic path between candidate arguments and predicates in dependency trees as linguistic knowledge. Referring to BIBREF9, we use the Tree-based Position Feature (TPF) as Dependency Path (DepPath) and use the Shortest Dependency Path (SDP) as Relation Path (RelPath).
+
+To generate DepPath & RelPath between candidate argument and predicate, we firstly find their lowest common ancestor. Then we get two sub-paths, one is from the ancestor to the predicate and the other is from the ancestor to the argument. For DepPath, we compute distance from ancestor to predicate and argument respectively and then concatenate two distances with the separator `,'. For RelPath, we concatenate the labels appearing in each sub-path with the separator “_" respectively to get two label paths, and then concatenate the two label paths with the separator `,'.
+
+UTF8gbsn As shown in Figure FIGREF21, the lowest common ancestor of the predicate “鼓励 (encourage)" and the candidate argument “农业 (agriculture)" is “鼓励 (encourage)", so their DepPath is “2,0" and its RelPath is “COMP_COMP,".
+
+We take both DepPath and RelPath as common strings and map them into dense vectors in the similar way of Dep and Rel.
+
+UTF8gbsn
+
+## Approaches ::: Incorporation Methods ::: Input Embedding Concatenation
+
+To incorporate syntactic knowledge, one simple method is to take it as part of the neural network input, denoted as Input. We represent the syntactic information with dense vectors, and concatenate it with other information like word embedding:
+
+where $\oplus $ means concatenation; $E_W$ means the original inputs of the neural model and $E_S$ means the embedding of syntax information, such as Dep/Rel or DepPath/RelPath.
+
+## Approaches ::: Incorporation Methods ::: LISA
+
+BIBREF15 propose the linguistically-informed self-attention model (LISA for short) to combine SRL and dependency parsing as multi-task learning in a subtle way. Based on the multi-head self-attention model, LISA uses one attention head to predict the dependency results and it can also directly use pre-trained dependency head results to replace the attention matrix during testing.
+
+Being different from their multi-task learning, we make the replacement of one attention head during both training and testing. Instead of the original $softmax$ attention matrix, we use a one-hot matrix, generated by mapping the dependency head index of each word into a 0-1 vector of the sentence length as Figure FIGREF27 shows.
+
+We add the dependency relation information with $V$ in the replaced head so that we can make full use of the syntactic knowledge. The replaced attention head is formulated as follows:
+
+where $M_D$ is the one-hot dependency head matrix and $E_R$ means the embedding of dependency relation information, such as Rel or RelPath.
+
+## Approaches ::: Incorporation Methods ::: Relation-Aware Self-Attention
+
+Relation-aware self-attention model (RelAwe for brevity) incorporates external information into the attention. By this way, the model considers the pairwise relationships between input elements, which highly agrees with the task of SRL, i.e., aiming to find the semantic relations between the candidate argument and predicate in one sentence.
+
+Compared to the standard attention, in this paper, we add the dependency information into $Q$ and $V$ in each attention head, like equation (DISPLAY_FORM15) shows:
+
+where $E_D$ and $E_R$ mean the syntactic dependency head and relation information respectively. For our multi-layer multi-head self-attention model, we make this change to each head of the first $N$ self-attention layers.
+
+## Experiment ::: Settings
+
+Datasets & Evaluation Metrics Our experiments are conducted on the CoNLL-2009 shared task dataset BIBREF20. We use the official evaluation script to compare the output of different system configurations, and report the labeled precision (P), labeled recall (R) and labeled f-score (F1) for the semantic dependencies.
+
+Word Representations Most of our experiments are conducted in the closed setting without any external word embeddings or data resources than those provided by the CoNLL-2009 datasets. In the closed setting, word embedding is initialized by a Gaussian distribution with mean 0 and variance $\frac{1}{\sqrt{d}}$, where $d$ is the dimension of embedding size of each layer.
+
+For the experiments with external resources in the open setting, we utilize 1) word embeddings pre-trained with GloVe BIBREF37 on the Gigaword corpus for Chinese and the published embeddings with 100 dimensions pre-trained on Wikipedia and Gigaword for English; and 2) ELMo BIBREF38 and BERT BIBREF39, two recently proposed effective deep contextualized word representations.
+
+Other embeddings, i.e., POS embedding, linguistic knowledge embedding, and so on are initialized in same way as random word embedding no matter in closed or open setting.
+
+Syntactic Parsers In Table TABREF30, both Auto and Gold syntactic dependencies are provided by the dataset. Since the performance of the Auto is far behind the state-of-the-art BiaffineParser BIBREF40, we generate more dependency results by training BiaffineParser with different external knowledge, including pre-trained word embedding and BERT. Performance for different parsers is listed in Table TABREF30.
+
+Parameters In this work, we set word embedding size $d_w=100$, POS embedding size $d_t=50$. The predicate embedding size is set as $d_p=100$. The syntax-related embedding size varies along with different configurations, so as the feature embedding size $d_f$.
+
+To facilitate residual connections, all sub-layers in the model produce outputs of dimension $d_{model}=d_f+d_p$. The hidden dimension $d_{ff}=800$ is applied for all the experiments. We set the number of shared self-attention blocks $N=10$. The number of heads varies with $d_{model}$, but dimension of each head is 25. Besides, LISA incorporates syntax knowledge in the 5-th self-attention layer while RelAwe incorporates in the first 5 layers.
+
+We apply the similar dropout strategy as BIBREF13, i.e., the attention and residual dropout values are $0.2$ and $0.3$ respectively. The dropout is also applied in the middle layer of FFN with value $0.2$. We also employ label smoothing BIBREF41 of value $0.1$ during training.
+
+We use softmax-cross-entropy as our loss function, and use the Adadelta optimizer BIBREF42 with $\epsilon =10^{-6}$ and $\rho =0.95$. For all experiments, we train the model $200,000$ steps with learning rate $lr=1.0$, and each batch has 4096 words.
+
+All the hyper-parameters are tuned on the development set.
+
+Configurations We use different abbreviations to represent the parsing results, syntactic dependency representations, and incorporation methods. All the system configurations in our experiments are listed in Table TABREF36.
+
+## Experiment ::: Quality of the Syntactic Dependencies
+
+We use the above-mentioned dependency trees of different quality for comparison, with Dep&Rel representation on our RelAwe model. In addition, we generate one more data AutoDel by deleting all the erroneous dependency heads and relations from the provided Auto data according to the gold heads and relations, and we do not replace them with any alternative heads and relations. We take this setting as another reference (along with GOLD) to indicate that erroneous syntax information may hurt the performance of the SRL model. We take the Gold as the upperbound reference of our task setting. Experiment results in Table TABREF37 demonstrate that, incorporating syntactic knowledge into the SRL model can achieve better performance and overall, the better the quality is, the better the SRL model performs. This is consistent with the previous study by BIBREF8 on the English dataset.
+
+Closer observation reveals two additional interesting phenomena. Firstly, SRL performance improvement is not proportionate to the improvement of dependency quality. When switching syntactic dependency trees from Auto to Biaffine, SRL performance improves 0.5%, although syntactic dependency improves about 8%. In contrast, the difference between Biaffine and BiaffineBert shows more significant improvement of 1.5%. The possible reason is that BiaffineBert provides key dependency information which is missing in other configurations. Secondly, the SRL performance gap between AutoDel and Auto is large though they provide the same correct syntactic information. This may indicate that incorporating erroneous syntactic knowledge hurts the SRL model, and even providing more correct dependencies cannot make up for the harm (cf. BiaffineBert).
+
+## Experiment ::: Representation of the Syntactic Dependencies
+
+Apart from Dep and Rel, we also use DepPath and RelPath to encode the syntactic knowledge. In this subsection, we conduct experiments to compare different syntactic encoding in our SRL model. We base the experiments on our RelAwe model, since it is easier to incorporate different representations for comparison. When generating the RelPath, we filter the paths 1) when the dependency distance between the predicate and the candidate argument is more than 4, and 2) when the RelPath's frequency is less than 10.
+
+No matter in which representation, dependency label information is more important than the head and the combination of the two achieves better performance as our experiment results in Table TABREF41 show. Furthermore, using Biaffine dependency trees, DepPath and RelPath perform better than Dep and Rel. This is because of the capability of DepPath and RelPath to capture more structural information of the dependency trees.
+
+Comparing Table TABREF37 and TABREF41, when using gold dependencies, DepPath&RelPath can achieve much better result than Dep&Rel. But with the Auto trees, DepPath&RelPath is much worse. Therefore, structural information is much more sensitive to the quality of dependency trees due to error propagation.
+
+## Experiment ::: Incorporation Methods
+
+[9]From the mechanism of LISA, we can find that the replaced attention head can't copy the syntactic dependency heads from DepPath.
+
+This subsection discusses the effectiveness of different incorporation methods of the syntactic knowledge. We take Biaffine's output as our dependency information for the comparison.
+
+Firstly, results in Table TABREF44 show that with little dependency information (Dep), LISA performs better, while incorporating richer syntactic knowledge (Dep&Rel or Dep&RelPath), three methods achieve similar performance. Overall, RelAwe achieves best results given enough syntactic knowledge.
+
+Secondly, Input and LISA achieve much better performance when we combine the dependency head information and the relation, while BIBREF15 have not introduced relation information to the LISA model and BIBREF9 have not combined the head and relation information either. Our proposed RelAwe method with DepPath&RelPath representation performs the best, which encodes the richest syntactic knowledge.
+
+Lastly, under the same settings, LISA and RelAwe perform better than Input, which indicates the importance of the location where the model incorporates the syntax, the input layer vs. the encoder layer.
+
+## Experiment ::: External Resources
+
+Apart from the experiments with syntactic knowledge itself, we also compare different external resources to discover their relationship with the syntax, including pre-trained word embeddings, ELMo, and BERT. We conduct experiments with our best setting, the RelAwe model with DepPath & RelPath and the results are listed in Table TABREF45.
+
+The plain word embedding improves a little in such settings with syntactic information, while for the newly proposed Elmo and Bert, both of them can boost the models further.
+
+## Experiment ::: Final Results on the Chinese Test Data
+
+Based on the above experiments and analyses, we present the overall results of our model in this subsection. We train the three models (Input, LISA, and RelAwe) with their best settings without any external knowledge as Closed, and we take the same models with Bert as Open. The DepPath&RelPath from Gold without external knowledge serves as the Gold for reference. Since we have been focusing on the task of argument identification and labeling, for both Closed and Open, we follow BIBREF22 to use existing systems' predicate senses BIBREF43 to exclude them from comparison.
+
+Table TABREF46 shows that our Open model achieves more than 3 points of f1-score than the state-of-the-art result, and RelAwe with DepPath&RelPath achieves the best in both Closed and Open settings. Notice that our best Closed model can almost perform as well as the state-of-the-art model while the latter utilizes pre-trained word embeddings. Besides, performance gap between three models under Open setting is very small. It indicates that the representation ability of BERT is so powerful and may contains rich syntactic information. At last, the Gold result is much higher than the other models, indicating that there is still large space for improvement for this task.
+
+## Experiment ::: Results on the English Data
+
+We also conduct several experiments on the English dataset to validate the effectiveness of our approaches on other languages than Chinese and the results are in Table TABREF49. Although both configurations are not exactly the same as their original papers, we tried our best to reproduce their methods on the CoNLL2009 dataset for our comparison. Overall, the results are consistent with the Chinese experiments, while the improvement is not as large as the Chinese counterparts. The RelAwe model with DepPath&RelPath still achieves the best performance. Applying our syntax-enhanced model to more languages will be an interesting research direction to work on in the future. [10]We reimplement LISA in BIBREF15 as LISA(Dep), and BIBREF9's best DepPath approach as Input(DepPath). Therefore, we can compare with their work as fairly as possible. Other settings are the best configurations for their corresponding methods.
+
+## Conclusion and Future Work
+
+This paper investigates how to incorporate syntactic dependency information into semantic role labeling in depth. Firstly, we confirm that dependency trees of better quality are more helpful for the SRL task. Secondly, we present different ways to encode the trees and the experiments show that keeping more (correct) structural information during encoding improves the SRL performance. Thirdly, we compare three incorporation methods and discover that our proposed relation-aware self-attention-based model is the most effective one.
+
+Although our experiments are primarily on the Chinese dataset, the approach is largely language independent. Apart from our tentative experiments on the English dataset, applying the approach to other languages will be an interesting research direction to work on in the future.

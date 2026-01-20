@@ -1,0 +1,137 @@
+# Neural Network Translation Models for Grammatical Error Correction
+
+**Paper ID:** 1606.00189
+
+## Abstract
+
+Phrase-based statistical machine translation (SMT) systems have previously been used for the task of grammatical error correction (GEC) to achieve state-of-the-art accuracy. The superiority of SMT systems comes from their ability to learn text transformations from erroneous to corrected text, without explicitly modeling error types. However, phrase-based SMT systems suffer from limitations of discrete word representation, linear mapping, and lack of global context. In this paper, we address these limitations by using two different yet complementary neural network models, namely a neural network global lexicon model and a neural network joint model. These neural networks can generalize better by using continuous space representation of words and learn non-linear mappings. Moreover, they can leverage contextual information from the source sentence more effectively. By adding these two components, we achieve statistically significant improvement in accuracy for grammatical error correction over a state-of-the-art GEC system.
+
+## Introduction
+
+Grammatical error correction (GEC) is a challenging task due to the variability of the type of errors and the syntactic and semantic dependencies of the errors on the surrounding context. Most of the grammatical error correction systems use classification and rule-based approaches for correcting specific error types. However, these systems use several linguistic cues as features. The standard linguistic analysis tools like part-of-speech (POS) taggers and parsers are often trained on well-formed text and perform poorly on ungrammatical text. This introduces further errors and limits the performance of rule-based and classification approaches to GEC. As a consequence, the phrase-based statistical machine translation (SMT) approach to GEC has gained popularity because of its ability to learn text transformations from erroneous text to correct text from error-corrected parallel corpora without any additional linguistic information. They are also not limited to specific error types. Currently, many state-of-the-art GEC systems are based on SMT or use SMT components for error correction BIBREF0 , BIBREF1 , BIBREF2 . In this paper, grammatical error correction includes correcting errors of all types, including word choice errors and collocation errors which constitute a large class of learners' errors.
+
+We model our GEC system based on the phrase-based SMT approach. However, traditional phrase-based SMT systems treat words and phrases as discrete entities. We take advantage of continuous space representation by adding two neural network components that have been shown to improve SMT systems BIBREF3 , BIBREF4 . These neural networks are able to capture non-linear relationships between source and target sentences and can encode contextual information more effectively. Our experiments show that the addition of these two neural networks leads to significant improvements over a strong baseline and outperforms the current state of the art.
+
+## Related Work
+
+In the past decade, there has been increasing attention on grammatical error correction in English, mainly due to the growing number of English as Second Language (ESL) learners around the world. The popularity of this problem in natural language processing research grew further through Helping Our Own (HOO) and the CoNLL shared tasks BIBREF5 , BIBREF6 , BIBREF7 , BIBREF8 . Most published work in GEC aimed at building specific classifiers for different error types and then use them to build hybrid systems BIBREF9 , BIBREF10 . One of the first approaches of using SMT for GEC focused on correction of countability errors of mass nouns (e.g., many informations INLINEFORM0 much information) BIBREF11 . They had to use an artificially constructed parallel corpus for training their SMT system. Later, the availability of large-scale error corrected data BIBREF12 further improved SMT-based GEC systems.
+
+Recently, continuous space representations of words and phrases have been incorporated into SMT systems via neural networks. Specifically, addition of monolingual neural network language models BIBREF13 , BIBREF14 , neural network joint models (NNJM) BIBREF4 , and neural network global lexicon models (NNGLM) BIBREF3 have been shown to be useful for SMT. Neural networks have been previously used for GEC as a language model feature in the classification approach BIBREF15 and as a classifier for article error correction BIBREF16 . Recently, a neural machine translation approach has been proposed for GEC BIBREF17 . This method uses a recurrent neural network to perform sequence-to-sequence mapping from erroneous to well-formed sentences. Additionally, it relies on a post-processing step based on statistical word-based translation models to replace out-of-vocabulary words. In this paper, we investigate the effectiveness of two neural network models, NNGLM and NNJM, in SMT-based GEC. To the best of our knowledge, there is no prior work that uses these two neural network models for SMT-based GEC.
+
+## A Machine Translation Framework for Grammatical Error Correction
+
+In this paper, the task of grammatical error correction is formulated as a translation task from the language of `bad' English to the language of `good' English. That is, the source sentence is written by a second language learner and potentially contains grammatical errors, whereas the target sentence is the corrected fluent sentence. We use a phrase-based machine translation framework BIBREF18 for translation, which employs a log-linear model to find the best translation INLINEFORM0 given a source sentence INLINEFORM1 . The best translation is selected according to the following equation: INLINEFORM2 
+
+where INLINEFORM0 is the number of features, INLINEFORM1 and INLINEFORM2 are the INLINEFORM3 th feature function and feature weight, respectively. We make use of the standard features used in phrase-based translation without any reordering, leading to monotone translations. The features can be broadly categorized as translation model and language model features. The translation model in the phrase-based machine translation framework is trained using parallel data, i.e., sentence-aligned erroneous source text and corrected target text. The translation model is responsible for finding the best transformation of the source sentence to produce the corrected sentence. On the other hand, the language model is trained on well-formed English text and this ensures the fluency of the corrected text. To find the optimal feature weights ( INLINEFORM4 ), we use minimum error rate training (MERT), maximizing the INLINEFORM5 measure on the development set BIBREF2 . The INLINEFORM6 measure BIBREF19 , which weights precision twice as much as recall, is the evaluation metric widely used for GEC and was the official evaluation metric adopted in the CoNLL 2014 shared task BIBREF8 .
+
+Additionally, we augment the feature set by adding two neural network translation models, namely a neural network global lexicon model BIBREF3 and a neural network joint model BIBREF4 . These models are described in detail in Sections SECREF4 and SECREF5 .
+
+## Neural Network Global Lexicon Model 
+
+A global lexicon model is used to predict the presence of words in the corrected output. The model estimates the overall probability of a target hypothesis (i.e., a candidate corrected sentence) given the source sentence, by making use of the probability computed for each word in the hypothesis. The individual word probabilities can be computed by training density estimation models such as maximum entropy BIBREF20 or probabilistic neural networks BIBREF3 . Following BIBREF3 , we formulate our global lexicon model using a feed-forward neural network. The model and the training algorithm are described below.
+
+## Model
+
+The probability of a target hypothesis is computed using the following equation: DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 are the source sentence and the target hypothesis respectively, and INLINEFORM2 denotes the number of words in the target hypothesis. INLINEFORM3 is the probability of the target word INLINEFORM4 given the source sentence INLINEFORM5 . INLINEFORM6 is the output of the neural network. The architecture of the neural network is shown in Figure FIGREF3 . INLINEFORM7 is calculated by:
+
+where INLINEFORM0 is the hidden layer output, and INLINEFORM1 and INLINEFORM2 are the output layer weights and biases respectively. INLINEFORM3 is the element-wise sigmoid function which scales the output to INLINEFORM4 .
+
+ INLINEFORM0 is computed by the following equation: INLINEFORM1 
+
+where INLINEFORM0 is the activation function, and INLINEFORM1 and INLINEFORM2 are the hidden layer weights and biases applied on a binary bag-of-words representation of the input sentence denoted by INLINEFORM3 . The size of INLINEFORM4 is equal to the size of the source vocabulary INLINEFORM5 and each element indicates the presence or absence (denoted by 1 or 0 respectively) of a given source word.
+
+The probability of the target hypothesis INLINEFORM0 given the source sentence INLINEFORM1 is estimated by the following equation: DISPLAYFORM0 
+
+where INLINEFORM0 is the number of words in the target sentence, INLINEFORM1 is the INLINEFORM2 th target word, and INLINEFORM3 is the context (history) for the target word INLINEFORM4 . The context INLINEFORM5 consists of a set of INLINEFORM6 source words represented by INLINEFORM7 and INLINEFORM8 words preceding INLINEFORM9 from the target sentence represented by INLINEFORM10 . The context words from the source side are the words in the window of size INLINEFORM11 surrounding the source word INLINEFORM12 that is aligned to the target word INLINEFORM13 . The output of the neural network INLINEFORM14 is the output of the final softmax layer which is given by the following equation: DISPLAYFORM0 
+
+where INLINEFORM0 is the output of the neural network before applying softmax and INLINEFORM1 is given by following equation: INLINEFORM2 
+
+The output of the neural network before softmax is computed by applying output layer weights INLINEFORM0 and biases INLINEFORM1 to the hidden layer output INLINEFORM2 . INLINEFORM3 
+
+ INLINEFORM0 is computed by applying weights INLINEFORM1 and biases INLINEFORM2 on the hidden layer input INLINEFORM3 and using a non-linear activation function INLINEFORM4 : INLINEFORM5 
+
+The input to the hidden layer ( INLINEFORM0 ) is a concatenated vector of context word embeddings: INLINEFORM1 
+
+ where INLINEFORM0 and INLINEFORM1 are the one-hot representations of the source word INLINEFORM2 and the target word INLINEFORM3 , respectively. Similarly, INLINEFORM4 and INLINEFORM5 are the word embeddings matrices for the source words and the target words.
+
+As we use log probabilities instead of raw probabilities in our GEC system, Equation EQREF11 can be rewritten as the following: DISPLAYFORM0 
+
+Finally, since the network is trained by Noise Contrastive Estimation (NCE) (described in Section SECREF14 ), it becomes self-normalized. This means that INLINEFORM0 will be approximately 1 and hence the raw output of the neural network INLINEFORM1 can be directly used as the log probabilities during decoding.
+
+## Training
+
+The model is trained using mini-batch gradient descent with back-propagation. We use binary cross entropy (Equation EQREF5 ) as the cost function: DISPLAYFORM0 
+
+ where INLINEFORM0 refers to the binary bag-of-words representation of the reference target sentence, and INLINEFORM1 is the target vocabulary. Each mini-batch is composed of a fixed number of sentence pairs INLINEFORM2 . The training algorithm repeatedly minimizes the cost function calculated for a given mini-batch by updating the parameters according to the gradients.
+
+To avoid the costly softmax layer and thereby speed up both training and decoding, we use Noise Contrastive Estimation (NCE) following BIBREF14 . During training, the negative log likelihood cost function is modified to a probabilistic binary classifier, which learns to discriminate between the actual target word and INLINEFORM0 random words (noisy samples) per training instance selected from a noise distribution INLINEFORM1 . The two classes are INLINEFORM2 indicating that the word is the target word and INLINEFORM3 indicating that the word is a noisy sample. The conditional probabilities for INLINEFORM4 and INLINEFORM5 given a target word and context is given by: INLINEFORM6 INLINEFORM7 
+
+where, INLINEFORM0 is the model probability given in Equation EQREF12 . The negative log likelihood cost function is replaced by the following function. INLINEFORM1 
+
+where INLINEFORM0 refers to the INLINEFORM1 th noise sample for the target word INLINEFORM2 . INLINEFORM3 is required for the computation of the neural network output, INLINEFORM4 . However, setting the term INLINEFORM5 to 1 during training forces the output of the neural network to be self-normalized. Hence, Equation EQREF13 reduces to: DISPLAYFORM0 
+
+Using Equation EQREF15 avoids the expensive softmax computation in the final layer and consequently speeds up decoding.
+
+## Rescaling
+
+Since the prior probability of observing a particular word in a sentence is usually a small number, the probabilistic output of NNGLM can be biased towards zero. This bias can hurt the performance of our system and therefore, we try to alleviate this problem by rescaling the output after training NNGLM. Our solution is to map the output probabilities to a new probability space by fitting a logistic function on the output. Formally, we use Equation EQREF7 as the mapping function: DISPLAYFORM0 
+
+where INLINEFORM0 is the rescaled probability and INLINEFORM1 and INLINEFORM2 are the parameters. For each sentence pair INLINEFORM3 in the development set, we collect training instances of the form INLINEFORM4 for every word INLINEFORM5 in the target vocabulary, where INLINEFORM6 and INLINEFORM7 . The value of INLINEFORM8 is set according to the presence ( INLINEFORM9 ) or absence ( INLINEFORM10 ) of the word INLINEFORM11 in the target sentence INLINEFORM12 . We use weighted cross entropy loss function with INLINEFORM13 -regularization to train INLINEFORM14 and INLINEFORM15 on the development set: INLINEFORM16 
+
+Here, INLINEFORM0 is the number of training samples, INLINEFORM1 is the probability of INLINEFORM2 computed by INLINEFORM3 , and INLINEFORM4 and INLINEFORM5 are the weights assigned to the two classes INLINEFORM6 and INLINEFORM7 , respectively. In order to balance the two classes, we weight each class inversely proportional to class frequencies in the training data (Equation EQREF8 ) to put more weight on the less frequent class: DISPLAYFORM0 
+
+In Equation EQREF8 , INLINEFORM0 and INLINEFORM1 are the number of samples in each class. After training the rescaling model, we use INLINEFORM2 and INLINEFORM3 to calculate INLINEFORM4 according to Equation EQREF7 . Finally, we use INLINEFORM5 instead of INLINEFORM6 in Equation EQREF2 .
+
+## Neural Network Joint Model
+
+Joint models in translation augment the context information in language models with words from the source sentence. A neural network joint model (NNJM) BIBREF4 uses a neural network to model the word probabilities given a context composed of source and target words. NNJM can scale up to large order of n-grams and still perform well because of its ability to capture semantic information through continuous space representations of words and to learn non-linear relationship between source and target words. Unlike the global lexicon model, NNJM uses a fixed window from the source side and take sequence information of words into consideration in order to estimate the probability of the target word. The model and the training method are described below.
+
+## Experiments
+
+We describe our experimental setup including the description of the data we used, the configuration of our baseline system and the neural network components, and the evaluation method in Section SECREF16 , followed by the results and discussion in Section SECREF23 
+
+## Setup
+
+We use the popular phrase-based machine translation toolkit Moses as our baseline SMT system. NUCLE BIBREF21 , which is the official training data for the CoNLL 2013 and 2014 shared tasks, is used as the parallel text for training. Additionally, we obtain parallel corpora from Lang-8 Corpus of Learner English v1.0 BIBREF12 , which consists of texts written by ESL (English as Second Language) learners on the language learning platform Lang-8. We use the test data for the CoNLL 2013 shared task as our development data. The statistics of the training and development data are given in Table TABREF19 . Source side refers to the original text written by the ESL learners and target side refers to the corresponding corrected text hand-corrected by humans. The source side and the target side are sentence-aligned and tokenized.
+
+We train the translation model for our SMT system using a concatenation of NUCLE and Lang-8 v1.0 parallel data. The training data is cleaned up by removing sentence pairs in which either the source or the target sentence is empty, or is too long (greater than 80 tokens), or violate a 9:1 sentence ratio limit. The translation model uses the default features in Moses which include the forward and inverse phrase translation probabilities, forward and inverse lexical weights, word penalty, and phrase penalty. We compute the phrase alignments using standard tools in Moses. We use two language model features: a 5-gram language model trained using the target side of NUCLE used for training the translation model and a 5-gram language model trained using English Wikipedia ( INLINEFORM0 1.78 billion tokens). Both language models are estimated with KenLM using modified Kneser-Ney smoothing. We use MERT for tuning the feature weights by optimizing the INLINEFORM1 measure (which weights precision twice as much as recall). This system constitutes our baseline system in Table TABREF24 . Our baseline system uses exactly the same training data as BIBREF0 for training the translation model and the language model. The difference between our baseline system and the SMT components of BIBREF0 is that we tune with INLINEFORM2 instead of BLEU and we use the standard Moses configuration without the Levenshtein distance feature.
+
+On top of our baseline system described above, we incorporate the two neural network components, neural network global lexicon model (NNGLM) and neural network joint model (NNJM) as features. Both NNGLM and NNJM are trained using the parallel data used to train the translation model of our baseline system.
+
+We implement NNGLM using the Theano library in Python in order to make use of parallelization with GPUs, thus speeding up training significantly. We use a source and target vocabulary of 10,000 most frequent words on both sides. We use a single hidden layer neural network with 2,000 hidden nodes. We use INLINEFORM0 as the activation function for the hidden layer. We optimize the model weights by stochastic gradient descent using a mini-batch size of 100 and a learning rate of 10. We train the model for 45 epochs. The logistic regression function for rescaling is trained using the probabilities obtained from this model on the development set. To speed up tuning and decoding, we pre-compute the probabilities of target words using the source side sentences of the development and the test sets, respectively. We implement a feature function in Moses to compute the probability of a target hypothesis given the source sentence using the pre-computed probabilities.
+
+To train NNJM, we use the publicly available implementation, Neural Probabilistic Language Model (NPLM) BIBREF14 . The latest version of Moses can incorporate NNJM trained using NPLM as a feature while decoding. Similar to NNGLM, we use the parallel text used for training the translation model in order to train NNJM. We use a source context window size of 5 and a target context window size of 4. We select a source context vocabulary of 16,000 most frequent words from the source side. The target context vocabulary and output vocabulary is set to the 32,000 most frequent words. We use a single hidden layer to speed up training and decoding with an input embedding dimension of 192 and 512 hidden layer nodes. We use rectified linear units (ReLU) as the activation function. We train NNJM with noise contrastive estimation with 100 noise samples per training instance, which are obtained from a unigram distribution. The neural network is trained for 30 epochs using stochastic gradient descent optimization with a mini-batch size of 128 and learning rate of 0.1.
+
+We conduct experiments by incorporating NNGLM and NNJM both independently and jointly into our baseline system. The results of our experiments are described in Section SECREF23 . The evaluation is performed similar to the CoNLL 2014 shared task setting using the the official test data of the CoNLL 2014 shared task with annotations from two annotators (without considering alternative annotations suggested by the participating teams). The test dataset consists of 1,312 error-annotated sentences with 30,144 tokens on the source side. We make use of the official scorer for the shared task, M INLINEFORM0 Scorer v3.2 BIBREF19 , for evaluation. We perform statistical significance test using one-tailed sign test with bootstrap resampling on 100 samples.
+
+## Results and Discussion
+
+Table TABREF24 presents the results of our experiments with neural network global lexicon model (NNGLM) and neural network joint model (NNJM).
+
+We see that the addition of both NNGLM and NNJM to our baseline individually improves INLINEFORM0 measure on the CoNLL 2014 test set by 0.43 and 0.80, respectively. Although both improvements over the baseline are statistically significant (with INLINEFORM1 ), we observe that the improvement of NNGLM is slightly lower than that of NNJM. NNGLM encodes the entire lexical information from the source sentence without word ordering information. Hence, it focuses mostly on the choice of words appearing in the output. Many of the words in the source context may not be necessary for ensuring the quality of corrected output. On the other hand, NNJM looks at a smaller window of words in the source side. NNJM can act as a language model and can ensure a fluent translation output compared to NNGLM.
+
+We also found rescaling to be important for NNGLM because of imbalanced training data. While the most frequent words in the data, `I' and to', appear in 43% and 27% of the training sentences, respectively, most words occur in very few sentences only. For example, the word `set' appears in 0.15% of the sentences and the word `enterprise' appears in 0.003% of the sentences.
+
+By incorporating both components together, we obtain an improvement of 1.17 in terms of INLINEFORM0 measure. This indicates that both components are beneficial and complement each other to improve the performance of the baseline system. While NNGLM looks at the entire source sentence and ensures the appropriate choice of words to appear in the output sentence, NNJM encourages the system to choose appropriate corrections that give a fluent output.
+
+We compare our system to the top 3 systems in the CoNLL 2014 shared task and to the best published results BIBREF17 , BIBREF0 on the test data of the CoNLL 2014 shared task. The results are summarized in Table TABREF26 . Our final system including both neural network models outperforms the best system BIBREF17 by 1.85 in F INLINEFORM0 measure. It should be noted that this is despite the fact that the system proposed in BIBREF17 uses much larger training data than our system.
+
+We qualitatively analyze the output of our neural network-enhanced systems against the outputs produced by our baseline system. We have included some examples in Table TABREF25 and the corresponding outputs of the baseline system and the reference sentences. The selected examples show that NNGLM and NNJM choose appropriate words by making use of the surrounding context effectively.
+
+Note that our neural networks, which rely on fixed source and target vocabulary, map the rare words and misspelled words to the UNK token. Therefore, phrases with the UNK token may get a higher probability than they actually should due to the large number of UNK tokens seen during training. This leads to fewer spelling error corrections compared to the baseline system which does not employ these neural networks. Consider the following example from the test data:
+
+ ... numerous profit-driven companies realize the hugh (huge) human traffic on such social media sites ....
+
+The spelling error hugh INLINEFORM0 huge is corrected by the baseline system, but not by our final system with the neural networks. This is because the misspelled word hugh is not in the neural network vocabulary and so it is mapped to the UNK token. The sentence with the UNK token gets a higher score and hence the system chooses this output over the correct one.
+
+From our experiments and analysis, we see that NNGLM and NNJM capture contextual information better than regular translation models and language models. This is because they make use of larger source sentence contexts and continuous space representation of words. This enables them to make better predictions compared to traditional translation models and language models. We also observed that our system has an edge over the baseline for correction of word choice and collocation errors.
+
+## Conclusion
+
+Our experiments show that using the two neural network translation models improves the performance of a phrase-based SMT approach to GEC. To the best of our knowledge, this is the first work that uses these two neural network models for SMT-based GEC. The ability of neural networks to model words and phrases in continuous space and capture non-linear relationships enables them to generalize better and make more accurate grammatical error correction. We have achieved state-of-the-art results on the CoNLL 2014 shared task test dataset. This has been done without using any additional training data compared to the best performing systems evaluated on the same dataset.
+
+## Acknowledgments
+
+This research is supported by Singapore Ministry of Education Academic Research Fund Tier 2 grant MOE2013-T2-1-150.

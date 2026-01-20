@@ -1,0 +1,191 @@
+# All Fingers are not Equal: Intensity of References in Scientific Articles
+
+**Paper ID:** 1609.00081
+
+## Abstract
+
+Research accomplishment is usually measured by considering all citations with equal importance, thus ignoring the wide variety of purposes an article is being cited for. Here, we posit that measuring the intensity of a reference is crucial not only to perceive better understanding of research endeavor, but also to improve the quality of citation-based applications. To this end, we collect a rich annotated dataset with references labeled by the intensity, and propose a novel graph-based semi-supervised model, GraLap to label the intensity of references. Experiments with AAN datasets show a significant improvement compared to the baselines to achieve the true labels of the references (46% better correlation). Finally, we provide four applications to demonstrate how the knowledge of reference intensity leads to design better real-world applications.
+
+## Introduction
+
+With more than one hundred thousand new scholarly articles being published each year, there is a rapid growth in the number of citations for the relevant scientific articles. In this context, we highlight the following interesting facts about the process of citing scientific articles: (i) the most commonly cited paper by Gerard Salton, titled “A Vector Space Model for Information Retrieval” (alleged to have been published in 1975) does not actually exist in reality BIBREF0 , (ii) the scientific authors read only 20% of the works they cite BIBREF1 , (iii) one third of the references in a paper are redundant and 40% are perfunctory BIBREF2 , (iv) 62.7% of the references could not be attributed a specific function (definition, tool etc.) BIBREF3 . Despite these facts, the existing bibliographic metrics consider that all citations are equally significant.
+
+In this paper, we would emphasize the fact that all the references of a paper are not equally influential. For instance, we believe that for our current paper, BIBREF4 is more influential reference than BIBREF5 , although the former has received lower citations (9) than the latter (1650) so far. Therefore the influence of a cited paper completely depends upon the context of the citing paper, not the overall citation count of the cited paper. We further took the opinion of the original authors of few selective papers and realized that around 16% of the references in a paper are highly influential, and the rest are trivial (Section SECREF4 ). This motivates us to design a prediction model, GraLap to automatically label the influence of a cited paper with respect to a citing paper. Here, we label paper-reference pairs rather than references alone, because a reference that is influential for one citing paper may not be influential with equal extent for another citing paper.
+
+We experiment with ACL Anthology Network (AAN) dataset and show that GraLap along with the novel feature set, quite efficiently, predicts the intensity of references of papers, which achieves (Pearson) correlation of INLINEFORM0 with the human annotations. Finally, we present four interesting applications to show the efficacy of considering unequal intensity of references, compared to the uniform intensity.
+
+The contributions of the paper are four-fold: (i) we acquire a rich annotated dataset where paper-reference pairs are labeled based on the influence scores (Section SECREF4 ), which is perhaps the first gold-standard for this kind of task; (ii) we propose a graph-based label propagation model GraLap for semi-supervised learning which has tremendous potential for any task where the training set is less in number and labels are non-uniformly distributed (Section SECREF3 ); (iii) we propose a diverse set of features (Section SECREF10 ); most of them turn out to be quite effective to fit into the prediction model and yield improved results (Section SECREF5 ); (iv) we present four applications to show how incorporating the reference intensity enhances the performance of several state-of-the-art systems (Section SECREF6 ).
+
+## Defining Intensity of References
+
+All the references of a paper usually do not carry equal intensity/strength with respect to the citing paper because some papers have influenced the research more than others. To pin down this intuition, here we discretize the reference intensity by numerical values within the range of 1 to 5, (5: most influential, 1: least influential). The appropriate definitions of different labels of reference intensity are presented in Figure FIGREF2 , which are also the basis of building the annotated dataset (see Section SECREF4 ):
+
+Note that “reference intensity” and “reference similarity” are two different aspects. It might happen that two similar reference are used with different intensity levels in a citing paper – while one is just mentioned somewhere in the paper and other is used as a baseline. Here, we address the former problem as a semi-supervised learning problem with clues taken from content of the citing and cited papers.
+
+## Reference Intensity Prediction Model
+
+In this section, we formally define the problem and introduce our prediction model.
+
+## Problem Definition
+
+We are given a set of papers INLINEFORM0 and a sets of references INLINEFORM1 , where INLINEFORM2 corresponds to the set of references (or cited papers) of INLINEFORM3 . There is a set of papers INLINEFORM4 whose references INLINEFORM5 are already labeled by INLINEFORM6 (each reference is labeled with exactly one value). Our objective is to define a predictive function INLINEFORM7 that labels the references INLINEFORM8 of the papers INLINEFORM9 whose reference intensities are unknown, i.e., INLINEFORM10 .
+
+Since the size of the annotated (labeled) data is much smaller than unlabeled data ( INLINEFORM0 ), we consider it as a semi-supervised learning problem.
+
+Definition 1 (Semi-supervised Learning) Given a set of entries INLINEFORM0 and a set of possible labels INLINEFORM1 , let us assume that ( INLINEFORM2 ), ( INLINEFORM3 ),..., ( INLINEFORM4 ) be the set of labeled data where INLINEFORM5 is a data point and INLINEFORM6 is its corresponding label. We assume that at least one instance of each class label is present in the labeled dataset. Let ( INLINEFORM7 ), ( INLINEFORM8 ),..., ( INLINEFORM9 ) be the unlabeled data points where INLINEFORM10 are unknown. Each entry INLINEFORM11 is represented by a set of features INLINEFORM12 . The problem is to determine the unknown labels using INLINEFORM13 and INLINEFORM14 .
+
+## GraLap: A Prediction Model
+
+We propose GraLap, a variant of label propagation (LP) model proposed by BIBREF9 where a node in the graph propagates its associated label to its neighbors based on the proximity. We intend to assign same label to the vertices which are closely connected. However unlike the traditional LP model where the original values of the labels continue to fade as the algorithm progresses, we systematically handle this problem in GraLap. Additionally, we follow a post-processing in order to handle “class-imbalance problem”.
+
+Graph Creation. The algorithm starts with the creation of a fully connected weighted graph INLINEFORM0 where nodes are data points and the weight INLINEFORM1 of each edge INLINEFORM2 is determined by the radial basis function as follows:
+
+ DISPLAYFORM0 
+
+The weight is controlled by a parameter INLINEFORM0 . Later in this section, we shall discuss how INLINEFORM1 is selected. Each node is allowed to propagate its label to its neighbors through edges (the more the edge weight, the easy to propagate).
+
+Transition Matrix. We create a probabilistic transition matrix INLINEFORM0 , where each entry INLINEFORM1 indicates the probability of jumping from INLINEFORM2 to INLINEFORM3 based on the following: INLINEFORM4 .
+
+Label Matrix. Here, we allow a soft label (interpreted as a distribution of labels) to be associated with each node. We then define a label matrix INLINEFORM0 , where INLINEFORM1 th row indicates the label distribution for node INLINEFORM2 . Initially, INLINEFORM3 contains only the values of the labeled data; others are zero.
+
+Label Propagation Algorithm. This algorithm works as follows:
+
+After initializing INLINEFORM0 and INLINEFORM1 , the algorithm starts by disseminating the label from one node to its neighbors (including self-loop) in one step (Step 3). Then we normalize each entry of INLINEFORM2 by the sum of its corresponding row in order to maintain the interpretation of label probability (Step 4). Step 5 is crucial; here we want the labeled sources INLINEFORM3 to be persistent. During the iterations, the initial labeled nodes INLINEFORM4 may fade away with other labels. Therefore we forcefully restore their actual label by setting INLINEFORM5 (if INLINEFORM6 is originally labeled as INLINEFORM7 ), and other entries ( INLINEFORM8 ) by zero. We keep on “pushing” the labels from the labeled data points which in turn pushes the class boundary through high density data points and settles in low density space. In this way, our approach intelligently uses the unlabeled data in the intermediate steps of the learning.
+
+Assigning Final Labels. Once INLINEFORM0 is computed, one may take the most likely label from the label distribution for each unlabeled data. However, this approach does not guarantee the label proportion observed in the annotated data (which in this case is not well-separated as shown in Section SECREF4 ). Therefore, we adopt a label-based normalization technique. Assume that the label proportions in the labeled data are INLINEFORM1 (s.t. INLINEFORM2 . In case of INLINEFORM3 , we try to balance the label proportion observed in the ground-truth. The label mass is the column sum of INLINEFORM4 , denoted by INLINEFORM5 , each of which is scaled in such a way that INLINEFORM6 . The label of an unlabeled data point is finalized as the label with maximum value in the row of INLINEFORM7 .
+
+Convergence. Here we briefly show that our algorithm is guaranteed to converge. Let us combine Steps 3 and 4 as INLINEFORM0 , where INLINEFORM1 . INLINEFORM2 is composed of INLINEFORM3 and INLINEFORM4 , where INLINEFORM5 never changes because of the reassignment. We can split INLINEFORM6 at the boundary of labeled and unlabeled data as follows:
+
+ INLINEFORM0 
+
+Therefore, INLINEFORM0 , which can lead to INLINEFORM1 , where INLINEFORM2 is the shape of INLINEFORM3 at iteration 0. We need to show INLINEFORM4 . By construction, INLINEFORM5 , and since INLINEFORM6 is row-normalized, and INLINEFORM7 is a part of INLINEFORM8 , it leads to the following condition: INLINEFORM9 . So, DISPLAYFORM0 
+
+Therefore, the sum of each row in INLINEFORM0 converges to zero, which indicates INLINEFORM1 .
+
+Selection of INLINEFORM0 . Assuming a spatial representation of data points, we construct a minimum spanning tree using Kruskal's algorithm BIBREF10 with distance between two nodes measured by Euclidean distance. Initially, no nodes are connected. We keep on adding edges in increasing order of distance. We choose the distance (say, INLINEFORM1 ) of the first edge which connects two components with different labeled points in them. We consider INLINEFORM2 as a heuristic to the minimum distance between two classes, and arbitrarily set INLINEFORM3 , following INLINEFORM4 rule of normal distribution BIBREF11 .
+
+## Features for Learning Model
+
+We use a wide range of features that suitably represent a paper-reference pair ( INLINEFORM0 ), indicating INLINEFORM1 refers to INLINEFORM2 through reference INLINEFORM3 . These features can be grouped into six general classes.
+
+The “reference context” of INLINEFORM0 in INLINEFORM1 is defined by three-sentence window (sentence where INLINEFORM2 occurs and its immediate previous and next sentences). For multiple occurrences, we calculate its average score. We refer to “reference sentence” to indicate the sentence where INLINEFORM3 appears.
+
+(i) CF:Alone. It indicates whether INLINEFORM0 is mentioned alone in the reference context or together with other references.
+
+(ii) CF:First. When INLINEFORM0 is grouped with others, this feature indicates whether it is mentioned first (e.g., “[2]” is first in “[2,4,6]”).
+
+Next four features are based on the occurrence of words in the corresponding lists created manually (see Table TABREF9 ) to understand different aspects.
+
+(iii) CF:Relevant. It indicates whether INLINEFORM0 is explicitly mentioned as relevant in the reference context (Rel in Table TABREF9 ).
+
+(iv) CF:Recent. It tells whether the reference context indicates that INLINEFORM0 is new (Rec in Table TABREF9 ).
+
+(v) CF:Extreme. It implies that INLINEFORM0 is extreme in some way (Ext in Table TABREF9 ).
+
+(vi) CF:Comp. It indicates whether the reference context makes some kind of comparison with INLINEFORM0 (Comp in Table TABREF9 ).
+
+Note we do not consider any sentiment-based features as suggested by BIBREF6 .
+
+It is natural that the high degree of semantic similarity between the contents of INLINEFORM0 and INLINEFORM1 indicates the influence of INLINEFORM2 in INLINEFORM3 . We assume that although the full text of INLINEFORM4 is given, we do not have access to the full text of INLINEFORM5 (may be due to the subscription charge or the unavailability of the older papers). Therefore, we consider only the title of INLINEFORM6 as a proxy of its full text. Then we calculate the cosine-similarity between the title (T) of INLINEFORM7 and (i) SF:TTitle. the title, (ii) SF:TAbs. the abstract, SF:TIntro. the introduction, (iv) SF:TConcl. the conclusion, and (v) SF:TRest. the rest of the sections (sections other than abstract, introduction and conclusion) of INLINEFORM8 .
+
+We further assume that the “reference context” (RC) of INLINEFORM0 in INLINEFORM1 might provide an alternate way of summarizing the usage of the reference. Therefore, we take the same similarity based approach mentioned above, but replace the title of INLINEFORM2 with its RC and obtain five more features: (vi) SF:RCTitle, (vii) SF:RCAbs, (viii) SF:RCIntro, (ix) SF:RCConcl and (x) SF:RCRest. If a reference appears multiple times in a citing paper, we consider the aggregation of all INLINEFORM3 s together.
+
+The underlying assumption of these features is that a reference which occurs more frequently in a citing paper is more influential than a single occurrence BIBREF8 . We count the frequency of INLINEFORM0 in (i) FF:Whole. the entire content, (ii) FF:Intro. the introduction, (iii) FF:Rel. the related work, (iv) FF:Rest. the rest of the sections (as mentioned in Section UID12 ) of INLINEFORM1 . We also introduce (v) FF:Sec. to measure the fraction of different sections of INLINEFORM2 where INLINEFORM3 occurs (assuming that appearance of INLINEFORM4 in different sections is more influential). These features are further normalized using the number of sentences in INLINEFORM5 in order to avoid unnecessary bias on the size of the paper.
+
+Position of a reference in a paper might be a predictive clue to measure the influence BIBREF6 . Intuitively, the earlier the reference appears in the paper, the more important it seems to us. For the first two features, we divide the entire paper into two parts equally based on the sentence count and then see whether INLINEFORM0 appears (i) PF:Begin. in the beginning or (ii) PF:End. in the end of INLINEFORM1 . Importantly, if INLINEFORM2 appears multiple times in INLINEFORM3 , we consider the fraction of times it occurs in each part.
+
+For the other two features, we take the entire paper, consider sentences as atomic units, and measure position of the sentences where INLINEFORM0 appears, including (iii) PF:Mean. mean position of appearance, (iv) PF:Std. standard deviation of different appearances. These features are normalized by the total length (number of sentences) of INLINEFORM1 . , thus ranging from 0 (indicating beginning of INLINEFORM2 ) to 1 (indicating the end of INLINEFORM3 ).
+
+The linguistic evidences around the context of INLINEFORM0 sometimes provide clues to understand the intrinsic influence of INLINEFORM1 on INLINEFORM2 . Here we consider word level and structural features.
+
+(i) LF:NGram. Different levels of INLINEFORM0 -grams (1-grams, 2-grams and 3-grams) are extracted from the reference context to see the effect of different word combination BIBREF13 .
+
+(ii) LF:POS. Part-of-speech (POS) tags of the words in the reference sentence are used as features BIBREF14 .
+
+(iii) LF:Tense. The main verb of the reference sentence is used as a feature BIBREF3 .
+
+(iv) LF:Modal. The presence of modal verbs (e.g., “can”, “may”) often indicates the strength of the claims. Hence, we check the presence of the modal verbs in the reference sentence.
+
+(v) LF:MainV. We use the main-verb of the reference sentence as a direct feature in the model.
+
+(vi) LF:hasBut. We check the presence of conjunction “but”, which is another clue to show less confidence on the cited paper.
+
+(vii) LF:DepRel. Following BIBREF13 we use all the dependencies present in the reference context, as given by the dependency parser BIBREF15 .
+
+(viii) LF:POSP. BIBREF16 use seven regular expression patterns of POS tags to capture syntactic information; then seven boolean features mark the presence of these patterns. We also utilize the same regular expressions as shown below with the examples (the empty parenthesis in each example indicates the presence of a reference token INLINEFORM0 in the corresponding sentence; while few examples are complete sentences, few are not):
+
+“.*\\(\\) VV[DPZN].*”: Chen () showed that cohesion is held in the vast majority of cases for English-French.
+
+“.*(VHP|VHZ) VV.*”: while Cherry and Lin () have shown it to be a strong feature for word alignment...
+
+“.*VH(D|G|N|P|Z) (RB )*VBN.*”: Inducing features for taggers by clustering has been tried by several researchers ().
+
+“.*MD (RB )*VB(RB )* VVN.*”: For example, the likelihood of those generative procedures can be accumulated to get the likelihood of the phrase pair ().
+
+“[∧ IW.]*VB(D|P|Z) (RB )*VV[ND].*”: Our experimental set-up is modeled after the human evaluation presented in ().
+
+“(RB )*PP (RB )*V.*”: We use CRF () to perform this tagging.
+
+“.*VVG (NP )*(CC )*(NP ).*”: Following (), we provide the annotators with only short sentences: those with source sentences between 10 and 25 tokens long.
+
+These are all considered as Boolean features. For each feature, we take all the possible evidences from all paper-reference pairs and prepare a vector. Then for each pair, we check the presence (absence) of tokens for the corresponding feature and mark the vector accordingly (which in turn produces a set of Boolean features).
+
+This group provides other factors to explain why is a paper being cited. (i) MS:GCount. To answer whether a highly-cited paper has more academic influence on the citing paper than the one which is less cited, we measure the number of other papers (except INLINEFORM0 ) citing INLINEFORM1 .
+
+(ii) MS:SelfC. To see the effect of self-citation, we check whether at least one author is common in both INLINEFORM0 and INLINEFORM1 .
+
+(iii) MG:Time. The fact that older papers are rarely cited, may not stipulate that these are less influential. Therefore, we measure the difference of the publication years of INLINEFORM0 and INLINEFORM1 .
+
+(iv) MG:CoCite. It measures the co-citation counts of INLINEFORM0 and INLINEFORM1 defined by INLINEFORM2 , which in turn answers the significance of reference-based similarity driving the academic influence BIBREF18 .
+
+Following BIBREF19 , we further make one step normalization and divide each feature by its maximum value in all the entires.
+
+## Dataset and Annotation
+
+We use the AAN dataset BIBREF20 which is an assemblage of papers included in ACL related venues. The texts are preprocessed where sentences, paragraphs and sections are properly separated using different markers. The filtered dataset contains 12,843 papers (on average 6.21 references per paper) and 11,092 unique authors.
+
+Next we use Parscit BIBREF21 to identify the reference contexts from the dataset and then extract the section headings from all the papers. Then each section heading is mapped into one of the following broad categories using the method proposed by BIBREF22 : Abstract, Introduction, Related Work, Conclusion and Rest.
+
+Dataset Labeling. The hardest challenge in this task is that there is no publicly available dataset where references are annotated with the intensity value. Therefore, we constructed our own annotated dataset in two different ways. (i) Expert Annotation: we requested members of our research group to participate in this survey. To facilitate the labeling process, we designed a portal where all the papers present in our dataset are enlisted in a drop-down menu. Upon selecting a paper, its corresponding references were shown with five possible intensity values. The citing and cited papers are also linked to the original texts so that the annotators can read the original papers. A total of 20 researchers participated and they were asked to label as many paper-reference pairs as they could based on the definitions of the intensity provided in Section SECREF2 . The annotation process went on for one month. Out of total 1640 pairs annotated, 1270 pairs were taken such that each pair was annotated by at least two annotators, and the final intensity value of the pair was considered to be the average of the scores. The Pearson correlation and Kendell's INLINEFORM0 among the annotators are INLINEFORM1 and INLINEFORM2 respectively. (ii) Author Annotation: we believe that the authors of a paper are the best experts to judge the intensity of references present in the paper. With this intension, we launched a survey where we requested the authors whose papers are present in our dataset with significant numbers. We designed a web portal in similar fashion mentioned earlier; but each author was only shown her own papers in the drop-down menu. Out of 35 requests, 22 authors responded and total 196 pairs are annotated. This time we made sure that each paper-reference pair was annotated by only one author. The percentages of labels in the overall annotated dataset are as follows: 1: 9%, 2: 74%, 3: 9%, 4: 3%, 5: 4%.
+
+## Experimental Results
+
+In this section, we start with analyzing the importance of the feature sets in predicting the reference intensity, followed by the detailed results.
+
+Feature Analysis. In order to determine which features highly determine the gold-standard labeling, we measure the Pearson correlation between various features and the ground-truth labels. Figure FIGREF27 (a) shows the average correlation for each feature group, and in each group the rank of features based on the correlation is shown in Figure FIGREF27 (b). Frequency-based features (FF) turn out to be the best, among which FF:Rest is mostly correlated. This set of features is convenient and can be easily computed. Both CF and LF seem to be equally important. However, INLINEFORM0 tends to be less important in this task.
+
+Results of Predictive Models. For the purpose of evaluation, we report the average results after 10-fold cross-validation. Here we consider five baselines to compare with GraLap: (i) Uniform: assign 3 to all the references assuming equal intensity, (ii) SVR+W: recently proposed Support Vector Regression (SVR) with the feature set mentioned in BIBREF4 , (iii) SVR+O: SVR model with our feature set, (iv) C4.5SSL: C4.5 semi-supervised algorithm with our feature set BIBREF23 , and (v) GLM: the traditional graph-based LP model with our feature set BIBREF9 . Three metrics are used to compare the results of the competing models with the annotated labels: Root Mean Square Error (RMSE), Pearson's correlation coefficient ( INLINEFORM0 ), and coefficient of determination ( INLINEFORM1 ).
+
+Table TABREF28 shows the performance of the competing models. We incrementally include each feature set into GraLap greedily on the basis of ranking shown in Figure FIGREF27 (a). We observe that GraLap with only FF outperforms SVR+O with 41% improvement of INLINEFORM0 . As expected, the inclusion of PF into the model improves the model marginally. However, the overall performance of GraLap is significantly higher than any of the baselines ( INLINEFORM1 ).
+
+## Applications of Reference Intensity
+
+In this section, we provide four different applications to show the use of measuring the intensity of references. To this end, we consider all the labeled entries for training and run GraLap to predict the intensity of rest of the paper-reference pairs.
+
+## Discovering Influential Articles
+
+Influential papers in a particular area are often discovered by considering equal weights to all the citations of a paper. We anticipate that considering the reference intensity would perhaps return more meaningful results. To show this, Here we use the following measures individually to compute the influence of a paper: (i) RawCite: total number of citations per paper, (ii) RawPR: we construct a citation network (nodes: papers, links: citations), and measure PageRank BIBREF24 of each node INLINEFORM0 : INLINEFORM1 ; where, INLINEFORM2 , the damping factor, is set to 0.85, INLINEFORM3 is the total number of nodes, INLINEFORM4 is the set of nodes that have edges to INLINEFORM5 , and INLINEFORM6 is the set of nodes that INLINEFORM7 has an edge to, (iii) InfCite: the weighted version of RawCite, measured by the sum of intensities of all citations of a paper, (iv) InfPR: the weighted version of RawPR: INLINEFORM8 , where INLINEFORM9 indicates the influence of a reference. We rank all the articles based on these four measures separately. Table TABREF32 (a) shows the Spearman's rank correlation between pair-wise measures. As expected, (i) and (ii) have high correlation (same for (iii) and (iv)), whereas across two types of measures the correlation is less. Further, in order to know which measure is more relevant, we conduct a subjective study where we select top ten papers from each measure and invite the experts (not authors) who annotated the dataset, to make a binary decision whether a recommended paper is relevant. . The average pair-wise inter-annotator's agreement (based on Cohen's kappa BIBREF25 ) is INLINEFORM10 . Table TABREF32 (b) presents that out of 10 recommendations of InfPR, 7 (5) papers are marked as influential by majority (all) of the annotators, which is followed by InfCite. These results indeed show the utility of measuring reference intensity for discovering influential papers. Top three papers based on InfPR from the entire dataset are shown in Table TABREF33 .
+
+## Identifying Influential Authors
+
+H-index, a measure of impact/influence of an author, considers each citation with equal weight BIBREF29 . Here we incorporate the notion of reference intensity into it and define hif-index.
+
+Definition 2 An author INLINEFORM0 with a set of papers INLINEFORM1 has an hif-index equals to INLINEFORM2 , if INLINEFORM3 is the largest value such that INLINEFORM4 ; where INLINEFORM5 is the sum of intensities of all citations of INLINEFORM6 .
+
+We consider 37 ACL fellows as the list of gold-standard influential authors. For comparative evaluation, we consider the total number of papers (TotP), total number of citations (TotC) and average citations per paper (AvgC) as three competing measures along with h-index and hif-index. We arrange all the authors in our dataset in decreasing order of each measure. Figure FIGREF36 (a) shows the Spearman's rank correlation among the common elements across pair-wise rankings. Figure FIGREF36 (b) shows the INLINEFORM0 for five competing measures at identifying ACL fellows. We observe that hif-index performs significantly well with an overall precision of INLINEFORM1 , followed by AvgC ( INLINEFORM2 ), h-index ( INLINEFORM3 ), TotC ( INLINEFORM4 ) and TotP ( INLINEFORM5 ). This result is an encouraging evidence that the reference-intensity could improve the identification of the influential authors. Top three authors based on hif-index are shown in Table TABREF33 .
+
+## Effect on Recommendation System
+
+Here we show the effectiveness of reference-intensity by applying it to a real paper recommendation system. To this end, we consider FeRoSA BIBREF30 , a new (probably the first) framework of faceted recommendation for scientific articles, where given a query it provides facet-wise recommendations with each facet representing the purpose of recommendation BIBREF30 . The methodology is based on random walk with restarts (RWR) initiated from a query paper. The model is built on AAN dataset and considers both the citation links and the content information to produce the most relevant results. Instead of using the unweighted citation network, here we use the weighted network with each edge labeled by the intensity score. The final recommendation of FeRoSA is obtained by performing RWR with the transition probability proportional to the edge-weight (we call it Inf-FeRoSA). We observe that Inf-FeRoSA achieves an average precision of INLINEFORM0 at top 10 recommendations, which is 14% higher then FeRoSA while considering the flat version and 12.34% higher than FeRoSA while considering the faceted version.
+
+## Detecting Citation Stacking
+
+Recently, Thomson Reuters began screening for journals that exchange large number of anomalous citations with other journals in a cartel-like arrangement, often known as “citation stacking” BIBREF31 , BIBREF32 . This sort of citation stacking is much more pernicious and difficult to detect. We anticipate that this behavior can be detected by the reference intensity. Since the AAN dataset does not have journal information, we use DBLP dataset BIBREF8 where the complete metadata information (along with reference contexts and abstract) is available, except the full content of the paper (559,338 papers and 681 journals; more details in BIBREF33 ). From this dataset, we extract all the features mentioned in Section SECREF10 except the ones that require full text, and run our model using the existing annotated dataset as training instances. We measure the traditional impact factor ( INLINEFORM0 ) of the journals and impact factor after considering the reference intensity ( INLINEFORM1 ). Figure FIGREF39 (a) shows that there are few journals whose INLINEFORM2 significantly deviates (3 INLINEFORM3 from the mean) from INLINEFORM4 ; out of the suspected journals 70% suffer from the effect of self-journal citations as well (shown in Figure FIGREF39 (b)), example including Expert Systems with Applications (current INLINEFORM5 of INLINEFORM6 ). One of the future work directions would be to predict such journals as early as possible after their first appearance.
+
+## Related Work
+
+Although the citation count based metrics are widely accepted BIBREF5 , BIBREF34 , the belief that mere counting of citations is dubious has also been a subject of study BIBREF35 . BIBREF36 was the first who explained the reasons of citing a paper. BIBREF37 introduced a method for the rapid development of complex rule bases for classifying text segments. BIBREF16 focused on a less manual approach by learning domain-insensitive features from textual, physical, and syntactic aspects To address concerns about h-index, different alternative measures are proposed BIBREF38 . However they too could benefit from filtering or weighting references with a model of influence. Several research have been proposed to weight citations based on factors such as the prestige of the citing journal BIBREF39 , BIBREF40 , prestige of an author BIBREF41 , frequency of citations in citing papers BIBREF42 . Recently, BIBREF4 proposed a SVR based approach to measure the intensity of citations. Our methodology differs from this approach in at lease four significant ways: (i) they used six very shallow level features; whereas we consider features from different dimensions, (ii) they labeled the dataset by the help of independent annotators; here we additionally ask the authors of the citing papers to identify the influential references which is very realistic BIBREF43 ; (iii) they adopted SVR for labeling, which does not perform well for small training instances; here we propose GraLap , designed specifically for small training instances; (iv) four applications of reference intensity mentioned here are completely new and can trigger further to reassessing the existing bibliometrics.
+
+## Conclusion
+
+We argued that the equal weight of all references might not be a good idea not only to gauge success of a research, but also to track follow-up work or recommending research papers. The annotated dataset would have tremendous potential to be utilized for other research. Moreover, GraLap can be used for any semi-supervised learning problem. Each application mentioned here needs separate attention. In future, we shall look into more linguistic evidences to improve our model.

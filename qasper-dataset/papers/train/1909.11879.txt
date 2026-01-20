@@ -1,0 +1,51 @@
+# Aspect and Opinion Term Extraction for Aspect Based Sentiment Analysis of Hotel Reviews Using Transfer Learning
+
+**Paper ID:** 1909.11879
+
+## Abstract
+
+One of the tasks in aspect-based sentiment analysis is to extract aspect and opinion terms from review text. Our study focuses on evaluating transfer learning using BERT (Devlin et al., 2019) to classify tokens from hotel reviews in bahasa Indonesia. We show that the default BERT model failed to outperform a simple argmax method. However, changing the default BERT tokenizer to our custom one can improve the F1 scores on our labels of interest by at least 5%. For I-ASPECT and B-SENTIMENT, it can even increased the F1 scores by 11%. On entity-level evaluation, our tweak on the tokenizer can achieve F1 scores of 87% and 89% for ASPECT and SENTIMENT labels respectively. These scores are only 2% away from the best model by Fernando et al. (2019), but with much less training effort (8 vs 200 epochs).
+
+## Introduction
+
+Sentiment analysis BIBREF2 in review text usually consists of multiple aspects. For instance, the following review talks about the location, room, and staff aspects of a hotel, “Excellent location to the Tower of London. We also walked to several other areas of interest; albeit a bit of a trek if you don't mind walking. The room was a typical hotel room in need of a refresh, however clean. The staff couldn't have been more professional, they really helped get us a taxi when our pre arranged pickup ran late.” In this review, some of the sentiment terms are “excellent”, “typical”, “clean”, and “professional”.
+
+In this study, we are focusing on the aspect and opinion term extraction from the reviews to do aspect-based sentiment analysis BIBREF3. While some work has been done in this task BIBREF4, BIBREF1, BIBREF5, we have not seen a transfer learning approach BIBREF6 employed, which should need much less training effort. Using transfer learning is especially helpful for low-resource languages BIBREF7, such as bahasa Indonesia.
+
+Our main contribution in this study is evaluating BERT BIBREF0 as a pretrained transformer model on this token classification task on hotel reviews in bahasa Indonesia. We also found that the current pretrained BERT tokenizer has a poor encoder for bahasa Indonesia, thus we proposed our own custom tokenizer. We also provided simpler baselines, namely argmax and logistic regression on word embeddings as comparisons.
+
+## Methodology
+
+For this aspect and opinion term extraction task, we use tokenized and annotated hotel reviews on Airy Rooms provided by BIBREF1. The dataset consists of 5000 reviews in bahasa Indonesia. The dataset is divided into training and test sets of 4000 and 1000 reviews respectively. The label distribution of the tokens in BIO scheme can be seen in Table TABREF3. In addition, we also see this case as on entity level, i.e. ASPECT, SENTIMENT, and OTHER labels.
+
+We found that there are 1643 and 809 unique tokens in the training and test sets respectively. Moreover, 75.4% of the unique tokens in the test set can be found in the training set.
+
+For baseline model, we employed two methods: a simple argmax method and logistic regression on word embeddings from fastText implementation BIBREF8. In the argmax method, we classify a token as the most probable label in the training set. For fastText implementation, we use the skip-gram model and produce 100-dimensional vectors.
+
+We proposed to use transfer learning from pretrained BERT-Base, Multilingual Cased BIBREF0 for this token classification problem. We used the implementation in PyTorch by BIBREF9. We found out that the multilingual cased tokenizer of BERT does not recognize some common terms in our dataset, such as “kamar” (room), “kendala” (issue), “wifi”, “koneksi” (connection), “bagus” (good), “bersih” (clean). In the training and validation sets, we found 24,370 unknown tokens. Thus, we encode the token ourselves to have no unknown tokens. For the rest of this paper, we will call this model BERT-custom. Since the labels are imbalanced, we are using $F_1$-score as the evaluation metric, which is defined as:
+
+Our experiment setup for BERT and BERT-custom is to use Adam BIBREF10 optimizer with $10^{-4}$ as the learning rate and 5 epochs. The batch size is 32 and we are optimizing the cross entropy loss function. We split the training set into 70:30 for training and validation sets to tune the hyperparameters and then train with the whole training set before applying the model onto the test set.
+
+## Results and discussion
+
+The results from our experiments with BIO scheme labels are summarized in Table TABREF5. We can see in the table that using the default tokenizer cannot beat the baseline $F_1$ scores for B-ASPECT and B-SENTIMENT labels. However, changing the tokenizer can improve the $F_1$ scores by at least 5%. For I-ASPECT and B-SENTIMENT, it can increase the $F_1$ scores by 11%. On the other hand, BIBREF1 trained their model using 200 epochs, while we only use 5 epochs. We also found that simply using word embedding (fastText) is not suitable for this task since it failed to achieve higher $F_1$ scores compared to a simple argmax method. Furthermore, we can see in Figure FIGREF6 that the model overfits after about 12 iterations (mini-batches).
+
+Unlike conditional random fields (CRF), BERT does not constrain the output labels. Thus, you might see I-ASPECT or I-SENTIMENT without preceding B-ASPECT or B-SENTIMENT. In our case, we found 735 cases of invalid BIO when using default BERT tokenizer and 12 cases of invalid BIO while using our custom tokenizer. Some examples of sentences with invalid token labels are “...termasuk(O) kamar(O) mandi(I-ASPECT) nya(I-ASPECT)...” (“...including the bathroom...”) and “...lantai(O) 3(O) tidak(I-ASPECT) ada(I-ASPECT)...” (“...3rd floor does not have...”).
+
+Table TABREF7 shows the performance on entity level. We are only interested in evaluating the ASPECT and SENTIMENT labels while actually trained the models with 3 labels. In this case, we increased the number of epochs to 8 since it can yield higher $F_1$ scores.
+
+It is interesting to see that BERT is not even better than argmax in this simplified setting. Nevertheless, changing the default BERT tokenizer is beneficial as well. BERT-custom model outperforms argmax by more than 5% on our labels of interest and only 2% away from beating the results by BIBREF1.
+
+## Related work
+
+BIBREF4 summarized several studies on aspect and opinion terms extraction. Some of the methods used are association rule mining BIBREF11, dependency rule parsers BIBREF12, conditional random fields (CRF) and hidden Markov model (HMM) BIBREF13, BIBREF14, topic modelling BIBREF15, BIBREF16, and deep learning BIBREF1, BIBREF4, BIBREF17, BIBREF5.
+
+BIBREF1 combines the idea of coupled multilayer attentions (CMLA) by BIBREF4 and double embeddings by BIBREF5 on aspect and opinion term extraction on SemEval. The work by BIBREF5 itself is an improvement from what their prior work on the same task BIBREF17. Thus, we only included the work by BIBREF1 because they show that we can get the best result by combining the latest work by BIBREF4 and BIBREF5.
+
+In their paper, BIBREF0 show that they can achieve state-of-the-art performance not only on sentence-level, but also on token-level tasks, such as for named entity recognition (NER). This motivates us to explore BERT in our study. This way, we do not need to use dependency parsers or any feature engineering.
+
+## Conclusions and future work
+
+Our work shows that BERT can achieve $F_1$ scores of more than 80% in aspect and opinion term extraction task with BIO scheme in noisy bahasa Indonesia text by changing the default tokenizer to have fewer unknown tokens. For both BIO scheme and aspect/sentiment/other labels, this simple tweak results in more than 5% absolute increase in $F_1$ scores on our labels of interest. On entity-level evaluation, changing the default tokenizer yields around 8% absolute increase in $F_1$ scores.
+
+In the future, we are aiming to compare several transformer-based models, such as XLNet BIBREF18, XLM BIBREF19, and RoBERTa BIBREF20 when they are trained using multilingual datasets that include text in bahasa Indonesia as well. We also plan to fine-tune those models with richer text in bahasa Indonesia to reduce the number of unknown tokens. Furthermore, it is also necessary to evaluate the same task on different datasets.

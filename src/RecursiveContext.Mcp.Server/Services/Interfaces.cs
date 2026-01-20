@@ -95,6 +95,19 @@ public interface IAggregationService
         int maxFiles, CancellationToken ct);
 
     /// <summary>
+    /// Aggregates matches for multiple patterns across files, with union or intersection combine mode.
+    /// </summary>
+    /// <param name="directory">Directory to search in, relative to workspace root.</param>
+    /// <param name="filePattern">File glob pattern (e.g., *.txt).</param>
+    /// <param name="searchPatterns">List of regex patterns to search for.</param>
+    /// <param name="combineMode">'union' (files matching ANY pattern) or 'intersection' (files matching ALL patterns).</param>
+    /// <param name="maxFiles">Maximum files to search.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<MultiPatternResult>> AggregateMultiPatternMatchesAsync(
+        string directory, string filePattern, IReadOnlyList<string> searchPatterns,
+        string combineMode, int maxFiles, CancellationToken ct);
+
+    /// <summary>
     /// Counts files matching a pattern in a directory.
     /// </summary>
     Task<Result<int>> CountFilesAsync(

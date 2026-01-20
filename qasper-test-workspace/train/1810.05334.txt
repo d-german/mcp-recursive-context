@@ -1,0 +1,93 @@
+# IndoSum: A New Benchmark Dataset for Indonesian Text Summarization
+
+**Paper ID:** 1810.05334
+
+## Abstract
+
+Automatic text summarization is generally considered as a challenging task in the NLP community. One of the challenges is the publicly available and large dataset that is relatively rare and difficult to construct. The problem is even worse for low-resource languages such as Indonesian. In this paper, we present IndoSum, a new benchmark dataset for Indonesian text summarization. The dataset consists of news articles and manually constructed summaries. Notably, the dataset is almost 200x larger than the previous Indonesian summarization dataset of the same domain. We evaluated various extractive summarization approaches and obtained encouraging results which demonstrate the usefulness of the dataset and provide baselines for future research. The code and the dataset are available online under permissive licenses.
+
+## Introduction
+
+The goal of text summarization task is to produce a summary from a set of documents. The summary should retain important information and be reasonably shorter than the original documents BIBREF0 . When the set of documents contains only a single document, the task is usually referred to as single-document summarization. There are two kinds of summarization characterized by how the summary is produced: extractive and abstractive. Extractive summarization attempts to extract few important sentences verbatim from the original document. In contrast, abstractive summarization tries to produce an abstract which may contain sentences that do not exist in or are paraphrased from the original document.
+
+Despite quite a few number of research on Indonesian text summarization, none of them were trained nor evaluated on a large, publicly available dataset. Also, although ROUGE BIBREF1 is the standard intrinsic evaluation metric for English text summarization, for Indonesian it does not seem so. Previous works rarely state explicitly that their evaluation was performed with ROUGE. The lack of a benchmark dataset and the different evaluation metrics make comparing among Indonesian text summarization research difficult.
+
+In this work, we introduce IndoSum, a new benchmark dataset for Indonesian text summarization, and evaluated several well-known extractive single-document summarization methods on the dataset. The dataset consists of online news articles and has almost 200 times more documents than the next largest one of the same domain BIBREF2 . To encourage further research in this area, we make our dataset publicly available. In short, the contribution of this work is two-fold:
+
+The state-of-the-art result on the dataset, although impressive, is still significantly lower than the maximum possible ROUGE score. This result suggests that the dataset is sufficiently challenging to be used as evaluation benchmark for future research on Indonesian text summarization.
+
+## Related work
+
+Fachrurrozi et al. BIBREF3 proposed some scoring methods and used them with TF-IDF to rank and summarize news articles. Another work BIBREF4 used latent Dirichlet allocation coupled with genetic algorithm to produce summaries for online news articles. Simple methods like naive Bayes has also been used for Indonesian news summarization BIBREF2 , although for English, naive Bayes has been used almost two decades earlier BIBREF5 . A more recent work BIBREF6 employed a summarization algorithm called TextTeaser with some predefined features for news articles as well. Slamet et al. BIBREF7 used TF-IDF to convert sentences into vectors, and their similarities are then computed against another vector obtained from some keywords. They used these similarity scores to extract important sentences as the summary. Unfortunately, all these work do not seem to be evaluated using ROUGE, despite being the standard metric for text summarization research.
+
+An example of Indonesian text summarization research which used ROUGE is BIBREF8 . They employed the best method on TAC 2011 competition for news dataset and achieved ROUGE-2 scores that are close to that of humans. However, their dataset consists of only 56 articles which is very small, and the dataset is not available publicly.
+
+An attempt to make a public summarization dataset has been done in BIBREF9 . They compiled a chat dataset along with its summary, which has both the extractive and abstractive versions. This work is a good step toward standardizing summarization research for Indonesian. However, to the best of our knowledge, for news dataset, there has not been a publicly available dataset, let alone a standard.
+
+## IndoSum: a new benchmark dataset
+
+We used a dataset provided by Shortir, an Indonesian news aggregator and summarizer company. The dataset contains roughly 20K news articles. Each article has the title, category, source (e.g., CNN Indonesia, Kumparan), URL to the original article, and an abstractive summary which was created manually by a total of 2 native speakers of Indonesian. There are 6 categories in total: Entertainment, Inspiration, Sport, Showbiz, Headline, and Tech. A sample article-summary pair is shown in Fig. FIGREF4 .
+
+Note that 20K articles are actually quite small if we compare to English CNN/DailyMail dataset used in BIBREF11 which has 200K articles. Therefore, we used 5-fold cross-validation to split the dataset into 5 folds of training, development, and testing set. We preprocessed the dataset by tokenizing, lowercasing, removing punctuations, and replacing digits with zeros. We used NLTK BIBREF12 and spaCy for sentence and word tokenization respectively.
+
+In our exploratory analysis, we discovered that some articles have a very long text and some summaries have too many sentences. Articles with a long text are mostly articles containing a list, e.g., list of songs played in a concert, list of award nominations, and so on. Since such a list is never included in the summary, we truncated such articles so that the number of paragraphs are at most two standard deviations away from the mean. For each fold, the mean and standard deviation were estimated from the training set. We discarded articles whose summary is too long since we do not want lengthy summaries anyway. The cutoff length is defined by the upper limit of the Tukey's boxplot, where for each fold, the quartiles were estimated from the training set. After removing such articles, we ended up with roughly 19K articles in total. The complete statistics of the corpus is shown in Table TABREF5 .
+
+Since the gold summaries provided by Shortir are abstractive, we needed to label the sentences in the article for training the supervised extractive summarizers. We followed Nallapati et al. BIBREF10 to make these labeled sentences (called oracles hereinafter) using their greedy algorithm. The idea is to maximize the ROUGE score between the labeled sentences and the abstractive gold summary. Although the provided gold summaries are abstractive, in this work we focused on extractive summarization because we think research on this area are more mature, especially for Indonesian, and thus starting with extractive summarization is a logical first step toward standardizing Indonesian text summarization research.
+
+Since there can be many valid summaries for a given article, having only a single abstractive summary for an article is a limitation of our dataset which we acknowledge. Nevertheless, we feel that the existence of such dataset is a crucial step toward a fair benchmark for Indonesian text summarization research. Therefore, we make the dataset publicly available for others to use.
+
+## Evaluation
+
+For evaluation, we used ROUGE BIBREF1 , a standard metric for text summarization. We used the implementation provided by pythonrouge. Following BIBREF11 , we report the INLINEFORM0 score of R-1, R-2, and R-L. Intuitively, R-1 and R-2 measure informativeness and R-L measures fluency BIBREF11 . We report the INLINEFORM1 score instead of just the recall score because although we extract a fixed number of sentences as the summary, the number of words are not limited. So, reporting only recall benefits models which extract long sentences.
+
+## Compared methods
+
+We compared several summarization methods which can be categorized into three groups: unsupervised, non-neural supervised, and neural supervised methods. For the unsupervised methods, we tested:
+
+SumBasic, which uses word frequency to rank sentences and selects top sentences as the summary BIBREF13 , BIBREF14 .
+
+Lsa, which uses latent semantic analysis (LSA) to decompose the term-by-sentence matrix of a document and extracts sentences based on the result. We experimented with the two approaches proposed in BIBREF15 and BIBREF16 respectively.
+
+LexRank, which constructs a graph representation of a document, where nodes are sentences and edges represent similarity between two sentences, and runs PageRank algorithm on that graph and extracts sentences based on the resulting PageRank values BIBREF17 . In the original implementation, sentences shorter than a certain threshold are removed. Our implementation does not do this removal to reduce the number of tunable hyperparameters. Also, it originally uses cross-sentence informational subsumption (CSIS) during sentence selection stage but the paper does not explain it well. Instead, we used an approximation to CSIS called cross-sentence word overlap described in BIBREF18 by the same authors.
+
+TextRank, which is very similar to LexRank but computes sentence similarity based on the number of common tokens BIBREF19 .
+
+For the non-neural supervised methods, we compared:
+
+Bayes, which represents each sentence as a feature vector and uses naive Bayes to classify them BIBREF5 . The original paper computes TF-IDF score on multi-word tokens that are identified automatically using mutual information. We did not do this identification, so our TF-IDF computation operates on word tokens.
+
+Hmm, which uses hidden Markov model where states correspond to whether the sentence should be extracted BIBREF20 . The original work uses QR decomposition for sentence selection but our implementation does not. We simply ranked the sentences by their scores and picked the top 3 as the summary.
+
+MaxEnt, which represents each sentence as a feature vector and leverages maximum entropy model to compute the probability of a sentence should be extracted BIBREF21 . The original approach puts a prior distribution over the labels but we put the prior on the weights instead. Our implementation still agrees with the original because we employed a bias feature which should be able to learn the prior label distribution.
+
+As for the neural supervised method, we evaluated NeuralSum BIBREF11 using the original implementation by the authors. We modified their implementation slightly to allow for evaluating the model with ROUGE. Note that all the methods are extractive. Our implementation code for all the methods above is available online.
+
+As a baseline, we used Lead-N which selects INLINEFORM0 leading sentences as the summary. For all methods, we extracted 3 sentences as the summary since it is the median number of sentences in the gold summaries that we found in our exploratory analysis.
+
+## Experiment setup
+
+Some of these approaches optionally require precomputed term frequency (TF) or inverse document frequency (IDF) table and a stopword list. We precomputed the TF and IDF tables from Indonesian Wikipedia dump data and used the stopword list provided in BIBREF22 . Hyperparameters were tuned to the development set of each fold, optimizing for R-1 as it correlates best with human judgment BIBREF23 . For NeuralSum, we tried several scenarios:
+
+tuning the dropout rate while keeping other hyperparameters fixed,
+
+increasing the word embedding size from the default 50 to 300,
+
+initializing the word embedding with FastText pre-trained embedding BIBREF24 .
+
+Scenario 2 is necessary to determine whether any improvement in scenario 3 is due to the larger embedding size or the pre-trained embedding. In scenario 2 and 3, we used the default hyperparameter setting from the authors' implementation. In addition, for every scenario, we picked the model saved at an epoch that yields the best R-1 score on the development set.
+
+## Overall results
+
+Table TABREF26 shows the test INLINEFORM0 score of ROUGE-1, ROUGE-2, and ROUGE-L of all the tested models described previously. The mean and standard deviation (bracketed) of the scores are computed over the 5 folds. We put the score obtained by an oracle summarizer as Oracle. Its summaries are obtained by using the true labels. This oracle summarizer acts as the upper bound of an extractive summarizer on our dataset. As we can see, in general, every scenario of NeuralSum consistently outperforms the other models significantly. The best scenario is NeuralSum with word embedding size of 300, although its ROUGE scores are still within one standard deviation of NeuralSum with the default word embedding size. Lead-3 baseline performs really well and outperforms almost all the other models, which is not surprising and even consistent with other work that for news summarization, Lead-N baseline is surprisingly hard to beat. Slightly lower than Lead-3 are LexRank and Bayes, but their scores are still within one standard deviation of each other so their performance are on par. This result suggests that a non-neural supervised summarizer is not better than an unsupervised one, and thus if labeled data are available, it might be best to opt for a neural summarizer right away. We also want to note that despite its high ROUGE, every NeuralSum scenario scores are still considerably lower than Oracle, hinting that it can be improved further. Moreover, initializing with FastText pre-trained embedding slightly lowers the scores, although they are still within one standard deviation. This finding suggests that the effect of FastText pre-trained embedding is unclear for our case.
+
+## Out-of-domain results
+
+Since Indonesian is a low-resource language, collecting in-domain dataset for any task (including summarization) can be difficult. Therefore, we experimented with out-of-domain scenario to see if NeuralSum can be used easily for a new use case for which the dataset is scarce or non-existent. Concretely, we trained the best NeuralSum (with word embedding size of 300) on articles belonging to category INLINEFORM0 and evaluated its performance on articles belonging to category INLINEFORM1 for all categories INLINEFORM2 and INLINEFORM3 . As we have a total of 6 categories, we have 36 domain pairs to experiment on. To reduce computational cost, we used only the articles from the first fold and did not tune any hyperparameters. We note that this decision might undermine the generalizability of conclusions drawn from these out-of-domain experiments. Nonetheless, we feel that the results can still be a useful guidance for future work. As comparisons, we also evaluated Lead-3, Oracle, and the best unsupervised method, LexRank. For LexRank, we used the best hyperparameter that we found in the previous experiment for the first fold. We only report the ROUGE-1 scores. Table TABREF27 shows the result of this experiment.
+
+We see that almost all the results outperform the Lead-3 baseline, which means that for out-of-domain cases, NeuralSum can summarize not just by selecting some leading sentences from the original text. Almost all NeuralSum results also outperform LexRank, suggesting that when there is no in-domain training data, training NeuralSum on out-of-domain data may yield better performance than using an unsupervised model like LexRank. Looking at the best results, we observe that they all are the out-of-domain cases. In other words, training on out-of-domain data is surprisingly better than on in-domain data. For example, for Sport as the target domain, the best model is trained on Headline as the source domain. In fact, using Headline as the source domain yields the best result in 3 out of 6 target domains. We suspect that this phenomenon is because of the similarity between the corpus of the two domain. Specifically, training on Headline yields the best result most of the time because news from any domain can be headlines. Further investigation on this issue might leverage domain similarity metrics proposed in BIBREF25 . Next, comparing the best NeuralSum performance on each target domain to Oracle, we still see quite a large gap. This gap hints that NeuralSum can still be improved further, probably by lifting the limitations of our experiment setup (e.g., tuning the hyperparameters for each domain pair).
+
+## Conclusion and future work
+
+We present IndoSum, a new benchmark dataset for Indonesian text summarization, and evaluated state-of-the-art extractive summarization methods on the dataset. We tested unsupervised, non-neural supervised, and neural supervised summarization methods. We used ROUGE as the evaluation metric because it is the standard intrinsic evaluation metric for text summarization evaluation. Our results show that neural models outperform non-neural ones and in absence of in-domain corpus, training on out-of-domain one seems to yield better performance instead of using an unsupervised summarizer. Also, we found that the best performing model achieves ROUGE scores that are still significantly lower than the maximum possible scores, which suggests that the dataset is sufficiently challenging for future work. The dataset, which consists of 19K article-summary pairs, is publicly available. We hope that the dataset and the evaluation results can serve as a benchmark for future research on Indonesian text summarization.
+
+Future work in this area may focus on improving the summarizer performance by employing newer neural models such as SummaRuNNer BIBREF10 or incorporating side information BIBREF26 . Since the gold summaries are abstractive, abstractive summarization techniques such as attention-based neural models BIBREF27 , seq2seq models BIBREF28 , pointer networks BIBREF29 , or reinforcement learning-based approach BIBREF30 can also be interesting directions for future avenue. Other tasks such as further investigation on the out-of-domain issue, human evaluation, or even extending the corpus to include more than one summary per article are worth exploring as well.

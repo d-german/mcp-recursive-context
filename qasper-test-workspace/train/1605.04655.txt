@@ -1,0 +1,149 @@
+# Joint Learning of Sentence Embeddings for Relevance and Entailment
+
+**Paper ID:** 1605.04655
+
+## Abstract
+
+We consider the problem of Recognizing Textual Entailment within an Information Retrieval context, where we must simultaneously determine the relevancy as well as degree of entailment for individual pieces of evidence to determine a yes/no answer to a binary natural language question. We compare several variants of neural networks for sentence embeddings in a setting of decision-making based on evidence of varying relevance. We propose a basic model to integrate evidence for entailment, show that joint training of the sentence embeddings to model relevance and entailment is feasible even with no explicit per-evidence supervision, and show the importance of evaluating strong baselines. We also demonstrate the benefit of carrying over text comprehension model trained on an unrelated task for our small datasets. Our research is motivated primarily by a new open dataset we introduce, consisting of binary questions and news-based evidence snippets. We also apply the proposed relevance-entailment model on a similar task of ranking multiple-choice test answers, evaluating it on a preliminary dataset of school test questions as well as the standard MCTest dataset, where we improve the neural model state-of-art.
+
+## Introduction
+
+Let us consider the goal of building machine reasoning systems based on knowledge from fulltext data like encyclopedic articles, scientific papers or news articles. Such machine reasoning systems, like humans researching a problem, must be able to recover evidence from large amounts of retrieved but mostly irrelevant information and judge the evidence to decide the answer to the question at hand.
+
+A typical approach, used implicitly in information retrieval (and its extensions, like IR-based Question Answering systems BIBREF0 ), is to determine evidence relevancy by a keyword overlap feature (like tf-idf or BM-25 BIBREF1 ) and prune the evidence by the relevancy score. On the other hand, textual entailment systems that seek to confirm hypotheses based on evidence BIBREF2 BIBREF3 BIBREF4 are typically provided with only a single piece of evidence or only evidence pre-determined as relevant, and are often restricted to short and simple sentences without open-domain named entity occurences. In this work, we seek to fuse information retrieval and textual entaiment recognition by defining the Hypothesis Evaluation task as deciding the truth value of a hypothesis by integrating numerous pieces of evidence, not all of it equally relevant.
+
+As a specific instance, we introduce the Argus Yes/No Question Answering task. The problem is, given a real-world event binary question like Did Donald Trump announce he is running for president? and numerous retrieved news article fragments as evidence, to determine the answer for the question. Our research is motivated by the Argus automatic reporting system for the Augur prediction market platform. BIBREF5 Therefore, we consider the question answering task within the constraints of a practical scenario that has limited available dataset and only minimum supervision. Hence, authentic news sentences are the evidence (with noise like segmentation errors, irrelevant participial phrases, etc.), and whereas we have gold standard for the correct answers, the model must do without explicit supervision on which individual evidence snippets are relevant and what do they entail.
+
+To this end, we introduce an open dataset of questions and newspaper evidence, and a neural model within the Sentence Pair Scoring framework BIBREF6 that (A) learns sentence embeddings for the question and evidence, (B) the embeddings represent both relevance and entailment characteristics as linear classifier inputs, and (C) the model aggregates all available evidence to produce a binary signal as the answer, which is the only training supervision.
+
+We also evaluate our model on a related task that concerns ranking answers of multiple-choice questions given a set of evidencing sentences. We consider the MCTest dataset and the AI2-8grade/CK12 dataset that we introduce below.
+
+The paper is structured as follows. In Sec. SECREF2 , we formally outline the Argus question answering task, describe the question-evidence dataset, and describe the multiple-choice questions task and datasets. In Sec. SECREF3 , we briefly survey the related work on similar problems, whereas in Sec. SECREF4 we propose our neural models for joint learning of sentence relevance and entailment. We present the results in Sec. SECREF5 and conclude with a summary, model usage recommendations and future work directions in Sec. SECREF6 .
+
+## The Hypothesis Evaluation Task
+
+Formally, the Hypothesis Evaluation task is to build a function INLINEFORM0 , where INLINEFORM1 is a binary label (no towards yes) and INLINEFORM2 is a hypothesis instance in the form of question text INLINEFORM3 and a set of INLINEFORM4 evidence texts INLINEFORM5 as extracted from an evidence-carrying corpus.
+
+## Argus Dataset
+
+Our main aim is to propose a solution to the Argus Task, where the Argus system BIBREF7 BIBREF5 is to automatically analyze and answer questions in the context of the Augur prediction market platform. In a prediction market, users pose questions about future events whereas others bet on the yes or no answer, with the assumption that the bet price reflects the real probability of the event. At a specified moment (e.g. after the date of a to-be-predicted sports match), the correct answer is retroactively determined and the bets are paid off. At a larger volume of questions, determining the bet results may present a significant overhead for running of the market. This motivates the Argus system, which should partially automate this determination — deciding questions related to recent events based on open news sources.
+
+To train a machine learning model for the INLINEFORM0 function, we have created a dataset of questions with gold labels, and produced sets of evidence texts from a variety of news paper using a pre-existing IR (information retrieval) component of the Argus system. We release this dataset openly.
+
+To pose a reproducible task for the IR component, the time domain of questions was restricted from September 1, 2014 to September 1, 2015, and topic domain was focused to politics, sports and the stock market. To build the question dataset, we have used several sources:
+
+We asked Amazon Mechanical Turk users to pose questions, together with a golden label and a news article reference. This seeded the dataset with initial, somewhat redundant 250 questions.
+
+We manually extended this dataset by derived questions with reversed polarity (to obtain an opposite answer).
+
+We extended the data with questions autogenerated from 26 templates, pertaining top sporting event winners and US senate or gubernatorial elections.
+
+To build the evidence dataset, we used the Syphon preprocessing component BIBREF5 of the Argus implementation to identify semantic roles of all question tokens and produce the search keywords if a role was assigned to each token. We then used the IR component to query a corpus of newspaper articles, and kept sentences that contained at least 2/3 of all the keywords. Our corpus of articles contained articles from The Guardian (all articles) and from the New York Times (Sports, Politics and Business sections). Furthermore, we scraped partial archive.org historical data out of 35 RSS feeds from CNN, Reuters, BBC International, CBS News, ABC News, c|net, Financial Times, Skynews and the Washington Post.
+
+For the final dataset, we kept only questions where at least a single evidence was found (i.e. we successfuly assigned a role to each token, found some news stories and found at least one sentence with 2/3 of question keywords within). The final size of the dataset is outlined in Fig. FIGREF8 and some examples are shown in Fig. FIGREF9 .
+
+## AI2-8grade/CK12 Dataset
+
+The AI2 Elementary School Science Questions (no-diagrams variant) released by the Allen Institute cover 855 basic four-choice questions regarding high school science and follows up to the Allen AI Science Kaggle challenge. The vocabulary includes scientific jargon and named entities, and many questions are not factoid, requiring real-world reasoning or thought experiments.
+
+We have combined each answer with the respective question (by substituting the wh-word in the question by each answer) and retrieved evidence sentences for each hypothesis using Solr search in a collection of CK-12 “Concepts B” textbooks. 525 questions attained any supporting evidence, examples are shown in Fig. FIGREF10 .
+
+We consider this dataset as preliminary since it was not reviewed by a human and many hypotheses are apparently unprovable by the evidence we have gathered (i.e. the theoretical top accuracy is much lower than 1.0). However, we released it to the public and still included it in the comparison as these qualities reflect many realistic datasets of unknown qualities, so we find relative performances of models on such datasets instructive.
+
+## MCTest Dataset
+
+The Machine Comprehension Test BIBREF8 dataset has been introduced to provide a challenge for researchers to come up with models that approach human-level reading comprehension, and serve as a higher-level alternative to semantic parsing tasks that enforce a specific knowledge representation. The dataset consists of a set of 660 stories spanning multiple sentences, written in simple and clean language (but with less restricted vocabulary than e.g. the bAbI dataset BIBREF9 ). Each story is accompanied by four questions and each of these lists four possible answers; the questions are tagged as based on just one in-story sentence, or requiring multiple sentence inference. We use an official extension of the dataset for RTE evaluation that again textually merges questions and answers.
+
+The dataset is split in two parts, MC-160 and MC-500, based on provenance but similar in quality. We train all models on a joined training set.
+
+The practical setting differs from the Argus task as the MCTest dataset contains relatively restricted vocabulary and well-formed sentences. Furthermore, the goal is to find the single key point in the story to focus on, while in the Argus setting we may have many pieces of evidence supporting an answer; another specific characteristics of MCTest is that it consists of stories where the ordering and proximity of evidence sentences matters.
+
+## Related Work
+
+Our primary concern when integrating natural language query with textual evidence is to find sentence-level representations suitable both for relevance weighing and answer prediction.
+
+Sentence-level representations in the retrieval + inference context have been popularly proposed within the Memory Network framework BIBREF10 , but explored just in the form of averaged word embeddings; the task includes only very simple sentences and a small vocabulary. Much more realistic setting is introduced in the Answer Sentence Selection context BIBREF11 BIBREF6 , with state-of-art models using complex deep neural architectures with attention BIBREF12 , but the selection task consists of only retrieval and no inference (answer prediction). A more indirect retrieval task regarding news summarization was investigated by BIBREF13 .
+
+In the entailment context, BIBREF4 introduced a large dataset with single-evidence sentence pairs (Stanford Natural Language Inference, SNLI), but a larger vocabulary and slightly more complicated (but still conservatively formed) sentences. They also proposed baseline recurrent neural model for modeling sentence representations, while word-level attention based models are being studied more recently BIBREF14 BIBREF15 .
+
+In the MCTest text comprehension challenge BIBREF8 , the leading models use complex engineered features ensembling multiple traditional semantic NLP approaches BIBREF16 . The best deep model so far BIBREF17 uses convolutional neural networks for sentence representations, and attention on multiple levels to pick evidencing sentences.
+
+## Neural Model
+
+Our approach is to use a sequence of word embeddings to build sentence embeddings for each hypothesis and respective evidence, then use the sentence embeddings to estimate relevance and entailment of each evidence with regard to the respective hypothesis, and finally integrate the evidence to a single answer.
+
+## Sentence Embeddings
+
+To produce sentence embeddings, we investigated the neural models proposed in the dataset-sts framework for deep learning of sentence pair scoring functions. BIBREF6 
+
+We refer the reader to BIBREF6 and its references for detailed model descriptions. We evaluate an RNN model which uses bidirectionally summed GRU memory cells BIBREF18 and uses the final states as embeddings; a CNN model which uses sentence-max-pooled convolutional filters as embeddings BIBREF19 ; an RNN-CNN model which puts the CNN on top of per-token GRU outputs rather than the word embeddings BIBREF20 ; and an attn1511 model inspired by BIBREF20 that integrates the RNN-CNN model with per-word attention to build hypothesis-specific evidence embeddings. We also report the baseline results of avg mean of word embeddings in the sentence with projection matrix and DAN Deep Averaging Network model that employs word-level dropout and adds multiple nonlinear transformations on top of the averaged embeddings BIBREF21 .
+
+The original attn1511 model BIBREF6 (as tuned for the Answer Sentence Selection task) used a softmax attention mechanism that would effectively select only a few key words of the evidence to focus on — for a hypothesis-evidence token INLINEFORM0 scalar attention score INLINEFORM1 , the focus INLINEFORM2 is: INLINEFORM3 
+
+A different focus mechanism exhibited better performance in the Hypothesis Evaluation task, modelling per-token attention more independently: INLINEFORM0 
+
+We also use relu instead of tanh in the CNNs.
+
+As model input, we use the standard GloVe embeddings BIBREF22 extended with binary inputs denoting token type and overlap with token or bigram in the paired sentence, as described in BIBREF6 . However, we introduce two changes to the word embedding model — we use 50-dimensional embeddings instead of 300-dimensional, and rather than building an adaptable embedding matrix from the training set words preinitialized by GloVe, we use only the top 100 most frequent tokens in the adaptable embedding matrix and use fixed GloVe vectors for all other tokens (including tokens not found in the training set). In preliminary experiments, this improved generalization for highly vocabulary-rich tasks like Argus, while still allowing the high-frequency tokens (like interpunction or conjunctions) to learn semantic operator representations.
+
+As an additional method for producing sentence embeddings, we consider the Ubu. RNN transfer learning method proposed by BIBREF6 where an RNN model (as described above) is trained on the Ubuntu Dialogue task BIBREF23 . The pretrained model weights are used to initialize an RNN model which is then fine-tuned on the Hypothesis Evaluation task. We use the same model as originally proposed (except the aforementioned vocabulary handling modification), with the dot-product scoring used for Ubuntu Dialogue training replaced by MLP point-scores described below.
+
+## Evidence Integration
+
+Our main proposed schema for evidence integration is Evidence Weighing. From each pair of hypothesis and evidence embeddings, we produce two INLINEFORM0 predictions using a pair of MLP point-scorers of dataset-sts BIBREF6 with sigmoid activation function. The predictions are interpreted as INLINEFORM1 entailment (0 to 1 as no to yes) and relevance INLINEFORM2 . To integrate the predictions across multiple pieces of evidence, we propose a weighed average model: INLINEFORM3 
+
+We do not have access to any explicit labels for the evidence, but we train the model end-to-end with just INLINEFORM0 labels and the formula for INLINEFORM1 is differentiable, carrying over the gradient to the sentence embedding model. This can be thought of as a simple passage-wide attention model.
+
+As a baseline strategy, we also consider Evidence Averaging, where we simply produce a single scalar prediction per hypothesis-evidence pair (using the same strategy as above) and decide the hypothesis simply based on the mean prediction across available evidence.
+
+Finally, following success reported in the Answer Sentence Selection task BIBREF6 , we consider a BM25 Feature combined with Evidence Averaging, where the MLP scorer that produces the pair scalar prediction as above takes an additional BM25 word overlap score input BIBREF1 besides the elementwise embedding comparisons.
+
+## Experimental Setup
+
+We implement the differentiable model in the Keras framework BIBREF24 and train the whole network from word embeddings to output evidence-integrated hypothesis label using the binary cross-entropy loss as an objective and the Adam optimization algorithm BIBREF25 . We apply INLINEFORM0 regularization and a INLINEFORM1 dropout.
+
+Following the recommendation of BIBREF6 , we report expected test set question accuracy as determined by average accuracy in 16 independent trainings and with 95% confidence intervals based on the Student's t-distribution.
+
+## Evaluation
+
+In Fig. FIGREF26 , we report the model performance on the Argus task, showing that the Ubuntu Dialogue transfer RNN outperforms other proposed models by a large margin. However, a comparison of evidence integration approaches in Fig. FIGREF27 shows that evidence integration is not the major deciding factor and there are no staticially meaningful differences between the evaluated approaches. We measured high correlation between classification and relevance scores with Pearson's INLINEFORM0 , showing that our model does not learn a separate evidence weighing function on this task.
+
+In Fig. FIGREF28 , we look at the model performance on the AI2-8grade/CK12 task, repeating the story of Ubuntu Dialogue transfer RNN dominating other models. However, on this task our proposed evidence weighing scheme improves over simpler approaches — but just on the best model, as shown in Fig. FIGREF29 . On the other hand, the simplest averaging model benefits from at least BM25 information to select relevant evidence, apparently.
+
+For the MCTest dataset, Fig. FIGREF30 compares our proposed models with the current state-of-art ensemble of hand-crafted syntactic and frame-semantic features BIBREF16 , as well as past neural models from the literature, all using attention mechanisms — the Attentive Reader of BIBREF26 , Neural Reasoner of BIBREF27 and the HABCNN model family of BIBREF17 . We see that averaging-based models are surprisingly effective on this task, and in particular on the MC-500 dataset it can beat even the best so far reported model of HABCNN-TE. Our proposed transfer model is statistically equivalent to the best model on both datasets (furthermore, previous work did not include confidence intervals, even though their models should also be stochastically initialized).
+
+As expected, our models did badly on the multiple-evidence class of questions — we made no attempt to model information flow across adjacent sentences in our models as this aspect is unique to MCTest in the context of our work.
+
+Interestingly, evidence weighing does play an important role on the MCTest task as shown in Fig. FIGREF31 , significantly boosting model accuracy. This confirms that a mechanism to allocate attention to different sentences is indeed crucial for this task.
+
+## Analysis
+
+While we can universally proclaim Ubu. RNN as the best model, we observe many aspects of the Hypothesis Evaluation problem that are shared by the AI2-8grade/CK12 and MCTest tasks, but not by the Argus task.
+
+Our largest surprise lies in the ineffectivity of evidence weighing on the Argus task, since observations of irrelevant passages initially led us to investigate this model. We may also see that non-pretrained RNN does very well on the Argus task while CNN is a better model otherwise.
+
+An aspect that could explain this rift is that the latter two tasks are primarily retrieval based, where we seek to judge each evidence as irrelevant or essentially a paraphrase of the hypothesis. On the other hand, the Argus task is highly semantic and compositional, with the questions often differing just by a presence of negation — recurrent model that can capture long-term dependencies and alter sentence representations based on the presence of negation may represent an essential improvement over an n-gram-like convolutional scheme. We might also attribute the lack of success of evidence weighing in the Argus task to a more conservative scheme of passage retrieval employed in the IR pipeline that produced the dataset. Given the large vocabulary and noise levels in the data, we may also simply require more data to train the evidence weighing properly.
+
+We see from the training vs. test accuracies that RNN-based models (including the word-level attention model) have a strong tendency to overfit on our small datasets, while CNN is much more resilient. While word-level attention seems appealing for such a task, we speculate that we simply might not have enough training data to properly train it. Investigating attention transfer is a point for future work — by our preliminary experiments on multiple datasets, attention models appear more task specific than the basic text comprehension models of memory based RNNs.
+
+One concrete limitation of our models in case of the Argus task is a problem of reconciling particular named entity instances. The more obvious form of this issue is Had Roger Federer beat Martin Cilic in US OPEN 2014? versus an opposite Had Martin Cilic beat Roger Federer in US OPEN 2014? — another form of this problem is reconciling a hypothesis like Will the Royals win the World Series? with evidence Giants Win World Series With Game 7 Victory Over Royals. An abstract embedding of the sentence will not carry over the required information — it is important to explicitly pass and reconcile the roles of multiple named entities which cannot be meaningfully embedded in a GloVe-like semantic vector space.
+
+## Conclusion
+
+We have established a general Hypothesis Evaluation task with three datasets of various properties, and shown that neural models can exhibit strong performance (with less hand-crafting effort than non-neural classifiers). We propose an evidence weighing model that is never harmful and improves performance on some tasks. We also demonstrate that simple models can outperform or closely match performance of complex architectures; all the models we consider are task-independent and were successfully used in different contexts than Hypothesis Evaluation BIBREF6 . Our results empirically show that a basic RNN text comprehension model well trained on a large dataset (even if the task is unrelated and vocabulary characteristics are very different) outperforms or matches more complex architectures trained only on the dataset of the task at hand.
+
+Finally, on the MCTest dataset, our best proposed model is better or statistically indistinguishable from the best neural model reported so far BIBREF17 , even though it has a simpler architecture and only a naive attention mechanism.
+
+We would like to draw several recommendations for future research from our findings: (A) encourage usage of basic neural architectures as evaluation baselines; (B) suggest that future research includes models pretrained on large data as baselines; (C) validate complex architectures on tasks with large datasets if they cannot beat baselines on small datasets; and (D) for randomized machine comprehension models (e.g. neural networks with random weight initialization, batch shuffling or probabilistic dropout), report expected test set performance based on multiple independent training runs.
+
+As a general advice for solving complex tasks with small datasets, besides the point (B) above our analysis suggests convolutional networks as the best models regarding the tendency to overfit, unless semantic composionality plays a crucial role in the task; in this scenario, simple averaging-based models are a great start as well. Preinitializing a model also helps against overfitting.
+
+We release our implementation of the Argus task, evidence integration models and processing of all the evaluated datasets as open source.
+
+We believe the next step towards machine comprehension NLP models (based on deep learning but capable of dealing with real-world, large-vocabulary data) will involve research into a better way to deal with entities without available embeddings. When distinguishing specific entities, simple word-level attention mechanisms will not do. A promising approach could extend the flexibility of the final sentence representation, moving from attention mechanism to a memory mechanism by allowing the network to remember a set of “facts” derived from each sentence; related work has been done for example on end-to-end differentiable shift-reduce parsers with LSTM as stack cells BIBREF28 .
+
+## Acknowledgments
+
+This work was co-funded by the Augur Project of the Forecast Foundation and financially supported by the Grant Agency of the Czech Technical University in Prague, grant No. SGS16/ 084/OHK3/1T/13. Computational resources were provided by the CESNET LM2015042 and the CERIT Scientific Cloud LM2015085, provided under the programme “Projects of Large Research, Development, and Innovations Infrastructures.”
+
+We'd like to thank Peronet Despeignes of the Augur Project for his support. Carl Burke has provided instructions for searching CK-12 ebooks within the Kaggle challenge.

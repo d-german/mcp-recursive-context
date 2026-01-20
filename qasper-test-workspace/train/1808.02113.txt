@@ -1,0 +1,135 @@
+# Paying Attention to Attention: Highlighting Influential Samples in Sequential Analysis
+
+**Paper ID:** 1808.02113
+
+## Abstract
+
+In (Yang et al. 2016), a hierarchical attention network (HAN) is created for document classification. The attention layer can be used to visualize text influential in classifying the document, thereby explaining the model's prediction. We successfully applied HAN to a sequential analysis task in the form of real-time monitoring of turn taking in conversations. However, we discovered instances where the attention weights were uniform at the stopping point (indicating all turns were equivalently influential to the classifier), preventing meaningful visualization for real-time human review or classifier improvement. We observed that attention weights for turns fluctuated as the conversations progressed, indicating turns had varying influence based on conversation state. Leveraging this observation, we develop a method to create more informative real-time visuals (as confirmed by human reviewers) in cases of uniform attention weights using the changes in turn importance as a conversation progresses over time.
+
+## Introduction
+
+The attention mechanism BIBREF1 in neural networks can be used to interpret and visualize model behavior by selecting the most pertinent pieces of information instead of all available information. For example, in BIBREF0 , a hierarchical attention network (Han) is created and tested on the classification of product and movie reviews. As a side effect of employing the attention mechanism, sentences (and words) that are considered important to the model can be highlighted, and color intensity corresponds to the level of importance (darker color indicates higher importance).
+
+Our application is the escalation of Internet chats. To maintain quality of service, users are transferred to human representatives when their conversations with an intelligent virtual assistant (IVA) fail to progress. These transfers are known as escalations. We apply Han to such conversations in a sequential manner by feeding each user turn to Han as they occur, to determine if the conversation should escalate. If so, the user will be transferred to a live chat representative to continue the conversation. To help the human representative quickly determine the cause of the escalation, we generate a visualization of the user's turns using the attention weights to highlight the turns influential in the escalation decision. This helps the representative quickly scan the conversation history and determine the best course of action based on problematic turns.
+
+Unfortunately, there are instances where the attention weights for every turn at the point of escalation are nearly equal, requiring the representative to carefully read the history to determine the cause of escalation unassisted. Table TABREF1 shows one such example with uniform attention weights at the point of escalation.
+
+Our application requires that the visualizations be generated in real-time at the point of escalation. The user must wait for the human representative to review the IVA chat history and resume the failed task. Therefore, we seek visualization methods that do not add significant latency to the escalation transfer. Using the attention weights for turn influence is fast as they were already computed at the time of classification. However, these weights will not generate useful visualizations for the representatives when their values are similar across all turns (see Han Weight in Table TABREF1 ). To overcome this problem, we develop a visualization method to be applied in the instances where the attention weights are uniform. Our method produces informative visuals for determining influential samples in a sequence by observing the changes in sample importance over the cumulative sequence (see Our Weight in Table TABREF1 ). Note that we present a technique that only serves to resolve situations when the existing attention weights are ambiguous; we are not developing a new attention mechanism, and, as our method is external, it does not require any changes to the existing model to apply.
+
+To determine when the turn weights are uniform, we use perplexity BIBREF2 (see more details in subsection SECREF4 ). If a conversation INLINEFORM0 escalates on turn INLINEFORM1 with attention weights INLINEFORM2 , let INLINEFORM3 . Intuitively, INLINEFORM4 should be low when uniformity is high. We measure the INLINEFORM5 of every escalated conversation and provide a user-chosen uniformity threshold for INLINEFORM6 (Figure FIGREF2 ). For example, if the INLINEFORM7 threshold for uniformity is INLINEFORM8 , 20% of conversations in our dataset will result in Han visuals where all turns have similar weight; thus, no meaningful visualization can be produced. Companies that deploy IVA solutions for customer service report escalated conversation volumes of INLINEFORM9 per day for one IVA BIBREF3 . Therefore, even at 20%, contact centers handling multiple companies may see hundreds or thousands of conversations per day with no visualizations. If we apply our method in instances where Han weights are uniform, all conversations become non-uniform using the same INLINEFORM10 threshold for INLINEFORM11 , enabling visualization to reduce human effort.
+
+## Related Work
+
+Neural networks are powerful learning algorithms, but are also some of the most complex. This is made worse by the non-deterministic nature of neural network training; a small change in a learning parameter can drastically affect the network's learning ability. This has led to the development of methodologies for understanding and uncovering not just neural networks, but black box models in general. The interpretation of deep networks is a young field of research. We refer readers to BIBREF4 for a comprehensive overview of different methods for understanding and visualizing deep neural networks. More recent developments include DeepLIFT BIBREF5 (not yet applicable to RNNs), layerwise relevance propagation BIBREF6 (only very recently adapted to textual input and LSTMs BIBREF7 , BIBREF8 ), and LIME BIBREF9 .
+
+LIME is model-agnostic, relying solely on the input data and classifier prediction probabilities. By perturbing the input and seeing how predictions change, one can approximate the complex model using a simpler, interpretable linear model. However, users must consider how the perturbations are created, which simple model to train, and what features to use in the simpler model. In addition, LIME is an external method not built into the classifier that can add significant latency when creating visuals in real-time as it requires generating perturbations and fitting a regression for every sample point. Attention BIBREF1 , however, is built into Han and commonly implemented in other network structures (see below), and, as a result, visuals are created for free as they are obtained from the attention weights directly.
+
+Attention has been used for grammatical error correction BIBREF10 , cloze-style reading tasks BIBREF11 , BIBREF12 , text classification BIBREF13 , abstractive sentence summarization BIBREF14 , and many other sequence transduction tasks. BIBREF15 uses an encoder-decoder framework with attention to model conversations and generate natural responses to user input. BIBREF16 is perhaps most similar to what we wish to achieve, but only uses one-round conversation data (one user input, one computer response).
+
+To the best of our knowledge, ours is the first paper that considers the changes in attention during sequential analysis to create more explanatory visuals in situations where attention weights on an entire sequence are uniform.
+
+## Methodology
+
+In Table TABREF3 , we see the bottom visualization where the weights are uniform at the point of escalation. However, on the 2nd turn, the Han had produced more distinct weights. It is clear from this example that the importance of a single sample can change drastically as a sequence progresses. Using these changes in attention over the sequence, we formalized a set of rules to create an alternative visualization for the entire sequence to be applied in cases where the attention weights are uniform over all samples at the stopping point.
+
+## Measuring Uniformity
+
+We begin with defining what it means for attention weights to be uniform.
+
+For a probability distribution INLINEFORM0 over the sample space INLINEFORM1 , the perplexity measure is defined as the exponential of the entropy of INLINEFORM2 . More formally, INLINEFORM3 
+
+where the entropy is INLINEFORM0 
+
+As entropy is a measure of the degree of randomness in INLINEFORM0 , perplexity is a measure of the number of choices that comprise this randomness. The following properties of perplexity will be applicable.
+
+ For any distribution INLINEFORM0 , the value of INLINEFORM1 is always positive. ( INLINEFORM2 for all INLINEFORM3 .)
+
+ For any distribution INLINEFORM0 over INLINEFORM1 values, we have INLINEFORM2 . The larger the value, the closer INLINEFORM3 is to being uniform. The equality holds if and only if INLINEFORM4 is uniform.
+
+With respect to property ( UID6 ) above, we define a metric INLINEFORM0 , where INLINEFORM1 is any distribution over INLINEFORM2 values. Thus, for all INLINEFORM3 and all distributions INLINEFORM4 that are uniform over INLINEFORM5 values, it must be the case that INLINEFORM6 . Furthermore, INLINEFORM7 for all INLINEFORM8 and INLINEFORM9 . We drop the subscript INLINEFORM10 from INLINEFORM11 when it is obvious from the context.
+
+In our application, obtaining an exact uniform distribution is not feasible; it suffices to consider a distribution to be uniform if it is almost the same over all values.
+
+We say that a given distribution INLINEFORM0 on INLINEFORM1 values is INLINEFORM2 -uniform if INLINEFORM3 . Note that since INLINEFORM4 can be at most INLINEFORM5 (as INLINEFORM6 ), this restricts INLINEFORM7 to be any real number between 0 and INLINEFORM8 .
+
+In this context, given a distribution INLINEFORM0 over INLINEFORM1 values, we will refer to INLINEFORM2 as the measure of uniformity of INLINEFORM3 . The smaller the value of INLINEFORM4 , the closer INLINEFORM5 is to being uniform.
+
+For our specific application, INLINEFORM0 is a user chosen uniformity threshold, INLINEFORM1 consists of turn weights, and INLINEFORM2 is the number of turns in the conversation. For example, in Figure FIGREF2 , if the threshold for INLINEFORM3 is chosen to be INLINEFORM4 , this will result in 20% of conversations in our datasets with uniform Han turn weights.
+
+## Attention Behaviors
+
+Given a conversation INLINEFORM0 that contains INLINEFORM1 turns, let INLINEFORM2 be the vector of attention weights obtained from inputting INLINEFORM3 (where INLINEFORM4 is the INLINEFORM5 -th turn in INLINEFORM6 ) to Han. When turn INLINEFORM7 is added, we consider three forms of behavior that help us create a new visual: attention, context, and variation dependency switches. See section SECREF4 for evidence as to why we chose these particular behaviors.
+
+An attention dependency switch occurs when the addition of a turn changes the distribution of weights. Suppose we have a 4 turn conversation. In Figure FIGREF8 , considering only the first 3 turns gives us a uniform distribution of weights (left). However, when we add turn 4 (Figure FIGREF8 , right), the distribution shifts to one of non-uniformity. We consider the addition of any such turn that causes a switch from uniform to non-uniform or vice-versa in the creation of our visuals.
+
+More formally, there is an attention dependency variable change from turn INLINEFORM0 to INLINEFORM1 with some threshold INLINEFORM2 (note that INLINEFORM3 in section SECREF4 ) if any one of the following occurs:
+
+ INLINEFORM0 and INLINEFORM1 
+
+ INLINEFORM0 and INLINEFORM1 
+
+With 1, we are switching from a uniform distribution to a non-uniform distribution with the addition of turn INLINEFORM0 . . With 2, we are switching from a non-uniform distribution to a uniform distribution.
+
+Note that it is possible that the attention dependency variable change is observed for many turns and not just one.
+
+A context dependency switch occurs when the addition of a turn causes a previous turn's weight to change significantly. In Figure FIGREF9 , the addition of turn 6 causes turn 3's weight to spike.
+
+Mathematically, there is a context dependency variable change in turn INLINEFORM0 by addition of turn INLINEFORM1 for INLINEFORM2 with some threshold INLINEFORM3 if INLINEFORM4 
+
+The final switch of consideration is a variation dependency switch, which occurs when the weight of turn INLINEFORM0 changes significantly over the entire course of a conversation.
+
+More formally, there is a variation dependency variable change in turn INLINEFORM0 with some threshold INLINEFORM1 when the conversation has INLINEFORM2 turns if INLINEFORM3 
+
+.
+
+Note that variation dependency differs from context dependency as the latter determines turn INLINEFORM0 's change with the addition of only one turn.
+
+For determining attention dependency, we considered normalized attention weights, but for variation and context, we considered the unnormalized output logits from the Han. It is also important to note that an attention dependency switch can occur without a context dependency switch and vice-versa. In Figure FIGREF9 , neither distribution is uniform; therefore, no attention dependency switch occurred. In Figure FIGREF12 , an attention dependency switch has occurred (uniform to non-uniform distribution), but there is no context dependency variable change. In Figure FIGREF13 , a context dependency variable change has occurred as many previous weights have spiked, but the distribution of weights has not changed (no attention dependency variable change bc it is still non-uniform).
+
+In our experiments, we compute the thresholds mentioned in the definitions above as follows:
+
+For attention dependency, we experimented with various INLINEFORM0 thresholds and tagged 100 randomly chosen conversations for each of those thresholds to determine a potential candidate. For example, using a threshold of INLINEFORM1 , weight vectors such as INLINEFORM2 would be considered uniform, which we greatly disagreed with. However, we determined that weight distributions below the INLINEFORM3 threshold appeared uniform 90% of the time, which we considered good agreement.
+
+For context dependency and variation dependency switches, we chose the value of INLINEFORM0 and INLINEFORM1 , respectively, using the 75th percentile of the values for different turns. Upon comparison with manual tagging of 100 randomly chosen conversations, we agreed on all 100 cases for the context dependency switch and 99 out of 100 cases for the variation dependency switch.
+
+## Data and Classifier
+
+Our escalation data was obtained from BIBREF17 , which consists of INLINEFORM0 conversations ( INLINEFORM1 user turns) from two commercial airline IVAs. INLINEFORM2 of the INLINEFORM3 conversations had been tagged for escalation. See dataset statistics in Table TABREF17 .
+
+Airline dataset 1 has INLINEFORM0 conversations and INLINEFORM1 turns, and airline dataset 2 has INLINEFORM2 conversations and INLINEFORM3 turns. The low turn counts present in dataset 2 are due to the FAQ focus of dataset 2's particular IVA. Users tend to perform single queries such as “baggage policy" instead of engaging in a conversational interaction. In contrast, dataset 1 originated from a more “natural" IVA, and, therefore, users appeared to engage with it more through conversation.
+
+The classifier (Han) used for escalation prediction is outlined in BIBREF0 . As the code was unavailable, we implemented Han with TensorFlow BIBREF18 . Our version has substantially the same architecture as in BIBREF0 with the exception that LSTM cells are used in place of GRU. We used the 200-dimensional word embeddings from glove.twitter.27B BIBREF19 and did not adapt them during the training of our model. Each recurrent encoding layer has 50 forward and 50 backward cells, giving 100-dimensional embeddings each for turns and conversations.
+
+In predicting escalation, our network obtained an INLINEFORM0 of INLINEFORM1 ( INLINEFORM2 precision, INLINEFORM3 recall, averaged over five random splits). To compute these metrics, turn-level annotations were converted to conversation-level annotations by labeling a conversation as escalate if any turn in the conversation was labeled escalate.
+
+For the visualization experiments, a random 80-20 split was used to create training and testing sets. The training set consisted of INLINEFORM0 conversations of which INLINEFORM1 should escalate. The testing set consisted of INLINEFORM2 conversations of which 241 should escalate.
+
+## Creating Our Visuals
+
+Given the occurrences of attention ( INLINEFORM0 ), context ( INLINEFORM1 ), and variation ( INLINEFORM2 ) dependency switches, we now discuss how a visual of the entire conversation can be created. For each turn INLINEFORM3 , create a vector INLINEFORM4 , where each variable inside this vector takes the value 1 when the attention, context, and variation dependency switches trigger, respectively, and 0 otherwise.
+
+Compute INLINEFORM0 , and use this value to represent the intensity of a single color (blue in our examples). The higher the value of INLINEFORM1 , the higher the color intensity. Note that INLINEFORM2 . Take, for example, Table TABREF19 where for the first conversation's weights (using our weights), turns 2,3, and 6 have values of INLINEFORM3 , turns 4,5, and 7 have values of INLINEFORM4 , and the first turn has a value of 0. Considering a higher dimension for INLINEFORM5 which would create more values for INLINEFORM6 is an objective for future work.
+
+## Results and Discussion
+
+We first considered the frequency of each of the behaviors discussed in section SECREF7 as well as their co-occurrences with escalation.
+
+After removing single turn conversations (as they are uniform by default), the number of turns that had a context dependency switch as a result of adding a new turn was INLINEFORM0 . However, the number of times that such an event coincided at least once with escalation was 766. As it appeared that the effect of context dependency was quite low, we next considered the variation and attention dependency variables. The total number of turns that had a variation dependency switch was INLINEFORM1 , and INLINEFORM2 also coincided with a change of escalation, indicating that a variation dependency switch is potentially valuable in the creation of new visuals. In addition, the number of uniform to non-uniform turn pairs (uniform weight distribution for first INLINEFORM3 turns but non-uniform for first INLINEFORM4 turns) was INLINEFORM5 whereas the number of non-uniform to uniform turn pairs was 259. Out of the times when there was a uniform to non-uniform switch, 710 cases coincided with escalation compared to only 22 for non-uniform to uniform changes.
+
+As shown in Figure FIGREF2 , the use of our method when the Han weights are uniform greatly reduces or even eliminates the uniformity at lower INLINEFORM0 thresholds. To determine if our visuals were also assigning weights properly, we had three reviewers rate on a 0 to 10 scale (0 being poor, 10 being best) of how well each visualization highlights the influential turns for escalation in the conversation. See Table TABREF20 for an example that was tagged nearly perfectly by reviewers. As our method only serves to highlight influential turns in situations when the existing attention weights are uniform, no direct comparison was done to Han weights over the entire dataset.
+
+To avoid bias, the chosen reviewers had never used the specific IVA and were not familiar with its knowledge base although they may have performed similar tagging tasks in the past. The annotators were reminded that if a turn is given a darker color, then that turn supposedly has greater influence in determining escalation. They were, thus, given the task of determining if they agree with the visualization's decision. A rating of 0 was instructed to be given on complete disagreement, and 10 upon perfect agreement. Consider a human representative given Our Weight in Table TABREF1 , which highlights turn 4 as the most influential turn on escalation, as opposed to the Han Weight which requires careful reading to make this determination.
+
+From the INLINEFORM0 conversations that escalated in the dataset, we first filtered conversations by a uniformity threshold, INLINEFORM1 (user chosen as described in subsection SECREF7 ). At this threshold, INLINEFORM2 or 138 conversations remained. Next, we filtered the conversations that were not correctly classified by Han, leaving 85 or INLINEFORM3 .
+
+The average INLINEFORM0 rating between the three reviewers over the remaining conversations was 6. This demonstrates that on average, reviewers felt that the visualizations were adequate. Put in perspective, adding adequate visuals to the thousands of daily escalations that would otherwise have no visual is a great improvement.
+
+In cases of uniform attention weights at the stopping point, this can also make it difficult to spot potential areas for classifier improvement if we do not incorporate turn weight fluctuations as the conversation progresses to the stopping point. For example, in the first escalated conversation displayed in Table TABREF19 , turn 6 has a high weight under our scheme because of the presence of the word “live". Customers will frequently ask for a “live customer representative" which is a sign for escalation. However, in Table TABREF19 , “live" is used in a different context, but the weight given to it is high due to turn weight fluctuations as the conversation progresses to the stopping point. Our weights expose this potential problem for the classifier which may suggest using n-grams or some other methodology for improvement. If we were to use uniform Han weights at the stopping point only, we might miss these areas for improvement.
+
+In addition to the possible reduction in human review time and spotting potential areas for classifier improvement, the visuals only required INLINEFORM0 milliseconds on average to compute per conversation (on a laptop with an Intel Core i7-4710MQ CPU @ 2.50GHz, 16 GB of RAM, running Ubuntu 16.04). This adds insignificant latency to the transfer while generating the visualization, which is an important goal.
+
+In the future, this work would greatly benefit from an expanded dataset. As we only wish to consider conversations with uniform weights on the turn of escalation, this cuts our dataset dramatically, necessitating a larger tagged dataset. Considering more attention behaviors so we can have higher granularity of color intensity is also an objective of future work. As our method only looks at the changes in attention weight, our method is not task-specific. Therefore, it would be beneficial to test our methodology on visualizing other sequential analysis tasks besides escalation, such as fraud or anomaly detection or applications in the medical domain BIBREF20 , BIBREF21 .
+
+## Conclusion
+
+Although attention in deep neural networks was not initially introduced to inform observers, but to help a model make predictions, it can also be used to inform. In the instances where a model thinks all historical samples should be considered equally important in a sequential analysis task, we must look elsewhere for a computationally inexpensive means to understand what happened at the stopping point. In this paper, we have introduced such a means by monitoring attention changes over the sequential analysis to inform observers. This method introduces negligible overhead, an important consideration in real-time systems, and is not tied to the implementation details or task of the model, other than the prerequisite of an attention layer.

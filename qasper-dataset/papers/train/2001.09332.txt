@@ -1,0 +1,87 @@
+# An Analysis of Word2Vec for the Italian Language
+
+**Paper ID:** 2001.09332
+
+## Abstract
+
+Word representation is fundamental in NLP tasks, because it is precisely from the coding of semantic closeness between words that it is possible to think of teaching a machine to understand text. Despite the spread of word embedding concepts, still few are the achievements in linguistic contexts other than English. In this work, analysing the semantic capacity of the Word2Vec algorithm, an embedding for the Italian language is produced. Parameter setting such as the number of epochs, the size of the context window and the number of negatively backpropagated samples is explored.
+
+## Introduction
+
+In order to make human language comprehensible to a computer, it is obviously essential to provide some word encoding. The simplest approach is the one-hot encoding, where each word is represented by a sparse vector with dimension equal to the vocabulary size. In addition to the storage need, the main problem of this representation is that any concept of word similarity is completely ignored (each vector is orthogonal and equidistant from each other). On the contrary, the understanding of natural language cannot be separated from the semantic knowledge of words, which conditions a different closeness between them. Indeed, the semantic representation of words is the basic problem of Natural Language Processing (NLP). Therefore, there is a necessary need to code words in a space that is linked to their meaning, in order to facilitate a machine in potential task of “understanding" it. In particular, starting from the seminal work BIBREF0, words are usually represented as dense distributed vectors that preserve their uniqueness but, at the same time, are able to encode the similarities.
+
+These word representations are called Word Embeddings since the words (points in a space of vocabulary size) are mapped in an embedding space of lower dimension. Supported by the distributional hypothesis BIBREF1 BIBREF2, which states that a word can be semantically characterized based on its context (i.e. the words that surround it in the sentence), in recent years many word embedding representations have been proposed (a fairly complete and updated review can be found in BIBREF3 and BIBREF4). These methods can be roughly categorized into two main classes: prediction-based models and count-based models. The former is generally linked to work on Neural Network Language Models (NNLM) and use a training algorithm that predicts the word given its local context, the latter leverage word-context statistics and co-occurrence counts in an entire corpus. The main prediction-based and count-based models are respectively Word2Vec BIBREF5 (W2V) and GloVe BIBREF6.
+
+Despite the widespread use of these concepts BIBREF7 BIBREF8, few contributions exist regarding the development of a W2V that is not in English. In particular, no detailed analysis on an Italian W2V seems to be present in the literature, except for BIBREF9 and BIBREF10. However, both seem to leave out some elements of fundamental interest in the learning of the neural network, in particular relating to the number of epochs performed during learning, reducing the importance that it may have on the final result. In BIBREF9, this for example leads to the simplistic conclusion that (being able to organize with more freedom in space) the more space is given to the vectors, the better the results may be. However, the problem in complex structures is that large embedding spaces can make training too difficult.
+
+In this work, by setting the size of the embedding to a commonly used average value, various parameters are analysed as the number of learning epochs changes, depending on the window sizes and the negatively backpropagated samples.
+
+## Word2Vec
+
+The W2V structure consists of a simple two-level neural network (Figure FIGREF1) with one-hot vectors representing words at the input. It can be trained in two different modes, algorithmically similar, but different in concept: Continuous Bag-of-Words (CBOW) model and Skip-Gram model. While CBOW tries to predict the target words from the context, Skip-Gram instead aims to determine the context for a given target word. The two different approaches therefore modify only the way in which the inputs and outputs are to be managed, but in any case, the network does not change, and the training always takes place between single pairs of words (placed as one-hot in input and output).
+
+The text is in fact divided into sentences, and for each word of a given sentence a window of words is taken from the right and from the left to define the context. The central word is coupled with each of the words forming the set of pairs for training. Depending on the fact that the central word represents the output or the input in training pairs, the CBOW and Skip-gram models are obtained respectively.
+
+Regardless of whether W2V is trained to predict the context or the target word, it is used as a word embedding in a substantially different manner from the one for which it has been trained. In particular, the second matrix is totally discarded during use, since the only thing relevant to the representation is the space of the vectors generated in the intermediate level (embedding space).
+
+## Word2Vec ::: Sampling rate
+
+The common words (such as “the", “of", etc.) carry very little information on the target word with which they are coupled, and through backpropagation they tend to have extremely small representative vectors in the embedding space. To solve both these problems the W2V algorithm implements a particular “subsampling" BIBREF11, which acts by eliminating some words from certain sentences. Note that the elimination of a word directly from the text means that it no longer appears in the context of any of the words of the sentence and, at the same time, a number of pairs equal to (at most) twice the size of the window relating to the deleted word will also disappear from the training set.
+
+In practice, each word is associated with a sort of “keeping probability" and, when you meet that word, if this value is greater than a randomly generated value then the word will not be discarded from the text. The W2V implementation assigns this “probability" to the generic word $w_i$ through the formula:
+
+where $f(w_i)$ is the relative frequency of the word $w_i$ (namely $count(w_i)/total$), while $s$ is a sample value, typically set between $10^{-3}$ and $10^{-5}$.
+
+## Word2Vec ::: Negative sampling
+
+Working with one-hot pairs of words means that the size of the network must be the same at input and output, and must be equal to the size of the vocabulary. So, although very simple, the network has a considerable number of parameters to train, which lead to an excessive computational cost if we are supposed to backpropagate all the elements of the one-hot vector in output.
+
+The “negative sampling" technique BIBREF11 tries to solve this problem by modifying only a small percentage of the net weights every time. In practice, for each pair of words in the training set, the loss function is calculated only for the value 1 and for a few values 0 of the one-hot vector of the desired output. The computational cost is therefore reduced by choosing to backpropagate only $K$ words “negative" and one positive, instead of the entire vocabulary. Typical values for negative sampling (the number of negative samples that will be backpropagated and to which therefore the only positive value will always be added), range from 2 to 20, depending on the size of the dataset.
+
+The probability of selecting a negative word to backpropagate depends on its frequency, in particular through the formula:
+
+Negative samples are then selected by choosing a sort of “unigram distribution", so that the most frequent words are also the most often backpropated ones.
+
+## Implementation details
+
+The dataset needed to train the W2V was obtained using the information extracted from a dump of the Italian Wikipedia (dated 2019.04.01), from the main categories of Italian Google News (WORLD, NATION, BUSINESS, TECHNOLOGY, ENTERTAINMENT, SPORTS, SCIENCE, HEALTH) and from some anonymized chats between users and a customer care chatbot (Laila). The dataset (composed of 2.6 GB of raw text) includes $421\,829\,960$ words divided into $17\,305\,401$ sentences.
+
+The text was previously preprocessed by removing the words whose absolute frequency was less than 5 and eliminating all special characters. Since it is impossible to represent every imaginable numerical value, but not wanting to eliminate the concept of “numerical representation" linked to certain words, it was also decided to replace every number present in the text with the particular $\langle NUM \rangle $ token; which probably also assumes a better representation in the embedding space (not separating into the various possible values). All the words were then transformed to lowercase (to avoid a double presence) finally producing a vocabulary of $618\,224$ words.
+
+Note that among the special characters are also included punctuation marks, which therefore do not appear within the vocabulary. However, some of them (`.', `?' and `!') are later removed, as they are used to separate the sentences.
+
+The Python implementation provided by Gensim was used for training the various embeddings all with size 300 and sampling parameter ($s$ in Equation DISPLAY_FORM3) set at $0.001$.
+
+## Results
+
+To analyse the results we chose to use the test provided by BIBREF10, which consists of $19\,791$ analogies divided into 19 different categories: 6 related to the “semantic" macro-area (8915 analogies) and 13 to the “syntactic" one (10876 analogies). All the analogies are composed by two pairs of words that share a relation, schematized with the equation: $a:a^{*}=b:b^{*}$ (e.g. “man : woman = king : queen"); where $b^{*}$ is the word to be guessed (“queen"), $b$ is the word coupled to it (“king"), $a$ is the word for the components to be eliminated (“man"), and $a^{*}$ is the word for the components to be added (“woman").
+
+The determination of the correct response was obtained both through the classical additive cosine distance (3COSADD) BIBREF5:
+
+and through the multiplicative cosine distance (3COSMUL) BIBREF12:
+
+where $\epsilon =10^{-6}$ and $\cos (x, y) = \frac{x \cdot y}{\left\Vert x\right\Vert \left\Vert y\right\Vert }$. The extremely low value chosen for the $\epsilon $ is due to the desire to minimize as much as possible its impact on performance, as during the various testing phases we noticed a strange bound that is still being investigated. As usual, moreover, the representative vectors of the embedding space are previously normalized for the execution of the various tests.
+
+## Results ::: Analysis of the various models
+
+We first analysed 6 different implementations of the Skip-gram model each one trained for 20 epochs. Table TABREF10 shows the accuracy values (only on possible analogies) at the 20th epoch for the six models both using 3COSADD and 3COSMUL. It is interesting to note that the 3COSADD total metric, respect to 3COSMUL, seems to have slightly better results in the two extreme cases of limited learning (W5N5 and W10N20) and under the semantic profile. However, we should keep in mind that the semantic profile is the one best captured by the network in both cases, which is probably due to the nature of the database (mainly composed of articles and news that principally use an impersonal language). In any case, the improvements that are obtained under the syntactic profile lead to the 3COSMUL metric obtaining better overall results.
+
+Figure FIGREF11 shows the trends of the total accuracy at different epochs for the various models using 3COSMUL (the trend obtained with 3COSADD is very similar). Here we can see how the use of high negative sampling can worsen performance, even causing the network to oscillate (W5N20) in order to better adapt to all the data. The choice of the negative sampling to be used should therefore be strongly linked to the choice of the window size as well as to the number of training epochs.
+
+Continuing the training of the two worst models up to the 50th epoch, it is observed (Table TABREF12) that they are still able to reach the performances of the other models. The W10N20 model at the 50th epoch even proves to be better than all the other previous models, becoming the reference model for subsequent comparisons. As the various epochs change (Figure FIGREF13.a) it appears to have the same oscillatory pattern observed previously, albeit with only one oscillation given the greater window size. This model is available at: https://mlunicampania.gitlab.io/italian-word2vec/.
+
+Various tests were also conducted on CBOW models, which however proved to be in general significantly lower than Skip-gram models. Figure FIGREF13.b shows, for example, the accuracy trend for a CBOW model with a window equal to 10 and negative sampling equal to 20, which on 50 epochs reaches only $37.20\%$ of total accuracy (with 3COSMUL metric).
+
+## Results ::: Comparison with other models
+
+Finally, a comparison was made between the Skip-gram model W10N20 obtained at the 50th epoch and the other two W2V in Italian present in the literature (BIBREF9 and BIBREF10). The first test (Table TABREF15) was performed considering all the analogies present, and therefore evaluating as an error any analogy that was not executable (as it related to one or more words absent from the vocabulary).
+
+As it can be seen, regardless of the metric used, our model has significantly better results than the other two models, both overall and within the two macro-areas. Furthermore, the other two models seem to be more subject to the metric used, perhaps due to a stabilization not yet reached for the few training epochs.
+
+For a complete comparison, both models were also tested considering only the subset of the analogies in common with our model (i.e. eliminating from the test all those analogies that were not executable by one or the other model). Tables TABREF16 and TABREF17 again highlight the marked increase in performance of our model compared to both.
+
+## Conclusion
+
+In this work we have analysed the Word2Vec model for Italian Language obtaining a substantial increase in performance respect to other two models in the literature (and despite the fixed size of the embedding). These results, in addition to the number of learning epochs, are probably also due to the different phase of data pre-processing, very carefully excuted in performing a complete cleaning of the text and above all in substituting the numerical values with a single particular token. We have observed that the number of epochs is an important parameter and its increase leads to results that rank our two worst models almost equal, or even better than others.
+
+Changing the number of epochs, in some configurations, creates an oscillatory trend, which seems to be linked to a particular interaction between the window size and the negative sampling value. In the future, thanks to the collaboration in the Laila project, we intend to expand the dataset by adding more user chats. The objective will be to verify if the use of a less formal language can improves accuracy in the syntactic macro-area.

@@ -1,0 +1,137 @@
+# Non-Parametric Adaptation for Neural Machine Translation
+
+**Paper ID:** 1903.00058
+
+## Abstract
+
+Neural Networks trained with gradient descent are known to be susceptible to catastrophic forgetting caused by parameter shift during the training process. In the context of Neural Machine Translation (NMT) this results in poor performance on heterogeneous datasets and on sub-tasks like rare phrase translation. On the other hand, non-parametric approaches are immune to forgetting, perfectly complementing the generalization ability of NMT. However, attempts to combine non-parametric or retrieval based approaches with NMT have only been successful on narrow domains, possibly due to over-reliance on sentence level retrieval. We propose a novel n-gram level retrieval approach that relies on local phrase level similarities, allowing us to retrieve neighbors that are useful for translation even when overall sentence similarity is low. We complement this with an expressive neural network, allowing our model to extract information from the noisy retrieved context. We evaluate our semi-parametric NMT approach on a heterogeneous dataset composed of WMT, IWSLT, JRC-Acquis and OpenSubtitles, and demonstrate gains on all 4 evaluation sets. The semi-parametric nature of our approach opens the door for non-parametric domain adaptation, demonstrating strong inference-time adaptation performance on new domains without the need for any parameter updates.
+
+## Introduction
+
+Over the last few years, neural sequence to sequence models BIBREF0 , BIBREF1 , BIBREF2 have revolutionized the field of machine translation by significantly improving translation quality over their phrase based counterparts BIBREF3 , BIBREF4 , BIBREF5 . With more gains arising from continued research on new neural network architectures and accompanying training techniques BIBREF6 , BIBREF7 , BIBREF8 , NMT researchers, both in industry and academia, have doubled down on their ability to train high capacity models on large corpora with gradient based optimization.
+
+However, despite huge improvements in overall translation quality NMT has shown some glaring weaknesses, including idiom processing, and rare word or phrase translation BIBREF9 , BIBREF10 , BIBREF11 - tasks that should be easy if the model could retain learned information from individual training examples. NMT has also been shown to perform poorly when dealing with multi-domain data BIBREF12 . This `catastrophic forgetting' problem has been well-studied in traditional neural network literature, caused by parameter shift during the training process BIBREF13 , BIBREF14 . Non-parametric methods, on the other hand, are resistant to forgetting but are prone to over-fitting due to their reliance on individual training examples. We focus on a non-parametric extension to NMT, hoping to combine the generalization ability of neural networks with the eidetic memory of non-parametric methods. Given a translation query, we rely on an external retrieval mechanism to find similar source-target instances in the training corpus, which are then utilized by the model.
+
+There has been some work on semi-parametric NMT BIBREF15 , BIBREF16 , BIBREF17 , but its effectiveness has been confined to narrow domain datasets. Existing approaches have relied on sentence level similarity metrics for retrieval, which works well for domains with high train-test overlap, but fails to retrieve useful candidates for broad domains. Even if we could find training instances with overlapping phrases it's likely that the information in most retrieved source-target pairs is noise for the purpose of translating the current query.
+
+To retrieve useful candidates when sentence similarity is low, we use n-gram retrieval instead of sentence retrieval. This results in neighbors which have high local overlap with the source sentence, even if they are significantly different in terms of overall sentence similarity. This is intuitively similar to utilizing information from a phrase table BIBREF18 within NMT BIBREF19 , without losing the global context lost when constructing the phrase table. We also propose another simple extension using dense vectors for n-gram retrieval which allows us to exploit similarities beyond lexical overlap.
+
+To effectively extract the signal from the noisy retrieved neighbors, we develop an extension of the approach proposed in BIBREF17 . While BIBREF17 encode the retrieved targets without any context, we incorporate information from the current and retrieved sources while encoding the retrieved target, in order to distinguish useful information from noise.
+
+We evaluate our semi-parametric NMT approach on two tasks.
+
+## Semi-parametric NMT
+
+Standard approaches for Neural Machine Translation rely on seq2seq architectures BIBREF0 , BIBREF1 , where given a source sequence INLINEFORM0 and a target sequence INLINEFORM1 , the goal is to model the probability distribution, INLINEFORM2 .
+
+Semi-parametric NMT BIBREF19 , BIBREF15 approaches this learning problem with a different formulation, by modeling INLINEFORM0 instead, where INLINEFORM1 is the set of sentence pairs where the source sentence is a neighbor of INLINEFORM2 , retrieved from the training corpus using some similarity metric. This relies on a two step approach - the retrieval stage finds training instances, INLINEFORM3 , similar to the source sentence INLINEFORM4 , and the translation stage generates the target sequence INLINEFORM5 given INLINEFORM6 and INLINEFORM7 . We follow this setup, proposing improvements to both stages in order to enhance the applicability of semi-parametric NMT to more general translation tasks.
+
+## Retrieval Approaches
+
+Existing approaches have proposed using off the shelf search engines for the retrieval stage. However, our objective differs from traditional information retrieval, since the goal of retrieval in semi-parametric NMT is to find neighbors which might improve translation performance, which might not correlate with maximizing sentence similarity.
+
+Our baseline strategy relies on a sentence level similarity score, similar to those used for standard information retrieval tasks BIBREF24 . We compare this against finer-grained n-gram retrieval using the same similarity metric. We also propose a dense vector based n-gram retrieval strategy, using representations extracted from a pre-trained NMT model.
+
+Our baseline approach relies on a simple inverse document frequency (IDF) based similarity score. We define the IDF score of any token, INLINEFORM0 , as INLINEFORM1 , where INLINEFORM2 is the number of sentence pairs in training corpus and INLINEFORM3 is the number of sentences INLINEFORM4 occurs in. Let any two sentence pairs in the corpus be INLINEFORM5 and INLINEFORM6 . Then we define the similarity between INLINEFORM7 and INLINEFORM8 by, DISPLAYFORM0 
+
+For every sentence in the training, dev and test corpora, we find the INLINEFORM0 most similar training sentence pairs and provide them as context to NMT.
+
+Motivated by phrase based SMT, we retrieve neighbors which have high local, sub-sentence level overlap with the source sentence. We adapt our approach to retrieve n-grams instead of sentences. We note that the similarity metric defined above for sentences is equally applicable for n-gram retrieval.
+
+Let INLINEFORM0 be a sentence. Then the set of all possible n-grams of X, for a given INLINEFORM1 , can be defined as INLINEFORM2 (also including padding at the end). To reduce the number of n-grams used to represent every sentence, we define the reduced set of n-grams for X to be INLINEFORM3 .
+
+We represent every sentence by their reduced n-gram set. For every n-gram in INLINEFORM0 , we find the closest n-gram in the training set using the IDF similarity defined above. For each retrieved n-gram we find the corresponding sentence (In case an n-gram is present in multiple sentences, we choose one randomly). The set of neighbors of INLINEFORM1 is then the set of all sentences in the training corpus that contain an n-gram that maximizes the n-gram similarity with any n-gram in INLINEFORM2 .
+
+To capture phrases of different lengths we use multiple n-gram widths, INLINEFORM0 . In case a sentence has already been added to the retrieved set, we find the next most similar sentence to avoid having duplicates. The number of neighbors retrieved for each source sentence is proportional to its length.
+
+We also extend our n-gram retrieval strategy with dense vector based n-gram representations. The objective behind using a dense vector based approach is to incorporate information relevant to the translation task in the retrieval stage. We use a pre-trained Transformer Base BIBREF6 encoder trained on WMT to generate sub-word level dense representations for the sentence. The representation for each n-gram is now defined to be the mean of the representations of all its constituent sub-words. We use the INLINEFORM0 distance of n-gram representations as the retrieval criterion. Note that we use a sub-word level decomposition of sentences for dense retrieval, as compared to word-level for IDF based retrieval (i.e., n-grams are composed of sub-words instead of words).
+
+Following the approach described for IDF based n-gram retrieval, we use multiple values of INLINEFORM0 , and remove duplicate neighbors while creating the retrieved set.
+
+## NMT with Context Retrieval
+
+To incorporate the retrieved neighbors, INLINEFORM0 , within the NMT model, we first encode them using Transformer layers, as described in subsection UID12 . This encoded memory is then used within the decoder via an attention mechanism, as described in subsection UID15 .
+
+We now describe how each retrieved translation pair, INLINEFORM0 , is encoded. This architecture is illustrated in Figure FIGREF9 .
+
+We first encode the retrieved source, INLINEFORM0 , in a Transformer layer. Apart from self-attention, we incorporate information from the encoder representation of the current source, INLINEFORM1 , using decoder style cross-attention.
+
+The retrieved target, INLINEFORM0 , is encoded in a similar manner, attending the encoded representation of INLINEFORM1 generated in the previous step.
+
+The encoded representations for all targets, INLINEFORM0 , are then concatenated along the time axis to form the Conditional Source Target Memory (CSTM).
+
+We use gated multi-source attention to combine the context from the source encoder representations and the CSTM. This is similar to the gated attention employed by BIBREF17 . We use a Transformer based decoder that attends to both, the encoder outputs and the CSTM, in every cross-attention layer. The rest of the decoder architecture remains unchanged.
+
+Let the context vectors obtained by applying multi-head attention to the source and memory, with query INLINEFORM0 be INLINEFORM1 and INLINEFORM2 respectively. Then the gated context vector, INLINEFORM3 , is given by, DISPLAYFORM0 DISPLAYFORM1 
+
+where INLINEFORM0 is the scalar gating variable at time-step t, and INLINEFORM1 and INLINEFORM2 are learned parameters. These steps are illustrated in Figure FIGREF10 .
+
+## Data and Evaluation
+
+We compare the performance of a standard Transformer Base model and our semi-parametric NMT approach on an English-French translation task. We create a new heterogeneous dataset, constructed from a combination of the WMT training set (36M pairs), the IWSLT bilingual corpus (237k pairs), JRC-Acquis (797k pairs) and OpenSubtitles (33M pairs). For WMT, we use newstest 13 for validation and newstest 14 for test. For IWSLT, we use a combination of the test corpora from 2012-14 for validation and test 2015 for eval. For OpenSubtitles and JRC-Acquis, we create our own splits for validation and test, since no benchmark split is publicly available. After deduping, the JRC-Acquis test and validation set contain 6574 and 5121 sentence pairs respectively. The OpenSubtitles test and validation sets contain 3975 and 3488 pairs. For multi-domain training, the validation set is a concatenation of the four individual validation sets.
+
+All datasets are tokenized with the Moses tokenizer BIBREF25 and mixed without any sampling. We use a shared vocabulary Sentence-Piece Model BIBREF26 for sub-word tokenization, with a vocabulary size of 32000 tokens. We train each model for 1M steps, and choose the best checkpoint from the last 5 checkpoints based on validation performance. BLEU scores are computed with tokenized true-cased output and references with multi-bleu.perl from Moses.
+
+For IDF based sentence retrieval, for each sentence in the training, dev and test corpus, we use INLINEFORM0 neighbors per example during both, training and evaluation. For the N-Gram level retrieval strategies, we used INLINEFORM1 neighbors during training, and neighbors corresponding to all n-grams during decoding. This was meant to limit memory requirements and enable the model to fit on P100s during training. We used n-gram width, INLINEFORM2 , for both IDF and dense vector based n-gram retrieval approaches. For scalability reasons, we restricted the retrieval set to the in-domain training corpus, i.e. neighbors for all train, dev and test sentences in the JRC-Acquis corpus were retrieved from the JRC-Acquis training split, and similarly for the other datasets.
+
+## Hyper-parameters and Optimization
+
+For our baseline model we use the standard Transformer Base model BIBREF6 . For the semi-parametric model, all our hyper-parameters for attention (8 attention heads), model dimensions (512) and hidden dimensions (2048), including those used in the CSTM memory are equivalent to Transformer Base.
+
+The Transformer baselines are trained on 16 GPUs, with the learning rate, warm-up schedule and batching scheme described in BIBREF6 . The semi-parametric models were trained on 32 GPUs with each replica split over 2 GPUs, one to train the translation model and the other for computing the CSTM. We used a conservative learning rate schedule (3, 40K) BIBREF8 to train the semi-parametric models.
+
+We apply a dropout rate BIBREF27 of 0.1 to all inputs, residuals, attentions and ReLU connections in both models. We use Adam BIBREF28 to train all models, and apply label smoothing with an uncertainty of 0.1 BIBREF29 . In addition to the transformer layers, layer normalization BIBREF30 was applied to the output of the CSTM. All models are implemented in Tensorflow-Lingvo BIBREF31 .
+
+## Results
+
+We compare the test performance of a multi-domain Transformer Base and our semi-parametric model using dense vector based n-gram retrieval and CSTM in Table TABREF21 . Apart from significantly improving performance by more than 10 BLEU points on JRC-Acquis, 2-3 BLEU on OpenSubtitles and IWSLT, we notice a moderate gain of 0.5 BLEU points on WMT 14.
+
+## Comparison of retrieval strategies
+
+We compare the performance of all 3 retrieval strategies in Table TABREF21 . The semi-parametric model with sentence level retrieval out-performs the seq2seq model by a huge margin on JRC-Acquis and OpenSubtitles. A sample from the JRC-Acquis dataset where the semi-parametric approach improves significantly over the neural approach is included in Table TABREF22 . We notice that there is a lot of overlap between the source sentence and the retrieved source, resulting in the semi-parametric model copying large chunks from the retrieved target. However, its performance is noticeably worse on WMT and IWSLT. Based on a manual inspection of the retrieved candidates, we attribute these losses to retrieval failures. For broad domain datasets like WMT and IWSLT sentence retrieval fails to find good candidates.
+
+Switching to n-gram level retrieval brings the WMT performance close to the seq2seq approach, and IWSLT performance to 2 BLEU points above the baseline model. Representative examples from IWSLT and WMT where n-gram retrieval improves over sentence level retrieval can be seen in Tables TABREF24 and TABREF25 . Despite the majority of the retrieved neighbor having nothing in common with the source sentence, n-gram retrieval is able to find neighbors that contain local overlaps.
+
+Using dense n-gram retrieval allows us to move beyond lexical overlap and retrieve semantically similar n-grams even when the actual tokens are different. As a result, dense n-gram retrieval improves performance over all our models on all 4 datasets. An illustrative example from WMT is included in Table TABREF26 .
+
+## Memory Ablation Experiments
+
+We report the performance of the various memory ablations in Table TABREF27 . We first remove the retrieved sources, INLINEFORM0 , from the CSTM, resulting in an architecture where the encoding of a retrieved target, INLINEFORM1 , only incorporates information from the source INLINEFORM2 , represented by the row CTM in the table. This results in a clear drop in performance on all datasets. We ablate further by removing the attention to the original source INLINEFORM3 , resulting in a slightly smaller drop in performance (represented by TM). These experiments indicate that incorporating context from the sources significantly contributes to performance, by allowing the model to distinguish between relevant context and noise.
+
+## Non-Parametric Adaptation
+
+Using a semi-parametric formulation for MT opens up the possibility of non-parametric adaptation. The biggest advantage of this approach is the possibility of training a single massively customizable model which can be adapted to any new dataset or document at inference time, by just updating the retrieval dataset.
+
+We evaluate our model's performance on non-parametric adaptation and compare it against a fully fine-tuned model. In this setting, we train a baseline model and a dense n-gram based semi-parametric model on the WMT training corpus. We only retrieve and train on examples from the WMT corpus during training. We use the same hyper-parameters and training approaches used for the multi-domain experiments, as in Section SECREF3 .
+
+The baseline model is then fine-tuned independently on JRC-Acquis, OpenSubtitles and IWSLT. The semi-parametric model is adapted non-parametrically to these three datasets, without any parameter updates. Adaptation is achieved via the retrieval mechanism - while evaluating, we retrieve similar examples from their respective training datasets. To quantify headroom, we also fine-tune our semi-parametric model on each of these datasets.
+
+The results for non-parametric adaptation experiments are documented in Table TABREF30 . We notice that the non-parametric adaptation strategy significantly out-performs the base model on all 4 datasets. More importantly, the we find that our approach is capable of adapting to both, JRC-Acquis and OpenSubtitles, via just the retrieval apparatus, and out-performs the fully fine-tuned model indicating that non-parametric adaptation might be a reasonable approach when adapting to a lot of narrow domains or documents.
+
+In-domain fine-tuning on top of non-parametric adaptation further improves by 2 BLEU points on all datasets, increasing the gap even further with the seq2seq adapted models.
+
+## Related Work
+
+Tools incorporating information from individual translation pairs, or translation memories BIBREF32 , BIBREF33 , have been widely utilized by human translators in the industry. There have been a few efforts attempting to combine non-parametric methods with NMT BIBREF15 , BIBREF16 , BIBREF17 , but the key difference of our approach is the introduction of local, sub-sentence level similarity in the retrieval process, via n-gram level retrieval. Combined with our architectural improvements, motivated by the target encoder and gated attention from BIBREF17 and the extended transformer model from BIBREF34 , our semi-parametric NMT model is able to out-perform purely neural models in broad multi-domain settings.
+
+Some works have proposed using phrase tables or the outputs of Phrase based MT within NMT BIBREF19 , BIBREF35 , BIBREF36 . While this reduces the noise present within the retrieved translation pairs, it requires training and maintaining a separate SMT system which might introduce errors of its own.
+
+Another class of methods requires fine-tuning the entire NMT model to every instance at inference time, using retrieved examples BIBREF37 , BIBREF38 , but these approaches require running expensive gradient descent steps before every translation.
+
+Beyond NMT, there have been a few other attempts to incorporate non-parametric approaches into neural generative models BIBREF39 , BIBREF40 , BIBREF41 . This strong trend towards combining neural generative models with non-parametric methods is an attempt to counter the weaknesses of neural networks, especially their failure to remember information from individual training instances and the diversity problem of seq2seq models BIBREF42 , BIBREF43 .
+
+While our approach relies purely on retrieval from the training corpus, there has been quite a lot of work, especially on Question Answering, that attempts to find additional signals to perform the supervised task in the presence of external knowledge sources BIBREF44 , BIBREF45 . Retrieving information from unsupervised corpora by utilizing multilingual representations BIBREF46 might be another interesting extension of this work.
+
+## Conclusions and Future Work
+
+We make two major technical contributions in this work which enable us to improve the quality of semi-parametric NMT on broad domain datasets. First, we propose using n-gram retrieval, with standard Inverse Document Frequency similarity and with dense vector representations, that takes into account local sentence similarities that are critical to translation. As a result we are able to retrieve useful candidates even for broad domain tasks with little train-test overlap. Second, we propose a novel architecture to encode retrieved source-target pairs, allowing the model to distinguish useful information from noise by encoding the retrieved targets in context of the current translation task.
+
+We demonstrate, for the first time, that semi-parametric methods can beat neural models by significant margins on multi-domain Machine Translation. By successfully training semi-parametric neural models on a broad domain dataset (WMT), we also open the door for non-parametric adaptation, showing huge improvements on new domains without any parameter updates.
+
+While we constrain this work to retrieved context, our architecture can be utilized to incorporate information from other sources of context, including documents, bilingual dictionaries etc. Using dense representations for retrieval also allows extending semi-parametric neural methods to other input modalities, including images and speech.
+
+With this work, we hope to motivate further investigation into semi-parametric neural models for and beyond Neural Machine Translation.
+
+## Acknowledgments
+
+We would like to thank Naveen Arivazhagan, Macduff Hughes, Dmitry Lepikhin, Mia Chen, Yuan Cao, Ciprian Chelba, Zhifeng Chen, Melvin Johnson and other members of the Google Brain and Google Translate teams for their useful inputs and discussions. We would also like to thank the entire Lingvo development team for their foundational contributions to this project.

@@ -133,3 +133,43 @@ public sealed record AggregateResult(
     int TotalMatches,
     ImmutableArray<FileMatchCount> MatchesByFile
 );
+
+/// <summary>
+/// Result for a single pattern in a multi-pattern search.
+/// </summary>
+/// <param name="Pattern">The regex pattern that was searched.</param>
+/// <param name="MatchCount">Total matches for this pattern.</param>
+/// <param name="MatchingFileCount">Number of files that matched this pattern.</param>
+public sealed record PatternMatchInfo(
+    string Pattern,
+    int MatchCount,
+    int MatchingFileCount
+);
+
+/// <summary>
+/// Per-file breakdown showing which patterns matched in each file.
+/// </summary>
+/// <param name="Path">Relative path to the file.</param>
+/// <param name="MatchedPatternIndices">Indices of patterns that matched in this file.</param>
+/// <param name="TotalMatches">Total match count across all patterns in this file.</param>
+public sealed record FilePatternMatches(
+    string Path,
+    ImmutableArray<int> MatchedPatternIndices,
+    int TotalMatches
+);
+
+/// <summary>
+/// Result of a multi-pattern search across files.
+/// </summary>
+/// <param name="FilesSearched">Total number of files searched.</param>
+/// <param name="CombineMode">How results were combined: 'union' or 'intersection'.</param>
+/// <param name="PatternResults">Per-pattern match statistics.</param>
+/// <param name="MatchingFiles">Files matching according to the combine mode.</param>
+/// <param name="FileBreakdown">Detailed breakdown of which patterns matched in each file.</param>
+public sealed record MultiPatternResult(
+    int FilesSearched,
+    string CombineMode,
+    ImmutableArray<PatternMatchInfo> PatternResults,
+    ImmutableArray<string> MatchingFiles,
+    ImmutableArray<FilePatternMatches> FileBreakdown
+);

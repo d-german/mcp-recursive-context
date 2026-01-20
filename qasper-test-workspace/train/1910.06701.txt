@@ -1,0 +1,243 @@
+# NumNet: Machine Reading Comprehension with Numerical Reasoning
+
+**Paper ID:** 1910.06701
+
+## Abstract
+
+Numerical reasoning, such as addition, subtraction, sorting and counting is a critical skill in human's reading comprehension, which has not been well considered in existing machine reading comprehension (MRC) systems. To address this issue, we propose a numerical MRC model named as NumNet, which utilizes a numerically-aware graph neural network to consider the comparing information and performs numerical reasoning over numbers in the question and passage. Our system achieves an EM-score of 64.56% on the DROP dataset, outperforming all existing machine reading comprehension models by considering the numerical relations among numbers.
+
+## Introduction
+
+Machine reading comprehension (MRC) aims to infer the answer to a question given the document. In recent years, researchers have proposed lots of MRC models BIBREF0, BIBREF1, BIBREF2, BIBREF3 and these models have achieved remarkable results in various public benchmarks such as SQuAD BIBREF4 and RACE BIBREF5. The success of these models is due to two reasons: (1) Multi-layer architectures which allow these models to read the document and the question iteratively for reasoning; (2) Attention mechanisms which would enable these models to focus on the part related to the question in the document.
+
+However, most of existing MRC models are still weak in numerical reasoning such as addition, subtraction, sorting and counting BIBREF6, which are naturally required when reading financial news, scientific articles, etc. BIBREF6 proposed a numerically-aware QANet (NAQANet) model, which divides the answer generation for numerical MRC into three types: (1) extracting spans; (2) counting; (3) addition or subtraction over numbers. NAQANet makes a pioneering attempt to answer numerical questions but still does not explicitly consider numerical reasoning.
+
+To tackle this problem, we introduce a novel model NumNet that integrates numerical reasoning into existing MRC models. A key problem to answer questions requiring numerical reasoning is how to perform numerical comparison in MRC systems, which is crucial for two common types of questions:
+
+(1) Numerical Comparison: The answers of the questions can be directly obtained via performing numerical comparison, such as sorting and comparison, in the documents. For example, in Table TABREF1, for the first question, if the MRC system knows the fact that “$49>47>36>31>22$”, it could easily extract that the second longest field goal is 47-yard.
+
+(2) Numerical Condition: The answers of the questions cannot be directly obtained through simple numerical comparison in the documents, but often require numerical comparison for understanding the text. For example, for the second question in Table TABREF1, an MRC system needs to know which age group made up more than 7% of the population to count the group number.
+
+Hence, our NumNet model considers numerical comparing information among numbers when answering numerical questions. As shown in Figure FIGREF3, NumNet first encodes both the question and passages through an encoding module consisting of convolution layers, self-attention layers and feed-forward layers as well as a passage-question attention layer. After that, we feed the question and passage representations into a numerically-aware graph neural network (NumGNN) to further integrate the comparison information among numbers into their representations. Finally, we utilize the numerically-aware representation of passages to infer the answer to the question.
+
+The experimental results on a public numerical MRC dataset DROP BIBREF6 show that our NumNet model achieves significant and consistent improvement as compared to all baseline methods by explicitly performing numerical reasoning over numbers in the question and passage. In particular, we show that our model could effectively deal with questions requiring sorting with multi-layer NumGNN. The source code of our paper is available at https://github.com/ranqiu92/NumNet.
+
+## Related Work ::: Machine Reading Comprehension
+
+Machine reading comprehension (MRC) has become an important research area in NLP. In recent years, researchers have published a large number of annotated MRC datasets such as CNN/Daily Mail BIBREF7, SQuAD BIBREF4, RACE BIBREF5, TriviaQA BIBREF8 and so on. With the blooming of available large-scale MRC datasets, a great number of neural network-based MRC models have been proposed to answer questions for a given document including Attentive Reader BIBREF9, BiDAF BIBREF3, Interactive AoA Reader BIBREF2, Gated Attention Reader BIBREF1, R-Net BIBREF10, DCN BIBREF11, QANet BIBREF12, and achieve promising results in most existing public MRC datasets.
+
+Despite the success of neural network-based MRC models, researchers began to analyze the data and rethink to what extent we have solved the problem of MRC. Some works BIBREF0, BIBREF13, BIBREF14 classify the reasoning skills required to answer the questions into the following types: (1) Exact matching/Paraphrasing; (2) Summary; (3) Logic reasoning; (4) Utilizing external knowledge; (5) Numerical reasoning. They found that most existing MRC models are focusing on dealing with the first three types of questions. However, all these models suffer from problems when answering the questions requiring numerical reasoning. To the best of our knowledge, our work is the first one that explicitly incorporates numerical reasoning into the MRC system. The most relevant work to ours is NAQANet BIBREF6, which adapts the output layer of QANet BIBREF12 to support predicting answers based on counting and addition/subtraction over numbers. However, it does not consider numerical reasoning explicitly during encoding or inference.
+
+## Related Work ::: Arithmetic Word Problem Solving
+
+Recently, understanding and solving arithmetic word problems (AWP) has attracted the growing interest of NLP researchers. BIBREF15 proposed a simple method to address arithmetic word problems, but mostly focusing on subsets of problems which only require addition and subtraction. After that, BIBREF16 proposed an algorithmic approach which could handle arithmetic word problems with multiple steps and operations. BIBREF17 further formalized the AWP problem as that of generating and scoring equation trees via integer linear programming. BIBREF18 and BIBREF19 proposed sequence to sequence solvers for the AWP problems, which are capable of generating unseen expressions and do not rely on sophisticated manual features. BIBREF20 leveraged deep Q-network to solve the AWP problems, achieving a good balance between effectiveness and efficiency. However, all the existing AWP systems are only trained and validated on small benchmark datasets. BIBREF21 found that the performance of these AWP systems sharply degrades on larger datasets. Moreover, from the perspective of NLP, MRC problems are more challenging than AWP since the passages in MRC are mostly real-world texts which require more complex skills to be understood. Above all, it is nontrivial to adapt most existing AWP models to the MRC scenario. Therefore, we focus on enhancing MRC models with numerical reasoning abilities in this work.
+
+## Methodology
+
+In this section, we will introduce the framework of our model NumNet and provide the details of the proposed numerically-aware graph neural network (NumGNN) for numerical reasoning.
+
+## Methodology ::: Framework
+
+An overview of our model NumNet is shown in Figure FIGREF3. We compose our model with encoding module, reasoning module and prediction module. Our major contribution is the reasoning module, which leverages a NumGNN between the encoding module and prediction module to explicitly consider the numerical comparison information and perform numerical reasoning. As NAQANet has been shown effective for handling numerical MRC problem BIBREF6, we leverage it as our base model and mainly focus on the design and integration of the NumGNN in this work.
+
+## Methodology ::: Framework ::: Encoding Module
+
+Without loss of generality, we use the encoding components of QANet and NAQANet to encode the question and passage into vector-space representations. Formally, the question $Q$ and passage $P$ are first encoded as:
+
+and then the passage-aware question representation and the question-aware passage representation are computed as:
+
+where $\texttt {QANet-Emb-Enc}(\cdot )$ and $\texttt {QANet-Att}(\cdot )$ denote the “stacked embedding encoder layer” and “context-query attention layer” of QANet respectively. The former consists of convolution, self-attention and feed-forward layers. The latter is a passage-question attention layer. $\bar{\mathbf {Q}}$ and $\bar{\mathbf {P}}$ are used by the following components.
+
+## Methodology ::: Framework ::: Reasoning Module
+
+First we build a heterogeneous directed graph $\mathcal {G}=(\mathbf {V};\mathbf {E})$, whose nodes ($\mathbf {V}$) are corresponding to the numbers in the question and passage, and edges ($\mathbf {E}$) are used to encode numerical relationships among the numbers. The details will be explained in Sec. SECREF19.
+
+Then we perform reasoning on the graph based on a graph neural network, which can be formally denoted as:
+
+where $\mathbf {W}^M$ is a shared weight matrix, $\mathbf {U}$ is the representations of the nodes corresponding to the numbers, $\texttt {QANet-Mod-Enc}(\cdot )$ is the “model encoder layer” defined in QANet which is similar to $\texttt {QANet-Emb-Enc}(\cdot )$, and the definition of $\texttt {Reasoning}(\cdot )$ will be given in Sec. SECREF23.
+
+Finally, as $\mathbf {U}$ only contains the representations of numbers, to tackle span-style answers containing non-numerical words, we concatenate $\mathbf {U}$ with $\mathbf {M}^P$ to produce numerically-aware passage representation $\mathbf {M}_0$. Formally,
+
+where $[\cdot ;\cdot ]$ denotes matrix concatenation, $\mathbf {W}[k]$ denotes the $k$-th column of a matrix $\mathbf {W}$, $\mathbf {0}$ is a zero vector, $I(i)$ denotes the node index corresponding to the passage word $w_i^p$ which is a number, $\mathbf {W}_0$ is a weight matrix, and $\mathbf {b}_0$ is a bias vector.
+
+## Methodology ::: Framework ::: Prediction Module
+
+Following NAQANet BIBREF6, we divide the answers into four types and use a unique output layer to calculate the conditional answer probability $\Pr (\text{answer}|\text{type})$ for each type :
+
+Passage span: The answer is a span of the passage, and the answer probability is defined as the product of the probabilities of the start and end positions.
+
+Question span: The answer is a span of the question, and the answer probability is also defined as the product of the probabilities of the start and end positions.
+
+Count: The answer is obtained by counting, and it is treated as a multi-class classification problem over ten numbers (0-9), which covers most of the Count type answers in the DROP dataset.
+
+Arithmetic expression: The answer is the result of an arithmetic expression. The expression is obtained in three steps: (1) extract all numbers from the passage; (2) assign a sign (plus, minus or zero) for each number; (3) sum the signed numbers .
+
+Meanwhile, an extra output layer is also used to predict the probability $\Pr (\text{type})$ of each answer type. At training time, the final answer probability is defined as the joint probability over all feasible answer types, i.e., $\sum _{\text{type}}\Pr (\text{type})\Pr (\text{answer}|\text{type})$. Here, the answer type annotation is not required and the probability $\Pr (\text{type})$ is learnt by the model. At test time, the model first selects the most probable answer type greedily and then predicts the best answer accordingly.
+
+Without loss of generality, we leverage the definition of the five output layers in BIBREF6, with $\mathbf {M_0}$ and $\mathbf {Q}$ as inputs. Please refer to the paper for more details due to space limitation.
+
+## Methodology ::: Framework ::: Comparison with NAQANet
+
+The major difference between our model and NAQANet is that NAQANet does not have the reasoning module, i.e., $\mathbf {M}_0$ is simply set as $\mathbf {M}^P$. As a result, numbers are treated as common words in NAQANet except in the prediction module, thus NAQANet may struggle to learn the numerical relationships between numbers, and potentially cannot well generalize to unseen numbers. However, as discussed in Sec. SECREF1, the numerical comparison is essential for answering questions requiring numerical reasoning. In our model, the numerical relationships are explicitly represented with the topology of the graph and a NumGNN is used to perform numerical reasoning. Therefore, our NumNet model can handle questions requiring numerical reasoning more effectively, which is verified by the experiments in Sec. SECREF4.
+
+## Methodology ::: Numerically-aware Graph Construction
+
+We regard all numbers from the question and passage as nodes in the graph for reasoning . The set of nodes corresponding to the numbers occurring in question and passage are denoted as $\mathbf {V}^Q$ and $\mathbf {V}^P$ respectively. And we denote all the nodes as $\mathbf {V}=\mathbf {V}^Q\cup \mathbf {V}^P$, and the number corresponding to a node $v\in \mathbf {V}$ as $n(v)$.
+
+Two sets of edges are considered in this work:
+
+Greater Relation Edge ($\overrightarrow{\mathbf {E}}$): For two nodes $v_i, v_j\in \mathbf {V}$, a directed edge $\overrightarrow{e}_{ij}=(v_i, v_j)$ pointing from $v_i$ to $v_j$ will be added to the graph if $n(v_i)>n(v_j)$, which is denoted as solid arrow in Figure FIGREF3.
+
+Lower or Equal Relation Edge ($\overleftarrow{\mathbf {E}}$): For two nodes $v_i, v_j\in \mathbf {V}$, a directed edge $\overleftarrow{e}_{ij}=(v_j, v_i)$ will be added to the graph if $n(v_i)\le n(v_j)$, which is denoted as dashed arrow in Figure FIGREF3.
+
+Theoretically, $\overrightarrow{\mathbf {E}}$ and $\overleftarrow{\mathbf {E}}$ are complement to each other . However, as a number may occur several times and represent different facts in a document, we add a distinct node for each occurrence in the graph to prevent potential ambiguity. Therefore, it is more reasonable to use both $\overrightarrow{\mathbf {E}}$ and $\overleftarrow{\mathbf {E}}$ in order to encode the equal information among nodes.
+
+## Methodology ::: Numerical Reasoning
+
+As we built the graph $\mathcal {G}=(\mathbf {V},\mathbf {E})$, we leverage NumGNN to perform reasoning, which is corresponding to the function $\texttt {Reasoning}(\cdot )$ in Eq. DISPLAY_FORM10. The reasoning process is as follows:
+
+## Methodology ::: Numerical Reasoning ::: Initialization
+
+For each node $v^P_i\in \mathbf {V}^P$, its representation is initialized as the corresponding column vector of $\mathbf {M}^P$. Formally, the initial representation is $\mathbf {v}_i^P=\mathbf {M}^P[I^P(v_i^P)]$, where $I^P(v^P_i)$ denotes the word index corresponding to $v_i^P$. Similarly, the initial representation $\mathbf {v}_j^Q$ for a node $v^Q_j\in \mathbf {V}^Q$ is set as the corresponding column vector of $\mathbf {M}^Q$. We denote all the initial node representations as $\mathbf {v}^0=\lbrace \mathbf {v}_i^P\rbrace \cup \lbrace \mathbf {v}_j^Q\rbrace $.
+
+## Methodology ::: Numerical Reasoning ::: One-step Reasoning
+
+Given the graph $\mathcal {G}$ and the node representations $\mathbf {v}$, we use a GNN to perform reasoning in three steps:
+
+(1) Node Relatedness Measure: As only a few numbers are relevant for answering a question generally, we compute a weight for each node to by-pass irrelevant numbers in reasoning. Formally, the weight for node $v_i$ is computed as:
+
+where $\mathbf {W}_v$ is a weight matrix, and $b_v$ is a bias.
+
+(2) Message Propagation: As the role a number plays in reasoning is not only decided by itself, but also related to the context, we propagate messages from each node to its neighbors to help to perform reasoning. As numbers in question and passage may play different roles in reasoning and edges corresponding to different numerical relations should be distinguished, we use relation-specific transform matrices in the message propagation. Formally, we define the following propagation function for calculating the forward-pass update of a node:
+
+where $\widetilde{\mathbf {v}}^{\prime }_i$ is the message representation of node $v_i$, $\texttt {r}_{ji}$ is the relation assigned to edge $e_{ji}$, $\mathbf {W}^{\texttt {r}_{ji}}$ are relation-specific transform matrices, and $\mathcal {N}_i=\lbrace j|(v_j,v_i)\in \mathbf {E}\rbrace $ is the neighbors of node $v_i$.
+
+For each edge $e_{ji}$, $\texttt {r}_{ji}$ is determined by the following two attributes:
+
+Number relation: $>$ or $\le $;
+
+Node types: the two nodes of the edge corresponding to two numbers that: (1) both from the question ($\text{q-q}$); (2) both from the passage ($\text{p-p}$); (3) from the question and the passage respectively ($\text{q-p}$); (4) from the passage and the question respectively ($\text{p-q}$).
+
+Formally, $\texttt {r}_{ij}\in \lbrace >,\le \rbrace \times \lbrace \text{q-q},\text{p-p},\text{q-p},\text{p-q}\rbrace $.
+
+(3) Node Representation Update: As the message representation obtained in the previous step only contains information from the neighbors, it needs to be fused with the node representation to combine with the information carried by the node itself, which is performed as:
+
+where $\mathbf {W}_f$ is a weight matrix, and $\mathbf {b}_f$ is a bias vector.
+
+We denote the entire one-step reasoning process (Eq. DISPLAY_FORM26-DISPLAY_FORM30) as a single function
+
+As the graph $\mathcal {G}$ constructed in Sec. SECREF19 has encoded the numerical relations via its topology, the reasoning process is numerically-aware.
+
+## Methodology ::: Numerical Reasoning ::: Multi-step Reasoning
+
+By single-step reasoning, we can only infer relations between adjacent nodes. However, relations between multiple nodes may be required for certain tasks, e.g., sorting. Therefore, it is essential to perform multi-step reasoning, which can be done as follows：
+
+where $t\ge 1$. Suppose we perform $K$ steps of reasoning, $\mathbf {v}^K$ is used as $\mathbf {U}$ in Eq. DISPLAY_FORM10.
+
+## Experiments ::: Dataset and Evaluation Metrics
+
+We evaluate our proposed model on DROP dataset BIBREF6, which is a public numerical MRC dataset. The DROP dataset is constructed by crowd-sourcing, which asks the annotators to generate question-answer pairs according to the given Wikipedia passages, which require numerical reasoning such as addition, counting, or sorting over numbers in the passages. There are $77,409$ training samples, $9,536$ development samples and $9,622$ testing samples in the dataset.
+
+In this paper, we adopt two metrics including Exact Match (EM) and numerically-focused F1 scores to evaluate our model following BIBREF6. The numerically-focused F1 is set to be 0 when the predicted answer is mismatched for those questions with the numeric golden answer.
+
+## Experiments ::: Baselines
+
+For comparison, we select several public models as baselines including semantic parsing models:
+
+[topsep=2pt, itemsep=0pt]
+
+Syn Dep BIBREF6, the neural semantic parsing model (KDG) BIBREF22 with Stanford dependencies based sentence representations;
+
+OpenIE BIBREF6, KDG with open information extraction based sentence representations;
+
+SRL BIBREF6, KDG with semantic role labeling based sentence representations;
+
+and traditional MRC models:
+
+[topsep=2pt, itemsep=0pt]
+
+BiDAF BIBREF3, an MRC model which utilizes a bi-directional attention flow network to encode the question and passage;
+
+QANet BIBREF12, which utilizes convolutions and self-attentions as the building blocks of encoders to represent the question and passage;
+
+BERT BIBREF23, a pre-trained bidirectional Transformer-based language model which achieves state-of-the-art performance on lots of public MRC datasets recently;
+
+and numerical MRC models:
+
+[topsep=2pt, itemsep=0pt]
+
+NAQANet BIBREF6, a numerical version of QANet model.
+
+NAQANet+, an enhanced version of NAQANet implemented by ourselves, which further considers real number (e.g. “2.5”), richer arithmetic expression, data augmentation, etc. The enhancements are also used in our NumNet model and the details are given in the Appendix.
+
+## Experiments ::: Experimental Settings
+
+In this paper, we tune our model on the development set and use a grid search to determine the optimal parameters. The dimensions of all the representations (e.g., $\mathbf {Q}$, $\mathbf {P}$, $\mathbf {M}^Q$, $\mathbf {M}^P$, $\mathbf {U}$, $\mathbf {M}_0^{\prime }$, $\mathbf {M}_0$ and $\mathbf {v}$) are set to 128. If not specified, the reasoning step $K$ is set to 3. Since other parameters have little effect on the results, we simply follow the settings used in BIBREF6.
+
+We use the Adam optimizer BIBREF24 with $\beta _1=0.8$, $\beta _2=0.999$, $\epsilon =10^{-7}$ to minimize the objective function. The learning rate is $5 \times 10^{-4}$, L2 weight decay $\lambda $ is $10^{-7}$ and the maximum norm value of gradient clipping is 5. We also apply exponential moving average with a decay rate $0.9999$ on all trainable variables. The model is trained with a batch size of 16 for 40 epochs. Passages and questions are trimmed to 400 and 50 tokens respectively during training, and trimmed to $1,000$ and 100 tokens respectively during prediction .
+
+## Experiments ::: Overall Results
+
+The performance of our NumNet model and other baselines on DROP dataset are shown in Table TABREF47. From the results, we can observe that:
+
+(1) Our NumNet model achieves better results on both the development and testing sets on DROP dataset as compared to semantic parsing-based models, traditional MRC models and even numerical MRC models NAQANet and NAQANet+. The reason is that our NumNet model can make full use of the numerical comparison information over numbers in both question and passage via the proposed NumGNN module.
+
+(2) Our implemented NAQANet+ has a much better performance compared to the original version of NAQANet. It verifies the effectiveness of our proposed enhancements for baseline.
+
+## Experiments ::: Effect of GNN Structure
+
+In this part, we investigate the effect of different GNN structures on the DROP development set. The results are shown in Table TABREF51. The “Comparison”, “Number” and “ALL” are corresponding to the comparing question subset , the number-type answer subset, and the entire development set, respectively . If we replace the proposed numerically-aware graph (Sec. SECREF19) with a fully connected graph, our model fallbacks to a traditional GNN, denoted as “GNN” in the table. Moreover, “- question num” denotes the numbers in the question is not included in the graph, and “- $\le $ type edge” and “- $>$ type edge” denote edges of $\le $ and $>$ types are not adopted respectively.
+
+As shown in Table TABREF51, our proposed NumGNN leads to statistically significant improvements compared to traditional GNN on both EM and F1 scores especially for comparing questions. It indicates that considering the comparing information over numbers could effectively help the numerical reasoning for comparing questions. Moreover, we find that the numbers in the question are often related to the numerical reasoning for answering the question, thus considering numbers in questions in NumGNN achieves better performance. And the results also justify that encoding “greater relation” and “lower or equal relation” simultaneously in the graph also benefits our model.
+
+## Experiments ::: Effect of GNN Layer Number
+
+The number of NumGNN layers represents the numerical reasoning ability of our models. A $K$-layer version has the ability for $K$-step numerical inference. In this part, we additionally perform experiments to understand the values of the numbers of NumGNN layers. From Figure FIGREF52, we could observe that:
+
+(1) The 2-layer version of NumNet achieves the best performance for the comparing questions. From careful analysis, we find that most comparing questions only require at most 2-step reasoning (e.g., “Who was the second oldest player in the MLB, Clemens or Franco?”), and therefore the 3-layer version of NumNet is more complex but brings no gains for these questions.
+
+(2) The performance of our NumNet model on the overall development set is improved consistently as the number of GNN layers increases. The reason is that some of the numerical questions require reasoning over many numbers in the passage, which could benefit from the multi-step reasoning ability of multi-layer GNN. However, further investigation shows that the performance gain is not stable when $K\ge 4$. We believe it is due to the intrinsic over smoothing problem of GNNs BIBREF25.
+
+## Experiments ::: Case Study
+
+We further give some examples to show why incorporating comparing information over numbers in the passage could help numerical reasoning in MRC in Table TABREF53. For the first case, we observe that NAQANet+ gives a wrong prediction, and we find that NAQANet+ will give the same prediction for the question “Which age group is smaller: under the age of 18 or 18 and 24?”. The reason is that NAQANet+ cannot distinguish which one is larger for $10.1\%$ and $56.2\%$. For the second case, NAQANet+ cannot recognize the second longest field goal is 22-yard and also gives a wrong prediction. For these two cases, our NumNet model could give the correct answer through the numeric reasoning, which indicates the effectiveness of our NumNet model.
+
+## Experiments ::: Error Analysis
+
+To investigate how well our NumNet model handles sorting/comparison questions and better understand the remaining challenges, we perform an error analysis on a random sample of NumNet predictions. We find that:
+
+(1) Our NumNet model can answer about 76% of sorting/comparison questions correctly, which indicates that our NumNet model has achieved numerical reasoning ability to some extend.
+
+(2) Among the incorrectly answered sorting/comparison questions, the most ones (26%) are those whose golden answers are multiple nonadjacent spans (row 1 in Table TABREF54), and the second most ones (19%) are those involving comparison with an intermediate number that does not literally occur in the document/question but has to be derived from counting or arithmetic operation (row 1 in Table TABREF54).
+
+## Experiments ::: Discussion
+
+By combining the numerically-aware graph and the NumGNN together, our NumNet model achieves the numerical reasoning ability. On one hand, the numerically-aware graph encodes numbers as nodes and relationships between them as the edges, which is required for numerical comparison. On the other hand, through one-step reasoning, our NumGNN could perform comparison and identify the numerical condition. After multiple-step reasoning, our NumGNN could further perform sorting.
+
+However, since the numerically-aware graph is pre-defined, our NumNet is not applicable to the case where an intermediate number has to be derived (e.g., from arithmetic operation) in the reasoning process, which is a major limitation of our model.
+
+## Conclusion and Future Work
+
+Numerical reasoning skills such as addition, subtraction, sorting and counting are naturally required by machine reading comprehension (MRC) problems in practice. Nevertheless, these skills are not taken into account explicitly for most existing MRC models. In this work, we propose a numerical MRC model named NumNet which performs explicit numerical reasoning while reading the passages. To be specific, NumNet encodes the numerical relations among numbers in the question and passage into a graph as its topology, and leverages a numerically-aware graph neural network to perform numerical reasoning on the graph. Our NumNet model outperforms strong baselines with a large margin on the DROP dataset. In the future, we will explore the following directions: (1)As we use a pre-defined reasoning graph in our model, it is incapable of handling reasoning process which involves intermediate numbers that not presented in the graph. How to incorporate dynamic graph into our model is an interesting problem. (2) Compared with methods proposed for arithmetic word problems (AWPs), our model has better natural language understanding ability. However, the methods for AWPs can handle much richer arithmetic expressions. Therefore, how to combine both of their abilities to develop a more powerful numerical MRC model is an interesting future direction. (3) Symbolic reasoning plays a crucial role in human reading comprehension. Our work integrates numerical reasoning, which is a special case of symbolic reasoning, into traditional MRC systems. How to incorporate more sophisticated symbolic reasoning abilities into MRC systems is also a valuable future direction.
+
+## Acknowledgments
+
+We would like to thank all anonymous reviewers for their insightful comments, and thank Yan Zhang for her help on improving the presentation of Figure FIGREF3.
+
+## Appendix: Baseline Enhancements
+
+The major enhancements leveraged by our implemented NAQANet+ model include:
+
+(1) “real number”: Unlike NAQANet only considers integer numbers, we also consider real numbers.
+
+(2) “richer arithmetic expression”: We conceptually append an extra number “100” to the passage to support arithmetic expressions like “100-25”, which is required for answering questions such as “How many percent were not American?”.
+
+(3) “passage-preferred”: If an answer is both a span of the question and the passage, we only propagate gradients through the output layer for processing “Passage span” type answers.
+
+(4) “data augmentation”: The original questions in the DROP dataset are generated by crowdsourced workers. For the comparing questions which contain answer candidates, we observe that the workers frequently only change the incorrect answer candidate to generate a new question. For example, “How many from the census is bigger: Germans or English?” whose golden answer is “Germans” is modified to “How many from the census is bigger: Germans or Irish?”. This may introduce undesired inductive bias to the model. Therefore, we propose to augment the training dataset with new questions automatically generated by swapping the candidate answers, e.g., “How many from the census is bigger: English or Germans?” is added to the training dataset.
+
+We further conduct ablation studies on the enhancements. And the validation scores on the development set are shown in Table TABREF59. As can be seen from Table TABREF59:
+
+(1) The uses of real number and richer arithmetic expression are crucial for answering numerical questions: both EM and F1 drop drastically by up to $15-21$ points if they are removed.
+
+(2) The passage-preferred strategy and data augmentation are also necessary components that contribute significant improvements for those comparing questions.

@@ -1,0 +1,85 @@
+# Measuring Social Bias in Knowledge Graph Embeddings
+
+**Paper ID:** 1912.02761
+
+## Abstract
+
+It has recently been shown that word embeddings encode social biases, with a harmful impact on downstream tasks. However, to this point there has been no similar work done in the field of graph embeddings. We present the first study on social bias in knowledge graph embeddings, and propose a new metric suitable for measuring such bias. We conduct experiments on Wikidata and Freebase, and show that, as with word embeddings, harmful social biases related to professions are encoded in the embeddings with respect to gender, religion, ethnicity and nationality. For example, graph embeddings encode the information that men are more likely to be bankers, and women more likely to be homekeepers. As graph embeddings become increasingly utilized, we suggest that it is important the existence of such biases are understood and steps taken to mitigate their impact.
+
+## Introduction
+
+Recent work in the word embeddings literature has shown that embeddings encode gender and racial biases, BIBREF0, BIBREF1, BIBREF2. These biases can have harmful effects in downstream tasks including coreference resolution, BIBREF3 and machine translation, BIBREF4, leading to the development of a range of methods to try to mitigate such biases, BIBREF0, BIBREF5. In an adjacent literature, learning embeddings of knowledge graph (KG) entities and relations is becoming an increasingly common first step in utilizing KGs for a range of tasks, from missing link prediction, BIBREF6, BIBREF7, to more recent methods integrating learned embeddings into language models, BIBREF8, BIBREF9, BIBREF10.
+
+A natural question to ask is “do graph embeddings encode social biases in similar fashion to word embeddings". We show that existing methods for identifying bias in word embeddings are not suitable for KG embeddings, and present an approach to overcome this using embedding finetuning. We demonstrate (perhaps unsurprisingly) that unequal distributions of people of different genders, ethnicities, religions and nationalities in Freebase and Wikidata result in biases related to professions being encoded in graph embeddings, such as that men are more likely to be bankers and women more likely to be homekeepers.
+
+Such biases are potentially harmful when KG embeddings are used in applications. For example, if embeddings are used in a fact checking task, they would make it less likely that we accept facts that a female entity is a politician as opposed to a male entity. Alternatively, as KG embeddings get utilized as input to language models BIBREF8, BIBREF9, BIBREF10, such biases can affect all downstream NLP tasks.
+
+## Method ::: Graph Embeddings
+
+Graph embeddings are a vector representation of dimension $d$ of all entities and relations in a KG. To learn these representations, we define a score function $g(.)$ which takes as input the embeddings of a fact in triple form and outputs a score, denoting how likely this triple is to be correct.
+
+where $E_{1/2}$ are the dimension $d$ embeddings of entities 1/2, and $R_1$ is the dimension $d$ embedding of relation 1. The score function is composed of a transformation, which takes as input one entity embedding and the relation embedding and outputs a vector of the same dimension, and a similarity function, which calculates the similarity or distance between the output of the transformation function and the other entity embedding.
+
+Many transformation functions have been proposed, including TransE BIBREF6, ComplEx BIBREF7 and RotatE BIBREF11. In this paper we use the TransE function and the dot product similarity metric, though emphasize that our approach is applicable to any score function:
+
+We use embeddings of dimension 200, and sample 1000 negative triples per positive, by randomly permuting the lhs or rhs entity. We pass the 1000 negatives and single positive through a softmax function, and train using the cross entropy loss. All training is implemented using the PyTorch-BigGraph library BIBREF12.
+
+## Method ::: Defining bias in embeddings
+
+Bias can be thought of as “prejudice in favor or against a person, group, or thing that is considered to be unfair" BIBREF13. Because definitions of fairness have changed over time, algorithms which are trained on “real-world" data may pick up associations which existed historically (or still exist), but which are considered undesirable. In the word embedding literature, one common idea is to analyse relationships which embeddings encode between professions and gender, race, ethnicity or nationality. We follow this approach in this paper, though note that our method is equally applicable to measuring the encoded relationship between any set of entities in a KG..
+
+## Method ::: Measuring bias in word embeddings
+
+The first common technique for exposing bias in word embeddings, the “Word Embedding Association Test" BIBREF1, measures the cosine distance between embeddings and the average embeddings of sets of attribute words (e.g. male vs. female). They give a range of examples of biases according to this metric, including that science related words are more associated with “male", and art related words with “female". In a similar vein, in BIBREF0, the authors use the direction between vectors to expose stereotypical analogies, claiming that the direction between man::doctor is analogous to that of woman::nurse. Despite BIBREF14 exposing some technical shortcomings in this approach, it remains the case that distance metrics appear to be appropriate in at least exposing bias in word embeddings, which has then been shown to clearly propagate to downstream tasks, BIBREF3, BIBREF4.
+
+We suggest that distance-based metrics are not suitable for measuring bias in KG embeddings. Figure FIGREF7 provides a simple demonstration of this. Visualizing in a two dimensional space, the embedding of person1 is closer to nurse than to doctor. However, graph embedding models do not use distance between two entity embeddings when making predictions, but rather the distance between some transformation of one entity embedding with the relation embedding.
+
+In the simplest case of TransE BIBREF6 this transformation is a summation, which could result in a vector positioned at the yellow dot in Figure FIGREF7, when making a prediction of the profession of person1. As the transformation function becomes more complicated, BIBREF7, BIBREF11 etc., the distance metric becomes increasingly less applicable, as associations in the distance space become less and less correlated with associations in the score function space.
+
+## Method ::: Score based metric
+
+In light of this, we present an alternative metric based on the score function. We define the sensitive attribute we are interested in, denoted $S$, and two alternative values of this attribute, denoted $A$ and $B$. For the purposes of this example we use gender as the sensitive attribute $S$, and male and female as the alternative values $A$ and $B$. We take a trained embedding of a human entity, $j$, denoted $E_j$ and calculate an update to this embedding which increases the score that they have attribute $A$ (male), and decreases the score that they have attribute $B$ (female). In other words, we finetune the embedding to make the person “more male" according to the model's encoding of masculinity. This is visualized in Figure FIGREF9, where we shift person1's embedding so that the transformation between person1 and the relation has_gender moves closer to male and away from female.
+
+Mathematically, we define function $M$ as the difference between the score that person $j$ has sensitive attribute $A$ (male) and that they have sensitive attribute $B$ (female). We then differentiate $M$ wrt the embedding of person $j$, $E_{j}$, and update the embedding to increase this score function.
+
+where $E_{j}^{\prime }$ denotes the new embedding for person $j$, $R_{S}$ the embedding of the sensitive relation $i$ (gender), and $E_{A}$ and $E_B$ the embeddings of attributes $A$ and $B$ (male and female). This is equivalent to providing the model with a batch of two triples, $(E_{j}, R_{S}, E_{A})$ and $(E_{j}, R_{S}, E_{B})$, and taking a step with the basic gradient descent algorithm with learning rate $\alpha $.
+
+We then analyse the change in the scores for all professions. That is, we calculate whether, according to the model's score function, making an entity more male increases or decreases the likelihood that they have a particular profession, $p$:
+
+where $E_{p}$ denotes the entity embedding of the profession, $p$.
+
+Figure FIGREF10 illustrates this. The adjustment to person1's embedding defined in Figure FIGREF9 results in the transformation of person1 and the relation has_profession moving closer to doctor and further away from nurse. That is, the score g(person1, has_profession, doctor) has increased, and the score g(person1, has_profession, nurse) has decreased. In other words, the embeddings in this case encode the bias that doctor is a profession associated with male rather than female entities.
+
+We can then repeat the process for all humans in the KG and calculate the average changes, giving a bias score $B_p$ for profession $p$:
+
+where J is the number of human entities in the KG. We calculate this score for each profession, $p = 1,...,P$ and rank the results.
+
+## Results
+
+We provide results in the main paper for Wikidata using TransE BIBREF6 embeddings, showing only professions which have at least 20 observations in the KG.
+
+Table TABREF11 presents the results for gender, with attribute $A$ being male and $B$ female. Alongside the score we present the counts of humans in the KG which have this profession, split by attributes $A$ and $B$. For example, the top rows of column $C_A$ and $C_B$ in Table TABREF11 shows that there are 44 male entities in Wikidata with the profession baritone, and 0 female entities with this profession.
+
+Whilst the discrepancies in counts are of interest in themselves BIBREF15 our main aim in this paper is to show that these differences propagate to the learned embeddings. Table TABREF11 confirms this; although it includes a number of professions which are male by definition, such as “baritone", there are also many which we may wish to be neutral, such as “banker" and “engineer". Whilst there is a strong correlation between the counts and $B_p$, it is not perfect. For example, there are more male and less female priests than there are bankers, but we get a higher score according to the model for banker than we do priest. The interconnected nature of graphs makes diagnosing the reason for this difficult, but there is clearly a difference in representation of the male entities in the graph who are bankers relatives to priests, which plays out along gender lines.
+
+Table TABREF12 presents the most female professions relative to male for Wikidata (i.e. we reverse $A$ and $B$ from Table TABREF11). As with the most male case, there are a mixture of professions which are female by definition, such as “nun", and those which we may wish to be neutral, such as “nurse" and “homekeeper". This story is supported by Tables TABREF22 and TABREF23 in the Appendix, which give the same results but for the FB3M dataset.
+
+We can also calculate biases for other sensitive relations such as ethnicity, religion and nationality. For each of these relations, we choose two attributes to compare. In Table TABREF13, we show the professions most associated with the ethnicity “Jewish" relative to “African American". As previously, the results include potentially harmful stereotypes, such as the “economist" and “entrepreneur" cases. It is interesting that these stereotypes play out in our measure, despite the more balanced nature of the counts. We provide sample results for religion and nationality in Appendix SECREF15, alongside results for Freebase. To verify that our approach is equally applicable to any transformation function, we also include results in Appendix SECREF30 for ComplEx embeddings.
+
+## Summary
+
+We have presented the first study on social bias in KG embeddings, and proposed a new metric for measuring such bias. We demonstrated that differences in the distributions of entities in real-world knowledge graphs (there are many more male bankers in Wikidata than female) translate into harmful biases related to professions being encoded in embeddings. Given that KGs are formed of real-world entities, we cannot simply equalize the counts; it is not possible to correct history by creating female US Presidents, etc. In light of this, we suggest that care is needed when applying graph embeddings in NLP pipelines, and work needed to develop robust methods to debias such embeddings.
+
+## Appendices ::: Wikidata additional results
+
+We provide a sample of additional results for Wikidata, across ethnicity, religion and nationality. For each case we choose a pair of values (e.g. Catholic and Islam for religion) to compare.
+
+The picture presented is similar to that in the main paper; the bias measure is highly correlated with the raw counts, with some associations being non-controversial, and others demonstrating potentially harmful stereotypes. Table TABREF19 is interesting, as the larger number of US entities in Wikidata (390k) relative to UK entities (131k) means the counts are more balanced, and the correlation between counts and bias measure less strong.
+
+## Appendices ::: FB3M results
+
+For comparison, we train TransE embeddings on FB3M of the same dimension, and present the corresponding results tables for gender, religion, ethnicity and nationality. The distribution of entities in FB3M is significantly different to that in Wikidata, resulting in a variety of different professions entering the top twenty counts. However, the broad conclusion is similar; the embeddings encode common and potentially harmful stereotypes related to professions.
+
+## Appendices ::: Complex embeddings
+
+Our method is equally applicable to any transformation function. To demonstrate this, we trained embeddings of the same dimension using the ComplEx transformation BIBREF7, and provide the results for gender in Tables TABREF31 and TABREF32 below. It would be interesting to carry out a comparison of the differences in how bias is encoded for different transformation functions, which we leave to future work.

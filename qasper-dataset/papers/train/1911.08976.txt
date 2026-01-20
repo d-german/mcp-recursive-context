@@ -1,0 +1,125 @@
+# Red Dragon AI at TextGraphs 2019 Shared Task: Language Model Assisted Explanation Generation
+
+**Paper ID:** 1911.08976
+
+## Abstract
+
+The TextGraphs-13 Shared Task on Explanation Regeneration asked participants to develop methods to reconstruct gold explanations for elementary science questions. Red Dragon AI's entries used the language of the questions and explanation text directly, rather than a constructing a separate graph-like representation. Our leaderboard submission placed us 3rd in the competition, but we present here three methods of increasing sophistication, each of which scored successively higher on the test set after the competition close.
+
+## Introduction
+
+The Explanation Regeneration shared task asked participants to develop methods to reconstruct gold explanations for elementary science questions BIBREF1, using a new corpus of gold explanations BIBREF2 that provides supervision and instrumentation for this multi-hop inference task.
+
+Each explanation is represented as an “explanation graph”, a set of atomic facts (between 1 and 16 per explanation, drawn from a knowledge base of 5,000 facts) that, together, form a detailed explanation for the reasoning required to answer and explain the resoning behind a question.
+
+Linking these facts to achieve strong performance at rebuilding the gold explanation graphs requires methods to perform multi-hop inference - which has been shown to be far harder than inference of smaller numbers of hops BIBREF3, particularly for the case here, where there is considerable uncertainty (at a lexical level) of how individual explanations logically link somewhat `fuzzy' graph nodes.
+
+## Introduction ::: Dataset Review
+
+The WorldTree corpus BIBREF2 is a new dataset is a comprehensive collection of elementary science exam questions and explanations. Each explanation sentence is a fact that is related to science or common sense, and is represented in a structured table that can be converted to free-text. For each question, the gold explanations have lexical overlap (i.e. having common words), and are denoted as having a specific explanation role such as CENTRAL (core concepts); GROUNDING (linking core facts to the question); and LEXICAL GLUE (linking facts which may not have lexical overlap).
+
+## Introduction ::: Problem Review
+
+As described in the introduction, the general task being posed is one of multi-hop inference, where a number of `atomic fact' sentences must be combined to form a coherent chain of reasoning to solve the elementary science problem being posed.
+
+These explanatory facts must be retrieved from a semi-structured knowledge base - in which the surface form of the explanation is represented as a series of terms gathered by their functional role in the explanation.
+
+For instance, for the explanation “Grass snakes live in grass” is encoded as “[Grass snakes] [live in] [grass]”, and this explanation is found in a PROTO-HABITATS table. However, in the same table there are also more elaborate explanations, for example : “Mice live in in holes in the ground in fields / in forests.” is expressed as : “[mice] [live in] [in holes in the ground] [in fields OR in forests]”. And more logically complex : “Most predators live in/near the same environment as their prey.” being expressed as : “[most] [predators] [live in OR live near] [the same environment as their prey]”.
+
+So, whereas the simpler explanations fit in the usual Knowledge-Base triples paradigm, the more complex ones are much more nuanced about what actually constitutes a node, and how reliable the arcs are between them. Indeed, there is also a collection of if/then explanations, including examples such as : “[if] [something] [has a] [positive impact on] [something else] [then] [increasing] [the] [amount of] [that something] [has a] [positive impact on] [that something else]” - where the explanation has meta-effect on the graph itself, and includes `unbound variables'.
+
+## Preliminary Steps
+
+In this work, we used the pure textual form of each explanation, problem and correct answer, rather than using the semi-structured form given in the column-oriented files provided in the dataset. For each of these we performed Penn-Treebank tokenisation, followed by lemmatisation using the lemmatisation files provided with the dataset, and then stop-word removal.
+
+Concerned by the low performance of the Python Baseline method (compared to the Scala Baseline, which seemed to operate using an algorithm of similar `strength'), we identified an issue in the organizer's evaluation script where predicted explanations that were missing any of the gold explanations were assigned a MAP score of zero. This dramatically penalised the Python Baseline, since it was restricted to only returning 10 lines of explanation. It also effectively forces all submissions to include a ranking over all explanations - a simple fix (with the Python Baseline rescored in Table 1) will be submitted via GitHub. This should also make the upload/scoring process faster, since only the top $\scriptstyle \sim $1000 explanation lines meaningfully contribute to the rank scoring.
+
+## Model Architectures
+
+Although more classic graph methods were initially attempted, along the lines of BIBREF4, where the challenge of semantic drift in multi-hop inference was analysed and the effectiveness of information extraction methods was demonstrated, the following 3 methods (which now easily surpass the score of our competition submission) were ultimately pursued due to their simplicity/effectiveness.
+
+## Model Architectures ::: Optimized TF-IDF
+
+As mentioned above, the original TF-IDF implementation of the provided Python baseline script did not predict a full ranking, and was penalized by the evaluation script. When this issue was remedied, its MAP score rose to 0.2140.
+
+However, there are three main steps that significantly improve the performance of this baseline:
+
+The original question text included all the answer choices, only one of which was correct (while the others are distractors). Removing the distractors resulted in improvement;
+
+The TF-IDF algorithm is very sensitive to keywords. Using the provided lemmatisation set and NLTK for tokenisation helped to align the different forms of the same keyword and reduce the vocabulary size needed;
+
+Stopword removal gave us approximately 0.04 MAP improvement throughout - removing noise in the texts that was evidently `distracting' for TF-IDF.
+
+As shown in Table 2, these optimisation steps increased the Python Baseline score significantly, without introducing algorithmic complexity.
+
+## Model Architectures ::: Iterated TF-IDF
+
+While graph methods have shown to be effective for multi-hop question answering, the schema in the textgraphs dataset is unconventional (as illustrated earlier). To counter this, the previous TF-IDF method was extended to simulate jumps between explanations, inspired by graph methods, but without forming any actual graphs:
+
+TF-IDF vectors are pre-computed for all questions and explanation candidates;
+
+For each question, the closest explanation candidate by cosine proximity is selected, and their TF-IDF vectors are aggregated by a max operation;
+
+The next closest (unused) explanation is selected, and this process was then applied iteratively up to maxlen=128 times, with the current TF-IDF comparison vector progressively increasing in expressiveness. At each iteration, the current TF-IDF vector was down-scaled by an exponential factor of the length of the current explanation set, as this was found to increase development set results by up to +0.0344.
+
+By treating the TF-IDF vector as a representation of the current chain of reasoning, each successive iteration builds on the representation to accumulate a sequence of explanations.
+
+The algorithm outlined above was additionally enhanced by adding a weighting factor to each successive explanation as it is added to the cumulative TF-IDF vector. Without this factor, the effectiveness was lower because the TF-IDF representation itself was prone to semantic drift away from the original question. Hence, each successive explanation’s weight was down-scaled, and this was shown to work well.
+
+## Model Architectures ::: BERT Re-ranking
+
+Large pretrained language models have been proven effective on a wide range of downstream tasks, including multi-hop question answering, such as in BIBREF5 on the RACE dataset, and BIBREF6 which showed that large finetuned language models can be beneficial for complex question answering domains (especially in a data-constrained context).
+
+Inspired by this, we decided to adapt BERT BIBREF7 - a popular language model that has produced competitive results on a variety of NLP tasks - for the explanation generation task.
+
+For our `BERT Re-ranking' method, we attach a regression head to a BERT Language Model. This regression head is then trained to predict a relevance score for each pair of question and explanation candidate. The approach is as follows :
+
+Calculate a TF-IDF relevance score for every tokenised explanation against the tokenised `[Problem] [CorrectAnswer] [Gold explanations]' in the training set. This will rate the true explanation sentences very highly, but also provide a `soft tail' of rankings across all explanations;
+
+Use this relevance score as the prediction target of the BERT regression head, where BERT makes its predictions from the original `[Problem] [CorrectAnswer]' text combined with each potential Explanation text in turn (over the training set);
+
+At prediction time, the explanations are ranked according to their relevance to `[Problem] [CorrectAnswer]' as predicted by the BERT model's output.
+
+We cast the problem as a regression task (rather than a classification task), since treating it as a task to classify which explanations are relevant would result in an imbalanced dataset because the gold explanation sentences only comprise a small proportion of the total set. By using soft targets (given to us by the TF-IDF score against the gold answers in the training set), even explanations which are not designated as “gold” but have some relevance to the gold paragraph can provide learning signal for the model.
+
+Due to constraints in compute and time, the model is only used to rerank the $top_n=64$ predictions made by the TF-IDF methods.
+
+The BERT model selected was of “Base” size with 110M parameters, which had been pretrained on BooksCorpus and English Wikipedia. We did not further finetune it on texts similar to the TextGraphs dataset prior to regression training. In other tests, we found that the “Large” size model did not help improve the final MAP score.
+
+## Discussion
+
+The authors' initial attempts at tackling the Shared Task focussed on graph-based methods. However, as identified in BIBREF3, the uncertainty involved with interpreting each lexical representation, combined with the number of hops required, meant that this line of enquiry was put to one side.
+
+While the graph-like approach is clearly attractive from a reasoning point of view (and will be the focus of future work), we found that using purely the textual aspects of the explanation database bore fruit more readily. Also. the complexity of the resulting systems could be minimised such that the description of each system could be as consise as possible.
+
+Specifically, we were able to optimise the TF-IDF baseline to such an extent that our `Optimised TF-IDF' would now place 2nd in the submission rankings, even though it used no special techniques at all.
+
+The Iterated TF-IDF method, while more algorithmically complex, also does not need any training on the data before it is used. This shows how effective traditional text processing methods can be, when used strategically.
+
+The BERT Re-ranking method, in contrast, does require training, and also applies one of the more sophisticated Language Models available to extract more meaning from the explanation texts.
+
+Figure 1 illustrates how there is a clear trend towards being able to build longer explanations as our semantic relevance methods become more sophisticated.
+
+There are also clear trends across the data in Table 3 that show that the more sophisticated methods are able to bring more CENTRAL explanations into the mix, even though they are more `textually distant' from the original Question and Answer statements. Surprisingly, this is at the expense of some of the GROUNDING statements.
+
+Since these methods seem to focus on different aspects of solving the ranking problem, we have also explored averaging the ranks they assign to the explanations (essentially ensembling their decisions). Empirically, this improves performance at the expense of making the model more obscure.
+
+## Discussion ::: Further Work
+
+Despite our apparent success with less sophisticated methods, it seems clear that more explicit graph-based methods appears will be required to tackle the tougher questions in this dataset (for instance those that require logical deductions, as illustrated earlier, or hypothetical situations such as some `predictor-prey equilibrium' problems). Even some simple statements (such as `Most predators ...') present obstacles to existing Knowledge-Base representations.
+
+In terms of concrete next steps, we are exploring the idea of creating intermediate forms of representation, where textual explanations can be linked using a graph to plan out the logical steps. However these grander schemes suffer from being incrementally less effective than finding additional `smart tricks' for existing methods!
+
+In preparation, we have begun to explore doing more careful preprocessing, notably :
+
+Exploiting the structure of the explanation tables individually, since some columns are known to be relationship-types that would be suitable for labelling arcs between nodes in a typical Knowledge Graph setting;
+
+Expanding out the conjunction elements within the explanation tables. For instance in explanations like “[coral] [lives in the] [ocean OR warm water]”, the different sub-explanations “(Coral, LIVES-IN, Ocean)” and “(Coral, LIVES-IN, WarmWater)” can be generated, which are far closer to a `graph-able' representation;
+
+Better lemmatisation : For instance `ice cube' covers both `ice' and `ice cube' nodes. We need some more `common sense' to cover these cases.
+
+Clearly, it is early days for this kind of multi-hop inference over textual explanations. At this point, we have only scratched the surface of the problem, and look forward to helping to advance the state-of-the-art in the future.
+
+## Acknowledgments
+
+The authors would like to thank Google for access to the TFRC TPU program which was used in training and fine-tuning models during experimentation for this paper.

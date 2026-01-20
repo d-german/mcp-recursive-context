@@ -1,0 +1,205 @@
+# Hooks in the Headline: Learning to Generate Headlines with Controlled Styles
+
+**Paper ID:** 2004.01980
+
+## Abstract
+
+Current summarization systems only produce plain, factual headlines, but do not meet the practical needs of creating memorable titles to increase exposure. We propose a new task, Stylistic Headline Generation (SHG), to enrich the headlines with three style options (humor, romance and clickbait), in order to attract more readers. With no style-specific article-headline pair (only a standard headline summarization dataset and mono-style corpora), our method TitleStylist generates style-specific headlines by combining the summarization and reconstruction tasks into a multitasking framework. We also introduced a novel parameter sharing scheme to further disentangle the style from the text. Through both automatic and human evaluation, we demonstrate that TitleStylist can generate relevant, fluent headlines with three target styles: humor, romance, and clickbait. The attraction score of our model generated headlines surpasses that of the state-of-the-art summarization model by 9.68%, and even outperforms human-written references.
+
+## Introduction
+
+Every good article needs a good title, which should not only be able to condense the core meaning of the text, but also sound appealing to the readers for more exposure and memorableness. However, currently even the best Headline Generation (HG) system can only fulfill the above requirement yet performs poorly on the latter. For example, in Figure FIGREF2, the plain headline by an HG model “Summ: Leopard Frog Found in New York City” is less eye-catching than the style-carrying ones such as “What's That Chuckle You Hear? It May Be the New Frog From NYC.”
+
+To bridge the gap between the practical needs for attractive headlines and the plain HG by the current summarization systems, we propose a new task of Stylistic Headline Generation (SHG). Given an article, it aims to generate a headline with a target style such as humorous, romantic, and click-baity. It has broad applications in reader-adapted title generation, slogan suggestion, auto-fill for online post headlines, and many others.
+
+SHG is a highly skilled creative process, and usually only possessed by expert writers. One of the most famous headlines in American publications, “Sticks Nix Hick Pix,” could be such an example. In contrast, the current best summarization systems are at most comparable to novice writers who provide a plain descriptive representation of the text body as the title BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4. These systems usually use a language generation model that mixes styles with other linguistic patterns and inherently lacks a mechanism to control the style explicitly. More fundamentally, the training data comprise of a mixture of styles (e.g., the Gigaword dataset BIBREF5), obstructing the models from learning a distinct style.
+
+In this paper, we propose the new task SHG, to emphasize the explicit control of style in headline generation. We present a novel headline generation model, TitleStylist, to produce enticing titles with target styles including humorous, romantic, and click-baity. Our model leverages a multitasking framework to train both a summarization model on headline-article pairs, and a Denoising Autoencoder (DAE) on a style corpus. In particular, based on the transformer architecture BIBREF6, we use the style-dependent layer normalization and the style-guided encoder-attention to disentangle the language style factors from the text. This design enables us to use the shared content to generate headlines that are more relevant to the articles, as well as to control the style by plugging in a set of style-specific parameters. We validate the model on three tasks: humorous, romantic, and click-baity headline generation. Both automatic and human evaluations show that TitleStylist can generate headlines with the desired styles that appeal more to human readers, as in Figure FIGREF2.
+
+The main contributions of our paper are listed below:
+
+To the best of our knowledge, it is the first research on the generation of attractive news headlines with styles without any supervised style-specific article-headline paired data.
+
+Through both automatic and human evaluation, we demonstrated that our proposed TitleStylist can generate relevant, fluent headlines with three styles (humor, romance, and clickbait), and they are even more attractive than human-written ones.
+
+Our model can flexibly incorporate multiple styles, thus efficiently and automatically providing humans with various creative headline options for references and inspiring them to think out of the box.
+
+## Related Work
+
+Our work is related to summarization and text style transfer.
+
+## Related Work ::: Headline Generation as Summarization
+
+Headline generation is a very popular area of research. Traditional headline generation methods mostly focus on the extractive strategies using linguistic features and handcrafted rules BIBREF7, BIBREF8, BIBREF9, BIBREF10, BIBREF11, BIBREF12, BIBREF13. To enrich the diversity of the extractive summarization, abstractive models were then proposed. With the help of neural networks, BIBREF14 proposed attention-based summarization (ABS) to make BIBREF15's framework of summarization more powerful. Many recent works extended ABS by utilizing additional features BIBREF16, BIBREF17, BIBREF18, BIBREF19, BIBREF20, BIBREF21, BIBREF22. Other variants of the standard headline generation setting include headlines for community question answering BIBREF23, multiple headline generation BIBREF24, user-specific generation using user embeddings in recommendation systems BIBREF25, bilingual headline generation BIBREF26 and question-style headline generation BIBREF27.
+
+Only a few works have recently started to focus on increasing the attractiveness of generated headlines BIBREF28, BIBREF29. BIBREF28 focuses on controlling several features of the summary text such as text length, and the style of two different news outlets, CNN and DailyMail. These controls serve as a way to boost the model performance, and the CNN- and DailyMail-style control shows a negligible improvement. BIBREF29 utilized reinforcement learning to encourage the headline generation system to generate more sensational headlines via using the readers' comment rate as the reward, which however cannot explicitly control or manipulate the styles of headlines. BIBREF30 proposed a style transfer approach to transfer a non-clickbait headline into a clickbait one. This method requires paired news articles-headlines data for the target style; however, for many styles such as humor and romance, there are no available headlines. Our model does not have this limitation, thus enabling transferring to many more styles.
+
+## Related Work ::: Text Style Transfer
+
+Our work is also related to text style transfer, which aims to change the style attribute of the text while preserving its content. First proposed by BIBREF31, it has achieved great progress in recent years BIBREF32, BIBREF33, BIBREF34, BIBREF35, BIBREF36, BIBREF37, BIBREF38. However, all these methods demand a text corpus for the target style; however, in our case, it is expensive and technically challenging to collect news headlines with humor and romance styles, which makes this category of methods not applicable to our problem.
+
+## Methods ::: Problem Formulation
+
+The model is trained on a source dataset $S$ and target dataset $T$. The source dataset $S=\lbrace (\mathbf {a^{(i)}},\mathbf {h^{(i)}})\rbrace _{i=1}^N$ consists of pairs of a news article $\mathbf {a}$ and its plain headline $\mathbf {h}$. We assume that the source corpus has a distribution $P(A, H)$, where $A=\lbrace \mathbf {a^{(i)}}\rbrace _{i=1}^N$, and $H=\lbrace \mathbf {h^{(i)}}\rbrace _{i=1}^N$. The target corpus $T=\lbrace \mathbf {t^{(i)}}\rbrace _{i=1}^{M}$ comprises of sentences $\mathbf {t}$ written in a specific style (e.g., humor). We assume that it conforms to the distribution $P(T)$.
+
+Note that the target corpus $T$ only contains style-carrying sentences, not necessarily headlines — it can be just book text. Also no sentence $\mathbf {t}$ is paired with a news article. Overall, our task is to learn the conditional distribution $P(T|A)$ using only $S$ and $T$. This task is fully unsupervised because there is no sample from the joint distribution $P(A, T)$.
+
+## Methods ::: Seq2Seq Model Architecture
+
+For summarization, we adopt a sequence-to-sequence (Seq2Seq) model based on the Transformer architecture BIBREF6. As in Figure FIGREF8, it consists of a 6-layer encoder $E(\mathbf {\cdot }; \mathbf {\theta _E})$ and a 6-layer decoder $G(\mathbf {\cdot }; \mathbf {\theta _G})$ with a hidden size of 1024 and a feed-forward filter size of 4096. For better generation quality, we initialize with the MASS model BIBREF3. MASS is pretrained by masking a sentence fragment in the encoder, and then predicting it in the decoder on large-scale English monolingual data. This pretraining is adopted in the current state-of-the-art systems across various summarization benchmark tasks including HG.
+
+## Methods ::: Multitask Training Scheme
+
+To disentangle the latent style from the text, we adopt a multitask learning framework BIBREF39, training on summarization and DAE simultaneously (as shown in Figure FIGREF10).
+
+## Methods ::: Multitask Training Scheme ::: Supervised Seq2Seq Training for @!START@$E_S$@!END@ and @!START@$G_S$@!END@
+
+With the source domain dataset $S$, based on the encoder-decoder architecture, we can learn the conditional distribution $P(H|A)$ by training $\mathbf {z}_S=E_S(A)$ and $H_S=G_S(\mathbf {z_S})$ to solve the supervised Seq2Seq learning task, where $\mathbf {z_S}$ is the learned latent representation in the source domain. The loss function of this task is
+
+where $\mathbf {\theta _{E_S}}$ and $\mathbf {\theta _{G_S}}$ are the set of model parameters of the encoder and decoder in the source domain and $p(\mathbf {h}|\mathbf {a})$ denotes the overall probability of generating an output sequence $\mathbf {h}$ given the input article $\mathbf {a}$, which can be further expanded as follows:
+
+where $L$ is the sequence length.
+
+## Methods ::: Multitask Training Scheme ::: DAE Training for @!START@$\mathbf {\theta _{E_T}}$@!END@ and @!START@$\mathbf {\theta _{G_T}}$@!END@
+
+For the target style corpus $T$, since we only have the sentence $\mathbf {t}$ without paired news articles, we train $\mathbf {z_T}=E_T(\mathbf {\tilde{t}})$ and $\mathbf {t}=G_T(\mathbf {z_T})$ by solving an unsupervised reconstruction learning task, where $\mathbf {z_T}$ is the learned latent representation in the target domain, and $\mathbf {\tilde{t}}$ is the corrupted version of $\mathbf {t}$ by randomly deleting or blanking some words and shuffling the word orders. To train the model, we minimize the reconstruction error $\mathcal {L}_T$:
+
+where $\mathbf {\theta _{E_T}}$ and $\mathbf {\theta _{G_T}}$ are the set of model parameters for the encoder and generator in the target domain. We train the whole model by jointly minimizing the supervised Seq2Seq training loss $\mathcal {L}_S$ and the unsupervised denoised auto-encoding loss $\mathcal {L}_T$ via multitask learning, so the total loss becomes
+
+where $\lambda $ is a hyper-parameter.
+
+## Methods ::: Parameter-Sharing Scheme
+
+More constraints are necessary in the multitask training process. We aim to infer the conditional distribution as $ P(T|A)=G_T(E_S(A))$. However, without samples from $P(A, T)$, this is a challenging or even impossible task if $E_S$ and $E_T$, or $G_S$ and $G_T$ are completely independent of each other. Hence, we need to add some constraints to the network by relating $E_S$ and $E_T$, and $G_S$ and $G_T$. The simplest design is to share all parameters between $E_S$ and $E_T$, and apply the same strategy to $G_S$ and $G_T$. The intuition behind this design is that by exposing the model to both summarization task and style-carrying text reconstruction task, the model would acquire some sense of the target style while summarizing the article. However, to encourage the model to better disentangle the content and style of text and more explicitly learn the style contained in the target corpus $T$, we share all parameters of the encoder between two domains, i.e., between $E_S$ and $E_T$, whereas we divide the parameters of the decoder into two types: style-independent parameters $\mathbf {\theta _{\mathrm {ind}}}$ and style-dependent parameters $\mathbf {\theta _{\mathrm {dep}}}$. This means that only the style-independent parameters are shared between $G_S$ and $G_T$ while the style-dependent parameters are not. More specifically, the parameters of the layer normalization and encoder attention modules are made style-dependent as detailed below.
+
+## Methods ::: Parameter-Sharing Scheme ::: Type 1. Style Layer Normalization
+
+Inspired by previous work on image style transfer BIBREF40, we make the scaling and shifting parameters for layer normalization in the transformer architecture un-shared for each style. This style layer normalization approach aims to transform a layer’s activation $\mathbf {x}$ into a normalized activation $\mathbf {z}$ specific to the style $s$:
+
+where $\mu $ and $\sigma $ are the mean and standard deviation of the batch of $\mathbf {x}$, and $\gamma _s$ and $\beta _s$ are style-specific parameters learned from data.
+
+Specifically, for the transformer decoder architecture, we use a style-specific self-attention layer normalization and final layer normalization for the source and target domains on all six decoder layers.
+
+## Methods ::: Parameter-Sharing Scheme ::: Type 2. Style-Guided Encoder Attention
+
+Our model architecture contains the attention mechanism, where the decoder infers the probability of the next word not only conditioned on the previous words but also on the encoded input hidden states. The attention patterns should be different for the summarization and the reconstruction tasks due to their different inherent nature. We insert this thinking into the model by introducing the style-guided encoder attention into the multi-head attention module, which is defined as follows:
+
+where $\mathbf {\mathrm {query}}$, $\mathbf {\mathrm {key}}$, and $\mathbf {\mathrm {value}}$ denote the triple of inputs into the multi-head attention module; $\mathbf {W_q^s}$, $\mathbf {W_k}$, and $\mathbf {W_v}$ denote the scaled dot-product matrix for affine transformation; $d_{\mathrm {model}}$ is the dimension of the hidden states. We specialize the dot-product matrix $\mathbf {W_q^s}$ of the query for different styles, so that $\mathbf {Q}$ can be different to induce diverse attention patterns.
+
+## Experiments ::: Datasets
+
+We compile a rich source dataset by combining the New York Times (NYT) and CNN, as well as three target style corpora on humorous, romantic, and click-baity text. The average sentence length in the NYT, CNN, Humor, Romance, and Clickbait datasets are 8.8, 9.2, 12.6, 11.6 and 8.7 words, respectively.
+
+## Experiments ::: Datasets ::: Source Dataset
+
+The source dataset contains news articles paired with corresponding headlines. To enrich the training corpus, we combine two datasets: the New York Times (56K) and CNN (90K). After combining these two datasets, we randomly selected 3,000 pairs as the validation set and another 3,000 pairs as the test set.
+
+We first extracted the archival abstracts and headlines from the New York Times (NYT) corpus BIBREF41 and treat the abstracts as the news articles. Following the standard pre-processing procedures BIBREF42, we filtered out advertisement-related articles (as they are very different from news reports), resulting in 56,899 news abstracts-headlines pairs.
+
+We then add into our source set the CNN summarization dataset, which is widely used for training abstractive summarization models BIBREF43. We use the short summaries in the original dataset as the news abstracts and automatically parsed the headlines for each news from the dumped news web pages, and in total collected 90,236 news abstract-headline pairs.
+
+## Experiments ::: Datasets ::: Three Target Style Corpora ::: Humor and Romance
+
+For the target style datasets, we follow BIBREF44 to use humor and romance novel collections in BookCorpus BIBREF45 as the Humor and Romance datasets. We split the documents into sentences, tokenized the text, and collected 500K sentences as our datasets.
+
+## Experiments ::: Datasets ::: Three Target Style Corpora ::: Clickbait
+
+We also tried to learn the writing style from the click-baity headlines since they have shown superior attraction to readers. Thus we used The Examiner - SpamClickBait News dataset, denoted as the Clickbait dataset. We collected 500K headlines for our use.
+
+Some examples from each style corpus are listed in Table TABREF32.
+
+## Experiments ::: Baselines
+
+We compared the proposed TitleStylist against the following five strong baseline approaches.
+
+## Experiments ::: Baselines ::: Neural Headline Generation (NHG)
+
+We train the state-of-the-art summarization model, MASS BIBREF3, on our collected news abstracts-headlines paired data.
+
+## Experiments ::: Baselines ::: Gigaword-MASS
+
+We test an off-the-shelf headline generation model, MASS from BIBREF3, which is already trained on Gigaword, a large-scale headline generation dataset with around 4 million articles.
+
+## Experiments ::: Baselines ::: Neural Story Teller (NST)
+
+It breaks down the task into two steps, which first generates headlines from the aforementioned NHG model, then applies style shift techniques to generate style-specific headlines BIBREF46. In brief, this method uses the Skip-Thought model to encode a sentence into a representation vector and then manipulates its style by a linear transformation. Afterward, this transformed representation vector is used to initialize a language model pretrained on a style-specific corpus so that a stylistic headline can be generated. More details of this method can refer to the official website.
+
+## Experiments ::: Baselines ::: Fine-Tuned
+
+We first train the NHG model as mentioned above, then further fine-tuned it on the target style corpus via DAE training.
+
+## Experiments ::: Baselines ::: Multitask
+
+We share all parameters between $E_S$ and $E_T$, and between $G_S$ and $G_T$, and trained the model on both the summarization and DAE tasks. The model architecture is the same as NHG.
+
+## Experiments ::: Evaluation Metrics
+
+To evaluate the performance of the proposed TitleStylist in generating attractive headlines with styles, we propose a comprehensive twofold strategy of both automatic evaluation and human evaluation.
+
+## Experiments ::: Evaluation Metrics ::: Setup of Human Evaluation
+
+We randomly sampled 50 news abstracts from the test set and asked three native-speaker annotators for evaluation to score the generated headlines. Specifically, we conduct two tasks to evaluate on four criteria: (1) relevance, (2) attractiveness, (3) language fluency, and (4) style strength. For the first task, the human raters are asked to evaluate these outputs on the first three aspects, relevance, attractiveness, and language fluency on a Likert scale from 1 to 10 (integer values). For relevance, human annotators are asked to evaluate how semantically relevant the headline is to the news body. For attractiveness, annotators are asked how attractive the headlines are. For fluency, we ask the annotators to evaluate how fluent and readable the text is. After the collection of human evaluation results, we averaged the scores as the final score. In addition, we have another independent human evaluation task about the style strength – we present the generated headlines from TitleStylist and baselines to the human judges and let them choose the one that most conforms to the target style such as humor. Then we define the style strength score as the proportion of choices.
+
+## Experiments ::: Evaluation Metrics ::: Setup of Automatic Evaluation
+
+Apart from the comprehensive human evaluation, we use automatic evaluation to measure the generation quality through two conventional aspects: summarization quality and language fluency. Note that the purpose of this two-way automatic evaluation is to confirm that the performance of our model is in an acceptable range. Good automatic evaluation performances are necessary proofs to compliment human evaluations on the model effectiveness.
+
+## Experiments ::: Evaluation Metrics ::: Setup of Automatic Evaluation ::: Summarization Quality
+
+We use the standard automatic evaluation metrics for summarization with the original headlines as the reference: BLEU BIBREF47, METEOR BIBREF48, ROUGE BIBREF49 and CIDEr BIBREF50. For ROUGE, we used the Files2ROUGE toolkit, and for other metrics, we used the pycocoeval toolkit.
+
+## Experiments ::: Evaluation Metrics ::: Setup of Automatic Evaluation ::: Language Fluency
+
+We fine-tuned the GPT-2 medium model BIBREF51 on our collected headlines and then used it to measure the perplexity (PPL) on the generated outputs.
+
+## Experiments ::: Experimental Details
+
+We used the fairseq code base BIBREF52. During training, we use Adam optimizer with an initial learning rate of $5\times 10^{-4}$, and the batch size is set as 3072 tokens for each GPU with the parameters update frequency set as 4. For the random corruption for DAE training, we follow the standard practice to randomly delete or blank the word with a uniform probability of $0.2$, and randomly shuffled the word order within 5 tokens. All datasets are lower-cased. $\lambda $ is set as 0.5 in experiments. For each iteration of training, we randomly draw a batch of data either from the source dataset or from the target style corpus, and the sampling strategy follows the uniform distribution with the probability being equal to $\lambda $.
+
+## Results and Discussion ::: Human Evaluation Results
+
+The human evaluation is to have a comprehensive measurement of the performances. We conduct experiments on four criteria, relevance, attraction, fluency, and style strength. We summarize the human evaluation results on the first three criteria in Table TABREF51, and the last criteria in Table TABREF57. Note that through automatic evaluation, the baselines NST, Fine-tuned, and Gigaword-MASS perform poorer than other methods (in Section SECREF58), thereby we removed them in human evaluation to save unnecessary work for human raters.
+
+## Results and Discussion ::: Human Evaluation Results ::: Relevance
+
+We first look at the relevance scores in Table TABREF51. It is interesting but not surprising that the pure summarization model NHG achieves the highest relevance score. The outputs from NHG are usually like an organic reorganization of several keywords in the source context (as shown in Table TABREF52), thus appearing most relevant. It is noteworthy that the generated headlines of our TitleStylist for all three styles are close to the original human-written headlines in terms of relevance, validating that our generation results are qualified in this aspect. Another finding is that more attractive or more stylistic headlines would lose some relevance since they need to use more words outside the news body for improved creativity.
+
+## Results and Discussion ::: Human Evaluation Results ::: Attraction
+
+In terms of attraction scores in Table TABREF51, we have three findings: (1) The human-written headlines are more attractive than those from NHG, which agrees with our observation in Section SECREF1. (2) Our TitleStylist can generate more attractive headlines over the NHG and Multitask baselines for all three styles, demonstrating that adapting the model to these styles could improve the attraction and specialization of some parameters in the model for different styles can further enhance the attraction. (3) Adapting the model to the “Clickbait” style could create the most attractive headlines, even out-weighting the original ones, which agrees with the fact that click-baity headlines are better at drawing readers' attention. To be noted, although we learned the “Clickbait” style into our summarization system, we still made sure that we are generating relevant headlines instead of too exaggerated ones, which can be verified by our relevance scores.
+
+## Results and Discussion ::: Human Evaluation Results ::: Fluency
+
+The human-annotated fluency scores in Table TABREF51 verified that our TitleStylist generated headlines are comparable or superior to the human-written headlines in terms of readability.
+
+## Results and Discussion ::: Human Evaluation Results ::: Style Strength
+
+We also validated that our TitleStylist can carry more styles compared with the Multitask and NHG baselines by summarizing the percentage of choices by humans for the most humorous or romantic headlines in Table TABREF57.
+
+## Results and Discussion ::: Automatic Evaluation Results
+
+Apart from the human evaluation of the overall generation quality on four criteria, we also conducted a conventional automatic assessment to gauge only the summarization quality. This evaluation does not take other measures such as the style strength into consideration, but it serves as important complimentary proof to ensure that the model has an acceptable level of summarization ability.
+
+Table TABREF59 summarizes the automatic evaluation results of our proposed TitleStylist model and all baselines. We use the summarization-related evaluation metrics, i.e., BLEU, ROUGE, CIDEr, and METEOR, to measure how relevant the generated headlines are to the news articles, to some extent, by comparing them to the original human-written headlines. In Table TABREF59, the first row “NHG” shows the performance of the current state-of-the-art summarization model on our data, and Table TABREF52 provides two examples of its generation output. Our ultimate goal is to generate more attractive headlines than these while maintaining relevance to the news body.
+
+From Table TABREF59, the baseline Gigaword-MASS scored worse than NHG, revealing that directly applying an off-the-shelf headline generation model to new in-domain data is not feasible, although this model has been trained on more than 20 times larger dataset. Both NST and Fine-tuned baselines present very poor summarization performance, and the reason could be that both of them cast the problem into two steps: summarization and style transfer, and the latter step is absent of the summarization task, which prevents the model from maintaining its summarization capability.
+
+In contrast, the Multitask baseline involves the summarization and style transfer (via reconstruction training) processes at the same time and shows superior summarization performance even compared with NHG. This reveals that the unsupervised reconstruction task can indeed help improve the supervised summarization task. More importantly, we use two different types of corpora for the reconstruction task: one consists of headlines that are similar to the news data for the summarization task, and the other consists of text from novels that are entirely different from the news data. However, unsupervised reconstruction training on both types of data can contribute to the summarization task, which throws light on the potential future work in summarization by incorporating unsupervised learning as augmentation.
+
+We find that in Table TABREF59 TitleStylist-F achieves the best summarization performance. This implicates that, compared with the Multitask baseline where the two tasks share all parameters, specialization of layer normalization and encoder-attention parameters can make $G_S$ focus more on summarization.
+
+It is noteworthy that the summarization scores for TitleStylist are lower than TitleStylist-F but still comparable to NHG. This agrees with the fact that the $G_T$ branch more focuses on bringing in stylistic linguistic patterns into the generated summaries, thus the outputs would deviate from the pure summarization to some degree. However, the relevance degree of them remains close to the baseline NHG, which is the starting point we want to improve on. Later in the next section, we will further validate that these headlines are faithful to the new article through human evaluation.
+
+We also reported the perplexity (PPL) of the generated headlines to evaluate the language fluency, as shown in Table TABREF59. All outputs from baselines NHG and Multitask and our proposed TitleStylist show similar PPL compared with the test set (used in the fine-tuning stage) PPL 42.5, indicating that they are all fluent expressions for news headlines.
+
+## Results and Discussion ::: Extension to Multi-Style
+
+We progressively expand TitleStylist to include all three target styles (humor, romance, and clickbait) to demonstrate the flexibility of our model. That is, we simultaneously trained the summarization task on the headlines data and the DAE task on the three target style corpora. And we made the layer normalization and encoder-attention parameters specialized for these four styles (fact, humor, romance, and clickbait) and shared the other parameters. We compared this multi-style version, TitleStylist-Versatile, with the previously presented single-style counterpart, as shown in Table TABREF61. From this table, we see that the BLEU and ROUGE-L scores of TitleStylist-Versatile are comparable to TitleStylist for all three styles. Besides, we conducted another human study to determine the better headline between the two models in terms of attraction, and we allow human annotators to choose both options if they deem them as equivalent. The result is presented in the last column of Table TABREF61, which shows that the attraction of TitleStylist-Versatile outputs is competitive to TitleStylist. TitleStylist-Versatile thus generates multiple headlines in different styles altogether, which is a novel and efficient feature.
+
+## Conclusion
+
+We have proposed a new task of Stylistic Headline Generation (SHG) to emphasize explicit control of styles in headline generation for improved attraction. To this end, we presented a multitask framework to induce styles into summarization, and proposed the parameters sharing scheme to enhance both summarization and stylization capabilities. Through experiments, we validated our proposed TitleStylist can generate more attractive headlines than state-of-the-art HG models.
+
+## Acknowledgement
+
+We appreciate all the volunteer native speakers (Shreya Karpoor, Lisa Orii, Abhishek Mohan, Paloma Quiroga, etc.) for the human evaluation of our study, and thank the reviewers for their inspiring comments. Joey Tianyi Zhou is partially supported by the Agency for Science, Technology and Research (A*STAR) under its AME Programmatic Funding Scheme (Project No. A18A1b0045).

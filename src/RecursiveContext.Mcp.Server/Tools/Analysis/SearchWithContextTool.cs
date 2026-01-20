@@ -9,7 +9,7 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class SearchWithContextTool
 {
     [McpServerTool(Name = "search_with_context")]
-    [Description("Search for regex pattern matches with surrounding context lines. IMPORTANT: The 'path' must be relative to workspace root (RLM_WORKSPACE_ROOT), not the current shell directory. Use 'list_directories' to discover paths first.")]
+    [Description("Search for regex pattern matches with surrounding context lines. TIP: Consider alternative spellings, synonyms, and format variations. Path is relative to workspace root.")]
     public static async Task<string> SearchWithContext(
         IContentAnalysisService analysisService,
         [Description("File path relative to workspace root. Example: 'mcp-recursive-context/qasper-test-workspace/train/1909.00694.txt'. NOT just the filename.")] string path,

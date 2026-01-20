@@ -1,0 +1,139 @@
+# Predictive Embeddings for Hate Speech Detection on Twitter
+
+**Paper ID:** 1809.10644
+
+## Abstract
+
+We present a neural-network based approach to classifying online hate speech in general, as well as racist and sexist speech in particular. Using pre-trained word embeddings and max/mean pooling from simple, fully-connected transformations of these embeddings, we are able to predict the occurrence of hate speech on three commonly used publicly available datasets. Our models match or outperform state of the art F1 performance on all three datasets using significantly fewer parameters and minimal feature preprocessing compared to previous methods.
+
+## Introduction
+
+The increasing popularity of social media platforms like Twitter for both personal and political communication BIBREF0 has seen a well-acknowledged rise in the presence of toxic and abusive speech on these platforms BIBREF1 , BIBREF2 . Although the terms of services on these platforms typically forbid hateful and harassing speech, enforcing these rules has proved challenging, as identifying hate speech speech at scale is still a largely unsolved problem in the NLP community. BIBREF3 , for example, identify many ambiguities in classifying abusive communications, and highlight the difficulty of clearly defining the parameters of such speech. This problem is compounded by the fact that identifying abusive or harassing speech is a challenge for humans as well as automated systems.
+
+Despite the lack of consensus around what constitutes abusive speech, some definition of hate speech must be used to build automated systems to address it. We rely on BIBREF4 's definition of hate speech, specifically: “language that is used to express hatred towards a targeted group or is intended to be derogatory, to humiliate, or to insult the members of the group.”
+
+In this paper, we present a neural classification system that uses minimal preprocessing to take advantage of a modified Simple Word Embeddings-based Model BIBREF5 to predict the occurrence of hate speech. Our classifier features:
+
+In the following sections, we discuss related work on hate speech classification, followed by a description of the datasets, methods and results of our study.
+
+## Related Work
+
+Many efforts have been made to classify hate speech using data scraped from online message forums and popular social media sites such as Twitter and Facebook. BIBREF3 applied a logistic regression model that used one- to four-character n-grams for classification of tweets labeled as racist, sexist or neither. BIBREF4 experimented in classification of hateful as well as offensive but not hateful tweets. They applied a logistic regression classifier with L2 regularization using word level n-grams and various part-of-speech, sentiment, and tweet-level metadata features.
+
+Additional projects have built upon the data sets created by Waseem and/or Davidson. For example, BIBREF6 used a neural network approach with two binary classifiers: one to predict the presence abusive speech more generally, and another to discern the form of abusive speech.
+
+ BIBREF7 , meanwhile, used pre-trained word2vec embeddings, which were then fed into a convolutional neural network (CNN) with max pooling to produce input vectors for a Gated Recurrent Unit (GRU) neural network. Other researchers have experimented with using metadata features from tweets. BIBREF8 built a classifier composed of two separate neural networks, one for the text and the other for metadata of the Twitter user, that were trained jointly in interleaved fashion. Both networks used in combination - and especially when trained using transfer learning - achieved higher F1 scores than either neural network classifier alone.
+
+In contrast to the methods described above, our approach relies on a simple word embedding (SWEM)-based architecture BIBREF5 , reducing the number of required parameters and length of training required, while still yielding improved performance and resilience across related classification tasks. Moreover, our network is able to learn flexible vector representations that demonstrate associations among words typically used in hateful communication. Finally, while metadata-based augmentation is intriguing, here we sought to develop an approach that would function well even in cases where such additional data was missing due to the deletion, suspension, or deactivation of accounts.
+
+## Data
+
+In this paper, we use three data sets from the literature to train and evaluate our own classifier. Although all address the category of hateful speech, they used different strategies of labeling the collected data. Table TABREF5 shows the characteristics of the datasets.
+
+Data collected by BIBREF3 , which we term the Sexist/Racist (SR) data set, was collected using an initial Twitter search followed by analysis and filtering by the authors and their team who identified 17 common phrases, hashtags, and users that were indicative of abusive speech. BIBREF4 collected the HATE dataset by searching for tweets using a lexicon provided by Hatebase.org. The final data set we used, which we call HAR, was collected by BIBREF9 ; we removed all retweets reducing the dataset to 20,000 tweets. Tweets were labeled as “Harrassing” or “Non-Harrassing”; hate speech was not explicitly labeled, but treated as an unlabeled subset of the broader “Harrassing” category BIBREF9 .
+
+## Transformed Word Embedding Model (TWEM)
+
+Our training set consists of INLINEFORM0 examples INLINEFORM1 where the input INLINEFORM2 is a sequence of tokens INLINEFORM3 , and the output INLINEFORM4 is the numerical class for the hate speech class. Each input instance represents a Twitter post and thus, is not limited to a single sentence.
+
+We modify the SWEM-concat BIBREF5 architecture to allow better handling of infrequent and unknown words and to capture non-linear word combinations.
+
+## Word Embeddings
+
+Each token in the input is mapped to an embedding. We used the 300 dimensional embeddings for all our experiments, so each word INLINEFORM0 is mapped to INLINEFORM1 . We denote the full embedded sequence as INLINEFORM2 . We then transform each word embedding by applying 300 dimensional 1-layer Multi Layer Perceptron (MLP) INLINEFORM3 with a Rectified Liner Unit (ReLU) activation to form an updated embedding space INLINEFORM4 . We find this better handles unseen or rare tokens in our training data by projecting the pretrained embedding into a space that the encoder can understand.
+
+## Pooling
+
+We make use of two pooling methods on the updated embedding space INLINEFORM0 . We employ a max pooling operation on INLINEFORM1 to capture salient word features from our input; this representation is denoted as INLINEFORM2 . This forces words that are highly indicative of hate speech to higher positive values within the updated embedding space. We also average the embeddings INLINEFORM3 to capture the overall meaning of the sentence, denoted as INLINEFORM4 , which provides a strong conditional factor in conjunction with the max pooling output. This also helps regularize gradient updates from the max pooling operation.
+
+## Output
+
+We concatenate INLINEFORM0 and INLINEFORM1 to form a document representation INLINEFORM2 and feed the representation into a 50 node 2 layer MLP followed by ReLU Activation to allow for increased nonlinear representation learning. This representation forms the preterminal layer and is passed to a fully connected softmax layer whose output is the probability distribution over labels.
+
+## Experimental Setup
+
+We tokenize the data using Spacy BIBREF10 . We use 300 Dimensional Glove Common Crawl Embeddings (840B Token) BIBREF11 and fine tune them for the task. We experimented extensively with pre-processing variants and our results showed better performance without lemmatization and lower-casing (see supplement for details). We pad each input to 50 words. We train using RMSprop with a learning rate of .001 and a batch size of 512. We add dropout with a drop rate of 0.1 in the final layer to reduce overfitting BIBREF12 , batch size, and input length empirically through random hyperparameter search.
+
+All of our results are produced from 10-fold cross validation to allow comparison with previous results. We trained a logistic regression baseline model (line 1 in Table TABREF10 ) using character ngrams and word unigrams using TF*IDF weighting BIBREF13 , to provide a baseline since HAR has no reported results. For the SR and HATE datasets, the authors reported their trained best logistic regression model's results on their respective datasets.
+
+SR: Sexist/Racist BIBREF3 , HATE: Hate BIBREF4 HAR: Harassment BIBREF9 
+
+## Results and Discussion
+
+The approach we have developed establishes a new state of the art for classifying hate speech, outperforming previous results by as much as 12 F1 points. Table TABREF10 illustrates the robustness of our method, which often outperform previous results, measured by weighted F1. 
+
+Using the Approximate Randomization (AR) Test BIBREF14 , we perform significance testing using a 75/25 train and test split
+
+to compare against BIBREF3 and BIBREF4 , whose models we re-implemented. We found 0.001 significance compared to both methods. We also include in-depth precision and recall results for all three datasets in the supplement.
+
+Our results indicate better performance than several more complex approaches, including BIBREF4 's best model (which used word and part-of-speech ngrams, sentiment, readability, text, and Twitter specific features), BIBREF6 (which used two fold classification and a hybrid of word and character CNNs, using approximately twice the parameters we use excluding the word embeddings) and even recent work by BIBREF8 , (whose best model relies on GRUs, metadata including popularity, network reciprocity, and subscribed lists).
+
+On the SR dataset, we outperform BIBREF8 's text based model by 3 F1 points, while just falling short of the Text + Metadata Interleaved Training model. While we appreciate the potential added value of metadata, we believe a tweet-only classifier has merits because retrieving features from the social graph is not always tractable in production settings. Excluding the embedding weights, our model requires 100k parameters , while BIBREF8 requires 250k parameters.
+
+## Error Analysis
+
+False negatives
+
+Many of the false negatives we see are specific references to characters in the TV show “My Kitchen Rules”, rather than something about women in general. Such examples may be innocuous in isolation but could potentially be sexist or racist in context. While this may be a limitation of considering only the content of the tweet, it could also be a mislabel.
+
+Debra are now my most hated team on #mkr after least night's ep. Snakes in the grass those two.
+
+Along these lines, we also see correct predictions of innocuous speech, but find data mislabeled as hate speech:
+
+@LoveAndLonging ...how is that example "sexism"?
+
+@amberhasalamb ...in what way?
+
+Another case our classifier misses is problematic speech within a hashtag:
+
+:D @nkrause11 Dudes who go to culinary school: #why #findawife #notsexist :)
+
+This limitation could be potentially improved through the use of character convolutions or subword tokenization.
+
+False Positives
+
+In certain cases, our model seems to be learning user names instead of semantic content:
+
+RT @GrantLeeStone: @MT8_9 I don't even know what that is, or where it's from. Was that supposed to be funny? It wasn't.
+
+Since the bulk of our model's weights are in the embedding and embedding-transformation matrices, we cluster the SR vocabulary using these transformed embeddings to clarify our intuitions about the model ( TABREF14 ). We elaborate on our clustering approach in the supplement. We see that the model learned general semantic groupings of words associated with hate speech as well as specific idiosyncrasies related to the dataset itself (e.g. katieandnikki)
+
+## Conclusion
+
+Despite minimal tuning of hyper-parameters, fewer weight parameters, minimal text preprocessing, and no additional metadata, the model performs remarkably well on standard hate speech datasets. Our clustering analysis adds interpretability enabling inspection of results.
+
+Our results indicate that the majority of recent deep learning models in hate speech may rely on word embeddings for the bulk of predictive power and the addition of sequence-based parameters provide minimal utility. Sequence based approaches are typically important when phenomena such as negation, co-reference, and context-dependent phrases are salient in the text and thus, we suspect these cases are in the minority for publicly available datasets. We think it would be valuable to study the occurrence of such linguistic phenomena in existing datasets and construct new datasets that have a better representation of subtle forms of hate speech. In the future, we plan to investigate character based representations, using character CNNs and highway layers BIBREF15 along with word embeddings to allow robust representations for sparse words such as hashtags.
+
+## Supplemental Material
+
+We experimented with several different preprocessing variants and were surprised to find that reducing preprocessing improved the performance on the task for all of our tasks. We go through each preprocessing variant with an example and then describe our analysis to compare and evaluate each of them.
+
+## Preprocessing
+
+Original text
+
+RT @AGuyNamed_Nick Now, I'm not sexist in any way shape or form but I think women are better at gift wrapping. It's the XX chromosome thing
+
+Tokenize (Basic Tokenize: Keeps case and words intact with limited sanitizing)
+
+RT @AGuyNamed_Nick Now , I 'm not sexist in any way shape or form but I think women are better at gift wrapping . It 's the XX chromosome thing
+
+Tokenize Lowercase: Lowercase the basic tokenize scheme
+
+rt @aguynamed_nick now , i 'm not sexist in any way shape or form but i think women are better at gift wrapping . it 's the xx chromosome thing
+
+Token Replace: Replaces entities and user names with placeholder)
+
+ENT USER now , I 'm not sexist in any way shape or form but I think women are better at gift wrapping . It 's the xx chromosome thing
+
+Token Replace Lowercase: Lowercase the Token Replace Scheme
+
+ENT USER now , i 'm not sexist in any way shape or form but i think women are better at gift wrapping . it 's the xx chromosome thing
+
+We did analysis on a validation set across multiple datasets to find that the "Tokenize" scheme was by far the best. We believe that keeping the case in tact provides useful information about the user. For example, saying something in all CAPS is a useful signal that the model can take advantage of.
+
+## Embedding Analysis
+
+Since our method was a simple word embedding based model, we explored the learned embedding space to analyze results. For this analysis, we only use the max pooling part of our architecture to help analyze the learned embedding space because it encourages salient words to increase their values to be selected. We projected the original pre-trained embeddings to the learned space using the time distributed MLP. We summed the embedding dimensions for each word and sorted by the sum in descending order to find the 1000 most salient word embeddings from our vocabulary. We then ran PCA BIBREF16 to reduce the dimensionality of the projected embeddings from 300 dimensions to 75 dimensions. This captured about 60% of the variance. Finally, we ran K means clustering for INLINEFORM0 clusters to organize the most salient embeddings in the projected space.
+
+The learned clusters from the SR vocabulary were very illuminating (see Table TABREF14 ); they gave insights to how hate speech surfaced in the datasets. One clear grouping we found is the misogynistic and pornographic group, which contained words like breasts, blonds, and skank. Two other clusters had references to geopolitical and religious issues in the Middle East and disparaging and resentful epithets that could be seen as having an intellectual tone. This hints towards the subtle pedagogic forms of hate speech that surface. We ran silhouette analysis BIBREF17 on the learned clusters to find that the clusters from the learned representations had a 35% higher silhouette coefficient using the projected embeddings compared to the clusters created from the original pre-trained embeddings. This reinforces the claim that our training process pushed hate-speech related words together, and words from other clusters further away, thus, structuring the embedding space effectively for detecting hate speech.

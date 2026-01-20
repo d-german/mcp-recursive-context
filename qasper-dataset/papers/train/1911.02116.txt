@@ -1,0 +1,149 @@
+# Unsupervised Cross-lingual Representation Learning at Scale
+
+**Paper ID:** 1911.02116
+
+## Abstract
+
+This paper shows that pretraining multilingual language models at scale leads to significant performance gains for a wide range of cross-lingual transfer tasks. We train a Transformer-based masked language model on one hundred languages, using more than two terabytes of filtered CommonCrawl data. Our model, dubbed XLM-R, significantly outperforms multilingual BERT (mBERT) on a variety of cross-lingual benchmarks, including +13.8% average accuracy on XNLI, +12.3% average F1 score on MLQA, and +2.1% average F1 score on NER. XLM-R performs particularly well on low-resource languages, improving 11.8% in XNLI accuracy for Swahili and 9.2% for Urdu over the previous XLM model. We also present a detailed empirical evaluation of the key factors that are required to achieve these gains, including the trade-offs between (1) positive transfer and capacity dilution and (2) the performance of high and low resource languages at scale. Finally, we show, for the first time, the possibility of multilingual modeling without sacrificing per-language performance; XLM-Ris very competitive with strong monolingual models on the GLUE and XNLI benchmarks. We will make XLM-R code, data, and models publicly available.
+
+## Introduction
+
+The goal of this paper is to improve cross-lingual language understanding (XLU), by carefully studying the effects of training unsupervised cross-lingual representations at a very large scale. We present XLM-R, a transformer-based multilingual masked language model pre-trained on text in 100 languages, which obtains state-of-the-art performance on cross-lingual classification, sequence labeling and question answering.
+
+Multilingual masked language models (MLM) like mBERT BIBREF0 and XLM BIBREF1 have pushed the state-of-the-art on cross-lingual understanding tasks by jointly pretraining large Transformer models BIBREF2 on many languages. These models allow for effective cross-lingual transfer, as seen in a number of benchmarks including cross-lingual natural language inference BIBREF3, BIBREF4, BIBREF5, question answering BIBREF6, BIBREF7, and named entity recognition BIBREF8, BIBREF9. However, all of these studies pre-train on Wikipedia, which provides a relatively limited scale especially for lower resource languages.
+
+In this paper, we first present a comprehensive analysis of the trade-offs and limitations of multilingual language models at scale, inspired by recent monolingual scaling efforts BIBREF10. We measure the trade-off between high-resource and low-resource languages and the impact of language sampling and vocabulary size. The experiments expose a trade-off as we scale the number of languages for a fixed model capacity: more languages leads to better cross-lingual performance on low-resource languages up until a point, after which the overall performance on monolingual and cross-lingual benchmarks degrades. We refer to this tradeoff as the curse of multilinguality, and show that it can be alleviated by simply increasing model capacity. We argue, however, that this remains an important limitation for future XLU systems which may aim to improve performance with more modest computational budgets.
+
+Our best model XLM-RoBERTa (XLM-R) outperforms mBERT on cross-lingual classification by up to 21% accuracy on low-resource languages like Swahili and Urdu. It outperforms the previous state of the art by 3.9% average accuracy on XNLI, 2.1% average F1-score on Named Entity Recognition, and 8.4% average F1-score on cross-lingual Question Answering. We also evaluate monolingual fine tuning on the GLUE and XNLI benchmarks, where XLM-R obtains results competitive with state-of-the-art monolingual models, including RoBERTa BIBREF10. These results demonstrate, for the first time, that it is possible to have a single large model for all languages, without sacrificing per-language performance. We will make our code, models and data publicly available, with the hope that this will help research in multilingual NLP and low-resource language understanding.
+
+## Related Work
+
+From pretrained word embeddings BIBREF11, BIBREF12 to pretrained contextualized representations BIBREF13, BIBREF14 and transformer based language models BIBREF15, BIBREF0, unsupervised representation learning has significantly improved the state of the art in natural language understanding. Parallel work on cross-lingual understanding BIBREF16, BIBREF14, BIBREF1 extends these systems to more languages and to the cross-lingual setting in which a model is learned in one language and applied in other languages.
+
+Most recently, BIBREF0 and BIBREF1 introduced mBERT and XLM - masked language models trained on multiple languages, without any cross-lingual supervision. BIBREF1 propose translation language modeling (TLM) as a way to leverage parallel data and obtain a new state of the art on the cross-lingual natural language inference (XNLI) benchmark BIBREF5. They further show strong improvements on unsupervised machine translation and pretraining for sequence generation. Separately, BIBREF8 demonstrated the effectiveness of multilingual models like mBERT on sequence labeling tasks. BIBREF17 showed gains over XLM using cross-lingual multi-task learning, and BIBREF18 demonstrated the efficiency of cross-lingual data augmentation for cross-lingual NLI. However, all of this work was at a relatively modest scale, in terms of the amount of training data, as compared to our approach.
+
+The benefits of scaling language model pretraining by increasing the size of the model as well as the training data has been extensively studied in the literature. For the monolingual case, BIBREF19 show how large-scale LSTM models can obtain much stronger performance on language modeling benchmarks when trained on billions of tokens. GPT BIBREF15 also highlights the importance of scaling the amount of data and RoBERTa BIBREF10 shows that training BERT longer on more data leads to significant boost in performance. Inspired by RoBERTa, we show that mBERT and XLM are undertuned, and that simple improvements in the learning procedure of unsupervised MLM leads to much better performance. We train on cleaned CommonCrawls BIBREF20, which increase the amount of data for low-resource languages by two orders of magnitude on average. Similar data has also been shown to be effective for learning high quality word embeddings in multiple languages BIBREF21.
+
+Several efforts have trained massively multilingual machine translation models from large parallel corpora. They uncover the high and low resource trade-off and the problem of capacity dilution BIBREF22, BIBREF23. The work most similar to ours is BIBREF24, which trains a single model in 103 languages on over 25 billion parallel sentences. BIBREF25 further analyze the representations obtained by the encoder of a massively multilingual machine translation system and show that it obtains similar results to mBERT on cross-lingual NLI. Our work, in contrast, focuses on the unsupervised learning of cross-lingual representations and their transfer to discriminative tasks.
+
+## Model and Data
+
+In this section, we present the training objective, languages, and data we use. We follow the XLM approach BIBREF1 as closely as possible, only introducing changes that improve performance at scale.
+
+## Model and Data ::: Masked Language Models.
+
+We use a Transformer model BIBREF2 trained with the multilingual MLM objective BIBREF0, BIBREF1 using only monolingual data. We sample streams of text from each language and train the model to predict the masked tokens in the input. We apply subword tokenization directly on raw text data using Sentence Piece BIBREF26 with a unigram language model BIBREF27. We sample batches from different languages using the same sampling distribution as BIBREF1, but with $\alpha =0.3$. Unlike BIBREF1, we do not use language embeddings, which allows our model to better deal with code-switching. We use a large vocabulary size of 250K with a full softmax and train two different models: XLM-R Base (L = 12, H = 768, A = 12, 270M params) and XLM-R (L = 24, H = 1024, A = 16, 550M params). For all of our ablation studies, we use a BERTBase architecture with a vocabulary of 150K tokens. Appendix SECREF8 goes into more details about the architecture of the different models referenced in this paper.
+
+## Model and Data ::: Scaling to a hundred languages.
+
+XLM-R is trained on 100 languages; we provide a full list of languages and associated statistics in Appendix SECREF7. Figure specifies the iso codes of 88 languages that are shared across XLM-R and XLM-100, the model from BIBREF1 trained on Wikipedia text in 100 languages.
+
+Compared to previous work, we replace some languages with more commonly used ones such as romanized Hindi and traditional Chinese. In our ablation studies, we always include the 7 languages for which we have classification and sequence labeling evaluation benchmarks: English, French, German, Russian, Chinese, Swahili and Urdu. We chose this set as it covers a suitable range of language families and includes low-resource languages such as Swahili and Urdu. We also consider larger sets of 15, 30, 60 and all 100 languages. When reporting results on high-resource and low-resource, we refer to the average of English and French results, and the average of Swahili and Urdu results respectively.
+
+## Model and Data ::: Scaling the Amount of Training Data.
+
+Following BIBREF20, we build a clean CommonCrawl Corpus in 100 languages. We use an internal language identification model in combination with the one from fastText BIBREF28. We train language models in each language and use it to filter documents as described in BIBREF20. We consider one CommonCrawl dump for English and twelve dumps for all other languages, which significantly increases dataset sizes, especially for low-resource languages like Burmese and Swahili.
+
+Figure shows the difference in size between the Wikipedia Corpus used by mBERT and XLM-100, and the CommonCrawl Corpus we use. As we show in Section SECREF19, monolingual Wikipedia corpora are too small to enable unsupervised representation learning. Based on our experiments, we found that a few hundred MiB of text data is usually a minimal size for learning a BERT model.
+
+## Evaluation
+
+We consider four evaluation benchmarks. For cross-lingual understanding, we use cross-lingual natural language inference, named entity recognition, and question answering. We use the GLUE benchmark to evaluate the English performance of XLM-R and compare it to other state-of-the-art models.
+
+## Evaluation ::: Cross-lingual Natural Language Inference (XNLI).
+
+The XNLI dataset comes with ground-truth dev and test sets in 15 languages, and a ground-truth English training set. The training set has been machine-translated to the remaining 14 languages, providing synthetic training data for these languages as well. We evaluate our model on cross-lingual transfer from English to other languages. We also consider three machine translation baselines: (i) translate-test: dev and test sets are machine-translated to English and a single English model is used (ii) translate-train (per-language): the English training set is machine-translated to each language and we fine-tune a multiligual model on each training set (iii) translate-train-all (multi-language): we fine-tune a multilingual model on the concatenation of all training sets from translate-train. For the translations, we use the official data provided by the XNLI project.
+
+## Evaluation ::: Named Entity Recognition.
+
+For NER, we consider the CoNLL-2002 BIBREF29 and CoNLL-2003 BIBREF30 datasets in English, Dutch, Spanish and German. We fine-tune multilingual models either (1) on the English set to evaluate cross-lingual transfer, (2) on each set to evaluate per-language performance, or (3) on all sets to evaluate multilingual learning. We report the F1 score, and compare to baselines from BIBREF31 and BIBREF32.
+
+## Evaluation ::: Cross-lingual Question Answering.
+
+We use the MLQA benchmark from BIBREF7, which extends the English SQuAD benchmark to Spanish, German, Arabic, Hindi, Vietnamese and Chinese. We report the F1 score as well as the exact match (EM) score for cross-lingual transfer from English.
+
+## Evaluation ::: GLUE Benchmark.
+
+Finally, we evaluate the English performance of our model on the GLUE benchmark BIBREF33 which gathers multiple classification tasks, such as MNLI BIBREF4, SST-2 BIBREF34, or QNLI BIBREF35. We use BERTLarge and RoBERTa as baselines.
+
+## Analysis and Results
+
+In this section, we perform a comprehensive analysis of multilingual masked language models. We conduct most of the analysis on XNLI, which we found to be representative of our findings on other tasks. We then present the results of XLM-R on cross-lingual understanding and GLUE. Finally, we compare multilingual and monolingual models, and present results on low-resource languages.
+
+## Analysis and Results ::: Improving and Understanding Multilingual Masked Language Models
+
+Much of the work done on understanding the cross-lingual effectiveness of mBERT or XLM BIBREF8, BIBREF9, BIBREF7 has focused on analyzing the performance of fixed pretrained models on downstream tasks. In this section, we present a comprehensive study of different factors that are important to pretraining large scale multilingual models. We highlight the trade-offs and limitations of these models as we scale to one hundred languages.
+
+## Analysis and Results ::: Improving and Understanding Multilingual Masked Language Models ::: Transfer-dilution trade-off and Curse of Multilinguality.
+
+Model capacity (i.e. the number of parameters in the model) is constrained due to practical considerations such as memory and speed during training and inference. For a fixed sized model, the per-language capacity decreases as we increase the number of languages. While low-resource language performance can be improved by adding similar higher-resource languages during pretraining, the overall downstream performance suffers from this capacity dilution BIBREF24. Positive transfer and capacity dilution have to be traded off against each other.
+
+We illustrate this trade-off in Figure , which shows XNLI performance vs the number of languages the model is pretrained on. Initially, as we go from 7 to 15 languages, the model is able to take advantage of positive transfer and this improves performance, especially on low resource languages. Beyond this point the curse of multilinguality kicks in and degrades performance across all languages. Specifically, the overall XNLI accuracy decreases from 71.8% to 67.7% as we go from XLM-7 to XLM-100. The same trend can be observed for models trained on the larger CommonCrawl Corpus.
+
+The issue is even more prominent when the capacity of the model is small. To show this, we pretrain models on Wikipedia Data in 7, 30 and 100 languages. As we add more languages, we make the Transformer wider by increasing the hidden size from 768 to 960 to 1152. In Figure , we show that the added capacity allows XLM-30 to be on par with XLM-7, thus overcoming the curse of multilinguality. The added capacity for XLM-100, however, is not enough and it still lags behind due to higher vocabulary dilution (recall from Section SECREF3 that we used a fixed vocabulary size of 150K for all models).
+
+## Analysis and Results ::: Improving and Understanding Multilingual Masked Language Models ::: High-resource/Low-resource trade-off.
+
+The allocation of the model capacity across languages is controlled by several parameters: the training set size, the size of the shared subword vocabulary, and the rate at which we sample training examples from each language. We study the effect of sampling on the performance of high-resource (English and French) and low-resource (Swahili and Urdu) languages for an XLM-100 model trained on Wikipedia (we observe a similar trend for the construction of the subword vocab). Specifically, we investigate the impact of varying the $\alpha $ parameter which controls the exponential smoothing of the language sampling rate. Similar to BIBREF1, we use a sampling rate proportional to the number of sentences in each corpus. Models trained with higher values of $\alpha $ see batches of high-resource languages more often. Figure shows that the higher the value of $\alpha $, the better the performance on high-resource languages, and vice-versa. When considering overall performance, we found $0.3$ to be an optimal value for $\alpha $, and use this for XLM-R.
+
+## Analysis and Results ::: Improving and Understanding Multilingual Masked Language Models ::: Importance of Capacity and Vocabulary Size.
+
+In previous sections and in Figure , we showed the importance of scaling the model size as we increase the number of languages. Similar to the overall model size, we argue that scaling the size of the shared vocabulary (the vocabulary capacity) can improve the performance of multilingual models on downstream tasks. To illustrate this effect, we train XLM-100 models on Wikipedia data with different vocabulary sizes. We keep the overall number of parameters constant by adjusting the width of the transformer. Figure shows that even with a fixed capacity, we observe a 2.8% increase in XNLI average accuracy as we increase the vocabulary size from 32K to 256K. This suggests that multilingual models can benefit from allocating a higher proportion of the total number of parameters to the embedding layer even though this reduces the size of the Transformer. With bigger models, we believe that using a vocabulary of up to 2 million tokens with an adaptive softmax BIBREF36, BIBREF37 should improve performance even further, but we leave this exploration to future work. For simplicity and given the computational constraints, we use a vocabulary of 250k for XLM-R.
+
+We further illustrate the importance of this parameter, by training three models with the same transformer architecture (BERTBase) but with different vocabulary sizes: 128K, 256K and 512K. We observe more than 3% gains in overall accuracy on XNLI by simply increasing the vocab size from 128k to 512k.
+
+## Analysis and Results ::: Improving and Understanding Multilingual Masked Language Models ::: Importance of large-scale training with more data.
+
+As shown in Figure , the CommonCrawl Corpus that we collected has significantly more monolingual data than the previously used Wikipedia corpora. Figure shows that for the same BERTBase architecture, all models trained on CommonCrawl obtain significantly better performance.
+
+Apart from scaling the training data, BIBREF10 also showed the benefits of training MLMs longer. In our experiments, we observed similar effects of large-scale training, such as increasing batch size (see Figure ) and training time, on model performance. Specifically, we found that using validation perplexity as a stopping criterion for pretraining caused the multilingual MLM in BIBREF1 to be under-tuned. In our experience, performance on downstream tasks continues to improve even after validation perplexity has plateaued. Combining this observation with our implementation of the unsupervised XLM-MLM objective, we were able to improve the performance of BIBREF1 from 71.3% to more than 75% average accuracy on XNLI, which was on par with their supervised translation language modeling (TLM) objective. Based on these results, and given our focus on unsupervised learning, we decided to not use the supervised TLM objective for training our models.
+
+## Analysis and Results ::: Improving and Understanding Multilingual Masked Language Models ::: Simplifying multilingual tokenization with Sentence Piece.
+
+The different language-specific tokenization tools used by mBERT and XLM-100 make these models more difficult to use on raw text. Instead, we train a Sentence Piece model (SPM) and apply it directly on raw text data for all languages. We did not observe any loss in performance for models trained with SPM when compared to models trained with language-specific preprocessing and byte-pair encoding (see Figure ) and hence use SPM for XLM-R.
+
+## Analysis and Results ::: Cross-lingual Understanding Results
+
+Based on these results, we adapt the setting of BIBREF1 and use a large Transformer model with 24 layers and 1024 hidden states, with a 250k vocabulary. We use the multilingual MLM loss and train our XLM-R model for 1.5 Million updates on five hundred 32GB Nvidia V100 GPUs with a batch size of 8192. We leverage the SPM-preprocessed text data from CommonCrawl in 100 languages and sample languages with $\alpha =0.3$. In this section, we show that it outperforms all previous techniques on cross-lingual benchmarks while getting performance on par with RoBERTa on the GLUE benchmark.
+
+## Analysis and Results ::: Cross-lingual Understanding Results ::: XNLI.
+
+Table shows XNLI results and adds some additional details: (i) the number of models the approach induces (#M), (ii) the data on which the model was trained (D), and (iii) the number of languages the model was pretrained on (#lg). As we show in our results, these parameters significantly impact performance. Column #M specifies whether model selection was done separately on the dev set of each language ($N$ models), or on the joint dev set of all the languages (single model). We observe a 0.6 decrease in overall accuracy when we go from $N$ models to a single model - going from 71.3 to 70.7. We encourage the community to adopt this setting. For cross-lingual transfer, while this approach is not fully zero-shot transfer, we argue that in real applications, a small amount of supervised data is often available for validation in each language.
+
+XLM-R sets a new state of the art on XNLI. On cross-lingual transfer, XLM-R obtains 80.1% accuracy, outperforming the XLM-100 and mBERT open-source models by 9.4% and 13.8% average accuracy. On the Swahili and Urdu low-resource languages, XLM-R outperforms XLM-100 by 13.8% and 9.3%, and mBERT by 21.6% and 13.7%. While XLM-R handles 100 languages, we also show that it outperforms the former state of the art Unicoder BIBREF17 and XLM (MLM+TLM), which handle only 15 languages, by 4.7% and 5% average accuracy respectively. Using the multilingual training of translate-train-all, XLM-R further improves performance and reaches 82.4% accuracy, a new overall state of the art for XNLI, outperforming Unicoder by 3.9%. Multilingual training is similar to practical applications where training sets are available in various languages for the same task. In the case of XNLI, datasets have been translated, and translate-train-all can be seen as some form of cross-lingual data augmentation BIBREF18, similar to back-translation BIBREF38.
+
+## Analysis and Results ::: Cross-lingual Understanding Results ::: Named Entity Recognition.
+
+In Table , we report results of XLM-R and mBERT on CoNLL-2002 and CoNLL-2003. We consider the LSTM + CRF approach from BIBREF31 and the Flair model from BIBREF32 as baselines. We evaluate the performance of the model on each of the target languages in three different settings: (i) train on English data only (en) (ii) train on data in target language (each) (iii) train on data in all languages (all). Results of mBERT are reported from BIBREF9. Note that we do not use a linear-chain CRF on top of XLM-R and mBERT representations, which gives an advantage to BIBREF32. Without the CRF, our XLM-R model still performs on par with the state of the art, outperforming BIBREF32 on Dutch by $2.84$ points. On this task, XLM-R also outperforms mBERT by 2.1 F1 on average for cross-lingual transfer, and 1.86 F1 when trained on each language. Training on all languages leads to an average F1 score of 89.18%, outperforming cross-lingual transfer approach by more than 8.5%.
+
+## Analysis and Results ::: Cross-lingual Understanding Results ::: Question Answering.
+
+We also obtain new state of the art results on the MLQA cross-lingual question answering benchmark, introduced by BIBREF7. We follow their procedure by training on the English training data and evaluating on the 7 languages of the dataset. We report results in Table . XLM-R obtains F1 and accuracy scores of 70.0% and 52.2% while the previous state of the art was 61.6% and 43.5%. XLM-R also outperforms mBERT by 12.3% F1-score and 10.6% accuracy. It even outperforms BERT-Large on English, confirming its strong monolingual performance.
+
+## Analysis and Results ::: Multilingual versus Monolingual
+
+In this section, we present results of multilingual XLM models against monolingual BERT models.
+
+## Analysis and Results ::: Multilingual versus Monolingual ::: GLUE: XLM-R versus RoBERTa.
+
+Our goal is to obtain a multilingual model with strong performance on both, cross-lingual understanding tasks as well as natural language understanding tasks for each language. To that end, we evaluate XLM-R on the GLUE benchmark. We show in Table , that XLM-R obtains better average dev performance than BERTLarge by 1.3% and reaches performance on par with XLNetLarge. The RoBERTa model outperforms XLM-R by only 1.3% on average. We believe future work can reduce this gap even further by alleviating the curse of multilinguality and vocabulary dilution. These results demonstrate the possibility of learning one model for many languages while maintaining strong performance on per-language downstream tasks.
+
+## Analysis and Results ::: Multilingual versus Monolingual ::: XNLI: XLM versus BERT.
+
+A recurrent criticism against multilingual model is that they obtain worse performance than their monolingual counterparts. In addition to the comparison of XLM-R and RoBERTa, we provide the first comprehensive study to assess this claim on the XNLI benchmark. We extend our comparison between multilingual XLM models and monolingual BERT models on 7 languages and compare performance in Table . We train 14 monolingual BERT models on Wikipedia and CommonCrawl, and two XLM-7 models. We add slightly more capacity in the vocabulary size of the multilingual model for a better comparison. To our surprise - and backed by further study on internal benchmarks - we found that multilingual models can outperform their monolingual BERT counterparts. Specifically, in Table , we show that for cross-lingual transfer, monolingual baselines outperform XLM-7 for both Wikipedia and CC by 1.6% and 1.3% average accuracy. However, by making use of multilingual training (translate-train-all) and leveraging training sets coming from multiple languages, XLM-7 can outperform the BERT models: our XLM-7 trained on CC obtains 80.0% average accuracy on the 7 languages, while the average performance of monolingual BERT models trained on CC is 77.5%. This is a surprising result that shows that the capacity of multilingual models to leverage training data coming from multiple languages for a particular task can overcome the capacity dilution problem to obtain better overall performance.
+
+## Analysis and Results ::: Representation Learning for Low-resource Languages
+
+We observed in Table that pretraining on Wikipedia for Swahili and Urdu performed similarly to a randomly initialized model; most likely due to the small size of the data for these languages. On the other hand, pretraining on CC improved performance by up to 10 points. This confirms our assumption that mBERT and XLM-100 rely heavily on cross-lingual transfer but do not model the low-resource languages as well as XLM-R. Specifically, in the translate-train-all setting, we observe that the biggest gains for XLM models trained on CC, compared to their Wikipedia counterparts, are on low-resource languages; 7% and 4.8% improvement on Swahili and Urdu respectively.
+
+## Conclusion
+
+In this work, we introduced XLM-R, our new state of the art multilingual masked language model trained on 2.5 TB of newly created clean CommonCrawl data in 100 languages. We show that it provides strong gains over previous multilingual models like mBERT and XLM on classification, sequence labeling and question answering. We exposed the limitations of multilingual MLMs, in particular by uncovering the high-resource versus low-resource trade-off, the curse of multilinguality and the importance of key hyperparameters. We also expose the surprising effectiveness of multilingual models over monolingual models, and show strong improvements on low-resource languages.
+
+## Languages and statistics for CC-100 used by XLM-R
+
+In this section we present the list of languages in the CC-100 corpus we created for training XLM-R. We also report statistics such as the number of tokens and the size of each monolingual corpus.
+
+## Model Architectures and Sizes
+
+As we showed in section SECREF5, capacity is an important parameter for learning strong cross-lingual representations. In the table below, we list multiple monolingual and multilingual models used by the research community and summarize their architectures and total number of parameters.

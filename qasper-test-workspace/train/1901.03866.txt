@@ -1,0 +1,264 @@
+# HAS-QA: Hierarchical Answer Spans Model for Open-domain Question Answering
+
+**Paper ID:** 1901.03866
+
+## Abstract
+
+This paper is concerned with open-domain question answering (i.e., OpenQA). Recently, some works have viewed this problem as a reading comprehension (RC) task, and directly applied successful RC models to it. However, the performances of such models are not so good as that in the RC task. In our opinion, the perspective of RC ignores three characteristics in OpenQA task: 1) many paragraphs without the answer span are included in the data collection; 2) multiple answer spans may exist within one given paragraph; 3) the end position of an answer span is dependent with the start position. In this paper, we first propose a new probabilistic formulation of OpenQA, based on a three-level hierarchical structure, i.e., the question level, the paragraph level and the answer span level. Then a Hierarchical Answer Spans Model (HAS-QA) is designed to capture each probability. HAS-QA has the ability to tackle the above three problems, and experiments on public OpenQA datasets show that it significantly outperforms traditional RC baselines and recent OpenQA baselines.
+
+## Introduction
+
+Open-domain question answering (OpenQA) aims to seek answers for a broad range of questions from a large knowledge sources, e.g., structured knowledge bases BIBREF0 , BIBREF1 and unstructured documents from search engine BIBREF2 . In this paper we focus on the OpenQA task with the unstructured knowledge sources retrieved by search engine.
+
+Inspired by the reading comprehension (RC) task flourishing in the area of natural language processing BIBREF3 , BIBREF4 , BIBREF5 , some recent works have viewed OpenQA as an RC task, and directly applied the existing RC models to it BIBREF6 , BIBREF7 , BIBREF3 , BIBREF8 . However, these RC models do not well fit for the OpenQA task.
+
+Firstly, they directly omit the paragraphs without answer string. RC task assumes that the given paragraph contains the answer string (Figure 1 top), however, it is not valid for the OpenQA task (Figure 1 bottom). That's because the paragraphs to provide answer for an OpenQA question is collected from a search engine, where each retrieved paragraph is merely relevant to the question. Therefore, it contains many paragraphs without answer string, for instance, in Figure 1 Paragraph2. When applying RC models to OpenQA task, we have to omit these paragraphs in the training phase. However, during the inference phase, when model meets one paragraph without answer string, it will pick out a text span as an answer span with high confidence, since RC model has no evidence to justify whether a paragraph contains the answer string.
+
+Secondly, they only consider the first answer span in the paragraph, but omit the remaining rich multiple answer spans. In RC task, the answer and its positions in the paragraph are provided by the annotator in the training data. Therefore RC models only need to consider the unique answer span, e.g., in SQuAD BIBREF9 . However, the OpenQA task only provides the answer string as the ground-truth. Therefore, multiple answer spans are detected in the given paragraph, which cannot be considered by the traditional RC models. Take Figure 1 as an example, all text spans contain `fat' are treated as answer span, so we detect two answer spans in Paragraph1.
+
+Thirdly, they assume that the start position and end position of an answer span is independent. However, the end position is evidently related with the start position, especially when there are multiple answer spans in a paragraph. Therefore, it may introduce some problems when using such independence assumption. For example, the detected end position may correspond to another answer span, rather than the answer span located by the start position. In Figure 1 Paragraph1, `fat in their $\cdots $ insulating effect fat' has a high confidence to be an answer span under independence assumption.
+
+In this paper, we propose a Hierarchical Answer Span Model, named HAS-QA, based on a new three-level probabilistic formulation of OpenQA task, as shown in Figure 2 .
+
+At the question level, the conditional probability of the answer string given a question and a collection of paragraphs, named answer probability, is defined as the product of the paragraph probability and conditional answer probability, based on the law of total probability.
+
+At the paragraph level, paragraph probability is defined as the degree to which a paragraph can answer the question. This probability is used to measure the quality of a paragraph and targeted to tackle the first problem mentioned, i.e. identify the useless paragraphs. For calculation, we first apply bidirectional GRU and an attention mechanism on the question aware context embedding to obtain a score. Then, we normalize the scores across the multiple paragraphs. In the training phase, we adopt a negative sampling strategy for optimization. Conditional answer probability is the conditional probability that a text string is the answer given the paragraph. Considering multiple answer spans in a paragraph, the conditional answer probability can be further represented as the aggregation of several span probability, defined later. In this paper, four types of functions, i.e. HEAD, RAND, MAX and SUM, are used for aggregation.
+
+At the span level, span probability represents the probability that a text span in a paragraph is the answer span. Similarly to previous work BIBREF3 , span probability can be computed as the product of two location probability, i.e., location start probability and location end probability. Then a conditional pointer network is proposed to model the probabilistic dependences between the start and end positions, by making generation of end position depended on the start position directly, rather than internal representation of start position BIBREF10 .
+
+The contributions of this paper include:
+
+1) a probabilistic formulation of the OpenQA task, based on the a three-level hierarchical structure, i.e. the question level, the paragraph level and the answer span level;
+
+2) the proposal of an end-to-end HAS-QA model to implement the three-level probabilistic formulation of OpenQA task (Section "HAS-QA Model" ), which tackles the three problems of direct applying existing RC models to OpenQA;
+
+3) extensive experiments on QuasarT, TriviaQA and SearchQA datasets, which show that HAS-QA outperforms traditional RC baselines and recent OpenQA baselines.
+
+## Related Works
+
+Research in reading comprehension grows rapidly, and many successful RC models have been proposed BIBREF11 , BIBREF4 , BIBREF3 in this area. Recently, some works have treated OpenQA task as an RC task and directly applied existing RC models. In this section, we first review the approach of typical RC models, then introduce some recent OpenQA models which are directly based on the RC approach.
+
+RC models typically have two components: context encoder and answer decoder. Context encoder is used to obtain the embeddings of questions, paragraphs and their interactions. Most of recent works are based on the attention mechanism and its extensions. The efficient way is to treat the question as a key to attention paragraph BIBREF3 , BIBREF6 . Adding the attention from paragraph to question BIBREF4 , BIBREF5 , enriches the representations of context encoder. Some works BIBREF12 , BIBREF13 , BIBREF8 find that self-attention is useful for RC task. Answer decoder aims to generate answer string based on the context embeddings. There exist two sorts of approaches, generate answer based on the entail word vocabulary BIBREF14 and retrieve answer from the current paragraph. Almost all works in RC task choose the retrieval-based method. Some of them use two independently position classifiers BIBREF6 , BIBREF15 , the others use the pointer networks BIBREF3 , BIBREF4 , BIBREF12 , BIBREF13 . An answer length limitation is applied in these models, i.e. omit the text span longer than 8. We find that relaxing length constrain leads to performance drop.
+
+Some recent works in OpenQA research directly introduce RC model to build a pure data driven pipline. DrQA BIBREF6 is the earliest work that applies RC model in OpenQA task. However, its RC model is trained using typical RC dataset SQuAD BIBREF9 , which turns to be over-confidence about its predicted results even if the candidate paragraphs contain no answer span. R ${}^3$ BIBREF16 introduces a ranker model to rerank the original paragraph list, so as to improve the input quality of the following RC model. The training data of the RC model is solely limited to the paragraphs containing the answer span and the first appeared answer span location is chosen as the ground truth. Shared-Norm BIBREF8 applied a shared-norm trick which considers paragraphs without answer span in training RC models. The trained RC model turns to be robust for the useless paragraphs and generates the lower span scores for them. However, it assumes that the start and the end positions of an answer span are independent, which is not suitable for modeling multiple answer spans in one paragraph.
+
+Therefore, we realize that the existing OpenQA models rarely consider the differences between RC and OpenQA task. In this paper, we directly model the OpenQA task based on a probabilistic formulation, in order to identify the useless paragraphs and utilize the multiple answer spans.
+
+## Probabilistic Views of OpenQA
+
+In OpenQA task, the question $Q$ and its answer string $A$ are given. Entering question $Q$ into a search engine, top $K$ relevant paragraphs are returned, denote as a list $\mathbf {P} = [P_1,\dots , P_K]$ . The target of OpenQA is to find the maximum probability of $P(A|Q, \mathbf {P})$ , named answer probability for short. We can see the following three characteristics of OpenQA:
+
+1) we cannot guarantee that paragraph retrieved by search engine contains the answer span for the question, so the paragraphs without answer span have to be deleted when using the above RC models. However, these paragraphs are useful for distinguishing the quality of paragraphs in training. More importantly, the quality of a paragraph plays an important role in determining the answer probability in the inference phase. It is clear that directly applying RC models fails to meet this requirement.
+
+2) only answer string is provided, while the location of the answer string is unknown. That means there may be many answer spans in the paragraph. It is well known that traditional RC models are only valid for a single answer span. To tackle this problem, the authors of BIBREF7 propose a distantly supervised method to use the first exact match location of answer string in the paragraph as the ground-truth answer span. However, this method omit the valuable multiple answer spans information, which may be important for the calculation of the answer probability.
+
+3) the start and end positions are coupled together to determine a specific answer span, since there may be multiple answer spans. However, existing RC models usually assume that the start and end positions are independent. That's because there is only one answer span in the RC scenario. This may introduce serious problem in the OpenQA task. For example, if we do not consider the relations between the start and end position, the end position may be another answer span's end position, instead of the one determined by the start position. Therefore, it is not appropriate to assume independence between start and end positions.
+
+In this paper, we propose to tackle the above three problems. Firstly, according to the law of total probability, the answer probability can be rewritten as the following form. 
+
+$$P(A|Q, \mathbf {P})\! =\! \sum _{i=1}^{K} P(P_i|Q, \mathbf {P}) P(A|Q, P_i).$$   (Eq. 4) 
+
+We name $P(P_i|Q, \mathbf {P})$ and $P(A|Q, P_i)$ as the paragraph probability and conditional answer probability, respectively. We can see that the paragraph probability measures the quality of paragraph $P_i$ across the list $\mathbf {P}$ , while the conditional answer probability measures the probability that string $A$ is an answer string given paragraph $P_i$ .
+
+The conditional answer probability can be treated as a function of multiple span probabilities $\lbrace P(L_j(A)|Q, P_i)\rbrace _j$ , as shown in Eq 5 . 
+
+$$\begin{aligned}
+P(A|Q, P_i) &:= \mathcal {F}(\lbrace P(L_j(A)|Q, P_i)\rbrace _j), \\
+&j \in [1, |\mathcal {L}(A,P_i)|],
+\end{aligned}$$   (Eq. 5) 
+
+where the aggregation function $\mathcal {F}$ treats a list of spans $\mathcal {L}(A,P_i)$ as input, and $|\mathcal {L}(A,P_i)|$ denotes the number of the text spans contain the string $A$ . A proper aggregation function makes use of all the answer spans information in OpenQA task. Previous work BIBREF7 can be treated as a special case, which uses a function of selecting first match span as the aggregation function $\mathcal {F}$ .
+
+The span probability $P(L_j(A)|Q, P_i)$ represents the probability that a text span $L_j(A)$ in the paragraph $P_i$ is an answer span. We further decompose it into the product of location start probability $P(L^s_j(A)|Q, P_i)$ and location end probability $P(L^e_j(A)|Q, P_i, L^s_j(A))$ , shown in Eq 6 . 
+
+$$\begin{aligned}
+P(L_j(A)|Q, P_i) = &P(L^s_j(A)|Q, P_i) \\
+\cdot &P(L^e_j(A)|Q, P_i, L^s_j(A)). \end{aligned}$$   (Eq. 6) 
+
+Some previous work such as DrQA BIBREF6 treats them as the two independently position classification tasks, thus $L^{s}(A)$ and $L^{e}(A)$ are modeled by two different functions. Match-LSTM BIBREF3 treats them as the pointer networks BIBREF10 . The difference is that $L^{e}(A)$ is the function of the hidden state of $L^{s}(A)$ , denote as $\mathbf {M^s}$ . However, $L^{s}(A)$ and $L^{e}(A)$ are still independent in probabilistic view, because $L^{e}(A)$ depends on the hidden state $\mathbf {M^s}$ , not the start position $L^{s}(A)$ . In this paper, the span positions $L^{e}(A)$0 and $L^{e}(A)$1 are determined by the question $L^{e}(A)$2 and the paragraph $L^{e}(A)$3 . Specially, end position $L^{e}(A)$4 is also conditional on start position $L^{e}(A)$5 directly. With this conditional probability, we can naturally remove the answer length limitation.
+
+With above formulation, we find that RC task is a special case of OpenQA task, where we set the number of paragraph $K$ to 1, set the paragraph probability to constant number 1, treat $P(A|Q,P){=}P(L(A)|Q, P)$ , $P(L(A)|Q, P){=}P(L^{s}(A)|Q, P)P(L^{e}(A)|Q, P)$ , where $P$ is the idealized paragraph that contain the answer string $A$ , and the right position $L(A)$ is also known.
+
+## HAS-QA Model
+
+In this section, we propose a Hierarchical Answer Span Model (HAS-QA) for OpenQA task, based on the probabilistic view of OpenQA in Section "Probabilistic Views of OpenQA" . HAS-QA has four components: question aware context encoder, conditional span predictor, multiple spans aggregator and paragraph quality estimator. We will introduce them one by one.
+
+## Question Aware Context Encoder
+
+The question aware context embeddings $\mathbf {C}$ is generated by the context encoder, while HAS-QA do not limit the use of context encoder. We choose a simple but efficient context encoder in this paper. It takes advantage of previous works BIBREF8 , BIBREF3 , which contains the character-level embedding enhancement, the bi-directional attention mechanism BIBREF4 and the self-attention mechanism BIBREF12 . We briefly describe the process below .
+
+Word Embeddings: use size 300 pre-trained GloVe BIBREF17 word embeddings.
+
+Char Embeddings: encode characters in size 20, which are learnable. Then obtain the embedding of each word by convolutional layer and max pooling layer.
+
+Context Embeddings: concatenate word embeddings and char embeddings, and apply bi-directional GRU BIBREF18 to obtain the context embeddings. Both question and paragraph get their own context embeddings.
+
+Question Aware Context Embeddings: use bi-directional attention mechanism from the BiDAF BIBREF4 to build question aware context embeddings. Additionally, we subsequently apply a layer of self-attention to get the final question aware context embeddings.
+
+After the processes above, we get the final question aware context embeddings, denoted $\mathbf {C} \in \mathbb {R}^{n \times r}$ , where $n$ is the length of the paragraph and $r$ is size of the embedding.
+
+## Conditional Span Predictor
+
+Conditional span predictor defines the span probability for each text span in a paragraph using a conditional pointer network.
+
+We first review the answer decoder in traditional RC models. It mainly has two types: two independently position classifiers (IndCls) and the pointer networks (PtrNet). Both of these approaches generate a distribution of start position $\mathbf {p^s} \in \mathbb {R}^n$ and a distribution of end position $\mathbf {p^e} \in \mathbb {R}^n$ , where $n$ is the length of the paragraph. Starting from the context embeddings $\mathbf {C}$ , two intermedia representations $\mathbf {M^s} \in \mathbb {R}^{n \times 2d}$ and $\mathbf {M^e} \in \mathbb {R}^{n \times 2d}$ are generated using two bidirectional GRUs with the output dimension $d$ . 
+
+$$ \mathbf {M^s} &= \mathrm {BiGRU}(\mathbf {C})\\
+ \textrm {IndCls:}\; \mathbf {M^e} &= \mathrm {BiGRU}(\mathbf {C}), \\
+ \textrm {PtrNet:}\; \mathbf {M^e} &= \mathrm {BiGRU}([\mathbf {C}, \mathbf {M^s}]).$$   (Eq. 10) 
+
+Then an additional Softmax function is used to generate the final positional distributions, 
+
+$$ 
+\begin{aligned}
+&\mathbf {p^s}\! =\! \mathrm {softmax}(\mathbf {M^s}w_s), \\
+&\mathbf {p^e}\! =\! \mathrm {softmax}(\mathbf {M^e}w_e).
+\end{aligned}$$   (Eq. 11) 
+
+where $w_s, w_e \in \mathbb {R}^{2d}$ denotes the linear transformation parameters.
+
+As mentioned in Section "Probabilistic Views of OpenQA" , IndCls and PtrNet both treat start and end position as probabilistic independent. Given the independent start and end positions can not distinguish the different answer spans in a paragraph properly, so it is necessary to build a conditional model for them. Therefore, we proposed a conditional pointer network which directly feed the start position to the process of generating the end position: 
+
+$$ 
+\begin{aligned}
+\mathbf {M^e_j} &= \mathrm {BiGRU}([\mathbf {C}, \mathbf {M^s}, \mathrm {OneHot}(L^s_j)]), \\
+\mathbf {p^e_j} &= \mathrm {softmax}(\mathbf {M^e_j}w_e),
+\end{aligned}$$   (Eq. 12) 
+
+where $L^s_j$ denotes the start position selected from the start positional distribution $\mathbf {p^s}$ and $\mathrm {OneHot}(\cdot )$ denotes the transformation from a position index to an one-hot vector.
+
+In the training phase, we are given the start and end positions of each answer span, denote as $L^s_j$ and $L^e_j$ . The span probability is: 
+
+$$ 
+P(L_j(A)|Q, P_i) = s_j = \mathbf {p^s}[L^s_j] \cdot \mathbf {p^e_j}[L^e_j].$$   (Eq. 13) 
+
+In the inference phase, we first select the start position $L^s_j$ from the start distribution $\mathbf {p^s}$ . Then we yield its corresponding end distribution $\mathbf {p^e_j}$ using Eq 12 , and select the end position $L^e_j$ from it. Finally, we get the span probability using Eq 13 .
+
+## Multiple Spans Aggregator
+
+Multiple span aggregator is used to build the relations among multiple answer spans and outputs the conditional answer probability. In this paper, we design four types of aggregation functions $\mathcal {F}$ : 
+
+$$ 
+\begin{aligned}
+&\textrm {HEAD:} \; P(A|Q, P_i) = s_1 \\
+&\textrm {RAND:} \; P(A|Q, P_i) = \textrm {Random}(s_j) \\
+&\textrm {MAX:} \;\;\; P(A|Q, P_i) = \max _j\nolimits (s_j) \\
+&\textrm {SUM:} \;\;\; P(A|Q, P_i) = \sum _j\nolimits (s_j) \\
+\end{aligned}$$   (Eq. 15) 
+
+where $s_j$ denotes the span probability defined in Eq 13 , $s_1$ denotes the first match answer span and $\textrm {Random}$ denotes a stochastic function for randomly choosing an answer span.
+
+Different aggregation functions represent different assumptions about the distribution of the oracle answer spans in a paragraph. The oracle answer span represents the answer of the question that can be merely determined by its context, e.g. in Figure 1 , the first answer span `fat' is the oracle answer span, while the second one is not, because we could retrieval the answer directly, if we have read `concentrating body fat in their humps'.
+
+HEAD operation simply chooses the first match span probability as the conditional answer probability, which simulates the answer preprocessing in previous works BIBREF16 , BIBREF7 . This function only encourages the first match answer span as the oracle, while punishes the others. It can be merely worked in a paragraph with definition, such as first paragraph in WikiPedia.
+
+RAND operation randomly chooses a span probability as the conditional answer probability. This function assumes that all answer spans are equally important, and must be treated as oracle. However, balancing the probabilities of answer spans is hard. It can be used in paraphrasing answer spans appear in a list.
+
+MAX operation chooses the maximum span probability as the conditional answer probability. This function assumes that only one answer span is the oracle. It can be used in a noisy paragraph, especially for those retrieved by a search engine.
+
+SUM operation sums all the span probabilities as the conditional answer probability. This function assumes that one or more answer spans are the oracle. It can be used in a broad range of scenarios, for its relatively weak assumption.
+
+In the training phase, all annotated answer spans contain the same answer string $A$ , we directly apply the Eq 15 to obtain the conditional answer probability in paragraph level.
+
+In the inference phase, we treat the top $K$ span probabilities $s_j$ as the input of the aggregation function. However, we have to check all possible start and end positions to get the precise top $K$ span probabilities. Instead, we use a beam search strategy BIBREF19 which only consider the top $K_1$ start positions and the top $K_2$ end positions, where $K_1 K_2 \ge K$ . Different span probabilities $s_j$ represent variance answer strings $A_t$ . Following the definition in Eq 15 , we group them by different answer strings respectively.
+
+## Paragraph Quality Estimator
+
+Paragraph quality estimator takes the useless paragraphs into consideration, which implements the paragraph probability $P(P_i|Q, \mathbf {P})$ directly.
+
+Firstly, we use an attention-based network to generate a quality score, denotes as $\hat{q}_i$ , in order to measure the quality of the given paragraph $P_i$ . 
+
+$$ 
+\begin{aligned}
+&\mathbf {M^c} = \textrm {BiGRU}(\mathbf {C}),\\
+&\hat{q}_i = (\mathbf {M^c}^{\top } \cdot \mathbf {p^s}) \cdot w_c.
+\end{aligned}$$   (Eq. 17) 
+
+where $\mathbf {M^c} \in \mathbb {R}^{n \times 2d}$ is the intermedia representation obtained by applying bidirectional GRU on the context embedding $\mathbf {C}$ . Then, let start distribution $\mathbf {p^s} \in \mathbb {R}^n$ as a key to attention $\mathbf {M^c}$ and transform it to 1-d value using weight $w_c \in \mathbb {R}^{2d}$ . Finally, we get the quality score $\hat{q}_i$ . Paragraph probabilities $P(P_i|Q, \mathbf {P})$ are generated by normalizing across $\mathbf {P}$ , 
+
+$$ 
+P(P_i|Q, \mathbf {P})\! =\! q_i =\! \frac{\exp (\hat{q}_i)}{\sum _{P_j \in \mathbf {P}} \exp (\hat{q}_j)}.$$   (Eq. 18) 
+
+In the training phase, we conduct a negative sampling strategy with one negative sample, for efficient training. Thus a pair of paragraphs, $P^+$ as positive and $P^-$ as negative, are used to approximate $q^+ \approx P(P^+|Q, [P^+, P^-])$ and $q^- \approx P(P^-|Q, [P^+, P^-])$ .
+
+In the inference phase, the probability $q_i$ is obtained by normalizing across all the retrieved paragraphs $\mathbf {P}$ .
+
+[h] HAS-QA Model in Training Phase [1] $Q$ : question; $A$ : answer string;
+
+ $\mathbf {P}$ : retrieved paragraphs;
+
+ $\mathcal {L}$ : loss function
+
+ $P^+$ , $P^-$ in $\mathbf {P}$ : Get answer locations $\mathbf {L^s}$ , $\mathbf {L^e}$ for $P^+$ ; Get the context embedding $\mathbf {C}$ ; Compute $\mathbf {p^s}$ ; (Eq 11 ) $L^s_j, L^e_j$ in $\mathbf {L^s}, \mathbf {L^e}$ : $P^-$0 ; Compute $P^-$1 ; (Eq 12 ) $P^-$2 ; $P^-$3 ; Apply function: $P^-$4 ; Compute $P^-$5 in $P^-$6 ; (Eq 17 , Eq 18 ) $P^-$7 ; $P^-$8 .
+
+[h] HAS-QA Model in Inference Phase [1] $Q$ : question; $\mathbf {P}$ : retrieved paragraphs; $A_{best}$ : answer string
+
+ $P_i$ in $\mathbf {P}$ : Get the context embedding $\mathbf {C}$ ; Compute $\mathbf {p^s}$ ; (Eq 11 ) $L^s_j$ in Top- $K_1$ $\mathbf {p^s}$ : $p^s_j \leftarrow \mathbf {p^s}[L^s_j]$ ; Compute $\mathbf {p^e_j}$ ; (Eq 12 ) $L^e_{jk}$ in Top- $\mathbf {P}$0 $\mathbf {P}$1 : $\mathbf {P}$2 ; $\mathbf {P}$3 ; Group $\mathbf {P}$4 by extracted answer string $\mathbf {P}$5 ; Apply function: $\mathbf {P}$6 ; Compute $\mathbf {P}$7 ; (Eq 17 )
+
+Normalize $\lbrace \hat{q}_i\rbrace $ get $\lbrace q_i\rbrace $ ; (Eq 18 ) $S(A_t) \leftarrow \sum _i q_i \cdot p^{A_t}_i$ ; $A_{best} \leftarrow \arg \max (S(A_t))$ .
+
+Above all, we describe our model with Algorithm "Paragraph Quality Estimator" in the training phase and Algorithm "Paragraph Quality Estimator" in the inference phase.
+
+## Datasets
+
+We evaluate our model on three OpenQA datasets, QuasarT BIBREF21 , TriviaQA BIBREF7 and SearchQA BIBREF22 .
+
+QuasarT: consists of 43k open-domain trivia questions whose answers obtained from various internet sources. ClueWeb09 BIBREF23 serves as the background corpus for providing evidences paragraphs. We choose the Long version, which is truncated to 2048 characters and 20 paragraphs for each question.
+
+TriviaQA: consists of 95k open-domain question-answer pairs authored by trivia enthusiasts and independently gathered evidence documents from Bing Web Search and Wikipedia, six per question on average. We focus on the open domain setting contains unfiltered documents.
+
+SearchQA: is based on a Jeopardy! questions and collects about top 50 web page snippets from Google search engine for each question.
+
+As we can see in Table 1 , there exist amounts of negative paragraphs which contains no answer span, especially in TriviaQA and SearchQA. For all datasets, more than 4 answer spans averagely obtained per paragraph. These statistics illustrate that problems mentioned above exist in OpenQA datasets.
+
+## Experimental Settings
+
+For RC baseline models GA BIBREF11 , BiDAF BIBREF4 and AQA BIBREF20 , their experimental results are collected from published papers BIBREF22 , BIBREF7 .
+
+The DrQA BIBREF6 , R ${}^3$ BIBREF16 and Shared-Norm BIBREF8 are evaluated using their released code.
+
+Our model adopts the same data preprocessing and question context encoder presented in BIBREF8 . In training step, we use the Adadelta optimizer BIBREF24 with the batch size of 30, and we choose the model performed the best on develop set . The hidden dimension of GRU is 200, and the dropout ratio is 0.8. We use 300 dimensional word embeddings pre-trained by GloVe (released by BIBREF17 ) and do not fine-tune in training step. Additionally, 20 dimensional character embeddings are left as learnable parameters. In inference step, for baseline models we set the answer length limitation to 8, while for our models it is unlimited. We analyze different answer length limitation settings in the Section UID31 . The parameters of beam search are $K_1=3$ and $K_2=1$ .
+
+## Overall Results
+
+The experimental results on three OpenQA datasets are shown in Table 2 . It concludes as follow:
+
+1) HAS-QA outperforms traditional RC baselines with a large gap, such as GA, BiDAF, AQA listed in the first part. For example, in QuasarT, it improves 16.8% in EM score and 20.4% in F1 score. As RC task is just a special case of OpenQA task. Some experiments on standard SQuAD dataset(dev-set) BIBREF9 show that HAS-QA yields EM/F1:0.719/0.798, which is comparable with the best released single model Reinforced Mnemonic Reader BIBREF25 in the leaderboard (dev-set) EM/F1:0.721/0.816. Our performance is slightly worse because Reinforced Mnemonic Reader directly use the accurate answer span, while we use multiple distantly supervised answer spans. That may introduce noises in the setting of SQuAD, since only one span is accurate.
+
+2) HAS-QA outperforms recent OpenQA baselines, such as DrQA, R ${}^3$ and Shared-Norm listed in the second part. For example, in QuasarT, it improves 4.6% in EM score and 3.5% in F1 score.
+
+## Model Analysis
+
+In this subsection, we analyze our model by answering the following fine-grained analytic questions:
+
+1) What advantages does HAS-QA have via modeling answer span using the conditional pointer network?
+
+2) How much does HAS-QA gain from modeling multiple answer spans in a paragraph?
+
+3) How does the paragraph quality work in HAS-QA?
+
+The following three parts are used to answer these questions respectively.
+
+In order to demonstrate the effect of the conditional pointer networks, we compare Shared-Norm, which uses pointer networks, with our model. Then, we gradually remove the answer length limitation, from restricting 4 words to 128 words until no limitation (denote as $\infty $ ). Finally, we draw the tendency of the EM performance and average predicted answer length according to the different answer length limitations.
+
+As shown in Figure 3 (TopLeft), the performance of Shared-Norm decreases when removing the answer length limitation, while the performance of HAS-QA first increases then becomes stable. In Figure 3 (TopRight), we find that the average predicted answer length increases in Shared-Norm when removing the answer length limitation. However, our model stably keeps average about 1.8 words, where the oracle average answer length is about 1.9 words. Example in Figure 3 (Bottom) illustrates that start/end pointers in Shared-Norm search their own optimal positions independently, such as two `Louis' in paragraph. It leads to an unreasonable answer span prediction.
+
+The effects of utilizing multiple answer spans lay into two aspects, 1) choose the aggregation functions in training phase, and 2) select the parameters of beam search in inference phase.
+
+In the training phase, we evaluate four types of aggregation functions introduced in Section "Multiple Spans Aggregator" . The experimental results on QuasarT dataset, shown in Table 3 , demonstrate the superiority of SUM and MAX operations. They take advantages of using multiple answer spans for training and improve about 6% - 10% in EM comparing to the HEAD operation. The performance of MAX operation is a little better than the SUM operation. The failure of RAND operation, mainly comes down to the conflicting training samples. Therefore, simple way to make use of multiple answer spans may not improve the performance.
+
+In the inference phase, Table 4 shows the effects of parameters in beam search. We find that the larger $K_1$ yields the better performance, while $K_2$ seems irrelevant to the performance. As a conclusion, we choose the parameters $K_1=3, K_2=1$ to balance the performance and the speed.
+
+The paragraph probability is efficient to measure the quality of paragraphs, especially for that containing useless paragraphs.
+
+Figure 4 (Left) shows that with the increasing number of given paragraphs which ordered by the rank of a search engine, EM performance of HAS-QA sustainably grows. However, EM performance of Shared-Norm stops increasing at about 15 paragraphs and our model without paragraph quality (denotes PosOnly) stops increasing at about 5 paragraphs. So that with the help of paragraph probability, model performance can be improved by adding more evidence paragraphs.
+
+We also evaluate the Mean Average Precision (MAP) score between the predicted scores and the label whether a paragraph contains answer spans (Figure 4 (Right)). The paragraph probability in our model outperforms PosOnly and Shared-Norm, so that it can rank the high quality paragraphs in the front of the given paragraph list.
+
+## Conclusions
+
+In this paper, we point out three distinct characteristics of OpenQA, which make it inappropriate to directly apply existing RC models to this task. In order to tackle these problems, we first propose a new probabilistic formulation of OpenQA, where the answer probability is written as the question, paragraph and span, three-level structure. In this formulation, RC can be treated as a special case. Then, Hierarchical Answer Spans Model (HAS-QA) is designed to implement this structure. Specifically, a paragraph quality estimator makes it robust for the paragraphs without answer spans; a multiple span aggregator points out that it is necessary to combine the contributions of multiple answer spans in a paragraph, and a conditional span predictor is proposed to model the dependence between the start and end positions of each answer span. Experiments on public OpenQA datasets, including QuasarT, TriviaQA and SearchQA, show that HAS-QA significantly outperforms traditional RC baselines and recent OpenQA baselines.
+
+## Acknowledgments
+
+This work was funded by the National Natural Science Foundation of China (NSFC) under Grants No. 61773362, 61425016, 61472401, 61722211, and 61872338, the Youth Innovation Promotion Association CAS under Grants No. 20144310, and 2016102, and the National Key R&D Program of China under Grants No. 2016QY02D0405.

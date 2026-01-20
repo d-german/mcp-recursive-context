@@ -1,0 +1,143 @@
+# Multilingual Graphemic Hybrid ASR with Massive Data Augmentation
+
+**Paper ID:** 1909.06522
+
+## Abstract
+
+Towards developing high-performing ASR for low-resource languages, approaches to address the lack of resources are to make use of data from multiple languages, and to augment the training data by creating acoustic variations. In this work we present a single grapheme-based ASR model learned on 7 geographically proximal languages, using standard hybrid BLSTM-HMM acoustic models with lattice-free MMI objective. We build the single ASR grapheme set via taking the union over each language-specific grapheme set, and we find such multilingual ASR model can perform language-independent recognition on all 7 languages, and substantially outperform each monolingual ASR model. Secondly, we evaluate the efficacy of multiple data augmentation alternatives within language, as well as their complementarity with multilingual modeling. Overall, we show that the proposed multilingual ASR with various data augmentation can not only recognize any within training set languages, but also provide large ASR performance improvements.
+
+## Introduction
+
+It can be challenging to build high-accuracy automatic speech recognition (ASR) systems in real world due to the vast language diversity and the requirement of extensive manual annotations on which the ASR algorithms are typically built. Series of research efforts have thus far been focused on guiding the ASR of a target language by using the supervised data from multiple languages.
+
+Consider the standard hidden Markov models (HMM) based ASR system with a phonemic lexicon, where the vocabulary is specified by a pronunciation lexicon. One popular strategy is to make all languages share the same phonemic representations through a universal phonetic alphabet such as International Phonetic Alphabet (IPA) phone set BIBREF0, BIBREF1, BIBREF2, BIBREF3, or X-SAMPA phone set BIBREF4, BIBREF5, BIBREF6, BIBREF7. In this case, multilingual joint training can be directly applied. Given the effective neural network based acoustic modeling, another line of research is to share the hidden layers across multiple languages while the softmax layers are language dependent BIBREF8, BIBREF9; such multitask learning procedure can improve ASR accuracies for both within training set languages, and also unseen languages after language-specific adaptation, i.e., cross-lingual transfer learning. Different nodes in hidden layers have been shown in response to distinct phonetic features BIBREF10, and hidden layers can be potentially transferable across languages. Note that the above works all assume the test language identity to be known at decoding time, and the language specific lexicon and language model applied.
+
+In the absence of a phonetic lexicon, building graphemic systems has shown comparable performance to phonetic lexicon-based approaches in extensive monolingual evaluations BIBREF11, BIBREF12, BIBREF13. Recent advances in end-to-end ASR models have attempted to take the union of multiple language-specific grapheme (i.e. orthographic character) sets, and use such union as a universal grapheme set for a single sequence-to-sequence ASR model BIBREF14, BIBREF15, BIBREF16. It allows for learning a grapheme-based model jointly on data from multiple languages, and performing ASR on within training set languages. In various cases it can produce performance gains over monolingual modeling that uses in-language data only.
+
+In our work, we aim to examine the same approach of building a multilingual graphemic lexicon, while using a standard hybrid ASR system – based on Bidirectional Long Short-Term Memory (BLSTM) and HMM – learned with lattice-free maximum mutual information (MMI) objective BIBREF17. Our initial attempt is on building a single cascade of an acoustic model, a phonetic decision tree, a graphemic lexicon and a language model – for 7 geographically proximal languages that have little overlap in their character sets. We evaluate it in a low resource context where each language has around 160 hours training data. We find that, despite the lack of explicit language identification (ID) guidance, our multilingual model can accurately produce ASR transcripts in the correct test language scripts, and provide higher ASR accuracies than each language-specific ASR model. We further examine if using a subset of closely related languages – along language family or orthography – can achieve the same performance improvements as using all 7 languages.
+
+We proceed with our investigation on various data augmentation techniques to overcome the lack of training data in the above low-resource setting. Given the highly scalable neural network acoustic modeling, extensive alternatives to increasing the amount or diversity of existing training data have been explored in prior works, e.g., applying vocal tract length perturbation and speed perturbation BIBREF18, volume perturbation and normalization BIBREF19, additive noises BIBREF20, reverberation BIBREF19, BIBREF21, BIBREF22, and SpecAugment BIBREF23. In this work we focus particularly on techniques that mostly apply to our wildly collected video datasets. In comparing their individual and complementary effects, we aim to answer: (i) if there is benefit in scaling the model training to significantly larger quantities, e.g., up to 9 times greater than the original training set size, and (ii) if any, is the data augmentation efficacy comparable or complementary with the above multilingual modeling.
+
+Improving accessibility to videos “in the wild” such as automatic captioning on YouTube has been studied in BIBREF24, BIBREF25. While allowing for applications like video captions, indexing and retrieval, transcribing the heterogeneous Facebook videos of extensively diverse languages is highly challenging for ASR systems. On the whole, we present empirical studies in building a single multilingual ASR model capable of language-independent decoding on multiple languages, and in effective data augmentation techniques for video datasets.
+
+## Multilingual ASR
+
+In this section we first briefly describe our deployed ASR architecture based on the weighted finite-state transducers (WFSTs) outlined in BIBREF26. Then we present its extension to multilingual training. Lastly, we discuss its language-independent decoding and language-specific decoding.
+
+## Multilingual ASR ::: Graphemic ASR with WFST
+
+In the ASR framework of a hybrid BLSTM-HMM, the decoding graph can be interpreted as a composed WFST of cascade $H \circ C \circ L \circ G$. Acoustic models, i.e. BLSTMs, produce acoustic scores over context-dependent HMM (i.e. triphone) states. A WFST $H$, which represents the HMM set, maps the triphone states to context-dependent phones.
+
+While in graphemic ASR, the notion of phone is turned to grapheme, and we typically create the grapheme set via modeling each orthographic character as a separate grapheme. Then a WFST $C$ maps each context-dependent grapheme, i.e. tri-grapheme, to an orthographic character. The lexicon $L$ is specified where each word is mapped to a sequence of characters forming that word. $G$ encodes either the transcript during training, or a language model during decoding.
+
+## Multilingual ASR ::: A single multilingual ASR model using lattice-free MMI
+
+To build a single grapheme-based acoustic model for multiple languages, a multilingual graphemic set is obtained by taking a union of each grapheme set from each language considered, each of which can be either overlapping or non-overlapping. In the multilingual graphemic lexicon, each word in any language is mapped to a sequence of characters in that language.
+
+A context-dependent acoustic model is constructed using the decision tree clustering of tri-grapheme states, in the same fashion as the context dependent triphone state tying BIBREF27. The graphemic-context decision tree is constructed over all the multilingual acoustic data including each language of interest. The optimal number of leaves for the multilingual model tends to be larger than for a monolingual neural network.
+
+The acoustic model is a BLSTM network, using sequence discriminative training with lattice-free MMI objective BIBREF17. The BLSTM model is bootstrapped from a standard Gaussian mixture model (GMM)-HMM system. A multilingual $n$-gram language model is learned over the combined transcripts including each language considered.
+
+## Multilingual ASR ::: Language-independent and language-specific decoding in the WFST framework
+
+Given the multilingual lexicon and language model, the multilingual ASR above can decode any within training set language, even though not explicitly given any information about language identity. We refer to it as language-independent decoding or multilingual decoding. Note that such ASR can thus far produce any word in the multilingual lexicon, and the hypothesized word can either be in the vocabulary of the considered test language, or out of test language vocabulary as a mismatched-language error.
+
+We further consider applying language-specific decoding, assuming the test language identity to be known at decoding time. Again consider the decoding graph $H \circ C \circ L \circ G$, and $H$ & $C$ are thus multilingual while the lexicon $L$ and language model $G$ can include only the words in test language vocabulary. The multilingual acoustic model can therefore make use of multilingual training data, while its language-specific decoding operation only produces monolingual words matched with test language identity.
+
+## Data augmentation
+
+In this section, we consider 3 categories of data augmentation techniques that are effectively applicable to video datasets.
+
+## Data augmentation ::: Speed and volume perturbation
+
+Both speed and volume perturbation emulate mean shifts in spectrum BIBREF18, BIBREF19. To perform speed perturbation of the training data, we produce three versions of each audio with speed factors $0.9$, $1.0$, and $1.1$. The training data size is thus tripled. For volume perturbation, each audio is scaled with a random variable drawn from a uniform distribution $[0.125, 2]$.
+
+## Data augmentation ::: Additive noise
+
+To further increase training data size and diversity, we can create new audios via superimposing each original audio with additional noisy audios in time domain. To obtain diverse noisy audios, we use AudioSet, which consists of 632 audio event classes and a collection of over 2 million manually-annotated 10-second sound clips from YouTube videos BIBREF28.
+
+Note that in our video datasets, video lengths vary between 10 seconds and 5 minutes, with an average duration of about 2 minutes. Rather than constantly repeating the 10-second sound clip to match the original minute-long audio, we superpose each sound clip on the short utterances via audio segmentation. Specifically, we first use an initial bootstrap model to align each original long audio, and segment each audio into around 10-second utterances via word boundaries.
+
+Then for each utterance in the original train set, we can create a new noisy utterance by the steps:
+
+Sample a sound clip from AudioSet.
+
+Trim or repeat the sound clip as necessary to match the duration of the original utterance.
+
+Sample a signal-to-noise ratio (SNR) from a Gaussian distribution with mean 10, and round the SNR up to 0 or down to 20 if the sample is beyond 0-20dB. Then scale the sound clip signal to obtain the target SNR.
+
+Superimpose the original utterance signal with the scaled sound clip signal in time domain to create the resulting utterance.
+
+Thus for each original utterance, we can create a variable number of new noisy utterances via sampling sound clips. We use a 3-fold augmentation that combines the original train set with two noisy copies.
+
+## Data augmentation ::: SpecAugment
+
+We consider applying the frequency and time masking techniques – which are shown to greatly improve the performance of end-to-end ASR models BIBREF23 – to our hybrid systems. Similarly, they can be applied online during each epoch of LF-MMI training, without the need for realignment.
+
+Consider each utterance (i.e. after the audio segmentation in Section SECREF5), and we compute its log mel spectrogram with $\nu $ dimension and $\tau $ time steps:
+
+Frequency masking is applied $m_F$ times, and each time the frequency bands $[f_0$, $f_0+ f)$ are masked, where $f$ is sampled from $[0, F]$ and $f_0$ is sampled from $[0, \nu - f)$.
+
+Time masking is optionally applied $m_T$ times, and each time the time steps $[t_0$, $t_0+ t)$ are masked, where $t$ is sampled from $[0, T]$ and $t_0$ is sampled from $[0, \tau - t)$.
+
+As in BIBREF23, we increase the training schedule accordingly, i.e., number of epochs.
+
+## Experiments
+
+## Experiments ::: Data
+
+Our multilingual ASR attempt was on 7 geographically proximal languages: Kannada, Malayalam, Sinhala, Tamil, Bengali, Hindi and Marathi. The datasets were a set of public Facebook videos, which were wildly collected and anonymized. We categorized them into four video types:
+
+Ads: any video content where the publisher paid for a promo on it.
+
+Pages: content published by a page that was not paid content promoted to users.
+
+UserLive: live streams from users.
+
+UserVOD (video on demand): was-live videos.
+
+For each language, the train and test set size are described in Table TABREF10, and most training data were Pages. On each language we also had a small validation set for model parameter tuning. Each monolingual ASR baseline was trained on language-specific data only.
+
+The character sets of these 7 languages have little overlap except that (i) they all include common basic Latin alphabet, and (ii) both Hindi and Marathi use Devanagari script. We took the union of 7 character sets therein as the multilingual grapheme set (Section SECREF2), which contained 432 characters. In addition, we deliberately split 7 languages into two groups, such that the languages within each group were more closely related in terms of language family, orthography or phonology. We thus built 3 multilingual ASR models trained on:
+
+all 7 languages, for 1059 training hours in total,
+
+4 languages – Kannada, Malayalam, Sinhala and Tamil – for 590 training hours,
+
+3 languages – Bengali, Hindi and Marathi – for 469 training hours,
+
+which are referred to as 7lang, 4lang, and 3lang respectively. Note that Kannada, Malayalam and Tamil are Dravidian languages, which have rich agglutinative inflectional morphology BIBREF2 and resulted in around 10% OOV token rates on test sets (Hindi had the lowest OOV rate as 2-3%). Such experimental setup was designed to answer the questions:
+
+If a single graphemic ASR model could scale its language-independent recognition up to all 7 languages.
+
+If including all 7 languages could yield better ASR performance than using a small subset of closely related languages.
+
+## Experiments ::: Model configurations
+
+Each bootstrap model was a GMM-HMM based system with speaker adaptive training, implemented with Kaldi BIBREF29. Each neural network acoustic model was a latency-controlled BLSTM BIBREF30, learned with lattice-free MMI objective and Adam optimizer BIBREF31. All neural networks were implemented with Caffe2 BIBREF32. Due to the production real time factor (RTF) requirements, we used the same model size in all cases – a 4 layer BLSTM network with 600 cells in each layer and direction – except that, the softmax dimensions, i.e. the optimal decision tree leaves, were determined through experiments on validation sets, varying within 7-30k. Input acoustic features were 80-dimensional log-mel filterbank coefficients. We used standard 5-gram language models. After lattice-free MMI training, the model with the best accuracy on validation set was used for evaluation on test set.
+
+## Experiments ::: Results with multilingual ASR
+
+ASR word error rate (WER%) results are shown in Table TABREF11. We found that, although not explicitly given any information on test language identities, multilingual ASR with language-independent decoding (Section SECREF3) - trained on 3, 4, or 7 languages - substantially outperformed each monolingual ASR in all cases, and on average led to relative WER reductions between 4.6% (Sinhala) and 10.3% (Hindi).
+
+Note that the word hypotheses from language-independent decoding could be language mismatched, e.g., part of a Kannada utterance was decoded into Marathi words. So we counted how many word tokens in the decoding transcripts were not in the lexicon of corresponding test language. We found in general only 1-3% word tokens are language mismatched, indicating that the multilingual model was very effective in identifying the language implicitly and jointly recognizing the speech.
+
+Consider the scenario that, test language identities are known likewise in each monolingual ASR, and we proceed with language-specific decoding (Section SECREF3) on Kannada and Hindi, via language-specific lexicon and language model at decoding time. We found that, the language-specific decoding provided only moderate gains, presumably as discussed above, the language-independent decoding had given the mismatched-language word token rates as sufficiently low as 1-3%.
+
+Additionally, the multilingual ASR of 4lang and 3lang (Section SECREF15) achieved the same, or even slightly better performance as compared to the ASR of 7lang, suggesting that incorporating closely related languages into multilingual training is most useful for improving ASR performance. However, the 7lang ASR by itself still yields the advantage in language-independent recognition of more languages.
+
+## Experiments ::: Results with data augmentation
+
+First, we experimented with monolingual ASR on Kannada and Hindi, and performed comprehensive evaluations of the data augmentation techniques described in Section SECREF3. As in Table TABREF11, the performance gains of using frequency masking were substantial and comparable to those of using speed perturbation, where $m_F = 2$ and $F=15$ (Section SECREF12) worked best. In addition, combining both frequency masking and speed perturbation could provide further improvements. However, applying additional volume perturbation (Section SECREF4) or time masking (Section SECREF12) was not helpful in our preliminary experimentation.
+
+Note that after speed perturbation, the training data tripled, to which we could apply another 3-fold augmentation based on additive noise (Section SECREF5), and the final train set was thus 9 times the size of original train set. We found that all 3 techniques were complementary, and in combination led to large fusion gains over each monolingual baseline – relative WER reductions of 8.7% on Kannada, and 14.8% on Hindi.
+
+Secondly, we applied the 3 data augmentation techniques to the multilingual ASR of 7lang, and tested their additive effects. We show the resulting WERs on Kannada and Hindi in Table TABREF11. Note that on Kannada, we found around 7% OOV token rate on Ads but around 10-11% on other 3 video types, and we observed more gains on Ads; presumably because the improved acoustic model could only correct the in-vocabulary word errors, lower OOV rates therefore left more room for improvements. Hindi had around 2.5% OOV rates on each video type, and we found incorporating data augmentation into multilingual ASR led to on average 9.0% relative WER reductions.
+
+Overall, we demonstrated the multilingual ASR with massive data augmentation – via a single graphemic model even without the use of explicit language ID – allowed for relative WER reductions of 11.0% on Kannada and 18.4% on Hindi.
+
+## Conclusions
+
+We have presented a multilingual grapheme-based ASR model can effectively perform language-independent recognition on any within training set languages, and substantially outperform each monolingual ASR alternative. Various data augmentation techniques can yield further complementary improvements. Such single multilingual model can not only provide better ASR performance, but also serves as an alternative to the standard production deployment that typically includes extensive monolingual ASR systems and a separate language ID model.
+
+Future work will expand the language coverage to include both geographically proximal and distant languages. Additionally, given the identity of a target test language, we will consider the hidden layers of such multilingual acoustic model as a pre-trained model, and thus perform subsequent monolingual fine-tuning, as compared to the multitask learning procedure in BIBREF8, BIBREF9.

@@ -1,0 +1,141 @@
+# Same Representation, Different Attentions: Shareable Sentence Representation Learning from Multiple Tasks
+
+**Paper ID:** 1804.08139
+
+## Abstract
+
+Distributed representation plays an important role in deep learning based natural language processing. However, the representation of a sentence often varies in different tasks, which is usually learned from scratch and suffers from the limited amounts of training data. In this paper, we claim that a good sentence representation should be invariant and can benefit the various subsequent tasks. To achieve this purpose, we propose a new scheme of information sharing for multi-task learning. More specifically, all tasks share the same sentence representation and each task can select the task-specific information from the shared sentence representation with attention mechanism. The query vector of each task's attention could be either static parameters or generated dynamically. We conduct extensive experiments on 16 different text classification tasks, which demonstrate the benefits of our architecture.
+
+## Introduction
+
+The distributed representation plays an important role in deep learning based natural language processing (NLP) BIBREF0 , BIBREF1 , BIBREF2 . On word level, many successful methods have been proposed to learn a good representation for single word, which is also called word embedding, such as skip-gram BIBREF3 , GloVe BIBREF4 , etc. There are also pre-trained word embeddings, which can easily used in downstream tasks. However, on sentence level, there is still no generic sentence representation which is suitable for various NLP tasks.
+
+Currently, most of sentence encoding models are trained specifically for a certain task in a supervised way, which results to different representations for the same sentence in different tasks. Taking the following sentence as an example for domain classification task and sentiment classification task,
+
+general text classification models always learn two representations separately. For domain classification, the model can learn a better representation of “infantile cart” while for sentiment classification, the model is able to learn a better representation of “easy to use”.
+
+However, to train a good task-specific sentence representation from scratch, we always need to prepare a large dataset which is always unavailable or costly. To alleviate this problem, one approach is pre-training the model on large unlabeled corpora by unsupervised learning tasks, such as language modeling BIBREF0 . This unsupervised pre-training may be helpful to improve the final performance, but the improvement is not guaranteed since it does not directly optimize the desired task.
+
+Another approach is multi-task learning BIBREF5 , which is an effective approach to improve the performance of a single task with the help of other related tasks. However, most existing models on multi-task learning attempt to divide the representation of a sentence into private and shared spaces. The shared representation is used in all tasks, and the private one is different for each task. The two typical information sharing schemes are stacked shared-private scheme and parallel shared-private scheme (as shown in Figure SECREF2 and SECREF3 respectively). However, we cannot guarantee that a good sentence encoding model is learned by the shared layer.
+
+To learn a better shareable sentence representation, we propose a new information-sharing scheme for multi-task learning in this paper. In our proposed scheme, the representation of every sentence is fully shared among all different tasks. To extract the task-specific feature, we utilize the attention mechanism and introduce a task-dependent query vector to select the task-specific information from the shared sentence representation. The query vector of each task can be regarded as learnable parameters (static) or be generated dynamically. If we take the former example, in our proposed model these two classification tasks share the same representation which includes both domain information and sentiment information. On top of this shared representation, a task-specific query vector will be used to focus “infantile cart” for domain classification and “easy to use” for sentiment classification.
+
+The contributions of this papers can be summarized as follows.
+
+## Neural Sentence Encoding Model
+
+The primary role of sentence encoding models is to represent the variable-length sentence or paragraphs as fixed-length dense vector (distributed representation). Currently, the effective neural sentence encoding models include neural Bag-of-words (NBOW), recurrent neural networks (RNN) BIBREF2 , BIBREF6 , convolutional neural networks (CNN) BIBREF1 , BIBREF7 , BIBREF8 , and syntactic-based compositional model BIBREF9 , BIBREF10 , BIBREF11 .
+
+Given a text sequence INLINEFORM0 , we first use a lookup layer to get the vector representation (word embedding) INLINEFORM1 of each word INLINEFORM2 . Then we can use CNN or RNN to calculate the hidden state INLINEFORM3 of each position INLINEFORM4 . The final representation of a sentence could be either the final hidden state of the RNN or the max (or average) pooling from all hidden states of RNN (or CNN).
+
+We use bidirectional LSTM (BiLSTM) to gain some dependency between adjacent words. The update rule of each LSTM unit can be written as follows: DISPLAYFORM0 
+
+ where INLINEFORM0 represents all the parameters of BiLSTM. The representation of the whole sequence is the average of the hidden states of all the positions, where INLINEFORM1 denotes the concatenation operation.
+
+## Shared-Private Scheme in Multi-task Learning
+
+Multi-task Learning BIBREF5 utilizes the correlation between related tasks to improve classification by learning tasks in parallel, which has been widely used in various natural language processing tasks, such as text classification BIBREF12 , semantic role labeling BIBREF13 , machine translation BIBREF14 , and so on.
+
+To facilitate this, we give some explanation for notations used in this paper. Formally, we refer to INLINEFORM0 as a dataset with INLINEFORM1 samples for task INLINEFORM2 . Specifically, DISPLAYFORM0 
+
+where INLINEFORM0 and INLINEFORM1 denote a sentence and corresponding label for task INLINEFORM2 .
+
+A common information sharing scheme is to divide the feature spaces into two parts: one is used to store task-specific features, the other is used to capture task-invariant features. As shown in Figure SECREF2 and SECREF3 , there are two schemes: stacked shared-private (SSP) scheme and parallel shared-private (PSP) scheme.
+
+In stacked scheme, the output of the shared LSTM layer is fed into the private LSTM layer, whose output is the final task-specific sentence representation. In parallel scheme, the final task-specific sentence representation is the concatenation of outputs from the shared LSTM layer and the private LSTM layer.
+
+For a sentence INLINEFORM0 and its label INLINEFORM1 in task INLINEFORM2 , its final representation is ultimately fed into the corresponding task-specific softmax layer for classification or other tasks. DISPLAYFORM0 
+
+ where INLINEFORM0 is prediction probabilities; INLINEFORM1 is the final task-specific representation; INLINEFORM2 and INLINEFORM3 are task-specific weight matrix and bias vector respectively.
+
+The total loss INLINEFORM0 can be computed as: DISPLAYFORM0 
+
+ where INLINEFORM0 (usually set to 1) is the weights for each task INLINEFORM1 respectively; INLINEFORM2 is the cross-entropy of the predicted and true distributions.
+
+## A New Information-Sharing Scheme for Multi-task Learning
+
+The key factor of multi-task learning is the information sharing scheme in latent representation space. Different from the traditional shared-private scheme, we introduce a new scheme for multi-task learning on NLP tasks, in which the sentence representation is shared among all the tasks, the task-specific information is selected by attention mechanism.
+
+In a certain task, not all information of a sentence is useful for the task, therefore we just need to select the key information from the sentence. Attention mechanism BIBREF15 , BIBREF16 is an effective method to select related information from a set of candidates. The attention mechanism can effectively solve the capacity problem of sequence models, thereby is widely used in many NLP tasks, such as machine translation BIBREF17 , textual entailment BIBREF18 and summarization BIBREF19 .
+
+## Static Task-Attentive Sentence Encoding
+
+We first introduce the static task-attentive sentence encoding model, in which the task query vector is a static learnable parameter. As shown in Figure FIGREF19 , our model consists of one shared BiLSTM layer and an attention layer. Formally, for a sentence in task INLINEFORM0 , we first use BiLSTM to calculate the shared representation INLINEFORM1 . Then we use attention mechanism to select the task-specific information from a generic task-independent sentence representation. Following BIBREF17 , we use the dot-product attention to compute the attention distribution. We introduce a task-specific query vector INLINEFORM2 to calculate the attention distribution INLINEFORM3 over all positions. DISPLAYFORM0 
+
+ where the task-specific query vector INLINEFORM0 is a learned parameter. The final task-specific representation INLINEFORM1 is summarized by DISPLAYFORM0 
+
+At last, a task-specific fully connected layer followed by a softmax non-linear layer processes the task-specific context INLINEFORM0 and predicts the probability distribution over classes.
+
+## Dynamic Task-Attentive Sentence Encoding
+
+Different from the static task-attentive sentence encoding model, the query vectors of the dynamic task-attentive sentence encoding model are generated dynamically. When each task belongs to a different domain, we can introduce an auxiliary domain classifier to predict the domain (or task) of the specific sentence. Thus, the domain information is also included in the shared sentence representation, which can be used to generate the task-specific query vector of attention.
+
+The original tasks and the auxiliary task of domain classification (DC) are joint learned in our multi-task learning framework.
+
+The query vector INLINEFORM0 of DC task is static and needs be learned in training phrase. The domain information is also selected with attention mechanism. DISPLAYFORM0 
+
+ where INLINEFORM0 is attention distribution of auxiliary DC task, and INLINEFORM1 is the attentive information for DC task, which is fed into the final classifier to predict its domain INLINEFORM2 .
+
+Since INLINEFORM0 contains the domain information, we can use it to generate a more flexible query vector DISPLAYFORM0 
+
+ where INLINEFORM0 is a shared learnable weight matrix and INLINEFORM1 is a task-specific bias vector. When we set INLINEFORM2 , the dynamic query is equivalent to the static one.
+
+## Experiment
+
+In this section, we investigate the empirical performances of our proposed architectures on three experiments.
+
+## Exp I: Sentiment Classification
+
+We first conduct a multi-task experiment on sentiment classification.
+
+We use 16 different datasets from several popular review corpora used in BIBREF20 . These datasets consist of 14 product review datasets and two movie review datasets.
+
+All the datasets in each task are partitioned randomly into training set, development set and testing set with the proportion of 70%, 10% and 20% respectively. The detailed statistics about all the datasets are listed in Table TABREF27 .
+
+We compare our proposed two information sharing schemes, static attentive sentence encoding (SA-MTL) and dynamic attentive sentence encoding (DA-MTL), with the following multi-task learning frameworks.
+
+FS-MTL: This model is a combination of a fully shared BiLSTM and a classifier.
+
+SSP-MTL: This is the stacked shared-private model as shown in Figure SECREF2 whose output of the shared BiLSTM layer is fed into the private BiLSTM layer.
+
+PSP-MTL: The is the parallel shared-private model as shown in Figure SECREF3 . The final sentence representation is the concatenation of both private and shared BiLSTM.
+
+ASP-MTL: This model is proposed by BIBREF20 based on PSP-MTL with uni-directional LSTM. The model uses adversarial training to separate task-invariant and task-specific features from different tasks.
+
+We initialize word embeddings with the 200d GloVe vectors (840B token version, BIBREF4 ). The other parameters are initialized by randomly sampling from uniform distribution in [-0.1, 0.1]. The mini-batch size is set to 32. For each task, we take hyperparameters which achieve the best performance on the development set via a small grid search. We use ADAM optimizer BIBREF21 with the learning rate of INLINEFORM0 . The BiLSTM models have 200 dimensions in each direction, and dropout with probability of INLINEFORM1 . During the training step of multi-task models, we select different tasks randomly. After the training step, we fix the parameters of the shared BiLSTM and fine tune every task.
+
+Table TABREF34 shows the performances of the different methods. From the table, we can see that the performances of most tasks can be improved with the help of multi-task learning. FS-MTL shows the minimum performance gain from multi-task learning since it puts all private and shared information into a unified space. SSP-MTL and PSP-MTL achieve similar performance and are outperformed by ASP-MTL which can better separate the task-specific and task-invariant features by using adversarial training. Our proposed models (SA-MTL and DA-MTL) outperform ASP-MTL because we model a richer representation from these 16 tasks. Compared to SA-MTL, DA-MTL achieves a further improvement of INLINEFORM0 accuracy with the help of the dynamic and flexible query vector. It is noteworthy that our models are also space efficient since the task-specific information is extracted by using only a query vector, instead of a BiLSTM layer in the shared-private models.
+
+We also present the convergence properties of our models on the development datasets compared to other multi-task models in Figure FIGREF36 . We can see that PSP-MTL converges much more slowly than the rest four models because each task-specific classifier should consider the output of shared layer which is quite unstable during the beginning of training phrase. Moreover, benefit from the attention mechanism which is useful in feature extraction, SA-TML and DA-MTL are converged much more quickly than the rest of models.
+
+Since all the tasks share the same sentence encoding layer, the query vector INLINEFORM0 of each task determines which part of the sentence to attend. Thus, similar tasks should have the similar query vectors. Here we simply calculate the Frobenius norm of each pair of tasks' INLINEFORM1 as the similarity. Figure FIGREF38 shows the similarity matrix of different task's query vector INLINEFORM2 in static attentive model. A darker cell means the higher similarity of the two task's INLINEFORM3 . Since the cells in the diagnose of the matrix denotes the similarity of one task, we leave them blank because they are meaningless. It's easy to find that INLINEFORM4 of “DVD”, “Video” and “IMDB” have very high similarity. It makes sense because they are all reviews related to movie. However, another movie review “MR” has very low similarity to these three task. It's probably that the text in “MR” is very short that makes it different from these tasks. The similarity of INLINEFORM5 from “Books” and “Video” is also very high because these two datasets share a lot of similar sentiment expressions.
+
+As shown in Figure FIGREF40 , we also show the attention distributions on a real example selected from the book review dataset. This piece of text involves two domains. The review is negative in the book domain while it is positive from the perspective of movie review. In our SA-MTL model, the “Books” review classifier from SA-MTL focus on the negative aspect of the book and evaluate the text as negative. In contrast, the “DVD” review classifier focuses on the positive part of the movie and produce the result as positive. In case of DA-MTL, the model first focuses on the two domain words “book” and “movie” and judge the text is a book review because “book” has a higher weight. Then, the model dynamically generates a query INLINEFORM0 and focuses on the part of the book review in this text, thereby finally predicting a negative sentiment.
+
+## Exp II: Transferability of Shared Sentence Representation 
+
+With attention mechanism, the shared sentence encoder in our proposed models can generate more generic task-invariant representations, which can be considered as off-the-shelf knowledge and then be used for unseen new tasks.
+
+To test the transferability of our learned shared representation, we also design an experiment shown in Table TABREF46 . The multi-task learning results are derived by training the first 6 tasks in general multi-task learning. For transfer learning, we choose the last 10 tasks to train our model with multi-task learning, then the learned shared sentence encoding layer are kept frozen and transferred to train the first 6 tasks.
+
+As shown in Table TABREF46 , we can see that SA-MTL and DA-MTL achieves better transfer learning performances compared to SSP-MTL and PSP-MTL. The reason is that by using attention mechanism, richer information can be captured into the shared representation layer, thereby benefiting the other task.
+
+## Exp III: Introducing Sequence Labeling as Auxiliary Task
+
+A good sentence representation should include its linguistic information. Therefore, we incorporate sequence labeling task (such as POS Tagging and Chunking) as an auxiliary task into the multi-task learning framework, which is trained jointly with the primary tasks (the above 16 tasks of sentiment classification). The auxiliary task shares the sentence encoding layer with the primary tasks and connected to a private fully connected layer followed by a softmax non-linear layer to process every hidden state INLINEFORM0 and predicts the labels.
+
+We use CoNLL 2000 BIBREF22 sequence labeling dataset for both POS Tagging and Chunking tasks. There are 8774 sentences in training data, 500 sentences in development data and 1512 sentences in test data. The average sentence length is 24 and has a total vocabulary size as 17k.
+
+The experiment results are shown in Table TABREF51 . We use the same hyperparameters and training procedure as the former experiments. The result shows that by leveraging auxiliary tasks, the performances of SA-MTL and DA-MTL achieve more improvement than PSP-MTL and SSP-MTL.
+
+For further analysis, Figure FIGREF53 shows the attention distribution produced by models trained with and without Chunking task on two pieces of texts. In the first piece of text, both of the models attend to the first “like” because it represents positive sentiment on the book. The model trained with Chunking task also labels the three “like” as 'B-VP' (beginning of verb phrase) correctly. However, in the second piece of text, the same work “like” denotes a preposition and has no sentiment meaning. The model trained without Chunking task fails to tell the difference with the former text and focuses on it and produces the result as positive. Meanwhile, the model trained with Chunking task successfully labels the “like” as 'B-PP' (beginning of prepositional phrase) and pays little attention to it and produces the right answer as negative. This example shows how the model trained with auxiliary task helps the primary tasks.
+
+## Related Work
+
+Neural networks based multi-task learning has been proven effective in many NLP problems BIBREF13 , BIBREF23 , BIBREF12 , BIBREF20 , BIBREF24 In most of these models, there exists a task-dependent private layer separated from the shared layer. The private layers play more important role in these models. Different from them, our model encodes all information into a shared representation layer, and uses attention mechanism to select the task-specific information from the shared representation layer. Thus, our model can learn a better generic sentence representation, which also has a strong transferability.
+
+Some recent work have also proposed sentence representation using attention mechanism. BIBREF25 uses a 2-D matrix, whose each row attending on a different part of the sentence, to represent the embedding. BIBREF26 introduces multi-head attention to jointly attend to information from different representation subspaces at different positions. BIBREF27 introduces human reading time as attention weights to improve sentence representation. Different from these work, we use attention vector to select the task-specific information from a shared sentence representation. Thus the learned sentence representation is much more generic and easy to transfer information to new tasks.
+
+## Conclusion
+
+In this paper, we propose a new information-sharing scheme for multi-task learning, which uses attention mechanism to select the task-specific information from a shared sentence encoding layer. We conduct extensive experiments on 16 different sentiment classification tasks, which demonstrates the benefits of our models. Moreover, the shared sentence encoding model can be transferred to other tasks, which can be further boosted by introducing auxiliary tasks.

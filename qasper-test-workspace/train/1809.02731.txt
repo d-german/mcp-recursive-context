@@ -1,0 +1,188 @@
+# Exploiting Invertible Decoders for Unsupervised Sentence Representation Learning
+
+**Paper ID:** 1809.02731
+
+## Abstract
+
+The encoder-decoder models for unsupervised sentence representation learning tend to discard the decoder after being trained on a large unlabelled corpus, since only the encoder is needed to map the input sentence into a vector representation. However, parameters learnt in the decoder also contain useful information about language. In order to utilise the decoder after learning, we present two types of decoding functions whose inverse can be easily derived without expensive inverse calculation. Therefore, the inverse of the decoding function serves as another encoder that produces sentence representations. We show that, with careful design of the decoding functions, the model learns good sentence representations, and the ensemble of the representations produced from the encoder and the inverse of the decoder demonstrate even better generalisation ability and solid transferability.
+
+## Introduction
+
+Learning sentence representations from unlabelled data is becoming increasingly prevalent in both the machine learning and natural language processing research communities, as it efficiently and cheaply allows knowledge extraction that can successfully transfer to downstream tasks. Methods built upon the distributional hypothesis BIBREF0 and distributional similarity BIBREF1 can be roughly categorised into two types:
+
+Word-prediction Objective: The objective pushes the system to make better predictions of words in a given sentence. As the nature of the objective is to predict words, these are also called generative models. In one of the two classes of models of this type, an encoder-decoder model is learnt using a corpus of contiguous sentences BIBREF2 , BIBREF3 , BIBREF4 to make predictions of the words in the next sentence given the words in the current one. After training, the decoder is usually discarded as it is only needed during training and is not designed to produce sentence representations. In the other class of models of this type, a large language model is learnt BIBREF5 , BIBREF6 , BIBREF7 on unlabelled corpora, which could be an autoregressive model or a masked language model, which gives extremely powerful language encoders but requires massive computing resources and training time.
+
+Similarity-based Objective: The objective here relies on a predefined similarity function to enforce the model to produce more similar representations for adjacent sentences than those that are not BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 . Therefore, the inductive biases introduced by the two key components, the differential similarity function and the context window, in the objective crucially determine the quality of learnt representations and what information of sentences can be encoded in them.
+
+To avoid tuning the inductive biases in the similarity-based objective, we follow the word-prediction objective with an encoder and a decoder, and we are particularly interested in exploiting invertible decoding functions, which can then be used as additional encoders during testing. The contribution of our work is summarised as follows:
+
+## Related Work
+
+Learning vector representations for words with a word embedding matrix as the encoder and a context word embedding matrix as the decoder BIBREF12 , BIBREF13 , BIBREF14 , BIBREF15 can be considered as a word-level example of our approach, as the models learn to predict the surrounding words in the context given the current word, and the context word embeddings can also be utilised to augment the word embeddings BIBREF14 , BIBREF16 . We are thus motivated to explore the use of sentence decoders after learning instead of ignoring them as most sentence encoder-decoder models do.
+
+Our approach is to invert the decoding function in order to use it as another encoder to assist the original encoder. In order to make computation of the inverse function well-posed and tractable, careful design of the decoder is needed. A simple instance of an invertible decoder is a linear projection with an orthonormal square matrix, whose transpose is its inverse. A family of bijective transformations with non-linear functions BIBREF17 , BIBREF18 , BIBREF19 can also be considered as it empowers the decoder to learn a complex data distribution.
+
+In our paper, we exploit two types of plausible decoding functions, including linear projection and bijective functions with neural networks BIBREF17 , and with proper design, the inverse of each of the decoding functions can be derived without expensive inverse calculation after learning. Thus, the decoder function can be utilised along with the encoder for building sentence representations. We show that the ensemble of the encoder and the inverse of the decoder outperforms each of them.
+
+## Model Design
+
+Our model has similar structure to that of skip-thought BIBREF2 and, given the neighbourhood hypothesis BIBREF20 , learns to decode the next sentence given the current one instead of predicting both the previous sentence and the next one at the same time.
+
+## Training Objective
+
+Given the finding BIBREF4 that neither an autoregressive nor an RNN decoder is necessary for learning sentence representations that excel on downstream tasks as the autoregressive decoders are slow to train and the quality of the generated sequences is not highly correlated with that of the representations of the sentences, our model only learns to predict words in the next sentence in a non-autoregressive fashion.
+
+Suppose that the $i$ -th sentence $S_i=\lbrace w_1,w_2,...,w_{N_i}\rbrace $ has $N_i$ words, and $S_{i+1}$ has $N_{i+1}$ words. The learning objective is to maximise the averaged log-likelihood for all sentence pairs: 
+
+$$\ell _{S_{i+i}|S_i}(\phi ,\theta )=\frac{1}{N_{i+1}}\sum _{w_j\in S_{i+1}}\log P(w_j|S_i)  \nonumber $$   (Eq. 5) 
+
+ where $\theta $ and $\phi $ contain the parameters in the encoder $f_\text{en}(S_i;\theta )$ and the decoder $f_\text{de}(_i;\phi )$ respectively. The forward computation of our model for a given sentence pair $\lbrace S_i, S_{i+1}\rbrace $ , in which the words in $S_i$ are the input to the learning system and the words in $S_{i+1}$ are targets is defined as: 
+
+$$_i &= f_\text{en}(S_i;\theta ) \nonumber \\
+_i &= f_\text{de}(_i;\phi ) \nonumber $$   (Eq. 6) 
+
+ where $_i$ is the vector representation of $S_i$ , and $_i$ is the vector output of the decoder which will be compared with the vector representations of words in the next sentence $S_{i+1}$ . Since calculating the likelihood of generating each word involves a computationally demanding softmax function, the negative sampling method BIBREF12 is applied to replace the softmax, and $\log P(w_j|s_i)$ is calculated as: 
+
+$$\log \sigma (_i^\top _{w_j}) + \sum _{k=1}^{K}\mathbb {E}_{w_k\sim P_e(w)}\log \sigma (-_i^\top _{w_k}) \nonumber $$   (Eq. 7) 
+
+ where $_{w_k}\in ^{d_}$ is the pretrained vector representation for $w_k$ , the empirical distribution $P_e(w)$ is the unigram distribution of words in the training corpus raised to power 0.75 as suggested in the prior work BIBREF21 , and $K$ is the number of negative samples. In this case, we enforce the output of the decoder $_i$ to have the same dimensionality as the pretrained word vectors $_{w_j}$ . The loss function is summed over all contiguous sentence pairs in the training corpus. For simplicity, we omit the subscription for indexing the sentences in the following sections.
+
+## Encoder
+
+The encoder $f_\text{en}(S;\theta )$ is a bi-directional Gated Recurrent Unit BIBREF22 with $d$ -dimensions in each direction. It processes word vectors in an input sentence $\lbrace _{w_1},_{w_2},...,_{w_{N}}\rbrace $ sequentially according to the temporal order of the words, and generates a sequence of hidden states. During learning, in order to reduce the computation load, only the last hidden state serves as the sentence representation $\in ^{d_}$ , where $d_=2d$ .
+
+## Decoder
+
+As the goal is to reuse the decoding function $f_{\text{de}}()$ as another plausible encoder for building sentence representations after learning rather than ignoring it, one possible solution is to find the inverse function of the decoder function during testing, which is noted as $f^{-1}_{\text{de}}()$ . In order to reduce the complexity and the running time during both training and testing, the decoding function $f_{\text{de}}()$ needs to be easily invertible. Here, two types of decoding functions are considered and explored.
+
+In this case, the decoding function is a linear projection, which is $= f_{\text{de}}()=+ $ , where $\in ^{d_\times d_}$ is a trainable weight matrix and $\in ^{d_\times 1}$ is the bias term.
+
+As $f_\text{de}$ is a linear projection, the simplest situation is when $$ is an orthogonal matrix and its inverse is equal to its transpose. Often, as the dimensionality of vector $$ doesn't necessarily need to match that of word vectors $$ , $$ is not a square matrix . To enforce invertibility on $$ , a row-wise orthonormal regularisation on $$ is applied during learning, which leads to $^\top =$ , where $$0 is the identity matrix, thus the inverse function is simply $$1 , which is easily computed. The regularisation formula is $$2 , where $$3 is the Frobenius norm. Specifically, the update rule BIBREF23 for the regularisation is: 
+
+$$:=(1+\beta )-\beta (^\top )\nonumber $$   (Eq. 12) 
+
+ The usage of the decoder during training and testing is defined as follows: 
+
+$$\text{Training:} \hspace{2.84544pt} & = f_{\text{de}}()=+ \nonumber \\
+\text{Testing:} \hspace{2.84544pt} & = f_\text{de}^{-1}()=^\top (- ) \nonumber $$   (Eq. 13) 
+
+ Therefore, the decoder is also utilised after learning to serve as a linear encoder in addition to the RNN encoder.
+
+A general case is to use a bijective function as the decoder, as the bijective functions are naturally invertible. However, the inverse of a bijective function could be hard to find and its calculation could also be computationally intense.
+
+A family of bijective transformation was designed in NICE BIBREF17 , and the simplest continuous bijective function $f:^D\rightarrow ^D$ and its inverse $f^{-1}$ is defined as: 
+
+$$h: \hspace{14.22636pt} _1 &= _1, & _2 &= _2+m(_1) \nonumber \\
+h^{-1}: \hspace{14.22636pt} _1 &= _1, & _2 &= _2-m(_1) \nonumber $$   (Eq. 15) 
+
+ where $_1$ is a $d$ -dimensional partition of the input $\in ^D$ , and $m:^d\rightarrow ^{D-d}$ is an arbitrary continuous function, which could be a trainable multi-layer feedforward neural network with non-linear activation functions. It is named as an `additive coupling layer' BIBREF17 , which has unit Jacobian determinant. To allow the learning system to explore more powerful transformation, we follow the design of the `affine coupling layer' BIBREF24 : 
+
+$$h: \hspace{5.69046pt} _1 &= _1, & _2 &= _2 \odot \text{exp}(s(_1)) + t(_1) \nonumber \\
+h^{-1}: \hspace{5.69046pt} _1 &= _1, & _2 &= (_2-t(_1)) \odot \text{exp}(-s(_1)) \nonumber $$   (Eq. 16) 
+
+ where $s:^d\rightarrow ^{D-d}$ and $t:^d\rightarrow ^{D-d}$ are both neural networks with linear output units.
+
+The requirement of the continuous bijective transformation is that, the dimensionality of the input $$ and the output $$ need to match exactly. In our case, the output $\in ^{d_}$ of the decoding function $f_{\text{de}}$ has lower dimensionality than the input $\in ^{d_}$ does. Our solution is to add an orthonormal regularised linear projection before the bijective function to transform the vector representation of a sentence to the desired dimension.
+
+The usage of the decoder that is composed of a bijective function and a regularised linear projection during training and testing is defined as: 
+
+$$\text{Training:} \hspace{2.84544pt} & = f_{\text{de}}() = h(+ ) \nonumber \\
+\text{Testing:} \hspace{2.84544pt} & = f_\text{de}^{-1}() = ^\top (h^{-1}() - ) \nonumber $$   (Eq. 17) 
+
+## Using Decoder in the Test Phase
+
+As the decoder is easily invertible, it is also used to produce vector representations. The post-processing step BIBREF25 that removes the top principal component is applied on the representations from $f_\text{en}$ and $f^{-1}_\text{de}$ individually. In the following sections, $_\text{en}$ denotes the post-processed representation from $f_\text{en}$ , and $_\text{de}$ from $f^{-1}_\text{de}$ . Since $f_\text{en}$ and $f^{-1}_\text{de}$ naturally process sentences in distinctive ways, it is reasonable to expect that the ensemble of $_\text{en}$ and $_\text{de}$ will outperform each of them.
+
+## Experimental Design
+
+Experiments are conducted in PyTorch BIBREF26 , with evaluation using the SentEval package BIBREF27 with modifications to include the post-processing step. Word vectors $_{w_j}$ are initialised with FastText BIBREF15 , and fixed during learning.
+
+## Unlabelled Corpora
+
+Two unlabelled corpora, including BookCorpus BIBREF28 and UMBC News Corpus BIBREF29 , are used to train models with invertible decoders. These corpora are referred as B, and U in Table 3 and 5 . The UMBC News Corpus is roughly twice as large as the BookCorpus, and the details are shown in Table 1 .
+
+## Unsupervised Evaluation
+
+The unsupervised tasks include five tasks from SemEval Semantic Textual Similarity (STS) in 2012-2016 BIBREF30 , BIBREF31 , BIBREF32 , BIBREF33 , BIBREF34 and the SemEval2014 Semantic Relatedness task (SICK-R) BIBREF35 .
+
+The cosine similarity between vector representations of two sentences determines the textual similarity of two sentences, and the performance is reported in Pearson's correlation score between human-annotated labels and the model predictions on each dataset.
+
+## Supervised Evaluation
+
+It includes Semantic relatedness (SICK) BIBREF35 , SemEval (STS-B) BIBREF36 , paraphrase detection (MRPC) BIBREF37 , question-type classification (TREC) BIBREF38 , movie review sentiment (MR) BIBREF39 , Stanford Sentiment Treebank (SST) BIBREF40 , customer product reviews (CR) BIBREF41 , subjectivity/objectivity classification (SUBJ) BIBREF42 , opinion polarity (MPQA) BIBREF43 .
+
+In these tasks, MR, CR, SST, SUBJ, MPQA and MRPC are binary classification tasks, TREC is a multi-class classification task. SICK and MRPC require the same feature engineering method BIBREF44 in order to compose a vector from vector representations of two sentences to indicate the difference between them.
+
+## Hyperparameter Tuning
+
+The hyperparameters are tuned on the averaged scores on STS14 of the model trained on BookCorpus, thus it is marked with a $^\star $ in tables to indicate potential overfitting.
+
+The hyperparameter setting for our model is summarised as follows: the batch size $N=512$ , the dimension of sentence vectors $d_=2048$ , the dimension of word vectors $d_{_{w_j}}=300$ , the number of negative samples $K=5$ , and the initial learning rate is $5\times 10^{-4}$ which is kept fixed during learning. The Adam optimiser BIBREF45 with gradient clipping BIBREF46 is applied for stable learning. Each model in our experiment is only trained for one epoch on the given training corpus.
+
+ $\beta $ in the invertible constraint of the linear projection is set to be $0.01$ , and after learning, all 300 eigenvalues are close to 1. For the bijective transformation, in order to make sure that each output unit is influenced by all input units, we stack four affine coupling layers in the bijective transformation BIBREF17 . The non-linear mappings $s$ and $t$ are both neural networks with one hidden layer with the rectified linear activation function.
+
+## Representation Pooling
+
+Various pooling functions are applied to produce vector representations for input sentences.
+
+For unsupervised evaluation tasks, as recommended in previous studies BIBREF14 , BIBREF50 , BIBREF51 , a global mean-pooling function is applied on both the output of the RNN encoder $f_\text{en}$ to produce a vector representation $_\text{en}$ and the inverse of the decoder $f_\text{de}^{-1}$ to produce $_\text{de}$ .
+
+For supervised evaluation tasks, three pooling functions, including global max-, min-, and mean-pooling, are applied on top of the encoder and the outputs from three pooling functions are concatenated to serve as a vector representation for a given sentence. The same representation pooling strategy is applied on the inverse of the decoder.
+
+The reason for applying different representation pooling strategies for two categories of tasks is:
+
+(1) cosine similarity of two vector representations is directly calculated in unsupervised evaluation tasks to determine the textual similarity of two sentences, and it suffers from the curse-of-dimensionality BIBREF52 , which leads to more equidistantly distributed representations for higher dimensional vector representations decreasing the difference among similarity scores.
+
+(2) given Cover's theorem BIBREF53 and the blessings-of-dimensionality property, it is more likely for the data points to be linearly separable when they are presented in high dimensional space, and in the supervised evaluation tasks, high dimensional vector representations are preferred as a linear classifier will be learnt to evaluate how likely the produced sentence representations are linearly separable;
+
+(3) in our case, both the encoder and the inverse of the decoder are capable of producing a vector representation per time step in a given sentence, although during training, only the last one is regarded as the sentence representation for the fast training speed, it is more reasonable to make use of all representations at all time steps with various pooling functions to compute a vector representations to produce high-quality sentence representations that excel the downstream tasks.
+
+## Discussion
+
+It is worth discussing the motivation of the model design and the observations in our experiments. As mentioned as one of the take-away messages BIBREF54 , to demonstrate the effectiveness of the invertible constraint, the comparison of our model with the constraint and its own variants use the same word embeddings from FastText BIBREF15 and have the same dimensionaility of sentence representations during learning, and use the same classifier on top of the produced representations with the same hyperparameter settings.
+
+Overall, given the performance of the inverse of each decoder presented in Table 3 and 5 , it is reasonable to state that the inverse of the decoder provides high-quality sentence representations as well as the encoder does. However, there is no significant difference between the two decoders in terms of the performance on the downstream tasks. In this section, observations and thoughts are presented based on the analyses of our model with the invertible constraint.
+
+## Effect of Invertible Constraint
+
+The motivation of enforcing the invertible constraint on the decoder during learning is to make it usable and potentially helpful during testing in terms of boosting the performance of the lone RNN encoder in the encoder-decoder models (instead of ignoring the decoder part after learning). Therefore, it is important to check the necessity of the invertible constraint on the decoders.
+
+A model with the same hyperparameter settings but without the invertible constraint is trained as the baseline model, and macro-averaged results that summarise the same type of tasks are presented in Table 2 .
+
+As noted in the prior work BIBREF55 , there exists significant inconsistency between the group of unsupervised tasks and the group of supervised ones, it is possible for a model to excel on one group of tasks but fail on the other one. As presented in our table, the inverse of the decoder tends to perform better than the encoder on unsupervised tasks, and the situation reverses when it comes to the supervised ones.
+
+In our model, the invertible constraint helps the RNN encoder $f_\text{en}$ to perform better on the unsupervised evaluation tasks, and helps the inverse of the decoder $f_\text{de}^{-1}$ to provide better results on single sentence classification tasks. An interesting observation is that, by enforcing the invertible constraint, the model learns to sacrifice the performance of $f_\text{de}^{-1}$ and improve the performance of $f_\text{en}$ on unsupervised tasks to mitigate the gap between the two encoding functions, which leads to more aligned vector representations between $f_\text{en}$ and $f_\text{de}^{-1}$ .
+
+## Effect on Ensemble
+
+Although encouraging the invertible constraint leads to slightly poorer performance of $f_\text{de}^{-1}$ on unsupervised tasks, it generally leads to better sentence representations when the ensemble of the encoder $f_\text{en}$ and the inverse of the decoder $f_\text{de}^{-1}$ is considered. Specifically, for unsupervised tasks, the ensemble is an average of two vector representations produced from two encoding functions during the testing time, and for supervised tasks, the concatenation of two representations is regarded as the representation of a given sentence. The ensemble method is recommended in prior work BIBREF14 , BIBREF16 , BIBREF51 , BIBREF56 , BIBREF4 , BIBREF54 .
+
+As presented in Table 2 , on unsupervised evaluation tasks (STS12-16 and SICK14), the ensemble of two encoding functions is averaging, which benefits from aligning representations from $f_\text{en}$ and $f_\text{de}^{-1}$ by enforcing the invertible constraint. While in the learning system without the invertible constraint, the ensemble of two encoding functions provides worse performance than $f_\text{de}^{-1}$ .
+
+On supervised evaluation tasks, as the ensemble method is concatenation and a linear model is applied on top of the concatenated representations, as long as the two encoding functions process sentences distinctively, the linear classifier is capable of picking relevant feature dimensions from both encoding functions to make good predictions, thus there is no significant difference between our model with and without invertible constraint.
+
+## Effect of Learning
+
+Recent research BIBREF54 showed that the improvement on the supervised evaluation tasks led by learning from labelled or unlabelled corpora is rather insignificant compared to random initialised projections on top of pretrained word vectors. Another interesting direction of research that utilises probabilistic random walk models on the unit sphere BIBREF57 , BIBREF25 , BIBREF58 derived several simple yet effective post-processing methods that operate on pretrained word vectors and are able to boost the performance of the averaged word vectors as the sentence representation on unsupervised tasks. While these papers reveal interesting aspects of the downstream tasks and question the need for optimising a learning objective, our results show that learning on unlabelled corpora helps.
+
+On unsupervised evaluation tasks, in order to show that learning from an unlabelled corpus helps, the performance of our learnt representations should be directly compared with the pretrained word vectors, FastText in our system, at the same dimensionality with the same post-processing BIBREF25 . The word vectors are scattered in the 300-dimensional space, and our model has a decoder that is learnt to project a sentence representation $\in ^{d_}$ to $=f_\text{de}(;\phi )\in ^{300}$ . The results of our learnt representations and averaged word vectors with the same postprocessing are presented in Table 4 .
+
+As shown in the Table 4 , the performance of our learnt system is better than FastText at the same dimensionality. It is worth mentioning that, in our system, the final representation is an average of postprocessed word vectors and the learnt representations $$ , and the invertible constraint guarantees that the ensemble of both gives better performance. Otherwise, as discussed in the previous section, an ensemble of postprocessed word vectors and some random encoders won't necessarily lead to stronger results. Table 3 also provides evidence for the effectiveness of learning on the unsupervised evaluation tasks.
+
+On supervised evaluation tasks, we agree that higher dimensional vector representations give better results on the downstream tasks. Compared to random projections with $4096\times 6$ output dimensions, learning from unlabelled corpora leverages the distributional similarity BIBREF1 at the sentence-level into the learnt representations and potentially helps capture the meaning of a sentence. In our system, the raw representations are in 2400-dimensional space, and the use of various pooling functions expands it to $2048\times 6$ dimensions, which is half as large as the random projection dimension and still yields better performance. Both our models and random projections with no training are presented in Table 5 .
+
+The evidence from both sets of downstream tasks support our argument that learning from unlabelled corpora helps the representations capture meaning of sentences. However, current ways of incorporating the distributional hypothesis only utilise it as a weak and noisy supervision, which might limit the quality of the learnt sentence representations.
+
+## Conclusion
+
+Two types of decoders, including an orthonormal regularised linear projection and a bijective transformation, whose inverses can be derived effortlessly, are presented in order to utilise the decoder as another encoder in the testing phase. The experiments and comparisons are conducted on two large unlabelled corpora, and the performance on the downstream tasks shows the high usability and generalisation ability of the decoders in testing.
+
+Analyses show that the invertible constraint enforced on the decoder encourages each one to learn from the other one during learning, and provides improved encoding functions after learning. Ensemble of the encoder and the inverse of the decoder gives even better performance when the invertible constraint is applied on the decoder side. Furthermore, by comparing with prior work, we argue that learning from unlabelled corpora indeed helps to improve the sentence representations, although the current way of utilising corpora might not be optimal.
+
+We view this as unifying the generative and discriminative objectives for unsupervised sentence representation learning, as it is trained with a generative objective which when inverted can be seen as creating a discriminative target.
+
+Our proposed method in our implementation doesn't provide extremely good performance on the downstream tasks, but we see our method as an opportunity to fuse all possible components in a model, even a usually discarded decoder, to produce sentence representations. Future work could potentially expand our work into end-to-end invertible model that is able to produce high-quality representations by omnidirectional computations.
+
+## Acknowledgements
+
+Many Thanks to Andrew Ying for helpful clarifications on several concepts.

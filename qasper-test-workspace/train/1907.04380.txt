@@ -1,0 +1,89 @@
+# Don't Take the Premise for Granted: Mitigating Artifacts in Natural Language Inference
+
+**Paper ID:** 1907.04380
+
+## Abstract
+
+Natural Language Inference (NLI) datasets often contain hypothesis-only biases---artifacts that allow models to achieve non-trivial performance without learning whether a premise entails a hypothesis. We propose two probabilistic methods to build models that are more robust to such biases and better transfer across datasets. In contrast to standard approaches to NLI, our methods predict the probability of a premise given a hypothesis and NLI label, discouraging models from ignoring the premise. We evaluate our methods on synthetic and existing NLI datasets by training on datasets containing biases and testing on datasets containing no (or different) hypothesis-only biases. Our results indicate that these methods can make NLI models more robust to dataset-specific artifacts, transferring better than a baseline architecture in 9 out of 12 NLI datasets. Additionally, we provide an extensive analysis of the interplay of our methods with known biases in NLI datasets, as well as the effects of encouraging models to ignore biases and fine-tuning on target datasets.
+
+## Introduction
+
+Natural Language Inference (NLI) is often used to gauge a model's ability to understand a relationship between two texts BIBREF0 , BIBREF1 . In NLI, a model is tasked with determining whether a hypothesis (a woman is sleeping) would likely be inferred from a premise (a woman is talking on the phone). The development of new large-scale datasets has led to a flurry of various neural network architectures for solving NLI. However, recent work has found that many NLI datasets contain biases, or annotation artifacts, i.e., features present in hypotheses that enable models to perform surprisingly well using only the hypothesis, without learning the relationship between two texts BIBREF2 , BIBREF3 , BIBREF4 . For instance, in some datasets, negation words like “not” and “nobody” are often associated with a relationship of contradiction. As a ramification of such biases, models may not generalize well to other datasets that contain different or no such biases.
+
+Recent studies have tried to create new NLI datasets that do not contain such artifacts, but many approaches to dealing with this issue remain unsatisfactory: constructing new datasets BIBREF5 is costly and may still result in other artifacts; filtering “easy” examples and defining a harder subset is useful for evaluation purposes BIBREF2 , but difficult to do on a large scale that enables training; and compiling adversarial examples BIBREF6 is informative but again limited by scale or diversity. Instead, our goal is to develop methods that overcome these biases as datasets may still contain undesired artifacts despite annotation efforts.
+
+Typical NLI models learn to predict an entailment label discriminatively given a premise-hypothesis pair (Figure 1 ), enabling them to learn hypothesis-only biases. Instead, we predict the premise given the hypothesis and the entailment label, which by design cannot be solved using data artifacts. While this objective is intractable, it motivates two approximate training methods for standard NLI classifiers that are more resistant to biases. Our first method uses a hypothesis-only classifier (Figure 1 ) and the second uses negative sampling by swapping premises between premise-hypothesis pairs (Figure 1 ).
+
+We evaluate the ability of our methods to generalize better in synthetic and naturalistic settings. First, using a controlled, synthetic dataset, we demonstrate that, unlike the baseline, our methods enable a model to ignore the artifacts and learn to correctly identify the desired relationship between the two texts. Second, we train models on an NLI dataset that is known to be biased and evaluate on other datasets that may have different or no biases. We observe improved results compared to a fully discriminative baseline in 9 out of 12 target datasets, indicating that our methods generate models that are more robust to annotation artifacts.
+
+An extensive analysis reveals that our methods are most effective when the target datasets have different biases from the source dataset or no noticeable biases. We also observe that the more we encourage the model to ignore biases, the better it transfers, but this comes at the expense of performance on the source dataset. Finally, we show that our methods can better exploit small amounts of training data in a target dataset, especially when it has different biases from the source data.
+
+In this paper, we focus on the transferability of our methods from biased datasets to ones having different or no biases. Elsewhere BIBREF7 , we have analyzed the effect of these methods on the learned language representations, suggesting that they may indeed be less biased. However, we caution that complete removal of biases remains difficult and is dependent on the techniques used. The choice of whether to remove bias also depends on the goal; in an in-domain scenario certain biases may be helpful and should not necessarily be removed.
+
+In summary, in this paper we make the following contributions:
+
+## Motivation
+
+A training instance for NLI consists of a hypothesis sentence $H$ , a premise statement $P$ , and an inference label $y$ . A probabilistic NLI model aims to learn a parameterized distribution $p_{\theta }(y \,|\,P, H)$ to compute the probability of the label given the two sentences. We consider NLI models with premise and hypothesis encoders, $f_{P,\theta }$ and $f_{H,\theta }$ , which learn representations of $P$ and $H$ , and a classification layer, $g_\theta $ , which learns a distribution over $y$ . Typically, this is done by maximizing this discriminative likelihood directly, which will act as our baseline (Figure 1 ).
+
+However, many NLI datasets contain biases that allow models to perform non-trivially well when accessing just the hypotheses BIBREF4 , BIBREF2 , BIBREF3 . This allows models to leverage hypothesis-only biases that may be present in a dataset. A model may perform well on a specific dataset, without identifying whether $P $ entails $H $ . gururangan-EtAl:2018:N18-2 argue that “the bulk” of many models' “success [is] attribute[d] to the easy examples”. Consequently, this may limit how well a model trained on one dataset would perform on other datasets that may have different artifacts.
+
+Consider an example where $P $ and $H $ are strings from $\lbrace a, b, c\rbrace $ , and an environment where $P $ entails $H $ if and only if the first letters are the same, as in synthetic dataset A. In such a setting, a model should be able to learn the correct condition for $P $ to entail $H $ . 
+
+Synthetic dataset A
+
+ $(a, a)$ $\rightarrow $ True $(a, b)$ $\rightarrow $ False
+
+ $(b, b)$ $\rightarrow $ True $(b, a)$ $\rightarrow $ False
+
+Imagine now that an artifact $c$ is appended to every entailed $H $ (synthetic dataset B). A model of $y$ with access only to the hypothesis side can fit the data perfectly by detecting the presence or absence of $c$ in $H $ , ignoring the more general pattern. Therefore, we hypothesize that a model that learns $p_{\theta }(y \,|\,P, H)$ by training on such data would be misled by the bias $c$ and would fail to learn the relationship between the premise and the hypothesis. Consequently, the model would not perform well on the unbiased synthetic dataset A.
+
+Synthetic dataset B (with artifact)
+
+ $(a, ac)$ $\rightarrow $ True $(a, b)$ $\rightarrow $ False
+
+ $(b, bc)$ $\rightarrow $ True $(b, a)$ $\rightarrow $ False
+
+Instead of maximizing the discriminative likelihood $p_{\theta }(y \,|\,P, H)$ directly, we consider maximizing the likelihood of generating the premise $P$ conditioned on the hypothesis $H$ and the label $y$ : $p(P \,|\,H, y)$ . This objective cannot be fooled by hypothesis-only features, and it requires taking the premise into account. For example, a model that only looks for $c$ in the above example cannot do better than chance on this objective. However, as $P$ comes from the space of all sentences, this objective is much more difficult to estimate.
+
+## Training Methods
+
+Our goal is to maximize $\log p(P \,|\,H, y)$ on the training data. While we could in theory directly parameterize this distribution, for efficiency and simplicity we instead write it in terms of the standard $p_{\theta }(y \,|\,P, H)$ and introduce a new term to approximate the normalization: $ \log p(P \,|\,y, H) = \log \dfrac{p_{\theta }(y
+\,|\,P, H) p(P \,|\,H)}{p(y \,|\,H)}. $ 
+
+Throughout we will assume $p(P \,|\,H)$ is a fixed constant ( justified by the dataset assumption that, lacking $y$ , $P$ and $H$ are independent and drawn at random). Therefore, to approximately maximize this objective we need to estimate $p(y \,|\,H)$ . We propose two methods for doing so.
+
+## Method 1: Hypothesis-only Classifier
+
+Our first approach is to estimate the term $p(y \,|\,H)$ directly. In theory, if labels in an NLI dataset depend on both premises and hypothesis (which poliak-EtAl:2018:S18-2 call “interesting NLI”), this should be a uniform distribution. However, as discussed above, it is often possible to correctly predict $y$ based only on the hypothesis. Intuitively, this model can be interpreted as training a classifier to identify the (latent) artifacts in the data.
+
+We define this distribution using a shared representation between our new estimator $p_{\phi ,\theta }(y \,|\,H)$ and $p_{\theta }(y \,|\,P, H)$ . In particular, the two share an embedding of $H$ from the hypothesis encoder $f_{H,\theta }$ . The additional parameters $\phi $ are in the final layer $g_{\phi }$ , which we call the hypothesis-only classifier. The parameters of this layer $\phi $ are updated to fit $p(y \,|\,H)$ whereas the rest of the parameters in $\theta $ are updated based on the gradients of $\log p(P \,|\,y, H)$ .
+
+Training is illustrated in Figure 1 . This interplay is controlled by two hyper-parameters. First, the negative term is scaled by a hyper-parameter $\alpha $ . Second, the updates of $g_\phi $ are weighted by $\beta $ . We therefore minimize the following multitask loss functions (shown for a single example): $
+\max _{\theta } L_1(\theta ) &= \log {p_{\theta }(y \,|\,P, H) } - \alpha \log {p_{\phi ,\theta }(y \,|\,H)} \\
+\max _{\phi } L_2(\phi ) &= \beta \log {p_{\phi , \theta }(y \,|\,H) }
+$ 
+
+ We implement these together with a gradient reversal layer BIBREF8 . As illustrated in Figure 1 , during back-propagation, we first pass gradients through the hypothesis-only classifier $g_{\phi }$ and then reverse the gradients going to the hypothesis encoder $g_{H,\theta }$ (potentially scaling them by $\beta $ ). 
+
+## Method 2: Negative Sampling
+
+As an alternative to the hypothesis-only classifier, our second method attempts to remove annotation artifacts from the representations by sampling alternative premises. Consider instead writing the normalization term above as, $
+-\log p(y \,|\,H) &= -\log \sum _{P^{\prime }} p(P^{\prime } \,|\,H) p(y \,|\,P^{\prime }, H) \\
+&= -\log {\mathbb {E}}_{P^{\prime }} p(y \,|\,P^{\prime }, H) \\
+&\ge - {\mathbb {E}}_{P^{\prime }} \log p(y \,|\,P^{\prime }, H),
+$ 
+
+where the expectation is uniform and the last step is from Jensen's inequality. As in Method 1, we define a separate $p_{\phi ,\theta }(y \,|\,P^{\prime }, H)$ which shares the embedding layers from $\theta $ , $f_{P,\theta }$ and $f_{H,\theta }$ . However, as we are attempting to unlearn hypothesis bias, we block the gradients and do not let it update the premise encoder $f_{P,\theta }$ . The full setting is shown in Figure 1 .
+
+To approximate the expectation, we use uniform samples $P^{\prime }$ (from other training examples) to replace the premise in a ( $P $ , $H $ )-pair, while keeping the label $y$ . We also maximize $p_{\theta , \phi }(y \,|\,P^{\prime }, H)$ to learn the artifacts in the hypotheses. We use $\alpha \in [0, 1]$ to control the fraction of randomly sampled $P $ 's (so the total number of examples remains the same). As before, we implement this using gradient reversal scaled by $\beta $ . $
+\max _{\theta } L_1(\theta ) &= (1- \alpha ) \log {p_{\theta }(y \,|\,P, H) } \\
+& \hspace{26.00006pt} - \alpha \log {p_{\theta , \phi }(y \,|\,P^{\prime }, H)} \\
+\max _{\phi } L_2(\phi ) &= \beta \log {p_{\theta , \phi }(y \,|\,P^{\prime }, H) }
+$ 
+
+Finally, we share the classifier weights between $p_{\theta }(y \,|\,P, H)$ and $p_{\phi ,\theta }(y \,|\,P^{\prime }, H)$ . In a sense this is counter-intuitive, since $p_{\theta }$ is being trained to unlearn bias, while $p_{\phi ,\theta }$ is being trained to learn it. However, if the models are trained separately, they may learn to co-adapt with each other BIBREF13 . If $p_{\phi ,\theta }$ is not trained well, we might be fooled to think that the representation does not contain any biases, while in fact they are still hidden in the representation. For some evidence that this indeed happens when the models are trained separately, see BIBREF7 .
+
+## Experimental Setup
+
+To evaluate how well our methods can overcome hypothesis-only biases, we test our methods on a synthetic dataset as well as on a wide range of existing NLI datasets. The scenario we aim to address is when training on a source dataset with biases and evaluating on a target dataset with different or no biases. We first describe the data and experimental setup before discussing the results.

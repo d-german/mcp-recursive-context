@@ -1,0 +1,110 @@
+# AMR-to-text Generation with Synchronous Node Replacement Grammar
+
+**Paper ID:** 1702.00500
+
+## Abstract
+
+This paper addresses the task of AMR-to-text generation by leveraging synchronous node replacement grammar. During training, graph-to-string rules are learned using a heuristic extraction algorithm. At test time, a graph transducer is applied to collapse input AMRs and generate output sentences. Evaluated on SemEval-2016 Task 8, our method gives a BLEU score of 25.62, which is the best reported so far.
+
+## Introduction
+
+Abstract Meaning Representation (AMR) BIBREF0 is a semantic formalism encoding the meaning of a sentence as a rooted, directed graph. AMR uses a graph to represent meaning, where nodes (such as “boy”, “want-01”) represent concepts, and edges (such as “ARG0”, “ARG1”) represent relations between concepts. Encoding many semantic phenomena into a graph structure, AMR is useful for NLP tasks such as machine translation BIBREF1 , BIBREF2 , question answering BIBREF3 , summarization BIBREF4 and event detection BIBREF5 .
+
+AMR-to-text generation is challenging as function words and syntactic structures are abstracted away, making an AMR graph correspond to multiple realizations. Despite much literature so far on text-to-AMR parsing BIBREF6 , BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 , BIBREF12 , BIBREF13 , BIBREF14 , BIBREF15 , there has been little work on AMR-to-text generation BIBREF16 , BIBREF17 , BIBREF18 .
+
+jeff2016amrgen transform a given AMR graph into a spanning tree, before translating it to a sentence using a tree-to-string transducer. Their method leverages existing machine translation techniques, capturing hierarchical correspondences between the spanning tree and the surface string. However, it suffers from error propagation since the output is constrained given a spanning tree due to the projective correspondence between them. Information loss in the graph-to-tree transformation step cannot be recovered. song-EtAl:2016:EMNLP2016 directly generate sentences using graph-fragment-to-string rules. They cast the task of finding a sequence of disjoint rules to transduce an AMR graph into a sentence as a traveling salesman problem, using local features and a language model to rank candidate sentences. However, their method does not learn hierarchical structural correspondences between AMR graphs and strings.
+
+We propose to leverage the advantages of hierarchical rules without suffering from graph-to-tree errors by directly learning graph-to-string rules. As shown in Figure 1 , we learn a synchronous node replacement grammar (NRG) from a corpus of aligned AMR and sentence pairs. At test time, we apply a graph transducer to collapse input AMR graphs and generate output strings according to the learned grammar. Our system makes use of a log-linear model with real-valued features, tuned using MERT BIBREF19 , and beam search decoding. It gives a BLEU score of 25.62 on LDC2015E86, which is the state-of-the-art on this dataset.
+
+## Grammar Definition
+
+A synchronous node replacement grammar (NRG) is a rewriting formalism: $G=\langle N, \Sigma , \Delta , P, S \rangle $ , where $N$ is a finite set of nonterminals, $\Sigma $ and $\Delta $ are finite sets of terminal symbols for the source and target sides, respectively. $S \in N$ is the start symbol, and $P$ is a finite set of productions. Each instance of $P$ takes the form $X_i \rightarrow (\langle F, E\rangle ,\sim )$ , where $X_i \in N$ is a nonterminal node, $F$ is a rooted, connected AMR fragment with edge labels over $N$0 and node labels over $N$1 , $N$2 is a corresponding target string over $N$3 and $N$4 denotes the alignment of nonterminal symbols between $N$5 and $N$6 . A classic NRG BIBREF20 also defines $N$7 , which is an embedding mechanism defining how $N$8 is connected to the rest of the graph when replacing $N$9 with $\Sigma $0 on the graph. Here we omit defining $\Sigma $1 and allow arbitrary connections. Following chiang:2005:ACL, we use only one nonterminal $\Sigma $6 in addition to $\Sigma $7 , and use subscripts to distinguish different non-terminal instances.
+
+Figure 2 shows an example derivation process for the sentence “the boy wants to go” given the rule set in Table 1 . Given the start symbol $S$ , which is first replaced with $X_1$ , rule (c) is applied to generate “ $X_2$ to go” and its AMR counterpart. Then rule (b) is used to generate “ $X_3$ wants” and its AMR counterpart from $X_2$ . Finally, rule (a) is used to generate “the boy” and its AMR counterpart from $X_3$ . Our graph-to-string rules are inspired by synchronous grammars for machine translation BIBREF21 , BIBREF22 , BIBREF23 , BIBREF24 , BIBREF25 , BIBREF26 , BIBREF27 , BIBREF28 , BIBREF29 .
+
+## Induced Rules
+
+[t] training corpus $C$ rule instances $R$ $R$ $\leftarrow $ [] $(Sent,AMR,\sim )$ in $C$ $R_{cur}$ $\leftarrow $ FragmentExtract( $Sent$ , $AMR$ , $R$0 ) $R$1 in $R$2 $R$3 .append( $R$4 ) $R$5 in $R$6 $R$7 .Contains $R$8 $R$9 $R$0 $R$1 .collapse( $R$2 ) $R$3 .append( $R$4 ) Rule extraction 
+
+There are three types of rules in our system, namely induced rules, concept rules and graph glue rules. Here we first introduce induced rules, which are obtained by a two-step procedure on a training corpus. Shown in Algorithm "Induced Rules" , the first step is to extract a set of initial rules from training $\langle $ sentence, AMR, $\sim $ $\rangle $ pairs (Line 2) using the phrase-to-graph-fragment extraction algorithm of peng2015synchronous (Line 3). Here an initial rule contains only terminal symbols in both $F$ and $E$ . As a next step, we match between pairs of initial rules $r_i$ and $r_j$ , and generate $r_{ij}$ by collapsing $r_i$ with $\sim $0 , if $\sim $1 contains $\sim $2 (Line 6-8). Here $\sim $3 contains $\sim $4 , if $\sim $5 is a subgraph of $\sim $6 and $\sim $7 is a sub-phrase of $\sim $8 . When collapsing $\sim $9 with $\rangle $0 , we replace the corresponding subgraph in $\rangle $1 with a new non-terminal node, and the sub-phrase in $\rangle $2 with the same non-terminal. For example, we obtain rule (b) by collapsing (d) with (a) in Table 1 . All initial and generated rules are stored in a rule list $\rangle $3 (Lines 5 and 9), which will be further normalized to obtain the final induced rule set.
+
+## Concept Rules and Glue Rules
+
+In addition to induced rules, we adopt concept rules BIBREF17 and graph glue rules to ensure existence of derivations. For a concept rule, $F$ is a single node in the input AMR graph, and $E$ is a morphological string of the node concept. A concept rule is used in case no induced rule can cover the node. We refer to the verbalization list and AMR guidelines for creating more complex concept rules. For example, one concept rule created from the verbalization list is “(k / keep-01 :ARG1 (p / peace)) $|||$ peacekeeping”.
+
+Inspired by chiang:2005:ACL, we define graph glue rules to concatenate non-terminal nodes connected with an edge, when no induced rules can be applied. Three glue rules are defined for each type of edge label. Taking the edge label “ARG0” as an example, we create the following glue rules:
+
+where for both $r_1$ and $r_2$ , $F$ contains two non-terminal nodes with a directed edge connecting them, and $E$ is the concatenation the two non-terminals in either the monotonic or the inverse order. For $r_3$ , $F$ contains one non-terminal node with a self-pointing edge, and $E$ is the non-terminal. With concept rules and glue rules in our final rule set, it is easily guaranteed that there are legal derivations for any input AMR graph.
+
+## Model
+
+We adopt a log-linear model for scoring search hypotheses. Given an input AMR graph, we find the highest scored derivation $t^{\ast }$ from all possible derivations $t$ : 
+
+$$t^{\ast } = \arg \!\max _{t} \exp \sum _i w_i f_i(g,t)\textrm {,}$$   (Eq. 11) 
+
+where $g$ denotes the input AMR, $f_i(\cdot ,\cdot )$ and $w_i$ represent a feature and the corresponding weight, respectively. The feature set that we adopt includes phrase-to-graph and graph-to-phrase translation probabilities and their corresponding lexicalized translation probabilities (section "Translation Probabilities" ), language model score, word count, rule count, reordering model score (section "Reordering Model" ) and moving distance (section "Moving Distance" ). The language model score, word count and phrase count features are adopted from SMT BIBREF30 , BIBREF24 .
+
+We perform bottom-up search to transduce input AMRs to surface strings. Each hypothesis contains the current AMR graph, translations of collapsed subgraphs, the feature vector and the current model score. Beam search is adopted, where hypotheses with the same number of collapsed edges and nodes are put into the same beam.
+
+## Translation Probabilities
+
+Production rules serve as a basis for scoring hypotheses. We associate each synchronous NRG rule $n \rightarrow (\langle F, E \rangle ,\sim )$ with a set of probabilities. First, phrase-to-fragment translation probabilities are defined based on maximum likelihood estimation (MLE), as shown in Equation 13 , where $c_{\langle F, E \rangle }$ is the fractional count of $\langle F, E \rangle $ . 
+
+$$p(F|E)=\frac{c_{\langle F,E \rangle }}{\sum _{F^{\prime }}c_{\langle F^{\prime },E \rangle }}$$   (Eq. 13) 
+
+In addition, lexicalized translation probabilities are defined as: 
+
+$$p_w(F|E)=\prod _{l \in F}{\sum _{w \in E} p(l|w)}$$   (Eq. 14) 
+
+Here $l$ is a label (including both edge labels such as “ARG0” and concept labels such as “want-01”) in the AMR fragment $F$ , and $w$ is a word in the phrase $E$ . Equation 14 can be regarded as a “soft” version of the lexicalized translation probabilities adopted by SMT, which picks the alignment yielding the maximum lexicalized probability for each translation rule. In addition to $p(F|E)$ and $p_w(F|E)$ , we use features in the reverse direction, namely $p(E|F)$ and $p_w(E|F)$ , the definitions of which are omitted as they are consistent with Equations 13 and 14 , respectively. The probabilities associated with concept rules and glue rules are manually set to 0.0001.
+
+## Reordering Model
+
+Although the word order is defined for induced rules, it is not the case for glue rules. We learn a reordering model that helps to decide whether the translations of the nodes should be monotonic or inverse given the directed connecting edge label. The probabilistic model using smoothed counts is defined as: 
+
+$$p(M|h,l,t)=\\
+\frac{1.0+\sum _{h}\sum _{t}c(h,l,t,M)}{2.0+\sum _{o\in \lbrace M,I\rbrace }\sum _{h}\sum _{t}c(h,l,t,o)}$$   (Eq. 16) 
+
+ $c(h,l,t,M)$ is the count of monotonic translations of head $h$ and tail $t$ , connected by edge $l$ .
+
+## Moving Distance
+
+The moving distance feature captures the distances between the subgraph roots of two consecutive rule matches in the decoding process, which controls a bias towards collapsing nearby subgraphs consecutively.
+
+## Setup
+
+We use LDC2015E86 as our experimental dataset, which contains 16833 training, 1368 dev and 1371 test instances. Each instance contains a sentence, an AMR graph and the alignment generated by a heuristic aligner. Rules are extracted from the training data, and model parameters are tuned on the dev set. For tuning and testing, we filter out sentences with more than 30 words, resulting in 1103 dev instances and 1055 test instances. We train a 4-gram language model (LM) on gigaword (LDC2011T07), and use BLEU BIBREF31 as the evaluation metric. MERT is used BIBREF19 to tune model parameters on $k$ -best outputs on the devset, where $k$ is set 50.
+
+We investigate the effectiveness of rules and features by ablation tests: “NoInducedRule” does not adopt induced rules, “NoConceptRule” does not adopt concept rules, “NoMovingDistance” does not adopt the moving distance feature, and “NoReorderModel” disables the reordering model. Given an AMR graph, if NoConceptRule cannot produce a legal derivation, we concatenate existing translation fragments into a final translation, and if a subgraph can not be translated, the empty string is used as the output. We also compare our method with previous works, in particular JAMR-gen BIBREF16 and TSP-gen BIBREF17 , on the same dataset.
+
+## Main results
+
+The results are shown in Table 2 . First, All outperforms all baselines. NoInducedRule leads to the greatest performance drop compared with All, demonstrating that induced rules play a very important role in our system. On the other hand, NoConceptRule does not lead to much performance drop. This observation is consistent with the observation of song-EtAl:2016:EMNLP2016 for their TSP-based system. NoMovingDistance leads to a significant performance drop, empirically verifying the fact that the translations of nearby subgraphs are also close. Finally, NoReorderingModel does not affect the performance significantly, which can be because the most important reordering patterns are already covered by the hierarchical induced rules. Compared with TSP-gen and JAMR-gen, our final model All improves the BLEU from 22.44 and 23.00 to 25.62, showing the advantage of our model. To our knowledge, this is the best result reported so far on the task.
+
+## Grammar analysis
+
+We have shown the effectiveness of our synchronous node replacement grammar (SNRG) on the AMR-to-text generation task. Here we further analyze our grammar as it is relatively less studied than the hyperedge replacement grammar (HRG) BIBREF32 .
+
+Statistics on the whole rule set
+
+We first categorize our rule set by the number of terminals and nonterminals in the AMR fragment $F$ , and show the percentages of each type in Figure 3 . Each rule contains at most 1 nonterminal, as we collapse each initial rule only once. First of all, the percentage of rules containing nonterminals are much more than those without nonterminals, as we collapse each pair of initial rules (in Algorithm "Induced Rules" ) and the results can be quadratic the number of initial rules. In addition, most rules are small containing 1 to 3 terminals, meaning that they represent small pieces of meaning and are easier to matched on a new AMR graph. Finally, there are a few large rules, which represent complex meaning.
+
+Statistics on the rules used for decoding
+
+In addition, we collect the rules that our well-tuned system used for generating the 1-best output on the testset, and categorize them into 3 types: (1) glue rules, (2) nonterminal rules, which are not glue rules but contain nonterminals on the right-hand side and (3) terminal rules, whose right-hand side only contain terminals. Over the rules used on the 1-best result, more than 30% are non-terminal rules, showing that the induced rules play an important role. On the other hand, 30% are glue rules. The reason is that the data sparsity for graph grammars is more severe than string-based grammars (such as CFG), as the graph structures are more complex than strings. Finally, terminal rules take the largest percentage, while most are induced rules, but not concept rules.
+
+Rule examples
+
+Finally, we show some rules in Table 4 , where $F$ and $E$ are the right-hand-side AMR fragment and phrase, respectively. For the first rule, the root of $F$ is a verb (“give-01”) whose subject is a nonterminal and object is a AMR fragment “(p / person :ARG0-of (u / use-01))”, which means “user”. So it is easy to see that the corresponding phrase $E$ conveys the same meaning. For the second rule, “(s3 / stay-01 :accompanier (i / i))” means “stay with me”, which is also covered by its phrase.
+
+## Generation example
+
+Finally, we show an example in Table 5 , where the top is the input AMR graph, and the bottom is the generation result. Generally, most of the meaning of the input AMR are correctly translated, such as “:example”, which means “such as”, and “thing”, which is an abstract concept and should not be translated, while there are a few errors, such as “that” in the result should be “what”, and there should be an “in” between “tmt” and “fairfax”.
+
+## Conclusion
+
+We showed that synchronous node replacement grammar is useful for AMR-to-text generation by developing a system that learns a synchronous NRG in the training time, and applies a graph transducer to collapse input AMR graphs and generate output strings according to the learned grammar at test time. Our method performs better than the previous systems, empirically proving the advantages of our graph-to-string rules.
+
+## Acknowledgement
+
+This work was funded by a Google Faculty Research Award. Yue Zhang is funded by NSFC61572245 and T2MOE201301 from Singapore Ministry of Education.

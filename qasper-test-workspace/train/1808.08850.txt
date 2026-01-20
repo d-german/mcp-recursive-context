@@ -1,0 +1,149 @@
+# WiSeBE: Window-based Sentence Boundary Evaluation
+
+**Paper ID:** 1808.08850
+
+## Abstract
+
+Sentence Boundary Detection (SBD) has been a major research topic since Automatic Speech Recognition transcripts have been used for further Natural Language Processing tasks like Part of Speech Tagging, Question Answering or Automatic Summarization. But what about evaluation? Do standard evaluation metrics like precision, recall, F-score or classification error; and more important, evaluating an automatic system against a unique reference is enough to conclude how well a SBD system is performing given the final application of the transcript? In this paper we propose Window-based Sentence Boundary Evaluation (WiSeBE), a semi-supervised metric for evaluating Sentence Boundary Detection systems based on multi-reference (dis)agreement. We evaluate and compare the performance of different SBD systems over a set of Youtube transcripts using WiSeBE and standard metrics. This double evaluation gives an understanding of how WiSeBE is a more reliable metric for the SBD task.
+
+## Introduction
+
+The goal of Automatic Speech Recognition (ASR) is to transform spoken data into a written representation, thus enabling natural human-machine interaction BIBREF0 with further Natural Language Processing (NLP) tasks. Machine translation, question answering, semantic parsing, POS tagging, sentiment analysis and automatic text summarization; originally developed to work with formal written texts, can be applied over the transcripts made by ASR systems BIBREF1 , BIBREF2 , BIBREF3 . However, before applying any of these NLP tasks a segmentation process called Sentence Boundary Detection (SBD) should be performed over ASR transcripts to reach a minimal syntactic information in the text.
+
+To measure the performance of a SBD system, the automatically segmented transcript is evaluated against a single reference normally done by a human. But given a transcript, does it exist a unique reference? Or, is it possible that the same transcript could be segmented in five different ways by five different people in the same conditions? If so, which one is correct; and more important, how to fairly evaluate the automatically segmented transcript? These questions are the foundations of Window-based Sentence Boundary Evaluation (WiSeBE), a new semi-supervised metric for evaluating SBD systems based on multi-reference (dis)agreement.
+
+The rest of this article is organized as follows. In Section SECREF2 we set the frame of SBD and how it is normally evaluated. WiSeBE is formally described in Section SECREF3 , followed by a multi-reference evaluation in Section SECREF4 . Further analysis of WiSeBE and discussion over the method and alternative multi-reference evaluation is presented in Section SECREF5 . Finally, Section SECREF6 concludes the paper.
+
+## Sentence Boundary Detection
+
+Sentence Boundary Detection (SBD) has been a major research topic science ASR moved to more general domains as conversational speech BIBREF4 , BIBREF5 , BIBREF6 . Performance of ASR systems has improved over the years with the inclusion and combination of new Deep Neural Networks methods BIBREF7 , BIBREF8 , BIBREF0 . As a general rule, the output of ASR systems lacks of any syntactic information such as capitalization and sentence boundaries, showing the interst of ASR systems to obtain the correct sequence of words with almost no concern of the overall structure of the document BIBREF9 .
+
+Similar to SBD is the Punctuation Marks Disambiguation (PMD) or Sentence Boundary Disambiguation. This task aims to segment a formal written text into well formed sentences based on the existent punctuation marks BIBREF10 , BIBREF11 , BIBREF12 , BIBREF13 . In this context a sentence is defined (for English) by the Cambridge Dictionary as:
+
+“a group of words, usually containing a verb, that expresses a thought in the form of a statement, question, instruction, or exclamation and starts with a capital letter when written”.
+
+PMD carries certain complications, some given the ambiguity of punctuation marks within a sentence. A period can denote an acronym, an abbreviation, the end of the sentence or a combination of them as in the following example:
+
+The U.S. president, Mr. Donald Trump, is meeting with the F.B.I. director Christopher A. Wray next Thursday at 8p.m.
+
+However its difficulties, DPM profits of morphological and lexical information to achieve a correct sentence segmentation. By contrast, segmenting an ASR transcript should be done without any (or almost any) lexical information and a flurry definition of sentence.
+
+The obvious division in spoken language may be considered speaker utterances. However, in a normal conversation or even in a monologue, the way ideas are organized differs largely from written text. This differences, added to disfluencies like revisions, repetitions, restarts, interruptions and hesitations make the definition of a sentence unclear thus complicating the segmentation task BIBREF14 . Table TABREF2 exemplifies some of the difficulties that are present when working with spoken language.
+
+Stolcke & Shriberg BIBREF6 considered a set of linguistic structures as segments including the following list:
+
+In BIBREF4 , Meteer & Iyer divided speaker utterances into segments, consisting each of a single independent clause. A segment was considered to begin either at the beginning of an utterance, or after the end of the preceding segment. Any dysfluency between the end of the previous segments and the begging of current one was considered part of the current segments.
+
+Rott & Červa BIBREF15 aimed to summarize news delivered orally segmenting the transcripts into “something that is similar to sentences”. They used a syntatic analyzer to identify the phrases within the text.
+
+A wide study focused in unbalanced data for the SBD task was performed by Liu et al. BIBREF16 . During this study they followed the segmentation scheme proposed by the Linguistic Data Consortium on the Simple Metadata Annotation Specification V5.0 guideline (SimpleMDE_V5.0) BIBREF14 , dividing the transcripts in Semantic Units.
+
+A Semantic Unit (SU) is considered to be an atomic element of the transcript that manages to express a complete thought or idea on the part of the speaker BIBREF14 . Sometimes a SU corresponds to the equivalent of a sentence in written text, but other times (the most part of them) a SU corresponds to a phrase or a single word.
+
+SUs seem to be an inclusive conception of a segment, they embrace different previous segment definitions and are flexible enough to deal with the majority of spoken language troubles. For these reasons we will adopt SUs as our segment definition.
+
+## Sentence Boundary Evaluation
+
+SBD research has been focused on two different aspects; features and methods. Regarding the features, some work focused on acoustic elements like pauses duration, fundamental frequencies, energy, rate of speech, volume change and speaker turn BIBREF17 , BIBREF18 , BIBREF19 .
+
+The other kind of features used in SBD are textual or lexical features. They rely on the transcript content to extract features like bag-of-word, POS tags or word embeddings BIBREF20 , BIBREF18 , BIBREF21 , BIBREF22 , BIBREF15 , BIBREF6 , BIBREF23 . Mixture of acoustic and lexical features have also been explored BIBREF24 , BIBREF25 , BIBREF19 , BIBREF26 , which is advantageous when both audio signal and transcript are available.
+
+With respect to the methods used for SBD, they mostly rely on statistical/neural machine translation BIBREF18 , BIBREF27 , language models BIBREF9 , BIBREF16 , BIBREF22 , BIBREF6 , conditional random fields BIBREF21 , BIBREF28 , BIBREF23 and deep neural networks BIBREF29 , BIBREF20 , BIBREF13 .
+
+Despite their differences in features and/or methodology, almost all previous cited research share a common element; the evaluation methodology. Metrics as Precision, Recall, F1-score, Classification Error Rate and Slot Error Rate (SER) are used to evaluate the proposed system against one reference. As discussed in Section SECREF1 , further NLP tasks rely on the result of SBD, meaning that is crucial to have a good segmentation. But comparing the output of a system against a unique reference will provide a reliable score to decide if the system is good or bad?
+
+Bohac et al. BIBREF24 compared the human ability to punctuate recognized spontaneous speech. They asked 10 people (correctors) to punctuate about 30 minutes of ASR transcripts in Czech. For an average of 3,962 words, the punctuation marks placed by correctors varied between 557 and 801; this means a difference of 244 segments for the same transcript. Over all correctors, the absolute consensus for period (.) was only 4.6% caused by the replacement of other punctuation marks as semicolons (;) and exclamation marks (!). These results are understandable if we consider the difficulties presented previously in this section.
+
+To our knowledge, the amount of studies that have tried to target the sentence boundary evaluation with a multi-reference approach is very small. In BIBREF24 , Bohac et al. evaluated the overall punctuation accuracy for Czech in a straightforward multi-reference framework. They considered a period (.) valid if at least five of their 10 correctors agreed on its position.
+
+Kolář & Lamel BIBREF25 considered two independent references to evaluate their system and proposed two approaches. The fist one was to calculate the SER for each of one the two available references and then compute their mean. They found this approach to be very strict because for those boundaries where no agreement between references existed, the system was going to be partially wrong even the fact that it has correctly predicted the boundary. Their second approach tried to moderate the number of unjust penalizations. For this case, a classification was considered incorrect only if it didn't match either of the two references.
+
+These two examples exemplify the real need and some straightforward solutions for multi-reference evaluation metrics. However, we think that it is possible to consider in a more inclusive approach the similarities and differences that multiple references could provide into a sentence boundary evaluation protocol.
+
+## Window-Based Sentence Boundary Evaluation
+
+Window-Based Sentence Boundary Evaluation (WiSeBE) is a semi-automatic multi-reference sentence boundary evaluation protocol which considers the performance of a candidate segmentation over a set of segmentation references and the agreement between those references.
+
+Let INLINEFORM0 be the set of all available references given a transcript INLINEFORM1 , where INLINEFORM2 is the INLINEFORM3 word in the transcript; a reference INLINEFORM4 is defined as a binary vector in terms of the existent SU boundaries in INLINEFORM5 . DISPLAYFORM0 
+
+where INLINEFORM0 
+
+Given a transcript INLINEFORM0 , the candidate segmentation INLINEFORM1 is defined similar to INLINEFORM2 . DISPLAYFORM0 
+
+where INLINEFORM0 
+
+## General Reference and Agreement Ratio
+
+A General Reference ( INLINEFORM0 ) is then constructed to calculate the agreement ratio between all references in. It is defined by the boundary frequencies of each reference INLINEFORM1 . DISPLAYFORM0 
+
+where DISPLAYFORM0 
+
+The Agreement Ratio ( INLINEFORM0 ) is needed to get a numerical value of the distribution of SU boundaries over INLINEFORM1 . A value of INLINEFORM2 close to 0 means a low agreement between references in INLINEFORM3 , while INLINEFORM4 means a perfect agreement ( INLINEFORM5 ) in INLINEFORM6 . DISPLAYFORM0 
+
+In the equation above, INLINEFORM0 corresponds to the ponderated common boundaries of INLINEFORM1 and INLINEFORM2 to its hypothetical maximum agreement. DISPLAYFORM0 DISPLAYFORM1 
+
+## Window-Boundaries Reference
+
+In Section SECREF2 we discussed about how disfluencies complicate SU segmentation. In a multi-reference environment this causes disagreement between references around a same SU boundary. The way WiSeBE handle disagreements produced by disfluencies is with a Window-boundaries Reference ( INLINEFORM0 ) defined as: DISPLAYFORM0 
+
+where each window INLINEFORM0 considers one or more boundaries INLINEFORM1 from INLINEFORM2 with a window separation limit equal to INLINEFORM3 . DISPLAYFORM0 
+
+## WiSeBEWiSeBE
+
+WiSeBE is a normalized score dependent of 1) the performance of INLINEFORM0 over INLINEFORM1 and 2) the agreement between all references in INLINEFORM2 . It is defined as: DISPLAYFORM0 
+
+where INLINEFORM0 corresponds to the harmonic mean of precision and recall of INLINEFORM1 with respect to INLINEFORM2 (equation EQREF23 ), while INLINEFORM3 is the agreement ratio defined in ( EQREF15 ). INLINEFORM4 can be interpreted as a scaling factor; a low value will penalize the overall WiSeBE score given the low agreement between references. By contrast, for a high agreement in INLINEFORM5 ( INLINEFORM6 ), INLINEFORM7 . DISPLAYFORM0 DISPLAYFORM1 
+
+Equations EQREF24 and EQREF25 describe precision and recall of INLINEFORM0 with respect to INLINEFORM1 . Precision is the number of boundaries INLINEFORM2 inside any window INLINEFORM3 from INLINEFORM4 divided by the total number of boundaries INLINEFORM5 in INLINEFORM6 . Recall corresponds to the number of windows INLINEFORM7 with at least one boundary INLINEFORM8 divided by the number of windows INLINEFORM9 in INLINEFORM10 .
+
+## Evaluating with WiSeBEWiSeBE
+
+To exemplify the INLINEFORM0 score we evaluated and compared the performance of two different SBD systems over a set of YouTube videos in a multi-reference enviroment. The first system (S1) employs a Convolutional Neural Network to determine if the middle word of a sliding window corresponds to a SU boundary or not BIBREF30 . The second approach (S2) by contrast, introduces a bidirectional Recurrent Neural Network model with attention mechanism for boundary detection BIBREF31 .
+
+In a first glance we performed the evaluation of the systems against each one of the references independently. Then, we implemented a multi-reference evaluation with INLINEFORM0 .
+
+## Dataset
+
+We focused evaluation over a small but diversified dataset composed by 10 YouTube videos in the English language in the news context. The selected videos cover different topics like technology, human rights, terrorism and politics with a length variation between 2 and 10 minutes. To encourage the diversity of content format we included newscasts, interviews, reports and round tables.
+
+During the transcription phase we opted for a manual transcription process because we observed that using transcripts from an ASR system will difficult in a large degree the manual segmentation process. The number of words per transcript oscilate between 271 and 1,602 with a total number of 8,080.
+
+We gave clear instructions to three evaluators ( INLINEFORM0 ) of how segmentation was needed to be perform, including the SU concept and how punctuation marks were going to be taken into account. Periods (.), question marks (?), exclamation marks (!) and semicolons (;) were considered SU delimiters (boundaries) while colons (:) and commas (,) were considered as internal SU marks. The number of segments per transcript and reference can be seen in Table TABREF27 . An interesting remark is that INLINEFORM1 assigns about INLINEFORM2 less boundaries than the mean of the other two references.
+
+## Evaluation
+
+We ran both systems (S1 & S2) over the manually transcribed videos obtaining the number of boundaries shown in Table TABREF29 . In general, it can be seen that S1 predicts INLINEFORM0 more segments than S2. This difference can affect the performance of S1, increasing its probabilities of false positives.
+
+Table TABREF30 condenses the performance of both systems evaluated against each one of the references independently. If we focus on F1 scores, performance of both systems varies depending of the reference. For INLINEFORM0 , S1 was better in 5 occasions with respect of S2; S1 was better in 2 occasions only for INLINEFORM1 ; S1 overperformed S2 in 3 occasions concerning INLINEFORM2 and in 4 occasions for INLINEFORM3 (bold).
+
+Also from Table TABREF30 we can observe that INLINEFORM0 has a bigger similarity to S1 in 5 occasions compared to other two references, while INLINEFORM1 is more similar to S2 in 7 transcripts (underline).
+
+After computing the mean F1 scores over the transcripts, it can be concluded that in average S2 had a better performance segmenting the dataset compared to S1, obtaining a F1 score equal to 0.510. But... What about the complexity of the dataset? Regardless all references have been considered, nor agreement or disagreement between them has been taken into account.
+
+All values related to the INLINEFORM0 score are displayed in Table TABREF31 . The Agreement Ratio ( INLINEFORM1 ) between references oscillates between 0.525 for INLINEFORM2 and 0.767 for INLINEFORM3 . The lower the INLINEFORM4 , the bigger the penalization INLINEFORM5 will give to the final score. A good example is S2 for transcript INLINEFORM6 where INLINEFORM7 reaches a value of 0.800, but after considering INLINEFORM8 the INLINEFORM9 score falls to 0.462.
+
+It is feasible to think that if all references are taken into account at the same time during evaluation ( INLINEFORM0 ), the score will be bigger compared to an average of independent evaluations ( INLINEFORM1 ); however this is not always true. That is the case of S1 in INLINEFORM2 , which present a slight decrease for INLINEFORM3 compared to INLINEFORM4 .
+
+An important remark is the behavior of S1 and S2 concerning INLINEFORM0 . If evaluated without considering any (dis)agreement between references ( INLINEFORM1 ), S2 overperforms S1; this is inverted once the systems are evaluated with INLINEFORM2 .
+
+## R G AR  R_{G_{AR}} and Fleiss' Kappa correlation
+
+In Section SECREF3 we described the INLINEFORM0 score and how it relies on the INLINEFORM1 value to scale the performance of INLINEFORM2 over INLINEFORM3 . INLINEFORM4 can intuitively be consider an agreement value over all elements of INLINEFORM5 . To test this hypothesis, we computed the Pearson correlation coefficient ( INLINEFORM6 ) BIBREF32 between INLINEFORM7 and the Fleiss' Kappa BIBREF33 of each video in the dataset ( INLINEFORM8 ).
+
+A linear correlation between INLINEFORM0 and INLINEFORM1 can be observed in Table TABREF33 . This is confirmed by a INLINEFORM2 value equal to INLINEFORM3 , which means a very strong positive linear correlation between them.
+
+## F1 mean F1_{mean} vs. WiSeBEWiSeBE
+
+Results form Table TABREF31 may give an idea that INLINEFORM0 is just an scaled INLINEFORM1 . While it is true that they show a linear correlation, INLINEFORM2 may produce a different system ranking than INLINEFORM3 given the integral multi-reference principle it follows. However, what we consider the most profitable about INLINEFORM4 is the twofold inclusion of all available references it performs. First, the construction of INLINEFORM5 to provide a more inclusive reference against to whom be evaluated and then, the computation of INLINEFORM6 , which scales the result depending of the agreement between references.
+
+## Conclusions
+
+In this paper we presented WiSeBE, a semi-automatic multi-reference sentence boundary evaluation protocol based on the necessity of having a more reliable way for evaluating the SBD task. We showed how INLINEFORM0 is an inclusive metric which not only evaluates the performance of a system against all references, but also takes into account the agreement between them. According to your point of view, this inclusivity is very important given the difficulties that are present when working with spoken language and the possible disagreements that a task like SBD could provoke.
+
+ INLINEFORM0 shows to be correlated with standard SBD metrics, however we want to measure its correlation with extrinsic evaluations techniques like automatic summarization and machine translation.
+
+## Acknowledgments
+
+We would like to acknowledge the support of CHIST-ERA for funding this work through the Access Multilingual Information opinionS (AMIS), (France - Europe) project.
+
+We also like to acknowledge the support given by the Prof. Hanifa Boucheneb from VERIFORM Laboratory (École Polytechnique de Montréal).

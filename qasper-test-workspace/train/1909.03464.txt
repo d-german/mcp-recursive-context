@@ -1,0 +1,155 @@
+# Back to the Future -- Sequential Alignment of Text Representations
+
+**Paper ID:** 1909.03464
+
+## Abstract
+
+Language evolves over time in many ways relevant to natural language processing tasks. For example, recent occurrences of tokens 'BERT' and 'ELMO' in publications refer to neural network architectures rather than persons. This type of temporal signal is typically overlooked, but is important if one aims to deploy a machine learning model over an extended period of time. In particular, language evolution causes data drift between time-steps in sequential decision-making tasks. Examples of such tasks include prediction of paper acceptance for yearly conferences (regular intervals) or author stance prediction for rumours on Twitter (irregular intervals). Inspired by successes in computer vision, we tackle data drift by sequentially aligning learned representations. We evaluate on three challenging tasks varying in terms of time-scales, linguistic units, and domains. These tasks show our method outperforming several strong baselines, including using all available data. We argue that, due to its low computational expense, sequential alignment is a practical solution to dealing with language evolution.
+
+## Introduction
+
+As time passes, language usage changes. For example, the names `Bert' and `Elmo' would only rarely make an appearance prior to 2018 in the context of scientific writing. After the publication of BERT BIBREF0 and ELMo BIBREF1, however, usage has increased in frequency. In the context of named entities on Twitter, it is also likely that these names would be tagged as person prior to 2018, and are now more likely to refer to an artefact. As such, their part-of-speech tags will also differ. Evidently, evolution of language usage affects multiple natural language processing (NLP) tasks and models based on data from one point in time cannot be expected to operate for an extended period of time.
+
+In order to become more robust to language evolution, data should be collected at multiple points in time. We consider a dynamic learning paradigm where one makes predictions for data points from the current time-step given labelled data points from previous time-steps. As time increments, data points from the current step are labelled and new unlabelled data points are observed. This setting occurs in natural language processing in, for instance, the prediction of paper acceptance to conferences BIBREF2 or named entity recognition from yearly data dumps of Twitter BIBREF3. Changes in language usage cause a data drift between time-steps and some way of controlling for the shift between time-steps is necessary.
+
+In this paper, we apply a domain adaptation technique to correct for shifts. Domain adaptation is a furtive area of research within machine learning that deals with learning from training data drawn from one data-generating distribution (source domain) and generalizing to test data drawn from another, different data-generating distribution (target domain) BIBREF4. We are interested in whether a sequence of adaptations can compensate for the data drift caused by shifts in the meaning of words or features across time. Given that linguistic tokens are embedded in some vector space using neural language models, we observe that in time-varying dynamic tasks, the drift causes token embeddings to occupy different parts of embedding space over consecutive time-steps. We want to avoid the computational expense of re-training a neural network every time-step. Instead, in each time-step, we map linguistic tokens using the same pre-trained language model (a "BERT" network BIBREF0) and align the resulting embeddings using a second procedure called subspace alignment BIBREF5. We apply subspace alignment sequentially: find the principal components in each time-step and linearly transform the components from the previous step to match the current step. A classifier trained on the aligned embeddings from the previous step will be more suited to classify embeddings in the current step. We show that sequential subspace alignment (SSA) yields substantial improvements in three challenging tasks: paper acceptance prediction on the PeerRead data set BIBREF2; Named Entity Recognition on the Broad Twitter Corpus BIBREF3; and rumour stance detection on the RumourEval 2019 data set BIBREF6. These tasks are chosen to vary in terms of domains, timescales, and the granularity of the linguistic units.In addition to evaluating SSA, we include two technical contributions as we extend the method both to allow for time series of unbounded length and to consider instance similarities between classes. The best-performing SSA methods proposed here are semi-supervised, but require only between 2 and 10 annotated data points per class from the test year for successful alignment. Crucially, the best proposed SSA models outperform baselines utilising more data, including the whole data set.
+
+## Subspace Alignment
+
+Suppose we embed words from a named entity recognition task, where artefacts should be distinguished from persons. Figure FIGREF1 shows scatterplots with data collected at two different time-points, say 2017 (top; source domain) and 2018 (bottom; target domain). Red points are examples of artefacts embedded in this space and blue points are examples of persons. We wish to classify the unknown points (black) from 2018 using the known points from 2018 and the known points from 2017.
+
+As can be seen, the data from 2017 is not particularly relevant to classification of data from 2018, because the red and blue point clouds do not match. In other words, a classifier trained to discriminate red from blue in 2017 would make many mistakes when applied directly to the data from 2018, partly because words such as 'Bert' and 'Elmo' have changed from being person to also being artefacts. To make the source data from 2017 relevant – and reap the benefits of having more data – we wish to align source and target data points.
+
+## Subspace Alignment ::: Unsupervised subspace alignment
+
+Unsupervised alignment extracts a set of bases from each data set and transforms the source components such that they match the target components BIBREF5. Let $C_{\cal S}$ be the principal components of the source data $X_{t-1}$ and $C_{\cal T}$ be the components of the target data set $X_t$. The optimal linear transformation matrix is found by minimising the difference between the transformed source components and the target components:
+
+where $\Vert \cdot \Vert _{F}$ denotes the Frobenius norm. Note that we left-multiplied both terms in the norm with the same matrix $C_{\cal S}^{\top }$ and that due to orthonormality of the principal components, $C_{\cal S}^{\top } C_{\cal S}$ is the identity and drops out. Source data $X_{t-1}$ is aligned to target data by first mapping it onto its own principal components and then applying the transformation matrix, $X_{t-1} C_{\cal S} M^{*}$. Target data $X_t$ is also projected onto its target components, $X_t C_{\cal T}$. The alignment is performed on the $d$ largest principal components, i.e. a subspace of the embedding. Keeping $d$ small avoids the otherwise high computational expense of eigendecomposition in high-dimensional data.
+
+Unsupervised alignment will only match the total structure of both data sets. Therefore, global shifts between domains can be accounted for, but not local shifts. Figure FIGREF1 is an example of a setting with local shifts, i.e. red and blue classes are shifted differently. Performing unsupervised alignment on this setting would fail. Figure FIGREF2 (left middle) shows the source data (left) aligned to the target data (right) in an unsupervised fashion. Note that although the total data sets match, the classes (red and blue ellipses) are not matched.
+
+## Subspace Alignment ::: Semi-supervised subspace alignment
+
+In semi-supervised alignment, one performs subspace alignment per class. As such, at least 1 target label per class needs to be available. However, even then, with only 1 target label per class, we would only be able to find 1 principal component. To allow for the estimation of more components, we provisionally label all target samples using a 1-nearest-neighbour classifier, starting from the given target labels. Using pseudo-labelled target samples, we estimate $d$ components.
+
+Now, the optimal linear transformation matrix for each class can be found with an equivalent procedure as in Equation DISPLAY_FORM4:
+
+Afterwards, we transform the source samples of each class $X_{t-1}^k$ through the projection onto class-specific components $C_{{\cal S},k}$ and the optimal transformation: $X_{t-1}^{k} C_{{\cal S}, k} M_{k}^{*}$. Additionally, we centre each transformed source class on the corresponding target class. Figure FIGREF2 (right middle) shows the source documents transformed through semi-supervised alignment. Now, the classes match the classes of the target data.
+
+## Subspace Alignment ::: Extending SSA to Unbounded Time
+
+Semi-supervised alignment allows for aligning two time steps, $t_1$ and $t_2$, to a joint space $t^{\prime }_{1,2}$. However, when considering a further alignment to another time step $t_3$, this can not trivially be mapped, since the joint space $t^{\prime }_{1,2}$ necessarily has a lower dimensionality. Observing that two independently aligned spaces, $t^{\prime }_{1,2}$ and $t^{\prime }_{2,3}$, do have the same dimensionality, we further learn a new alignment between the two, resulting in the joint space of $t^{\prime }_{1,2}$ and $t^{\prime }_{2,3}$, namely $t^{\prime \prime }_{1,2,3}$.
+
+Although this is seemingly straight-forward, there is no guarantee that $t^{\prime }_{1,2}$ and $t^{\prime }_{2,3}$ will be coherent with one another, in the same way that two word embedding spaces trained with different algorithms might also differ in spite of having the same dimensionality. This issue is partially taken care of by using semi-supervised alignment which takes class labels into account when learning the 'deeper' alignment $t^{\prime \prime }$. We further find that it is beneficial to also take the similarities between samples into account when aligning.
+
+## Subspace Alignment ::: Considering Sample Similarities between Classes
+
+Since intermediary spaces, such as $t^{\prime }_{1,2}$ and $t^{\prime }_{2,3}$, do not necessarily share the same semantic properties, we add a step to the semi-supervised alignment procedure. Given that the initial unaligned spaces do encode similarities between instances, we run the $k$-means clustering algorithm ($k=5$) to give us some course-grained indication of instance similarities in the original embedding space. This cluster ID is passed to SSA, resulting in an alignment which both attempts to match classes across time steps, in addition to instance similarities. Hence, even though $t^{\prime }_{1,2}$ and $t^{\prime }_{2,3}$ are not necessarily semantically coherent, an alignment to $t^{\prime \prime }_{1,2,3}$ is made possible.
+
+## Experimental Setup
+
+In the past year, several approaches to pre-training representations on language modelling based on transformer architectures BIBREF7 have been proposed. These models essentially use a multi-head self-attention mechanism in order to learn representations which are able to attend directly to any part of a sequence. Recent work has shown that such contextualised representations pre-trained on language modelling tasks offer highly versatile representations which can be fine-tuned on seemingly any given task BIBREF1, BIBREF0, BIBREF8, BIBREF9. In line with the recommendations from experiments on fine-tuning representations BIBREF10, we use a frozen BERT to extract a consistent task-agnostic representation. Using a frozen BERT with subsequent subspace alignment allows us to avoid re-training a neural network each time-step while still working in an embedding learned by a neural language model. It also allows us to test the effectiveness of SSA without the confounding influence of representation updates.
+
+## Experimental Setup ::: Three Tasks.
+
+We consider three tasks representing a broad selection of natural language understanding scenarios: paper acceptance prediction based on the PeerRead data set BIBREF2, Named Entity Recognition (NER) based on the Broad Twitter Corpus BIBREF3, and author stance prediction based on the RumEval-19 data set BIBREF6. These tasks were chosen so as to represent i) different textual domains, across ii) differing time scales, and iii) operating at varying levels of linguistic granularity. As we are dealing with dynamical learning, the vast majority of NLP data sets can unfortunately not be used since they do not include time stamps.
+
+## Paper Acceptance Prediction
+
+The PeerRead data set contains papers from ten years of arXiv history, as well as papers and reviews from major AI and NLP conferences BIBREF2. From the perspective of evaluating our method, the arXiv sub-set of this data set offers the possibility of evaluating our method while adapting to ten years of history. This is furthermore the only subset of the data annotated with both timestamps and with a relatively balanced accept/reject annotation. As arXiv naturally contains both accepted and rejected papers, this acceptance status has been assigned based on BIBREF11 who match arXiv submissions to bibliographic entries in DBLP, and additionally defining acceptance as having been accepted to major conferences, and not to workshops. This results in a data set of nearly 12,000 papers, from which we use the raw abstract text as input to our system. The first three years were filtered out due to containing very few papers. We use the standard train/test splits supplied with the data set.
+
+BIBREF2 show that it is possible to predict paper acceptance status at major conferences at above baseline levels. Our intuition in applying SSA to this problem, is that the topic of a paper is likely to bias acceptance to certain conferences across time. For instance, it is plausible that the likelihood of a neural paper being accepted to an NLP conference before and after 2013 differs wildly. Hence, we expect that our model will, to some extent, represent the topic of an article, and that this will lend itself nicely to SSA.
+
+## Paper Acceptance Prediction ::: Model
+
+We use the pre-trained bert-base-uncased model as the base for our paper acceptance prediction model. Following the approach of BIBREF0, we take the final hidden state (i.e., the output of the transformer) corresponding to the special [CLS] token of an input sequence to be our representation of a paper, as this has aggregated information through the sequence (Figure FIGREF14). This gives us a $d$-dimensional representation of each document, where $d=786$. In all of the experiments for this task, we train an SVM with an RBF kernel on these representations, either with or without SSA depending on the setting.
+
+## Paper Acceptance Prediction ::: Experiments & Results
+
+We set up a series of experiments where we observe past data, and evaluate on present data. We compare both unsupervised and semi-supervised subspace alignment, with several strong baselines. The baselines represent cases in which we have access to more data, and consist of training our model on either all data, on the same year as the evaluation year, and on the previous year. In our alignment settings, we only observe data from the previous year, and apply subspace alignment. This is a different task than presented by BIBREF2, as we evaluate paper acceptance for papers in the present. Hence, our scores are not directly comparable to theirs.
+
+One parameter which significantly influences performance, is the number of labelled data points we use for learning the semi-supervised subspace alignment. We tuned this hyperparameter on the development set, finding an increasing trend. Using as few as 2 tuning points per class yielded an increase in performance in some cases (Figure FIGREF16).
+
+Our results are shown in Table TABREF10, using 10 tuning samples per class. With unsupervised subspace alignment, we observe relatively unstable results – in one exceptional case, namely testing on 2010, unsupervised alignment is as helpful as semi-supervised alignment. Semi-supervised alignment, however, yields consistent improvements in performance across the board. It is especially promising that adapting from past data outperforms training on all available data, as well as training on the actual in-domain data. This highlights the importance of controlling for data drift due to language evolution. It shows that this signal can be taken advantage of to increase performance on present data with only a small amount of annotated data. We further find that using several past time steps in the Unbounded condition is generally helpful, as is using instance similarities in the alignment.
+
+## Named Entity Recognition
+
+The Broad Twitter Corpus contains tweets annotated with named entities, collected between the years 2009 and 2014 BIBREF3. However, as only a handful of tweets are collected before 2012, we focus our analysis on the final three years of this period (i.e. two test years). The corpus includes diverse data, annotated in part via crowdsourcing and in part by experts. The inventory of tags in their tag scheme is relatively small, including Person, Location, and Organisation. To the best of our knowledge no one has evaluated on this corpus either in general or per year, and so we cannot compare with previous work.
+
+In the case of NER, we expect the adaptation step of our model to capture the fact that named entities may change their meaning across time (e.g. the example with ”Bert” and ”BERT” in Figure FIGREF1). This is related to work showing temporal drift of topics BIBREF12.
+
+## Named Entity Recognition ::: Model
+
+Since casing is typically an important feature in NER, we use the pre-trained bert-base-cased model as our base for NER. For each token, we extract its contextualised representation from BERT, before applying SSA. As BIBREF0 achieve state-of-the-art results without conditioning the predicted tag sequence on surrounding tags (as would be the case with a CRF, for example), we also opt for this simpler architecture. The resulting contextualised representations are therefore passed to an MLP with a single hidden layer (200 hidden units, ReLU activation), before predicting NER tags. We train the MLP over 5 epochs using the Adam optimiser BIBREF13.
+
+## Named Entity Recognition ::: Experiments & Results
+
+As with previous experiments, we compare unsupervised and semi-supervised subspace alignment with baselines corresponding to using all data, data from the same year as the evaluation year, and data from the previous year. For each year, we divide the data into 80/10/10 splits for training, development, and test. Results on the two test years 2013 and 2014 are shown in Table TABREF17. In the case of NER, we do not observe any positive results for unsupervised subspace alignment. In the case of semi-supervised alignment, however, we find increased performance as compared to training on the previous year, and compared to training on all data. This shows that learning an alignment from just a few data points can help the model to generalise from past data. However, unlike our previous experiments, results are somewhat better when given access to the entire set of training data from the test year itself in the case of NER. The fact that training on only 2013 and evaluating on the same year does not work well can be explained by the fact that the amount of data available for 2013 is only 10% of that for 2012. The identical results for the unbounded extension is because aligning from a single time step renders this irrelevant.
+
+## SDQC Stance Classification
+
+The RumourEval-2019 data set consists of roughly 5500 tweets collected for 8 events surrounding well-known incidents, such as the Charlie Hebdo shooting in Paris BIBREF6. Since the shared task test set is not available, we split the training set into a training, dev and test part based on rumours (one rumour will be training data with a 90/10 split for development and another rumour will be the test data, with a few samples labelled). For Subtask A, tweets are annotated with stances, denoting whether it is in the category Support, Deny, Query, or Comment (SDQC).
+
+Each rumour only lasts a couple of days, but the total data set spans years, from August 2014 to November 2016. We regard each rumour as a time-step and adapt from the rumour at time $t$-1 to the rumour at time $t$. We note that this setting is more difficult than the previous two due to the irregular time intervals. We disregard the rumour ebola-essien as it has too few samples per class.
+
+## SDQC Stance Classification ::: Model
+
+For this task, we use the same modelling approach as described for paper acceptance prediction. This method is also suitable here, since we simply require a condensed representation of a few sentences on which to base our temporal adaptation and predictions. In the last iteration of the task, the winning system used hand-crafted features to achieve a high performance BIBREF14. Including these would complicate SSA, so we opt for this simpler architecture instead. We use the shorter time-scale of approximately weeks rather than years as rumours can change rapidly BIBREF15.
+
+## SDQC Stance Classification ::: Experiments & Results
+
+In this experiment, we start with the earliest rumour and adapt to the next rumour in time. As before, we run the following baselines: training on all available labelled data (i.e. all previous rumours and the labelled data for the current rumour), training on the labelled data from the current rumour (designated as `same') and training on the labelled data from the previous rumour. We perform both unsupervised and semi-supervised alignment using data from the previous rumour. We label 5 samples per class for each rumour.
+
+In this data set, there is a large class imbalance, with a large majority of comment tweets and few support or deny tweets. To address this, we over-sample the minority classes. Afterwards, a SVM with RBF is trained and we test on unlabelled tweets for the current rumour. Table TABREF23 shows the performance of the baselines and the two alignment procedures. As with the previous tasks, semi-supervised alignment generally helps, except for in the charliehebdo rumour.
+
+## Analysis and Discussion
+
+We have shown that sequential subspace alignment is useful across natural language processing tasks. For the PeerRead data set we were particularly successful. This might be explained by the fact that the topic of a paper is a simple feature for SSA to pick up on, while being predictive of a paper's acceptance chances. For NER, on the other hand, named entities can change in less predictable ways across time, proving a larger challenge for our approach. For SDQC, we were successful in cases where the tweets are nicely clustered by class. For instance, where both rumours are about terrorist attacks, many of the support tweets were headlines from reputable newspaper agencies. These agencies structure tweets in a way that is consistently dissimilar from comments and queries.
+
+The effect of our unbounded time extension boosts results on the PeerRead data set, as the data stretches across a range of years. In the case of NER, however, this extension is excessive as only two time steps are available. In the case of SDQC, the lack of improvement could be due to the irregular time intervals, making it hard to learn consistent mappings from rumour to rumour. Adding instance similarity clustering aids alignment, since considering sample similarities across classes is important over longer time scales.
+
+## Analysis and Discussion ::: Example of Aligning Tweets
+
+Finally, we set up the following simplified experiment to investigate the effect of alignment on SDQC data. First, we consider the rumour charliehebdo, where we picked the following tweet:
+
+px
+
+Support:France: 10 people dead after shooting at HQ of satirical weekly newspaper #CharlieHebdo, according to witnesses <URL>
+
+px
+
+It has been labeled to be in support of the veracity of the rumour. We will consider the scenario where we use this tweet and others involving the charliehebdo incident to predict author stance in the rumour germanwings-crash. Before alignment, the following 2 germanwings-crash tweets are among the nearest neighbours in the embedding space:
+
+px
+
+Query: @USER @USER if they had, it’s likely the descent rate would’ve been steeper and the speed not reduce, no ?
+
+px
+
+Comment: @USER Praying for the families and friends of those involved in crash. I'm so sorry for your loss.
+
+The second tweet is semantically similar (both are on the topic of tragedy), but the other is unrelated. Note that the news agency tweet differs from the comment and query tweets in that it stems from a reputable source, mentions details and includes a reference. After alignment, the charliehebdo tweet has the following 2 nearest neighbours:
+
+px
+
+Support: “@USER: 148 passengers were on board #GermanWings Airbus A320 which has crashed in the southern French Alps <URL>”
+
+px
+
+Support: Report: Co-Pilot Locked Out Of Cockpit Before Fatal Plane Crash <URL> #Germanwings <URL> Now, both neighbours are of the support class. This example shows that semi-supervised alignment maps source tweets from one class close to target tweets of the same class.
+
+## Analysis and Discussion ::: Limitations
+
+A necessary assumption in both unsupervised and semi-supervised subspace alignment is that the data of each class is clustered in the embedding space. In other words, that most embedded tokens lie closer to other embedded tokens of the same class than to embedded tokens of another class. If this is not the case, then aligning to a few labelled samples of class $k$ does not mean that the embedded source tokens are aligned to any other target points of class $k$. This assumption is violated if, for instance, people only discuss one aspect of a rumour on day one and discuss several aspects of a rumour simultaneously on day two. One would observe a single cluster of token embeddings for supporters of the rumour initially and several clusters at a later time-step. There is no unique solution to aligning a single cluster to several clusters.
+
+Additionally, if the few samples labeled in the current time-step (for semi-supervised alignment) are falsely labeled or their label is ambiguous (e.g. a tweet that could equally be labeled as query or deny), then it is possible that the source data is aligned to the wrong target data point cloud. It is important that the few labeled tokens actually represent their classes. This is a common requirement in semi-supervised learning and is not specific to sequential alignment of text representations.
+
+## Analysis and Discussion ::: Related Work
+
+The temporal nature of data can have a significant impact in natural language processing tasks. For instance, BIBREF16 compare a number of approaches to diachronic word embeddings, and detection of semantic shifts across time. For instance, such representations can be used to uncover changes of word meanings, or senses of new words altogether BIBREF17, BIBREF18, BIBREF19, BIBREF20, BIBREF21. Other work has investigated changes in the usage of parts of speech across time BIBREF22. BIBREF23 investigate the changing meanings and associations of words across time, in the perspective of language change. By learning time-aware embeddings, they are able to outperform standard word representation learning algorithms, and can discover, e.g., equivalent technologies through time. BIBREF24 show that lexical features can change their polarity across time, which can have a significant impact in sentiment analysis. BIBREF12 show that associating topics with continuous distributions of timestamps yields substantial improvements in terms of topic prediction and interpretation of trends. Temporal effects in NLP have also been studied in the context of scientific journals, for instance in the context of emerging themes and viewpoints BIBREF25, BIBREF26, and in terms of topic modelling on news corpora across time BIBREF27. Finally, in the context of rumour stance classification, BIBREF28 show that temporal information as a feature in addition to textual content offers an improvement in results. While this previous work has highlighted the extent to which language change across time is relevant for NLP, we present a concrete approach to taking advantage of this change. Nonetheless, these results could inspire more specialized forms of sequential adaptation for specific tasks.
+
+Unsupervised subspace alignment has been used in computer vision to adapt between various types of representations of objects, such as high-definition photos, online retail images and illustrations BIBREF5, BIBREF29. Alignment is not restricted to linear transformations, but can be made non-linear through kernelisation BIBREF30. An extension to semi-supervised alignment has been done for images BIBREF31, but not in the context of classification of text embeddings or domain adaptation on a sequential basis.
+
+## Conclusions
+
+In this paper, we introduced sequential subspace alignment (SSA) for natural language processing (NLP), which allows for improved generalisation from past to present data. Experimental evidence shows that this method is useful across diverse NLP tasks, in various temporal settings ranging from weeks to years, and for word-level and document-level representations. The best-performing SSA method, aligning sub-spaces in a semi-supervised way, outperforms simply training on all data with no alignment.

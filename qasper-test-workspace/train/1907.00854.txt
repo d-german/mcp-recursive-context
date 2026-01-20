@@ -1,0 +1,121 @@
+# Katecheo: A Portable and Modular System for Multi-Topic Question Answering
+
+**Paper ID:** 1907.00854
+
+## Abstract
+
+We introduce a modular system that can be deployed on any Kubernetes cluster for question answering via REST API. This system, called Katecheo, includes four configurable modules that collectively enable identification of questions, classification of those questions into topics, a search of knowledge base articles, and reading comprehension. We demonstrate the system using publicly available, pre-trained models and knowledge base articles extracted from Stack Exchange sites. However, users can extend the system to any number of topics, or domains, without the need to modify any of the model serving code. All components of the system are open source and available under a permissive Apache 2 License.
+
+## Introduction
+
+When people interact with chatbots, smart speakers or digital assistants (e.g., Siri), one of their primary modes of interaction is information retrieval BIBREF0 . Thus, those that build dialog systems often have to tackle the problem of question answering.
+
+Developers could support question answering using publicly available chatbot platforms, such as Watson Assistant or DialogFlow. To do this, a user would need to program an intent for each anticipated question with various examples of the question and one or more curated responses. This approach has the advantage of generating high quality answers, but it is limited to those questions anticipated by developers. Moreover, the management burden of such a system might be prohibitive as the number of questions that needs to be supported is likely to increase over time.
+
+To overcome the burden of programming intents, developers might look towards more advanced question answering systems that are built using open domain question and answer data (e.g., from Stack Exchange or Wikipedia), reading comprehension models, and knowledge base searches. In particular, BIBREF1 previously demonstrated a two step system, called DrQA, that matches an input question to a relevant article from a knowledge base and then uses a recurrent neural network (RNN) based comprehension model to detect an answer within the matched article. This more flexible method was shown to produce promising results for questions related to Wikipedia articles and it performed competitively on the SQuAD benchmark BIBREF2 .
+
+However, if developers wanted to integrate this sort of reading comprehension based methodology into their applications, how would they currently go about this? They would need to wrap pre-trained models in their own custom code and compile similar knowledge base articles at the very least. At the most, they may need to re-train reading comprehension models on open domain question and answer data (e.g., SQuAD) and/or implement their own knowledge base search algorithms.
+
+In this paper we present Katecheo, a portable and modular system for reading comprehension based question answering that attempts to ease this development burden. The system provides a quickly deployable and easily extendable way for developers to integrate question answering functionality into their applications. Katecheo includes four configurable modules that collectively enable identification of questions, classification of those questions into topics, a search of knowledge base articles, and reading comprehension. The modules are tied together in a single inference graph that can be invoked via a REST API call. We demonstrate the system using publicly available, pre-trained models and knowledge base articles extracted from Stack Exchange sites. However, users can extend the system to any number of topics, or domains, without the need to modify the model serving code. All components of the system are open source and publicly available under a permissive Apache 2 License.
+
+The rest of the paper is organized as follows. In the next section, we provide an overview of the system logic and its modules. In Section 3, we outline the architecture and configuration of Katecheo, including extending the system to an arbitrary number of topics. In Section 4, we report some results using example pre-trained models and public knowledge base articles. Then in conclusion, we summarize the system, its applicability, and future development work.
+
+## System Overview
+
+Katecheo is partially inspired by the work of BIBREF1 on DrQA. That previously developed method has two primary phases of question answering: document retrieval and reading comprehension. Together these functionalities enable open domain question answering. However, many dialog systems are not completely open domain. For example, developers might want to create a chatbot that has targeted conversations about restaurant reservations and movie times. It would be advantageous for such a chatbot to answer questions about food and entertainment, but the developers might not want to allow the conversation to stray into other topics.
+
+With Katecheo, one of our goals was to create a question answering system that is more flexible than those relying on curated responses while remaining more targeted than a completely open domain question answering system. The system includes document retrieval (or what we refer to as “knowledge base search”) and reading comprehension, but only within sets of curated knowledge base articles each corresponding to a particular topic (e.g., food or entertainment).
+
+When a question text is input into the Katecheo system, it is processed through four modules: (1) question identification, (2) topic classification, (3) knowledge base search, and (4) reading comprehension. This overall logic is depicted in Figure FIGREF6 .
+
+## Question Identification
+
+The first module in Katecheo, question identification, determines if the input text (labeled Q in Figure FIGREF6 ) is actually a question. In our experience, users of dialog systems provide a huge number of unexpected inputs. Some of these unexpected inputs are questions and some are just statements. Before going to the trouble of matching a knowledge base article and generating an answer, Katecheo completes this initial step to ensure that the input is a question. If the input is a question, the question identification module (henceforth the “question identifier") passes a positive indication/flag to the next module indicating that it should continue processing the question. Otherwise, it passes a negative flag to end the processing.
+
+The question identifier uses a rule-based approach to question identification. As suggested in BIBREF3 , we utilize the presence of question marks and 5W1H words to determine if the input is a question. Based on our testing, this provides quite high performance (90%+ accuracy) and is not a blocker to overall performance.
+
+## Topic Classification
+
+To reach our goal of a question answering system that would be more targeted than previous open domain question answering, we decided to allow the user of the system to define one or more topics. The topic classification module of the system (henceforth the “topic classifier") will attempt to classify the input question into one of the topics and then select a knowledge base article from a set of knowledge base articles corresponding to that topic.
+
+One way we could enable this topic classification is by training a text classifier that would classify the input text into one of the user supplied topics. However, this approach would require (i) the user to provide both the topic and many example questions within that topic, and (ii) the system to retrain its classification model any time a new topic was added. We wanted to prioritize the ease of deployment, modularity and extensibility of the system, and, thus, we decided to take a slightly more naive approach.
+
+Along with each topic, the user supplies the system with a pre-trained Named Entity Recognition (NER) model that identifies entities within that topic. The topic classifier then utilizes these pre-trained models to determine if the input question includes entities from one of the user supplied topics. If so, the topic classifier classifies the question into that topic. When two of the topics conflict, the system currently suspends processing and returns a null answer.
+
+The system accepts NER models that are compatible with spaCy BIBREF4 . As discussed further below, the user can supply a link to a zip file that contains each topic NER model.
+
+Note, it might be possible to remove the dependence on NER models in the future. We are currently exploring the use of other topic modeling techniques including non-negative matrix factorization and/or Latent Dirichlet Allocation (LDA). These techniques could enable the system to automatically match the input question to most appropriate topical knowledge base, and thus only rely on the user to supply knowledge base articles.
+
+## Knowledge Base Search
+
+Once the topic has been identified, a search is made to match the question with an appropriate knowledge base article from a set of user supplied knowledge base articles corresponding to the user supplied topic. This matched article will be utilized in the next stage of processing to generate an answer.
+
+The user supplied sets of knowledge base articles for each topic are in a JSON format and include a title and body text for each article. The system assumes that the knowledge base articles are in the form of a question and answer knowledge base (e.g., like a Stack Exchange site), rather than any arbitrarily structured articles. In this way, we are able to utilize the titles of the articles (i.e., the questions) in matching to user input questions.
+
+In the knowledge base search module of Katecheo (henceforth the “KB Search" module), we use the Python package FuzzyWuzzy to perform string matching between the input question and the knowledge base article titles. FuzzyWuzzy uses Levenshtein Distance BIBREF5 match the input string to one or more input candidate strings.
+
+We eventually plan to update this knowledge base search to an approach similar to that of BIBREF1 using bigram hashing and TF-IDF. However, the fuzzy string matching approach works reasonably well as long as the supplied knowledge bases are of a type where many of the article titles are in the form of topical questions.
+
+## Reading Comprehension
+
+The final module of the Katecheo system is the reading comprehension (or just “comprehension") module. This module takes as input the original input question plus the matched knowledge base article body text and uses a reading comprehension model to select an appropriate answer from within the article.
+
+The current release of Katecheo uses a Bi-Directional Attention Flow, or BiDAF, model for reading comprehension BIBREF6 . This BiDAF model includes a Convolutional Neural Network (CNN) based character level embedding layer, a word embedding layer that uses pre-trained GloVE embeddings, a Long Short-Term Memory Network (LSTM) based contextual embedding layer, an “attention flow layer", and a modeling layer include bi-directional LSTMs. We are using a pre-trained version of BiDAF available in the AllenNLP BIBREF7 library.
+
+Future releases of Katecheo will include the ability to swap out the reading comprehension model for newer architectures based on, e.g., BERT BIBREF8 or XLNet BIBREF9 or custom trained models.
+
+## Architecture and Configuration
+
+All four of the Katecheo modules are containerized with Docker BIBREF10 and are deployed as pods on top of Kubernetes BIBREF11 (see Figure FIGREF12 ). In this way, Katecheo is completely portable to any standard Kubernetes cluster including hosted versions in AWS, GCP, Digital Ocean, Azure, etc. and on-premises version that use vanilla Kubernetes, OpenShift, CaaS, etc.
+
+To provide developers with a familiar interface to the question answering system, we provide a REST API interface. Developers can call Katecheo via a single endpoint with ingress to the system provided by Ambassador, a Kubernetes-native API Gateway.
+
+Seldon-core is used to simplify the routing between the four modules, create the REST API, and manage deployments. To create the Seldon deployment of the four modules, as depicted in Figure FIGREF12 , we: (1) create a Python class for each module that contains standardized Seldon-specified methods and that loads the various models for making predictions; (2) wrap that Python class in a standard, containerized Seldon model server using a public Seldon Docker image and s2i ; (3) push the wrapped Python code to DockerHub ; (4) create a Seldon inference graph that links the modules in a Directed Acyclic Graph (DAG); and (5) deploy the inference graph to Kubernetes. After all of these steps are complete, a single REST API endpoint is exposed. When a user calls this single API endpoint the Seldon inference graph is invoked and the modules are executed using the specified routing logic.
+
+To specify the topic names, topic NER models, and topic knowledge base JSON files (as mentioned in reference to Figure FIGREF6 ), the user need only fill out a JSON configuration file template in the following format:
+
+[
+
+ {
+
+ "name": "topic 1 name",
+
+ "ner_model": "<link>",
+
+ "kb_file": "<link>"
+
+ },
+
+ {
+
+ "name": "topic 2 name",
+
+ "ner_model": "<link>",
+
+ "kb_file": "<link>"
+
+ },
+
+ etc...
+
+]
+
+where each INLINEFORM0 would be replaced with a respective URL containing the NER model or knowledge base JSON file. The linked NER models need to be spaCy compatible and compressed into a single zip file, and the linked knowledge base JSON files need to include both titles and bodies as specified in the Katecheo GitHub repository README file. Once this configuration file is created, a deploy script can be executed to automatically deploy all of the Katecheo modules.
+
+## Example Usage
+
+We demonstrated the utility of Katecheo by deploying the system for question answering in two topics, Medical Sciences and Christianity. These topics are diverse enough that they would warrant different curated sets of knowledge base articles, and we can easily retrieve knowledge base articles for each of these subjects from the Medical Sciences and Christianity Stack Exchange sites, respectively.
+
+We also have access to NER models for both of these topics. For the Medical Sciences NER model, we utilized the en_ner_bc5cdr_md model from scispaCy BIBREF12 , which is trained on the BC5CDR corpus BIBREF13 . For the Christianity topic, we utilize a custom spaCy NER model trained on annotated data from the GotQuestions website.
+
+Example inputs and outputs of the system are included in Table TABREF17 . As can be seen, the system is able to match many questions with an appropriate topic and subsequently generate an answer using the BiDAF comprehension model. Not all of the answers would fit into conversational question answering in terms of naturalness, but others show promise.
+
+There were cases in which the system was not able to classify an input question into an appropriate topic, even when there would have been a closely matching knowledge base article. In particular when testing the system on the Medical Sciences topic, we noticed a higher number of these cases (see the fourth and fifth rows of Table TABREF17 ). This is due to the fact that the pre-trained Medical Sciences NER model from scispaCy is primarily intended to recognize chemical and disease entities within text, not general medical sciences terminology. On the other hand, the NER model utilized for the Christianity topic is more generally applicable within that topic.
+
+## Conclusions
+
+In conclusion, Katecheo is a portable and modular system for reading comprehension based question answering. It is portable because it is built on cloud native technologies (i.e., Docker and Kubernetes) and can be deployed to any cloud or on-premise environment. It is modular because it is composed of four configurable modules that collectively enable identification of questions, classification of those questions into topics, a search of knowledge base articles, and reading comprehension.
+
+Initial usage of the system indicates that it provides a flexible and developer friendly way to enable question answering functionality for multiple topics or domains via REST API. That being said, the current configurations of Katecheo are limited to answering from knowledge bases constructed in a question and answer format, and the current topic classification relies on topical NER models that are compatible with spaCy. In the future, we plan to overcome these limitations by extending our knowledge base search methodology, enabling usage of a wider variety of pre-trained models, and exploring other topic matching/modeling techniques to remove our NER model dependency.
+
+The complete source code, configuration information, deployment scripts, and examples for Katecheo are available at https://github.com/cvdigitalai/katecheo. A screencast demonstration of Katecheo is available at https://youtu.be/g51t6eRX2Y8.

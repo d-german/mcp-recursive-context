@@ -1,0 +1,161 @@
+# A Tensorized Transformer for Language Modeling
+
+**Paper ID:** 1906.09777
+
+## Abstract
+
+Latest development of neural models has connected the encoder and decoder through a self-attention mechanism. In particular, Transformer, which is solely based on self-attention, has led to breakthroughs in Natural Language Processing (NLP) tasks. However, the multi-head attention mechanism, as a key component of Transformer, limits the effective deployment of the model to a limited resource setting. In this paper, based on the ideas of tensor decomposition and parameters sharing, we propose a novel self-attention model (namely Multi-linear attention) with Block-Term Tensor Decomposition (BTD). We test and verify the proposed attention method on three language modeling tasks (i.e., PTB, WikiText-103 and One-billion) and a neural machine translation task (i.e., WMT-2016 English-German). Multi-linear attention can not only largely compress the model parameters but also obtain performance improvements, compared with a number of language modeling approaches, such as Transformer, Transformer-XL, and Transformer with tensor train decomposition.
+
+## Introduction
+
+In NLP, Neural language model pre-training has shown to be effective for improving many tasks BIBREF0 , BIBREF1 . Transformer BIBREF2 is based solely on the attention mechanism, and dispensing with recurrent and convolutions entirely. At present, this model has received extensive attentions and plays an key role in many neural language models, such as BERT BIBREF0 , GPT BIBREF3 and Universal Transformer BIBREF4 . However, in Transformer based model, a lot of model parameters may cause problems in training and deploying these parameters in a limited resource setting. Thus, the compression of large neural pre-training language model has been an essential problem in NLP research.
+
+In literature, there are some compression methods BIBREF5 , BIBREF6 , BIBREF7 proposed. When the vocabulary is large, the corresponding weight matrices can be enormous. Tensorized embedding (TE) BIBREF5 uses the way of tensor-train BIBREF8 to compress the embedding layers in Transformer-XL BIBREF9 . In TE BIBREF5 , researchers only study the compression of input embedding layers, rathar than the attention layer. Recently, Block-Term Tensor Decomposition(BTD) BIBREF10 is used to compress recurrent neural networks (RNNs) BIBREF6 . Ye et al. BIBREF6 propose a compact flexible structure to deal with the large number of model parameters instead by high dimensional inputs in training recurrent neural networks (RNNs). This method greatly reduces the parameters of RNNs and improves their training efficiency. Still, the model only considers the input layer compression by the idea of low-rank approximation. On the other hand, some methods BIBREF7 , BIBREF11 aim to develop a specific structure on its weight matrices and are successful in compressing the pre-trained models. However, the new structure after compressing can not be integrated into the model.
+
+In Transformer, the multi-head attention is a key part and it is constructed by a large number of parameters. Specifically, Ashish et.al BIBREF2 compute the attention function on a set of queries simultaneously, packed together into a matrix $Q$ , while the keys and values are also packed together into matrices $K$ and $V$ , respectively. The attention function then adopts a no-linear function $softmax$ over three matrices $Q$ , $K$ and $V$ . There are two challenges to find a high-quality compression method to compress the multi-head attention in Transformer.
+
+First, the self-attention function in Transformer is a non-linear function, which makes it difficult to compress. In order to address this challenge, we first prove that the output of the attention function of the self-attention model BIBREF2 can be linearly represented by a group of orthonormal base vectors. $Q$ , $K$ and $V$ can be considered as factor matrices. Then, by initializing a low rank core tensor, we use Tucker-decomposition BIBREF12 , BIBREF13 to reconstruct a new attention representation. In order to construct the multi-head mechanism and compress the model, we use the method of Block-Term Tensor Decomposition (BTD), which is a combination of CP decomposition BIBREF14 and Tucker decomposition BIBREF12 . The difference is that three factor matrices $Q,~K$ and $V$ are shared in constructing each 3-order block tensor. This process can lead to reduce many parameters.
+
+The second challenge is that the attention model after compressing can not be directly integrated into the encoder and decoder framework of Transformer BIBREF2 , BIBREF9 . In order to address this challenge, there are three steps as follows. First, the average of each block tensor can be computed; Second, some matrices can be given by tensor split. Third, the concatenation of these matrices can serve as the input to the next layer network in Transformer. After that, it can be integrated into the encoder and decoder framework of Transformer BIBREF2 , BIBREF9 and trained end-to-end. Moreover, we also prove that the 3-order tensor can reconstruct the scaled dot-product attention in Transformer by a sum on a particular dimension.
+
+Our method combines two ideas which are the low-rank approximation and parameters sharing at the same time. Therefore, it achieves the higher compression ratios. Although the self-attention (i.e., scaled dot-product attention) in Transformer can be reconstructed, we do not consider reconstructing it and choose to split the 3-order tensor (the output of Multi-linear attention) which is helpful for improving the accuracy in experiments.
+
+Our major contributions of this paper are as follows:
+
+In order to validate the benefits of our model, we test it on two NLP tasks, namely language modeling and neural machine translation. In our experiments, the multi-head attention can be replaced by the proposed model, namely multi-linear attention. We have observed that the standard multi-head attention can be compressed with higher compression ratios on One-Billion dtaset. As a result, we show that multi-linear attention not only considerably reduces the number of parameters, but also achieve promising experiments results, especially in language modeling tasks.
+
+## Preliminaries
+
+Multi-linear attention is carried out in this paper. The analysis of Multi-linear attention relies on these concepts and results from the field of tensor decomositon and multi-head attention. We cover below in Section "Related Work" basic background on Block-Term tensor decomposition BIBREF10 . Then, we describe in Section "Multi-head Attention" multi-head attention BIBREF2 .
+
+## Tensor and Block-Term Tensor Decomposition
+
+Tensor We use the Euler script letter $\mathcal {A}$ to denote a tensor which can be thought of as a multi-array. Thereby a vector and a matrix is a 1-order tensor and 2-order tensor, respectively. The element in a $n$ -order tensor is denoted as $\mathcal {A}_{d_1,\ldots ,d_n}$ . In the geometric representation of a tensor, 3-order tensor can be representation by a cube. After that, there is a related concept named $tensor~slice$ that will be used in this paper. Tensor and some other related concepts are shows in Supplementary Materials A.
+
+Block-Term Tensor Decomposition (BTD) Block-Term tensor decomposition is a combination of CP decomposition BIBREF14 and Tucker decomposition BIBREF12 . Given a $n$ -order tensor $\mathcal {A} \in \mathbb {R}^{d_1\times \ldots \times d_n}$ . A high-order tensor can be decomposed into $P$ block terms by the method named BTD. ${\bullet }_z$ is denoted as the tenor-tensor product on the $z$ - $th$ order BIBREF15 and $z\in \lbrace 1,\ldots ,d\rbrace $ . Each term contains ${\bullet }_z$ between a core tensor $\mathcal {G}_i \in \mathbb {R}^{R_1 \times \ldots \times R_d}$ and $d$ factor matrices $\mathcal {A} \in \mathbb {R}^{d_1\times \ldots \times d_n}$0 , where $\mathcal {A} \in \mathbb {R}^{d_1\times \ldots \times d_n}$1 and $\mathcal {A} \in \mathbb {R}^{d_1\times \ldots \times d_n}$2 . The formulation of BTD decomposition is as follows: 
+
+$$\mathcal {A} = \sum _{i=1}^{P} \mathcal {G}_i {\bullet }_1 \mathcal {X}_i^{(1)} {\bullet }_2 \mathcal {X}_i^{2} {\bullet }_3 \ldots {\bullet }_d \mathcal {X}_i^{(d)}$$   (Eq. 5) 
+
+where $P$ is the CP rank, and $d$ is the Core-order. In our work, we consider a tensor is 3-order tensor. Figure 1 demonstrates the example of how a 3-order tensor $\mathcal {A}$ can be decomposed into $P$ block terms.
+
+## Multi-head Attention
+
+In Transformer, the attention function is named as “Scaled Dot-Product Attention”. In practice, Transformer BIBREF2 processes query, keys and values as matrices $Q$ , $K$ , and $V$ respectively. The attention function can be written as follows: 
+
+$$Attention(Q,K,V) = softmax(\frac{QK^{T}}{\sqrt{d}})V$$   (Eq. 8) 
+
+where $d$ is the number of columns of $Q$ and $K$ . In these work BIBREF2 , BIBREF0 , BIBREF9 , they all use the multi-head attention, as introduced in BIBREF2 , 
+
+$$\begin{aligned}
+MultiHeadAttention(Q,K,V) &=
+Concat(head_1,\ldots ,head_k)W^{O}\\
+where~head_i &= Attention(QW^{Q}_{i}, KW^{K}_{i},VW^{V}_{i})
+\end{aligned}$$   (Eq. 9) 
+
+where matrices $W^{Q}_{i}$ and $W^{K}_{i}\in \mathbb {R}^{d_{model}\times {d}}$ , $W_{i}^{V} \in \mathbb {R}^{d_{model}\times {d}}$ and $W^O \in \mathbb {R}^{hd_v\times d_{model}}$ . In practice, $d_v$ is equal to $d$ . In this work BIBREF2 , multiple groups of parameters ( $W_i^{Q}$ , $W_i^{K}$ and $W_i^{V}$ ) are used, which results in a large number of redundant parameters.
+
+## Tensorized Transformer
+
+In this section, we first build a Single-block attention in Figure 2 (left) based on the Tucker decomposition, a low-rank decomposition method. In this process, we prove that the self-attention function in Transformer can be represented by a linear function, i.e., a linear combination representation of a set of basic vectors.
+
+In order to compress the multi-head mechanism, we propose a multi-linear attention constructed by a Block-Term tensor decomposition. This attention uses the idea of parameters sharing, i.e., sharing factor matrices across multiple blocks, shown in Figure 2 (right). After that, the compression ratios and relatively lower complexity have been analyzed.
+
+## Single-block Attention by Tucker Decomposition
+
+Before building the Single-block attention, it is necessary to propose the theorem "Theorem 3.1" . The theorem is closely related to attributes of Single-block attention function by Tucker-decomposition BIBREF12 .
+
+Theorem 3.1 Let $\mathbf {e}_1, \ldots , \mathbf {e}_n$ be basis vectors from the vector space $S$ . Assume that these vectors $\mathbf {e}_1,\ldots ,\mathbf {e}_n$ are linear independent. The output of the attention function in Eq. 8 can be represented by a linear combination of the set of these basis vectors. 
+
+$$Attention(Q,K,V) = (\mathbf {e}_1, \ldots , \mathbf {e}_n)M,$$   (Eq. 13) 
+
+where $M \in \mathbb {R}^{n\times d}$ is a coefficient matrix, and $d$ is a dimension of these matrices (i.e., $Q,~K$ , and $V$ ).
+
+The proof can be found in Supplementary Materials B.
+
+In Figure 2 (left), it is a schematic diagram about the Single-block attention. First, we assume that the query, key and value can be mapped into three factor matrices of which are composed of three groups of orthogonal basis vectors. Three factor matrices are $Q$ , $K$ and $V$ . After that, we can construct a new attention (i.e., Single-block attention) by initializing a 3-order diagonal tensor (trainable) which is the $\mathcal {G}$ . In Figure 2 (left), $R$ is the rank about the tensor, $N$ is the length of a sequence, and $d$ is the dimension of matrix. The function of Single-block attention can be computed based on Tucker-decomposition as follows: 
+
+$$\begin{aligned}
+Atten_{TD}(\mathcal {G};Q,K,V) =& \mathcal {G} {\bullet }_1 Q {\bullet }_2 K {\bullet }_3 V \\
+=& \sum _{i=1}^{I}\sum _{j=1}^{J} \sum _{m=1}^{M} \mathcal {G}_{ijm} Q_i \circ K_j \circ V_m
+\end{aligned}$$   (Eq. 14) 
+
+where $\mathcal {G}$ is a core tensor. $i, j$ and $m$ are the indexes of the core tensor. $\circ $ is the outer product. ${\bullet }_z$ is the same definition in Eq. 5 . $Q_i, K_j$ and $V_k$ are column vectors from matrices $Q, K$ and $V$ , where $Q \in \mathbb {R}^{N \times d}$ , $i, j$0 and $i, j$1 ,and $i, j$2 is the length of a sequence. In practice, we set $i, j$3 = $i, j$4 = $i, j$5 = $i, j$6 . The core tensor $i, j$7 can be defined as follows, 
+
+$$\mathcal {G}_{ijm} =
+\left\lbrace 
+\begin{array}{lr}
+rand(0,1) & i=j=m \\
+0 & otherwise\\
+\end{array}
+\right.$$   (Eq. 15) 
+
+where the $rand(0,1)$ is a random function, and the diagonal entries of core tensor $\mathcal {G}$ form the vector $\mathbf {g}$ . Each entry $\mathbf {g}_r\in (0,1)$ , $r \in \lbrace 1, \ldots , R\rbrace $ . We can consider $\mathbf {g}$ as the trainable weight. In experiments, we compute the weight vector by $softmax$ function (i.e., $softmax(\mathbf {g})$ ).
+
+After that, the output of Single-block attention function is a 3-order tensor which is given by linear computation. The Single-block attention (i.e., a 3-order tensor with Tucker decomposition) can reconstruct the Scaled Dot-Product attention in Eq. 8 by the summing over the tensor according to the second index (it can be seen as the coordinates in the vertical direction for a tensor), as proved in the following corollary. Note that in our model, we do not adopt the above reconstructing process. Instead, to obtain a new representation, we adopt the concat method after the tensor splitting (see Sec. "Multi-Linear Attention by Block-Term Tensor Decomposition" ). We will further show the compression ability of the Single-block attention in Sec. "Analysis of Compression and Complexity" .
+
+Corollary 1 Under the same conditions as in Theorem "Theorem 3.1" and the elements in each row of the matrix $V$ are the same, Single-block attention representation Eq. 14 can reconstruct the Scaled Dot-Product attention in Eq. 8 by the summing over the tensor (i.e., the output of Single-block attention function) according to the second index. It holds that: 
+
+$$Attention(Q,K,V)_{i,m} = \sum _{j=1}^{d} Atten_{TD}(\mathcal {G};Q,K,V)_{i,j,m}$$   (Eq. 18) 
+
+where $i$ , $j$ and $m$ are the indices of the Single-block attention's output (i.e., a 3-order tensor), and $d$ is the dimension for the second index. $Atten_{TD}(\cdot )$ is the function of Single-block attention based on Tucker decomposition. $i$ and $m$ are the indices of outputs (i.e., a matrix) from Eq. 8 .
+
+The proof can be found in Supplementary Materials C.
+
+## Multi-Linear Attention by Block-Term Tensor Decomposition
+
+In order to construct the multi-head mechanism and compress the parameters of multiple groups of mapping parameters, we use a group of linear projections, and share the output from the linear projections. In Figure 2 (right), the learned linear projection can map queries, keys and values to three matrices which are composed of basis vectors. After that, we use the Block-Term tensor decomposition to build multi-head mechanism. In our work, our model is named as Multi-linear attention, which can be formulated as follows: 
+
+$$\begin{aligned}
+MultiLinear(\mathcal {G};Q,K,V) &= SplitConcat(\frac{1}{h}*({T}_1+ \ldots +{T}_h))W^{O} \\
+where~~{T_j} &= Atten_{TD}(\mathcal {G}_j;QW^{q},KW^{k},VW^{v})
+\end{aligned}$$   (Eq. 20) 
+
+where the core tensor $\mathcal {G}_j$ is a diagonal tensor, and the number of parameter in $\mathcal {G}_j$ is equal to the rank of core tensor, $j\in \lbrace 1,\ldots , h\rbrace $ . $\mathcal {G}$ is the set of the core tensors. $SplitConcat(\cdot )$ is a function which achieves the concatenation after splitting for a 3-order tensor. Figure 2 (right) shows the basis idea about the multi-linear attention. The $W^{O}$ is the parameter matrix which is a full connection layer and correlated to the output of Multi-linear attention. $Atten_{TD}(\cdot )$ is the function of Single-block attention, which is a partion of Multi-linear attention. $W^{q}$ , $W^{K}$ and $W^{v}$ are the parameters matrices which are shared in constructing Multi-linear attention.
+
+The Multi-linear attention is a compression model. After compressing the multi-head attention in Transformer, it is to achieve a Tensorized Transformer. The Multi-linear attention can be incorporated into Transformer architecture. A diagram which is about the incorporating of Multi-linear attention in partial Transformer structure is given in Supplementary Materials E.1.
+
+## Analysis of Compression and Complexity
+
+Compression Our focus is on the compression of the multi-head mechanism in the multi-head attention of Transformer. Previous work BIBREF2 gets the multi-head attention by multiple groups of linear mappings. We use three linear ma for matrices $Q$ , $K$ and $V$ , respectively. For the output of three mappings, we choose to share them which are considered as three factor matrices in reconstructing the Multi-linear attention. This process is shown in Figure 2 (left). $h$ is the number of heads in BIBREF2 , and $d$ is the dimension of factor matrices. The compression ratios can be computed by $({3 \times h \times d})/({3 \times d + h})$ . In practice, $h$ is normally set to 8, $d$ is set to 512. In this case, the compression raio can achive 8. In other words, we can reduce almost 8 times parameters in the attention layer. The details of the computing of compression ratios can be found in Supplementary Materials D. The Transformer also contains other network layers, such as Position-wise feed forward network and embedding layers et al. Therefore, for the compression ratios in whole Transformer, we can compare it by the analysis of experimental results for model parameters.
+
+Complexity Eq. 14 reduces the time complexity in the attention layer. The time complexity of the attention function in Eq. 8 is $\mathcal {O}(N^2~d)$ , $N$ is the length of a sequence, and $d$ is the representation dimension. However, we can reorder the computations to reduce the model complexity $\mathcal {O}(R^2d)$ , where $R$ is the rank of the tensor which can be set in our experiments. In our experiments, $R$ is set as the number between 10 and 18 which is smaller than $N$ . The minimum number of sequential operations in Multi-linear attention for different layers is lower than that of the self-attention in Transformer BIBREF2 .
+
+## Related Work
+
+The field of language modeling has witnessed many significant advances. Different from the architectures of convolutional neural network (CNNs) and recurrent neural networks (RNNs) language modeling, the Transformer BIBREF2 and its variants BIBREF9 , BIBREF0 , BIBREF4 achieve excellent results in language modeling processing. Transformer networks have a potential of learning long-term dependency, but are limited by a fixed-length context in the setting of language modeling. Vaswani et al. BIBREF2 uses a segment-level recurrence mechanism and a novel positional encoding scheme to resolve this question. BERT BIBREF0 is a kind of bidirectional encoder representations from transformers. It is designed to pre-train deep bidirectional representation and obtains new SoTA on some NLP tasks. Although these methods have achieved great results, a large number of parameters make it difficult for the model to be trained in limited resources. Transformer fail to generalize in many simple tasks, e.g. copying string and logical inference BIBREF4 . Universal Transformers BIBREF4 propose a self-attentive recurrent sequence model which addresses this problem. This methods can increase the training speed. In their work, authors following weight sharing found in CNNs and RNNs, extend the Transformer with a simple form of weight sharing that strikes an effective balance between induces and model expressivity. This methods also uses a large number of parameters.
+
+Therefore, it is very important to consider how to reduce the amount of memory and computing they need. As we know, existing model compression methods are mainly divided into parameter pruning and share BIBREF7 , low rank approximation BIBREF16 , knowledge transfer BIBREF11 , and transferred convolutional filters BIBREF17 . Here, we mainly review some relevant compression methods. Tensor decomposition methods which adopts the idea of low rank approximation in most cases, have been successfully applied to neural networks compression. For example, in literature BIBREF18 , BIBREF19 , researchers approximate a tensor by minimizing the reconstruction error of the original parameters on convolutional neural networks(CNNs). However, these approaches tend to accumulate errors when multiple layers are compressed sequentially, and the output feature maps deviate far from the original values with the increase of compressed layers. Our compression method uses the idea of parameters sharing in the constructing of attention layers, the size of output is same as the output form self-attention in Transformer which can effectively avoid these problems. Tensorizing Neural Networks BIBREF20 have combined the idea of reshaping weights of fully-connected layers into high-dimensional tensors and representing them in Tensor Train format BIBREF8 . This approach was later extended to convolutional BIBREF21 and recurrent neural networks BIBREF22 . Recently, in these work BIBREF23 , BIBREF24 , researchers introduce efficient compression methods for the embedding and $softmax$ layers based on structured low rank matrix approximation. TT-embedding BIBREF5 aims to compression the larger embedding layer on Transformer-XL BIBREF9 . Our method is different from these works, and combines two compression idea (low rank approximate and parameters sharing) to construct a tensorized Transformer.
+
+In our work, we focus on the compression the multi-head attention in Transformer based the idea of parameters sharing. At the same time, we also combine low-rank approximate method to reduce parameters and time complexity.
+
+## Experiments
+
+Transformer is a versatile and powerful modeling tool and widely is used in various natural language process tasks. In order to verify the effectiveness of our method (i.e., Multi-linear attention) replacing multi-head attention in Transformer, we carry out two NLP tasks named language modeling (LM) and neural machine translation (NMT). Complete code for running experiments will be released after the paper is accepted, while the key code which is about our method can be found in Supplementary Materials F.
+
+## Language Modeling
+
+Language modeling is the task of predicting the next word in a sentence. This task is to estimate the joint probability $p(s)$ of a sentence of tokens $s$ = $(w_1,\ldots , w_n)$ . The resulting models can be used to generate text or further fine-tuned to solve other NLP tasks BIBREF3 . In this paper, we employ the standard setting of predicting next token given the sequence of preceding tokens, based on the function $p(s)=p(w_1)\prod _{i=2}^n p(w_i|w_1,\ldots ,w_{i-1})$ . We chose three datasets in the order of small (i.e., PTB), medium (i.e., WikiText-103) and large (i.e., One-Billion). As part of pre-processing, words are lower case. Newlines were replaced with <eos>. The vocabulary is the most frequent words with the rest of the tokens replaced by an <UNK> token. Models are evaluated based on Perplexity (PPL), which is the average per-word log-probability. The lower the PPL, the better the model is.
+
+Specially, we take Transformer, the open source state-of-the art language modeling architecture, and replace the standard multi-head attention layers with our Multi-linear attention. Then, we test different model configurations on the PTB BIBREF25 , WikiText-103 BIBREF26 and One-Billion Word benchmark BIBREF27 datasets and report the results in Table 1 and Table 2 .
+
+## Results and Details
+
+PTB has $929k$ training tokens, $73k$ validation words, and $82k$ test words. The results is reported in Table 2 . Similar to AWD-LSTM-MoS BIBREF31 , we apply variational dropout and weight average to our model (i.e., Tensorized Transformer). In addition, we need to state that, our model only replaces the multi-head attention using Multi-linear attention structure, and the other structures remain the same. We compare the result of our model with other models. Our model achieves the comparable results with SoTA when the number of core tensor is equal to two. However, our model size (i.e, model parameters) reduces by nearly half comparing with Transformer and Transformer-XL.
+
+WikiText-103 contains 267,735 unique tokens. The dataset is available word-level language modeling benchmark with long-term dependency. It contains 103M training tokens from $28k$ articles, with an average length of 3.6k tokens per article, which allows testing the ability of long-term dependency modeling. Here, we set the sentence length is 100, which is different from the sentence length in PTB (30) and One-Billion (30). As shown in Table 2 , our model reduces the previous SoTA perplexity form $20.5$ to $18.9$ , which demonstrates the effectiveness of the proposed attention architecture.
+
+The One-Billion Word benchmark is a large dataset derived from a news site. The dataset consists of $829,250,940$ tokens over a vocabulary of $793,471$ words. In this dataset, sentences are shuffled and hence the context is limited. Consequently, this dataset mainly tests the ability of modeling only short-term dependency. The comparison between Tensorized Transformer and the other methods are shown in Table 1 . Although Tensorized Transformer is mainly designed to better compress Transformer or Transformer-XL model, it dramatically improves the single-model SoTA from 21.8 to 19.5. Specifically, Tensorized Transformer significantly outperforms a contemporary method using vanilla Transformers BIBREF2 , suggesting that the advantage of the tensorized Transformer is also generalizable to modeling short sequences.
+
+Table 2 and Table 1 show that our model get the lower PPL than other models in three datasets. An exciting observation is that our model has much fewer parameters. On One-Billion word benchmark and WikiText-103 dataset, we use the adaptive input method for input layer, and not on PTB dataset. The model of Transformer-XL+TT BIBREF5 is a recent compression model with Tensor Train to compress the input embedding layers only. The results in Table 2 show that compared with Transformer-XL+TT, our method has much fewer parameters, and better language modeling performance. These results verify that our model (i.e., Multi-linear attention) is effective in language modeling tasks, and has performed well for the model compression. Other details (such as hyperparameters and Hardware) can be found in Supplementary Materials E.
+
+## Neural Machine Translation
+
+The goal is to map an input sequence $s=(x_1,x_2,\ldots ,x_n)$ representing a phrase in one language, to an output sequence $y=(y_1,y_2,\ldots , y_m)$ representing the same phrase in a different language. In this task, we have trained the Transformer model BIBREF2 on WMT 2016 English-German dataset BIBREF36 . Sentences were tokenized using the SentencePiece . For our experiments, we have replaced each of the attention layers with Multi-linear attention. For evaluation we used beam search with a beam size of 5 and length penalty $\alpha $ = $0.6$ . In this section, we only compared the results with Transformer BIBREF2 . Our results are summarized in Table 3 . $*$ indicates that the result is our own implementation.
+
+In Table 3 , we select two baseline models. The Base-line BIBREF36 is first model in WMT 2016 English-German dataset. For the other baseline, we use the basic Transformer architecture BIBREF2 . The BLEU score is $34.5$ for the basic architecture. We carry out two tensorized Transformer structures, namely core-1 and core-2 respectively. When tensorized Transformer core-1 and core-2 are used, the BLEU scores are $34.10$ and $34.91$ , which achieves better performance over Transformer. As for the reported model parameter size, our model uses less parameters.
+
+## Conclusion and Further Work
+
+We have proposed a novel self attention encoder layer, namely the Multi-linear attention, to compress the original multi-head attention and derive a novel encoding scheme. Our main contribution lies in a structure of Tensorized Transformer based on Block-Term tensor decomposition which is represented by the combination of a group of 3-order tensors, with low-rank approximation and parameters sharing ideas adopted. Compared with existing Transformer based methods, our model achieved higher compression ratio and got better experimental results, particularly in language modeling task. These evidences imply that our method can potentially be further applied to more NLP tasks with limited resources.
+
+In the future, we will continue to optimize the Tensorized Transformer framework and apply it in other NLP tasks. As we stated earlier, our model may suffer from overfitting when the number of cores is large in language modeling. In the future, we will explore the fundamental reasons that cause the problem and tackle them within the Tensorized Transformer framework.

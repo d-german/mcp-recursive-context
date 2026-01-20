@@ -1,0 +1,277 @@
+# Explaining Queries over Web Tables to Non-Experts
+
+**Paper ID:** 1808.04614
+
+## Abstract
+
+Designing a reliable natural language (NL) interface for querying tables has been a longtime goal of researchers in both the data management and natural language processing (NLP) communities. Such an interface receives as input an NL question, translates it into a formal query, executes the query and returns the results. Errors in the translation process are not uncommon, and users typically struggle to understand whether their query has been mapped correctly. We address this problem by explaining the obtained formal queries to non-expert users. Two methods for query explanations are presented: the first translates queries into NL, while the second method provides a graphic representation of the query cell-based provenance (in its execution on a given table). Our solution augments a state-of-the-art NL interface over web tables, enhancing it in both its training and deployment phase. Experiments, including a user study conducted on Amazon Mechanical Turk, show our solution to improve both the correctness and reliability of an NL interface.
+
+## Introduction
+
+Natural language interfaces have been gaining significant popularity, enabling ordinary users to write and execute complex queries. One of the prominent paradigms for developing NL interfaces is semantic parsing, which is the mapping of NL phrases into a formal language. As Machine Learning techniques are standardly used in semantic parsing, a training set of question-answer pairs is provided alongside a target database BIBREF0 , BIBREF1 , BIBREF2 . The parser is a parameterized function that is trained by updating its parameters such that questions from the training set are translated into queries that yield the correct answers.
+
+A crucial challenge for using semantic parsers is their reliability. Flawless translation from NL to formal language is an open problem, and even state-of-the-art parsers are not always right. With no explanation of the executed query, users are left wondering if the result is actually correct. Consider the example in Figure FIGREF1 , displaying a table of Olympic games and the question "Greece held its last Olympics in what year?". A semantic parser parsing the question generates multiple candidate queries and returns the evaluation result of its top ranked query. The user is only presented with the evaluation result, 2004. Although the end result is correct, she has no clear indication whether the question was correctly parsed. In fact, the interface might have chosen any candidate query yielding 2004. Ensuring the system has executed a correct query (rather than simply returning a correct answer in a particular instance) is essential, as it enables reusing the query as the data evolves over time. For example, a user might wish for a query such as "The average price of the top 5 stocks on Wall Street" to be run on a daily basis. Only its correct translation into SQL will consistently return accurate results.
+
+Our approach is to design provenance-based BIBREF3 , BIBREF4 query explanations that are extensible, domain-independent and immediately understandable by non-expert users. We devise a cell-based provenance model for explaining formal queries over web tables and implement it with our query explanations, (see Figure FIGREF1 ). We enhance an existing NL interface for querying tables BIBREF5 by introducing a novel component featuring our query explanations. Following the parsing of an input NL question, our component explains the candidate queries to users, allowing non-experts to choose the one that best fits their intention. The immediate application is to improve the quality of obtained queries at deployment time over simply choosing the parser's top query (without user feedback). Furthermore, we show how query explanations can be used to obtain user feedback which is used to retrain the Machine Learning system, thereby improving its performance.
+
+## System Overview
+
+We review our system architecture from Figure FIGREF7 and describe its general workflow.
+
+## Preliminaries
+
+We begin by formally defining our task of querying tables. Afterwards, we discuss the formal query language and show how lambda DCS queries can be translated directly into SQL.
+
+## Data Model
+
+An NL interface for querying tables receives a question INLINEFORM0 on a table INLINEFORM1 and outputs a set of values INLINEFORM2 as the answer (where each value is either the content of a cell, or the result of an aggregate function on cells). As discussed in the introduction, we make the assumption that a query concerns a single table.
+
+Following the model presented in BIBREF1 , all table records are ordered from top to bottom with each record possessing a unique INLINEFORM0 (0, 1, 2, ...). In addition, every record has a pointer INLINEFORM1 to the record above it. The values of table cells can be either strings, numbers or dates. While we view the table as a relation, it is common BIBREF1 , BIBREF5 to describe it as a knowledge base (KB) INLINEFORM2 where INLINEFORM3 is a set of entities and INLINEFORM4 a set of binary properties. The entity set, INLINEFORM5 is comprised of all table cells (e.g., INLINEFORM6 ) and all table records, while INLINEFORM7 contains all column headers, serving as binary relations from an entity to the table records it appears in. In the example of Figure FIGREF1 , column Country is a binary relation such that Country.Greece returns all table records where the value of column Country is Greece (see definition of composition operators below). If the table in Figure FIGREF1 has INLINEFORM8 records, the returned records indices will be INLINEFORM9 .
+
+## Query Language
+
+Following the definition of our data model we introduce our formal query language, lambda dependency-based compositional semantics (lambda DCS) BIBREF6 , BIBREF0 , which is a language inspired by lambda calculus, that revolves around sets. Lambda DCS was originally designed for building an NL interface over Freebase BIBREF9 .
+
+Lambda DCS is a highly expressive language, designed to represent complex NL questions involving sorting, aggregation intersection and more. It has been considered a standard language for performing semantic parsing over knowledge bases BIBREF6 , BIBREF0 , BIBREF1 , BIBREF5 . A lambda DCS formula is executed against a target table and returns either a set of values (string, number or date) or a set of table records. We describe here a simplified version of lambda DCS that will be sufficient for understanding the examples presented in this paper. For a full description of lambda DCS, the reader should refer to BIBREF6 . The basic constructs of lambda DCS are as follows:
+
+Unary: a set of values. The simplest type of unary in a table is a table cell, e.g., Greece, which denotes the set of cells containing the entity 'Greece'.
+
+Binary: A binary relation describes a relation between sets of objects. The simplest type of a binary relation is a table column INLINEFORM0 , mapping table entities to the records where they appear, e.g., Country.
+
+Join: For a binary relation INLINEFORM0 and unary relation INLINEFORM1 , INLINEFORM2 operates as a selection and projection. INLINEFORM3 denotes all table records where the value of column Country is Greece.
+
+Prev: Given records INLINEFORM0 the INLINEFORM1 operator will return the set of preceding table records, INLINEFORM2 .
+
+Reverse: Given a binary relation INLINEFORM0 from INLINEFORM1 to INLINEFORM2 , there is a reversed binary relation R[ INLINEFORM3 ] from INLINEFORM4 to INLINEFORM5 . E.g., for a column binary relation INLINEFORM6 from table values to their records, R[ INLINEFORM7 ] is a relation from records to values. R[Year].Country.Greece takes all the record indices of Country.Greece and returns the values of column Year in these records. Similarly, R[Prev] denotes a relation from a set of records, to the set of following (reverse of previous) table records.
+
+Intersection: Intersection of sets. E.g., the set of records where Country is Greece and also where Year is 2004, Country.Greece INLINEFORM0 Year.2004.
+
+Union: Union of sets. E.g., records where the value of column Country is Greece or China, Country.Greece INLINEFORM0 Country.China.
+
+Aggregation: Aggregate functions min, max, avg, sum, count that take a unary and return a unary with one number. E.g., INLINEFORM0 returns the number of records where the value of City is Athens.
+
+Superlatives: argmax, argmin. For unary INLINEFORM0 and binary INLINEFORM1 , INLINEFORM2 is the set of all values INLINEFORM3 .
+
+In this paper we use a group of predefined operators specifically designed for the task of querying tables BIBREF1 . The language operators are compositional in nature, allowing the semantic parser to compose several sub-formulas into a single formula representing complex query operations.
+
+Example 3.1 Consider the following lambda DCS query on the table from Figure FIGREF1 , INLINEFORM0 
+
+it returns values of column City (binary) appearing in records (Record unary) that have the lowest value in column Year.
+
+To position our work in the context of relational queries we show lambda DCS to be an expressive fragment of SQL. The translation into SQL proves useful when introducing our provenance model by aligning our model with previous work BIBREF10 , BIBREF4 . Table TABREF69 (presented at the end of the paper) describes all lambda DCS operators with their corresponding translation into SQL.
+
+Example 3.2 Returning to the lambda DCS query from the previous example, it can be easily translated to SQL as,
+
+ SELECT City FROM T
+
+ WHERE Index IN (
+
+ SELECT Index FROM T
+
+ WHERE Year = ( SELECT MIN(Year) FROM T ) ); 
+
+where Index denotes the attribute of record indices in table INLINEFORM0 . The query first computes the set of record indices containing the minimum value in column Year, which in our running example table is {0}. It then returns the values of column City in these records, which is Athens as it is the value of column City at record 0.
+
+## Provenance
+
+The tracking and presentation of provenance data has been extensively studied in the context of relational queries BIBREF10 , BIBREF4 . In addition to explaining query results BIBREF4 , we can use provenance information for explaining the query execution on a given web table. We design a model for multilevel cell-based provenance over tables, with three levels of granularity. The model enables us to distinguish between different types of table cells involved in the execution process. This categorization of provenance cells serves as a form of query explanation that is later implemented in our provenance-based highlights (Section SECREF34 ).
+
+## Model Definitions
+
+Given query INLINEFORM0 and table INLINEFORM1 , the execution result, denoted by INLINEFORM2 , is either a collection of table cells, or a numeric result of an aggregate or arithmetic operation.
+
+We define INLINEFORM0 to be the infinite domain of possible queries over INLINEFORM1 , INLINEFORM2 to be the set of table records, INLINEFORM3 to be the set of table cells and denote by INLINEFORM4 the set of aggregate functions, {min, max, avg, count, sum}.
+
+Our cell-based provenance takes as input a query and its corresponding table and returns the set of cells and aggregate functions involved in the query execution. The model distinguishes between three types of provenance cells. There are the cells returned as the query output INLINEFORM0 , cells that are examined during the execution, and also the cells in columns that are projected or aggregated on by the query. We formally define the following three cell-based provenance functions.
+
+Definition 4.1 Let INLINEFORM0 be a formal query and INLINEFORM1 its corresponding table. We define three cell-based provenance functions, INLINEFORM2 . Given INLINEFORM3 the functions output a set of table cells and aggregate functions. INLINEFORM4 
+
+We use INLINEFORM0 to denote an aggregate function or arithmetic operation on tables cells. Given the compositional nature of the lambda DCS query language, we define INLINEFORM1 as the set of all sub-queries composing INLINEFORM2 . We have used INLINEFORM3 to denote the table columns that are either projected by the query, or that are aggregated on by it. DISPLAYFORM0 DISPLAYFORM1 
+
+Function INLINEFORM0 returns all cells output by INLINEFORM1 or, if INLINEFORM2 is the result of an arithmetic or aggregate operation, returns all table cells involved in that operation in addition to the aggregate function itself. INLINEFORM3 returns cells and aggregate functions used during the query execution. INLINEFORM4 returns all table cells in columns that are either projected or aggregated on by INLINEFORM5 . These cell-based provenance functions have a hierarchical relation, where the cells output by each function are a subset of those output by the following function. Therefore, the three provenance sets constitute an ordered chain, where INLINEFORM6 .
+
+Having described our three levels of cell-based provenance, we combine them into a single multilevel cell-based model for querying tables.
+
+Definition 4.2 Given formal query INLINEFORM0 and table INLINEFORM1 , the multilevel cell-based provenance of INLINEFORM2 executed on INLINEFORM3 is a function, INLINEFORM4 
+
+Returning the provenance chain, INLINEFORM0 
+
+## Query Operators
+
+Using our model, we describe the multilevel cell-based provenance of several lambda DCS operator in Table TABREF21 . Provenance descriptions of all lambda DCS operators are provided in Table TABREF69 (at the end of the paper). For simplicity, we omit the table parameter INLINEFORM0 from provenance expressions, writing INLINEFORM1 instead of INLINEFORM2 . We also denote both cells and aggregate functions as belonging to the same set.
+
+We use INLINEFORM0 to denote a table cell with value INLINEFORM1 , while denoting specific cell values by INLINEFORM2 . Each cell INLINEFORM3 belongs to a table record, INLINEFORM4 with a unique index, INLINEFORM5 (Section SECREF8 ). We distinguish between two types of lambda DCS formulas: formulas returning values are denoted by INLINEFORM6 while those returning table records by INLINEFORM7 .
+
+Example 4.3 We explain the provenance of the following lambda DCS query, INLINEFORM0 
+
+It returns the values of column Year in records where column City is Athens, thus INLINEFORM0 will return all cells containing these values. INLINEFORM1 
+
+The cells involved in the execution of INLINEFORM0 include the output cells INLINEFORM1 in addition to the provenance of the sub-formula City.Athens, defined as all cells of column City with value Athens. INLINEFORM2 
+
+Where, INLINEFORM0 
+
+The provenance of the columns of INLINEFORM0 is simply all cells appearing in columns Year and City. INLINEFORM1 
+
+The provenance rules used in the examples regard the lambda DCS operators of "column records" and of "column values". The definition of the relevant provenance rules are described in the first two rows of Table TABREF69 .
+
+## Explaining Queries
+
+To allow users to understand formal queries we must provide them with effective explanations. We describe the two methods of our system for explaining its generated queries to non-experts. Our first method translates formal queries into NL, deriving a detailed utterance representing the query. The second method implements the multilevel provenance model introduced in Section SECREF4 . For each provenance function ( INLINEFORM0 ) we uniquely highlight its cells, creating a visual explanation of the query execution.
+
+## Query to Utterance
+
+Given a formal query in lambda DCS we provide a domain independent method for converting it into a detailed NL utterance. Drawing on the work in BIBREF7 we use a similar technique of deriving an NL utterance alongside the formal query. We introduce new NL templates describing complex lambda DCS operations for querying tables.
+
+Example 5.1 The lambda DCS query, INLINEFORM0 
+
+is mapped to the utterance, "value in column Year where column Country is Greece". If we compose it with an aggregate function, INLINEFORM0 
+
+its respective utterance will be composed as well, being "maximum of values in column Year where column Country is Greece". The full derivation trees are presented in Figure FIGREF32 , where the original query parse tree is shown on the left, while our derived NL explanation is presented on the right.
+
+We implement query to utterance as part of the semantic parser of our interface (Section SECREF42 ). The actual parsing of questions into formal queries is achieved using a context-free grammar (CFG). As shown in Figure FIGREF32 , formal queries are derived recursively by repeatedly applying the grammar deduction rules. Using the CYK BIBREF11 algorithm, the semantic parser returns derivation trees that maximize its objective (Section SECREF42 ). To generate an NL utterance for any formal query, we change the right-hand-side of each grammar rule to be a sequence of both non-terminals and NL phrases. For example, grammar rule: ("maximum of" Values INLINEFORM0 Entity) where Values, Entity and "maximum of" are its non-terminals and NL phrase respectively. Table TABREF33 describes the rules of the CFG augmented with our NL utterances. At the end of the derivation, the full query utterance can be read as the yield of the parse tree.
+
+To utilize utterances as query explanations, we design them to be as clear and understandable as possible, albeit having a somewhat clumsy syntax. The references to table columns, rows as part of the NL utterance helps to clarify the actual semantics of the query to the non-expert users.
+
+As the utterances are descriptions of formal queries, reading the utterance of each candidate query to determine its correctness might take some time. As user work-time is expensive, explanation methods that allow to quickly target correct results are necessary. We enhance utterances by employing provenance-based explanations, used for quickly identifying correct queries.
+
+## Provenance to Highlights
+
+The understanding of a table query can be achieved by examining the cells on which it is executed. We explain a query by highlighting its multilevel cell-based provenance (Section SECREF4 ).
+
+Using our provenance model, we define a procedure that takes a query as input and returns all cells involved in its execution on the corresponding table. These cells are then highlighted in the table, illustrating the query execution. Given a query INLINEFORM0 and table INLINEFORM1 , the INLINEFORM2 procedure divides cells into four types, based on their multilevel provenance functions. To help illustrate the query, each type of its provenance cells is highlighted differently: Colored cells are equivalent to INLINEFORM3 and are the cells returned by INLINEFORM4 as output, or used to compute the final output. Framed cells are equivalent to INLINEFORM5 and are the cells and aggregate functions used during query execution. Lit cells are equivalent to INLINEFORM6 , and are the cells of columns projected by the query. All other cells are unrelated to the query, hence no highlights are applied to them.
+
+Example 5.2 Consider the lambda DCS query, INLINEFORM0 
+
+The utterance of this query is, "difference in column Total between rows where Nation is Fiji and Tonga". Figure FIGREF38 displays the highlights generated for this query, lighting all of the query's columns, framing its provenance cells and coloring the cells that comprise its output. In this example, all cells in columns Nation and Total are lit. The cells Fiji and Tonga are part of INLINEFORM0 and are therefore framed. The cells in INLINEFORM1 , containing 130 and 20, are colored as they contain the values used to compute the final result.
+
+To highlight a query over the input table we call the procedure INLINEFORM0 with INLINEFORM1 . We describe our implementation in Algorithm SECREF34 . It is a recursive procedure which leverages the compositional nature of lambda DCS formulas. It decomposes the query INLINEFORM2 into its set of sub-formulas INLINEFORM3 , recursively computing the multilevel provenance. When reaching an atomic formula the algorithm will execute it and return its output. Cells returned by a sub-formula are both lit and framed, being part of INLINEFORM4 and INLINEFORM5 . Finally, all of the cells in INLINEFORM6 (Equation EQREF24 ) are colored.
+
+Examples of provenance-based highlights are provided for several lambda DCS operators in Figures FIGREF38 - FIGREF38 . We display highlight examples for all lambda DCS operators in Figures TABREF70 - TABREF70 (at the end of the paper). Highlighting query cell-based provenance [1] Highlight INLINEFORM0 , INLINEFORM1 , INLINEFORM2 INLINEFORM3 provenance sets INLINEFORM4 INLINEFORM5 aggregate function INLINEFORM6 INLINEFORM7 is atomic INLINEFORM8 INLINEFORM9 INLINEFORM10 INLINEFORM11 INLINEFORM12 INLINEFORM13 INLINEFORM14 INLINEFORM15 INLINEFORM16 INLINEFORM17 ; INLINEFORM18 INLINEFORM19 INLINEFORM20 
+
+We note that different queries may possess identical provenance-based highlights. Consider Figure FIGREF38 and the following query utterances,
+
+"values in column Games that are more than 4."
+
+"values in column Games that are at least 5 and also less than 17."
+
+The highlights displayed on Figure FIGREF38 will be the same for both of the above queries. In such cases the user should refer to the NL utterances of the queries in order to distinguish between them. Thus our query explanation methods are complementary, with the provenance-based highlights providing quick visual feedback while the NL utterances serve as detailed descriptions.
+
+## Scaling to Large Tables
+
+We elaborate on how our query explanations can be easily extended to tables with numerous records. Given the nature of the NL utterances, this form of explanation is independent of a table's given size. The utterance will still provide an informed explanation of the query regardless of the table size or its present relations.
+
+When employing our provenance-based highlights to large tables it might seem intractable to display them to the user. However, the highlights are meant to explain the candidate query itself, and not the final answer returned by it. Thus we can precisely indicate to the user what are the semantics of the query by employing highlights to a subsample of the table.
+
+An intuitive solution can be used to achieve a succinct sample. First we use Algorithm SECREF34 to compute the cell-based provenance sets INLINEFORM0 and to mark the aggregation operators on relevant table headers. We can then map each provenance cell to its relevant record (table row), enabling us to build corresponding record sets, INLINEFORM1 . To illustrate the query highlights we sample one record from each of the three sets: INLINEFORM2 , INLINEFORM3 and INLINEFORM4 . In the special case of a query containing arithmetic difference (Figure FIGREF38 ), we select two records from INLINEFORM5 , one for each subtracted value. Sampled records are ordered according to their order in the original table. The example in Figure FIGREF40 contains three table rows selected from a large web table BIBREF12 .
+
+## Concrete Applications
+
+So far we have described our methods for query explanations (Sections SECREF30 , SECREF34 ) and we now harness these methods to enhance an existing NL interface for querying tables.
+
+## Implementation
+
+We return to our system architecture from Figure FIGREF7 . Presented with an NL question and corresponding table, our interface parses the question into lambda DCS queries using the state-of-the-art parser in BIBREF5 . The parser is trained for the task of querying web tables using the WikiTableQuestions dataset BIBREF1 .
+
+Following the mapping of a question to a set of candidate queries, our interface will generate relevant query explanations for each of the queries, displaying a detailed NL utterance and highlighting the provenance data. The explanations are presented to non-technical users to assist in selecting the correct formal-query representing the question.
+
+User feedback in the form of question-query pairs is also used offline in order to retrain the semantic parser.
+
+We briefly describe the benchmark dataset used in our framework and its relation to the task of querying web tables.
+
+WikiTableQuestions BIBREF1 is a question answering dataset over semi-structured tables. It is comprised of question-answer pairs on HTML tables, and was constructed by selecting data tables from Wikipedia that contained at least 8 rows and 5 columns. Amazon Mechanical Turk workers were then tasked with writing trivia questions about each table. In contrast to common NLIDB benchmarks BIBREF2 , BIBREF0 , BIBREF15 , WikiTableQuestions contains 22,033 questions and is an order of magnitude larger than previous state-of-the-art datasets. Its questions were not designed by predefined templates but were hand crafted by users, demonstrating high linguistic variance. Compared to previous datasets on knowledge bases it covers nearly 4,000 unique column headers, containing far more relations than closed domain datasets BIBREF15 , BIBREF2 and datasets for querying knowledge bases BIBREF16 . Its questions cover a wide range of domains, requiring operations such as table lookup, aggregation, superlatives (argmax, argmin), arithmetic operations, joins and unions. The complexity of its questions can be shown in Tables TABREF6 and TABREF66 .
+
+The complete dataset contains 22,033 examples on 2,108 tables. As the test set, 20% of the tables and their associated questions were set aside, while the remaining tables and questions serve as the training set. The separation between tables in the training and test sets forces the question answering system to handle new tables with previously unseen relations and entities.
+
+## Training on Feedback
+
+The goal of the semantic parser is to translate natural language questions into equivalent formal queries. Thus, in order to ideally train the parser, we should train it on questions annotated with their respective queries. However, annotating NL questions with formal queries is a costly operation, hence recent works have trained semantic parsers on examples labeled solely with their answer BIBREF17 , BIBREF18 , BIBREF0 , BIBREF1 . This weak supervision facilitates the training process at the cost of learning from incorrect queries. Figure FIGREF48 presents two candidate queries for the question "What was the last year the team was a part of the USL A-league?". Note that both queries output the correct answer to the question, which is 2004. However, the second query is clearly incorrect given its utterance is "minimum value in column Year in rows that have the highest value in column Open Cup".
+
+The WikiTableQuestions dataset, on which the parser is trained, is comprised of question-answer pairs. Thus by retraining the parser on question-query pairs, that are provided as feedback, we can improve its overall correctness. We address this in our work by explaining queries to non-experts, enabling them to select the correct candidate query or mark None when all are incorrect.
+
+These annotations are then used to retrain the semantic parser. Given a question, its annotations are the queries marked as correct by users. We note that a question may have more than one correct annotation.
+
+Semantic Parsing is the task of mapping natural language questions to formal language queries (SQL, lambda DCS, etc.) that are executed against a target database. The semantic parser is a parameterized function, trained by updating its parameter vector such that questions from the training set are translated to formal queries yielding the correct answer.
+
+We denote the table by INLINEFORM0 and the NL question by INLINEFORM1 . The semantic parser aims to generate a query INLINEFORM2 which executes to the correct answer of INLINEFORM3 on INLINEFORM4 , denoted by INLINEFORM5 . In our running example from Figure FIGREF1 , the parser tries to generate queries which execute to the value 2004. We define INLINEFORM6 as the set of candidate queries generated by parsing INLINEFORM7 . For each INLINEFORM8 we extract a feature vector INLINEFORM9 and define a log-linear distribution over candidates: DISPLAYFORM0 
+
+where INLINEFORM0 is the parameter vector. We formally define the parser distribution of yielding the correct answer, DISPLAYFORM0 
+
+where INLINEFORM0 is 1 when INLINEFORM1 and zero otherwise.
+
+The parser is trained using examples INLINEFORM0 , optimizing the parameter vector INLINEFORM1 using AdaGrad BIBREF19 in order to maximize the following objective BIBREF1 , DISPLAYFORM0 
+
+where INLINEFORM0 is a hyperparameter vector obtained from cross-validation. To train a semantic parser that is unconstrained to any specific domain we deploy the parser in BIBREF5 , trained end-to-end on the WikiTableQuestions dataset BIBREF1 .
+
+We modify the original parser so that annotated questions are trained using question-query pairs while all other questions are trained as before. The set of annotated examples is denoted by INLINEFORM0 . Given annotated example INLINEFORM1 , its set of valid queries is INLINEFORM2 . We define the distribution for an annotated example to yield the correct answer by, DISPLAYFORM0 
+
+Where INLINEFORM0 is 1 when INLINEFORM1 and zero otherwise. Our new objective for retraining the semantic parser, DISPLAYFORM0 
+
+the first sum denoting the set of annotated examples, while the second sum denotes all other examples.
+
+This enables the parser to update its parameters so that questions are translated into correct queries, rather than merely into queries that yield the correct answer.
+
+## Deployment
+
+At deployment, user interaction is used to ensure that the system returns formal-queries that are correct.
+
+We have constructed a web interface allowing users to pose NL questions on tables and by using our query explanations, to choose the correct query from the top-k generated candidates. Normally, a semantic parser receives an NL question as input and displays to the user only the result of its top ranked query. The user receives no explanation as to why was she returned this specific result or whether the parser had managed to correctly parse her question into formal language. In contrast to the baseline parser, our system displays to users its top-k candidates, allowing them to modify the parser's top query.
+
+Example 6.1 Figure FIGREF51 shows an example from the WikitableQuestions test set with the question "How many more ships were wrecked in lake Huron than in Erie". Note that the original table contains many more records than those displayed in the figure. Given the explanations of the parser's top candidates, our provenance-based highlights make it clear that the first query is correct as it compares the table occurrences of lakes Huron and Erie. The second result is incorrect, comparing lakes Huron and Superior, while the third query does not compare occurrences.
+
+## Experiments
+
+Following the presentation of concrete applications for our methods we have designed an experimental study to measure the effect of our query explanation mechanism. We conducted experiments to evaluate both the quality of our explanations, as well as their contribution to the baseline parser. This section is comprised of two main parts:
+
+The experimental results show our query explanations to be effective, allowing non-experts to easily understand generated queries and to disqualify incorrect ones. Training on user feedback further improves the system correctness, allowing it to learn from user experience.
+
+## Evaluation Metrics
+
+We begin by defining the system correctness, used as our main evaluation metric. Recall that the semantic parser is given an NL question INLINEFORM0 and table INLINEFORM1 and generates a set INLINEFORM2 of candidate queries. Each query INLINEFORM3 is then executed against the table, yielding result INLINEFORM4 . We define the parser correctness as the percentage of questions where the top-ranked query is a correct translation of INLINEFORM5 from NL to lambda DCS. In addition to correctness, we also measured the mean reciprocal rank (MRR), used for evaluating the average correctness of all candidate queries generated, rather than only that of the top-1.
+
+Example 7.1 To illustrate the difference between correct answers and correct queries let us consider the example in Figure FIGREF48 . The parser generates the following candidate queries (we present only their utterances):
+
+maximum value in column Year in rows where value of column League is USL A-League.
+
+minimum value in column Year in rows that have the highest value in column Open Cup.
+
+Both return the correct answer 2004, however only the first query conveys the correct translation of the NL question.
+
+## Interactive Parsing at Deployment
+
+We use query explanations to improve the real-time performance of the semantic parser. Given any NL question on a (never before seen) table, the parser will generate a set of candidate queries. Using our explanations, the user will interactively select the correct query (when generated) from the parser's top-k results. We compare the correctness scores of our interactive method with that of the baseline parser.
+
+Our user study was conducted using anonymous workers recruited through the the Amazon Mechanical Turk (AMT) crowdsourcing platform. Focusing on non-experts, our only requirements were that participants be over 18 years old and reside in a native English speaking country. Our study included 35 distinct workers, a significant number of participants compared to previous works on NL interfaces BIBREF4 , BIBREF15 , BIBREF20 . Rather than relying on a small set of NL test questions BIBREF4 , BIBREF15 we presented each worker with 20 distinct questions that were randomly selected from the WikiTableQuestions benchmark dataset (Section SECREF41 ). A total of 405 distinct questions were presented (as described in Table TABREF59 ). For each question, workers were shown explanations (utterances, highlights) of the top-7 candidate queries generated. Candidates were randomly ordered, rather than ranked by the parser scores, so that users will not be biased towards the parser's top query. Given a question, participants were asked to mark the correct candidate query, or None if no correct query was generated.
+
+Displaying the top-k results allowed workers to improve the baseline parser in cases where the correct query was generated, but not ranked at the top. After examining different values of INLINEFORM0 , we chose to display top-k queries with INLINEFORM1 . We made sure to validate that our choice of INLINEFORM2 was sufficiently large, so that it included the correct query (when generated). We randomly selected 100 examples where no correct query was generated in the top-7 and examined whether one was generated within the top-14 queries. Results had shown that for INLINEFORM3 only 5% of the examples contained a correct query, a minor improvement at the cost of doubling user effort. Thus a choice of INLINEFORM4 appears to be reasonable.
+
+To verify that our query explanations were understandable to non-experts we measured each worker's success. Results in Table TABREF59 show that in 78.4% of the cases, workers had succeeded in identifying the correct query or identifying that no candidate query was correct. The average success rate for all 35 workers being 15.7/20 questions. When comparing our explanation approach (utterances + highlights) to a baseline of no explanations, non-expert users failed to identify correct queries when shown only lambda DCS queries. This demonstrates that utterances and provenance-based highlights serve as effective explanations of formal queries to the layperson. We now show that using them jointly is superior to using only utterances.
+
+When introducing our two explanation methods, we noted their complementary nature. NL utterances serve as highly detailed phrases describing the query, while highlighting provenance cells allows to quickly single out the correct queries. We put this claim to the test by measuring the impact our novel provenance-based highlights had on the average work-time of users. We measured the work-time of 20 distinct AMT workers, divided into two separate groups, each containing half of the participants. Workers from both groups were presented with 20 questions from WikiTableQuestions. The first group of workers were presented both with highlights and utterances as their query explanations, while the second group had to rely solely on NL utterances. Though both groups achieved identical correctness results, the group employing table highlights performed significantly faster. Results in Table TABREF60 show our provenance-based explanations cut the average and median work-time by 34% and 20% respectively. Since user work-time is valuable, the introduction of visual explanations such as table highlights may lead to significant savings in worker costs.
+
+We have examined the effect to which our query explanations can help users improve the correctness of a baseline NL interface. Our user study compares the correctness of three scenarios:
+
+Parser correctness - our baseline is the percentage of examples where the top query returned by the semantic parser was correct.
+
+User correctness - the percentage of examples where the user selected a correct query from the top-7 generated by the parser.
+
+Hybrid correctness - correctness of queries returned by a combination of the previous two scenarios. The system returns the query marked by the user as correct; if the user marks all queries as incorrect it will return the parser's top candidate.
+
+Results in Table TABREF64 show the correctness rates of these scenarios. User correctness score is superior to that of the baseline parser by 7.5% (from 37.1% to 44.6%), while the hybrid approach outscores both with a correctness of 48.7% improving the baseline by 11.6%. For the user and hybrid correctness we used a INLINEFORM0 test to measure significance. Random queries and tables included in the experiment are presented in Table TABREF66 . We also include a comparison of the top ranked query of the baseline parser compared to that of the user.
+
+We define the correctness bound as the percentage of examples where the top-k candidate queries actually contain a correct result. This bound serves as the optimal correctness score that workers can achieve. The 56% correctness-bound of the baseline parser stems from the sheer complexity of the WikiTableQuestions benchmark. Given the training and test tables are disjoint, the parser is tested on relations and entities unobserved during its training. This task of generalizing to unseen domains is an established challenge in semantic parsing BIBREF1 , BIBREF21 . Using the correctness-bound as an upper bound on our results shows the hybrid approach achieves 87% of its full potential. Though there is some room for improvement, it seems reasonable given that our non-expert workers possess no prior experience of their given task.
+
+We describe the execution times for generating our query explanations in Table TABREF65 . We trained the semantic parser using the SMEPRE toolkit BIBREF0 on a machine with Xeon 2.20GHz CPU and 256GB RAM running Linux Ubuntu 14.04 LTS. We report the average generation times of candidate queries, utterances and highlights over the entire WikiTableQuestions test set, numbering 4,344 questions.
+
+## Training on User Feedback
+
+We measure our system's ability to learn from user feedback in the form of question-query pairs. Given a question, the user is shown explanations of the parser's top-7 queries, using them to annotate the question, i.e. assign to it correct formal queries (e.g., the first query in Figure FIGREF48 ). Annotations were collected by displaying users with questions from the WikiTableQuestions training set along with query explanations of the parser results. To enhance the annotation quality, each question was presented to three distinct users, taking only the annotations marked by at least two of them as correct. Data collection was done using AMT and in total, 2,068 annotated questions were collected. Following a standard methodology, we split the annotated data into train and development sets. Out of our 2,068 annotated examples, 418 were selected as the development set, and 1,650 as the training set. The annotated development examples were used to evaluate the effect of our annotations on the parser correctness.
+
+We experiment on two scenarios: (1) training the parser solely on 1,650 annotated examples; (2) integrating our training examples into the entire WikiTableQuestions training set of 11K examples. For each scenario we trained two parsers, one trained using annotations and the other without any use of annotations. To gain more robust results we ran our experiments on three different train/dev splits of our data, averaging the results. Table TABREF68 displays the results of our experiments. When training solely on the annotated examples, parser correctness on development examples increased by 8% (41.8% to 49.8%). The spike in correctness shows that feedback acquired using our explanations is high-quality input for the semantic parser, hence the parser achieves better correctness when trained on it compared to training on the original WikiTableQuestions benchmark.
+
+When training on all 11K train examples using our 1,650 annotations we also saw an increase (of 2.1%), albeit being more modest due to the percentage of annotated examples. We witnessed an increase in both correctness and MRR (mean reciprocal rank) that grows in the number of annotated train examples. This further asserts the significance of annotated training data BIBREF22 , BIBREF14 and shows that our system can learn from quality feedback collected by non-experts.
+
+## Conclusion and Future Work
+
+We have studied in this paper the problem of explaining complex NL queries to non expert users. We introduced visual query explanations in the form of table highlights, based on a novel cell-based provenance model tested on web tables from hundreds of distinct domains. Table highlights provide immediate visual feedback for identifying correct candidate queries. We combine table highlights with utterance based query explanations, significantly improving their effectiveness. Using our query explanations we enhanced an NL interface for querying tables by providing it with feedback at both deployment and training time. Feedback is procured through query explanations, allowing users with no technical background to query tables with confidence, while simultaneously providing feedback to enhance the interface itself. We implement a human in the loop paradigm, where our users both exploit the underlying Machine Learning algorithm while providing it with further data to train on.
+
+We have put our methods to the test, having conducted an extensive user study to determine the clarity of our explanations. Experimenting with explanations for hundreds of formal queries, users proved to be successful in interactively choosing correct queries, easily topping the baseline parser correctness. The addition of provenance-based highlights helps boost the efficacy of user feedback, cutting average work-time by a third compared to the utterances baseline.

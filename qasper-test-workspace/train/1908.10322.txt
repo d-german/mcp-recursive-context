@@ -1,0 +1,83 @@
+# Bridging the Gap for Tokenizer-Free Language Models
+
+**Paper ID:** 1908.10322
+
+## Abstract
+
+Purely character-based language models (LMs) have been lagging in quality on large scale datasets, and current state-of-the-art LMs rely on word tokenization. It has been assumed that injecting the prior knowledge of a tokenizer into the model is essential to achieving competitive results. In this paper, we show that contrary to this conventional wisdom, tokenizer-free LMs with sufficient capacity can achieve competitive performance on a large scale dataset. We train a vanilla transformer network with 40 self-attention layers on the One Billion Word (lm1b) benchmark and achieve a new state of the art for tokenizer-free LMs, pushing these models to be on par with their word-based counterparts.
+
+## Introduction
+
+There has been a recent surge of improvements in language modeling, powered by the introduction of the transformer architecture BIBREF0. These gains stem from the ability of the transformer self-attention mechanism to better model long context (as compared to RNN networks), spanning hundreds of characters BIBREF1 or words BIBREF2, BIBREF3. These approaches consider language modeling as a classification problem with the aim of predicting the next token given a fixed-size preceding context. To support variable-length context, BIBREF4 adds recurrence to a transformer model, improving the state-of-the-art further.
+
+Current word-based language models (LMs) depend on a series of preprocessing steps that include lowercasing, tokenization, normalization, and out-of-vocabulary handling. This preprocessing stage is language dependent and can add significant complexity to real applications. As such, it is appealing to shift to more general LMs that process raw text at the character level. Processing language at the character level allows us to model morphological variants of a word, assign reasonable likelihood to out-of-vocabulary words, and learn subword-level language abstractions. This open vocabulary modeling is quite important for languages with complex morphology such as Arabic, Turkish, or Finnish BIBREF5, BIBREF6, BIBREF7.
+
+While character- and word-based LMs have both improved in their performance over time, purely character-based LMs have continued to lag in performance compared to models that leverage a tokenizer. BIBREF1 report inferior performance from character-level modeling on a large scale word-level benchmark, lm1b BIBREF8. Similarly, BIBREF3 observe that a character-level LM is harder to train to competitive performance on their huge WebText corpus, as compared with subword segmentation using byte pair encoding (BPE) BIBREF9, BIBREF10.
+
+Sub-word tokenization approaches like BPE represent a middle ground for text segmentation. On one hand, they can help with better modeling open vocabulary. On the other hand, they still depend on a tokenizer, adding complexity to the final system. Moreover, the preprocessing stage is not jointly optimized with learning the task objective. This last point is especially relevant given that LMs are increasingly used for their ability to produce pretrained representations that will be fine-tuned for a downstream task BIBREF11, BIBREF12, BIBREF13, BIBREF14. Since word-based LMs use closed vocabulary and sub-word models adopt a segmentation that targets the pretraining corpus, there is little space to adapt the vocabulary or optimize the segmentation to fit the final task data distribution.
+
+The rest of this paper is organized as follows. In Section SECREF2, we describe our model architecture, which is a vanilla deep transformer byte-level LM. Section SECREF3 describes the lm1b dataset and our evaluation methodology. Section SECREF4 presents our results and how our model compares to the previous work. In Section SECREF5 we analyze the representations learned by the network at different depths using word-similarity benchmarks. For this analysis to be feasible we propose a strategy to extract word representations from a character model.
+
+To summarize our contributions:
+
+We develop a competitive tokenizer-free language model on a large scalable dataset.
+
+We probe the performance of our model's learned intermediate representations on word similarity tasks.
+
+## Modeling
+
+Language models (LMs) assign a probability distribution over a sequence $x_{0:t}$ by factoring out the joint probability from left to right as follows
+
+Instead of reading in the tokenized input text, our model reads raw utf-8 bytes. For English text in the ASCII range, this is equivalent to processing characters as individual tokens. Non-ASCII characters (e.g. accented characters, or non-Latin scripts) are typically two or three utf-8 bytes. We use a standard “transformer decoder” (a stack of transformer layers with a causal attention mask) to process the sequence $x_{0:i-1}$ and predict the following byte $x_i$. The model's prediction is an estimate of the probability distribution over all possible 256 byte values. Our input byte embedding matrix has dimensionality 256. Our byte-level transformer model has 40 standard transformer layers with hidden size 1024, filter size 8192, and 16 heads. The model has around 836M parameters, of which only 66K are byte embeddings.
+
+## Modeling ::: Training
+
+We sample random byte sequences of length 512. This sampling process does not respect the sentence boundary. Therefore, one example might span complete and partial sentences. We dropout both timesteps of self-attention layers and features of relu activations across timesteps with a probability of 0.3. We use the Adam optimizer BIBREF15 with initial learning rate $10^{-4}$ and batch size 1024. The training runs for two million steps, and at every 10,000 steps we decay the learning rate geometrically by 0.99.
+
+## Modeling ::: Windowed Prediction
+
+To score each byte prediction, we need to process an entire 512-byte context from scratch, which is computationally intensive. To speed up development, for each window of context size $c$, we score $(\text{stride}=c/2)$ characters in parallel (the second half of the window). This leads to a tractable running time for our development evaluation process. While this setup is sub-optimal for our model, we did not observe any significant regression in our metrics. For example, the final bits/byte value of 0.874055 ($\text{stride}=1$) only grows to 0.87413 with $\text{stride}=256$. Our final test evaluation is reported with $\text{stride} = 1$.
+
+## Experimental Setup
+
+There are no large scale datasets that are heavily studied for both word and character language modeling. Typically, a specific dataset will be considered under just one level of segmentation. For our efforts to be comparable with the literature, we use a word LM dataset. This puts our model at a disadvantage; the dataset is tokenized and our model will not utilize the given word boundary information. Our approach is able to model rare words and estimate their appropriate likelihoods, however, they have been replaced with a special token to produce closed vocabulary text that is appropriate for word-level modeling. Hence, the metrics we report are meant to provide a lower bound on the utility of our approach in realistic settings.
+
+## Experimental Setup ::: LM1B
+
+We use the One Billion Word benchmark BIBREF8 to compare LM performance. The dataset consists of shuffled short sentences, and doesn't require modeling long contexts (95% of the training sentences are under 256 bytes and over 99.78% are under 512 bytes). The corpus is tokenized, and a small percentage of rare words are replaced with UNK tokens. The data gets split into 100 shards, and the first one (00) is held out while the rest (01-99) are used for training. The holdout set is split again into 50 shards, and historically shard 00 of the holdout has been used as the test set. There is no standard dev set, so we use shard 01 of the holdout as dev. See the corpus statistics in Table TABREF6 for details.
+
+## Experimental Setup ::: Metrics
+
+Word LMs typically report their results in terms of perplexity per word $(ppl)$ while byte LMs report their results in bits per byte $(bpb)$. We report both metrics to make our results more accessible.
+
+Conversion between those metrics are based on the following observation: The amount of information in the test dataset is the same independent of segmentation.
+
+where $I(x)$ is the information contained in $x$, which is $- \log _2 P(x; model)$. Equation DISPLAY_FORM10 allows us to convert bits/word to bits/byte. Then straightforwardly, using Equation DISPLAY_FORM11 we can convert $bpb$ to $ppl$:
+
+We train our model to minimize $bpb$ over the training set and convert $bpb$ on the test set to $ppl$ for comparison. For the test dataset, we use the $|words|$ and $|bytes|$ values reported in Table TABREF6.
+
+## Results and Discussion
+
+Table TABREF7 shows the perplexity of several models on lm1b. We observe that tokenizer-free LM performance improves significantly (40.6 to 23.0) when the model capacity is increased from 0.2B to 0.8B parameters. With sufficient capacity our byte-level LM is competitive with word based models (ranging from 21.8 to 28.0). Note, our model is able to achieve comparable performance without any explicit signal of word boundaries.
+
+Because of the large symbol space that word-based LMs address, they rely on sparse operations running on heterogeneous devices to run efficiently (e.g. running sparse embedding lookups on CPU as opposed to GPU/TPU). By contrast, byte LMs are dense, and all operations can be executed on specialized accelerators efficiently. We expect that with advances in accelerated hardware, byte-level text processing will become a popular choice.
+
+Of all the baseline models we reference, only BIBREF4 uses recurrence to model arbitrary length history. This technique could be added to tokenizer-free models as well. Indeed, we expect this approach to be particularly well-suited to byte and character models where text gets mapped onto longer token sequences, as BIBREF4 show that adding recurrence increases the length of context their model can effectively use.
+
+## Extracting Word Representations
+
+In this section, we test our model's ability to produce meaningful word-level representations. We investigate this by feeding the model single words, and evaluating its intermediate activations on word similarity tasks.
+
+Since our model is trained to predict each individual character, activations within a word only have partial information about that word. To get a word representation, we append an empty space character at the end of the input word. The activation at the space position from the transformer's feed-forward layer takes all characters into account, given the causal attention. To predict what follows the space, the model must have a good understanding of the preceding word, so this activation can be used as a proxy for a word representation.
+
+To evaluate our extracted word representations, we use the word similarity tasks described in Swivel BIBREF16. Following their evaluation methodology, we score word pairs using cosine similarity, and then measure the correlation with human ratings using Spearman's $\rho $.
+
+We do not expect these results to be competitive, given that our model is never trained to represent words. Moreover, the Swivel model is trained on a combination of Wikipedia and the Gigaword5 corpus BIBREF17 which is composed of 3.3 billion lowercased words with discarded punctuation. They discard out-of-vocabulary words for evaluation, while we use all word pairs in the benchmark. Nevertheless, this evaluation is valuable for comparing the relative quality of representation across different layers.
+
+Figure FIGREF12 shows Spearman's $\rho $ across different layers of the model. We observe two main phases of performance. In the first phrase (layers 1-10), all task metrics improve with depth. In the second phase (layers 11-40), performance either plateaus or degrades slightly with depth. We suspect that the earlier layers learn general-purpose features which are linguistically relevant, while the final layers fine-tune specifically to the task of next character prediction. Interestingly, the Rare Word and SimLex999 datasets do not follow this paradigm. Their performance drops between layers 4-6, but picks up again and improves with depth (layers 6-40). We hypothesize that the model may be storing words at different depths according to their frequency. It would be interesting to investigate to what degree the improved performance of deeper LMs is due to better modeling of rare words/phrases.
+
+Table TABREF13 shows the best performance of our model across all layers compared to the state-of-the-art model on word similarity. The gap here is a reminder that work remains to be done on improving methods for extracting word representations from character models.
+
+## Conclusion
+
+We show that a tokenizer-free language model with sufficient capacity can achieve results that are competitive with word-based LMs. Our model reads raw byte-level input without the use of any text preprocessing. As such, the model has no direct access to word boundary information. Finally, we show that our model's intermediate representations capture word-level semantic similarity and relatedness across layers.

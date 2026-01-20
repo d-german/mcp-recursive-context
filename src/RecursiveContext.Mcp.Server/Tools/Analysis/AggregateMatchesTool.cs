@@ -9,7 +9,7 @@ namespace RecursiveContext.Mcp.Server.Tools.Analysis;
 internal static class AggregateMatchesTool
 {
     [McpServerTool(Name = "aggregate_matches")]
-    [Description("Count regex pattern matches across multiple files. Returns total count plus per-file breakdown. IMPORTANT: All paths are relative to the workspace root (RLM_WORKSPACE_ROOT). Use 'list_directories' with path='.' first to discover the directory structure.")]
+    [Description("Count regex pattern matches across files. TIP: For thorough searches, try pattern variations or use multi_pattern_search. Paths are relative to workspace root.")]
     public static async Task<string> AggregateMatches(
         IAggregationService aggregationService,
         [Description("Directory to search in, relative to workspace root. Example: 'src/components' or 'qasper-test-workspace/train'. Use '.' for workspace root.")] string directory,

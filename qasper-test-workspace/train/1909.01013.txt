@@ -1,0 +1,77 @@
+# Duality Regularization for Unsupervised Bilingual Lexicon Induction
+
+**Paper ID:** 1909.01013
+
+## Abstract
+
+Unsupervised bilingual lexicon induction naturally exhibits duality, which results from symmetry in back-translation. For example, EN-IT and IT-EN induction can be mutually primal and dual problems. Current state-of-the-art methods, however, consider the two tasks independently. In this paper, we propose to train primal and dual models jointly, using regularizers to encourage consistency in back translation cycles. Experiments across 6 language pairs show that the proposed method significantly outperforms competitive baselines, obtaining the best-published results on a standard benchmark.
+
+## Introduction
+
+Unsupervised bilingual lexicon induction (UBLI) has been shown to benefit NLP tasks for low resource languages, including unsupervised NMT BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4, information retrieval BIBREF5, BIBREF6, dependency parsing BIBREF7, and named entity recognition BIBREF8, BIBREF9.
+
+Recent research has attempted to induce unsupervised bilingual lexicons by aligning monolingual word vector spaces BIBREF10, BIBREF11, BIBREF12, BIBREF13, BIBREF14, BIBREF15. Given a pair of languages, their word alignment is inherently a bi-directional problem (e.g. English-Italian vs Italian-English). However, most existing research considers mapping from one language to another without making use of symmetry. Our experiments show that separately learned UBLI models are not always consistent in opposite directions. As shown in Figure 1a, when the model of BIBREF11 Conneau18a is applied to English and Italian, the primal model maps the word “three” to the Italian word “tre”, but the dual model maps “tre” to “two” instead of “three”.
+
+We propose to address this issue by exploiting duality, encouraging forward and backward mappings to form a closed loop (Figure 1b). In particular, we extend the model of BIBREF11 Conneau18a by using a cycle consistency loss BIBREF16 to regularize two models in opposite directions. Experiments on two benchmark datasets show that the simple method of enforcing consistency gives better results in both directions. Our model significantly outperforms competitive baselines, obtaining the best published results. We release our code at xxx.
+
+## Related Work
+
+UBLI. A typical line of work uses adversarial training BIBREF17, BIBREF10, BIBREF18, BIBREF11, matching the distributions of source and target word embeddings through generative adversarial networks BIBREF19. Non-adversarial approaches have also been explored. For instance, BIBREF15 Mukherjee18EMNLP use squared-loss mutual information to search for optimal cross-lingual word pairing. BIBREF13 and BIBREF20 exploit the structural similarity of word embedding spaces to learn word mappings. In this paper, we choose BIBREF11 Conneau18a as our baseline as it is theoretically attractive and gives strong results on large-scale datasets.
+
+Cycle Consistency. Forward-backward consistency has been used to discover the correspondence between unpaired images BIBREF21, BIBREF22. In machine translation, similar ideas were exploited, BIBREF23, BIBREF24 and BIBREF25 use dual learning to train two “opposite” language translators by minimizing the reconstruction loss. BIBREF26 consider back-translation, where a backward model is used to build synthetic parallel corpus and a forward model learns to generate genuine text based on the synthetic output.
+
+Closer to our method, BIBREF27 jointly train two autoencoders to learn supervised bilingual word embeddings. BIBREF28 use sinkhorn distance BIBREF29 and back-translation to align word embeddings. However, they cannot perform fully unsupervised training, relying on WGAN BIBREF30 for providing initial mappings. Concurrent with our work, BIBREF31 build a adversarial autoencoder with cycle consistency loss and post-cycle reconstruction loss. In contrast to these works, our method is fully unsupervised, simpler, and empirically more effective.
+
+## Approach
+
+We take BIBREF11 as our baseline, introducing a novel regularizer to enforce cycle consistency. Let $X=\lbrace x_1,...,x_n\rbrace $ and $Y=\lbrace y_1,...,y_m\rbrace $ be two sets of $n$ and $m$ word embeddings for a source and a target language, respectively. The primal UBLI task aims to learn a linear mapping $\mathcal {F}:X\rightarrow Y$ such that for each $x_i$, $\mathcal {F}(x_i)$ corresponds to its translation in $Y$. Similarly, a linear mapping $\mathcal {G}:Y\rightarrow X$ is defined for the dual task. In addition, we introduce two language discriminators $D_x$ and $D_y$, which are trained to discriminate between the mapped word embeddings and the original word embeddings.
+
+## Approach ::: Baseline Adversarial Model
+
+BIBREF11 align two word embedding spaces through generative adversarial networks, in which two networks are trained simultaneously. Specifically, take the primal UBLI task as an example, the linear mapping $\mathcal {F}$ tries to generate “fake” word embeddings $\mathcal {F}(x)$ that look similar to word embeddings from $Y$, while the discriminator $D_y$ aims to distinguish between “fake” and real word embeddings from $Y$. Formally, this idea can be expressed as the minmax game min$_{\mathcal {F}}$max$_{D{_y}}\ell _{adv}(\mathcal {F},D_y,X,Y)$, where
+
+$P_{D_y}(src|y_j)$ is a model probability from $D_y$ to distinguish whether word embedding $y_j$ is coming from the target language (src = 1) or the primal mapping $\mathcal {F}$ (src = 0). Similarly, the dual UBLI problem can be formulated as min$_{\mathcal {G}}$max$_{D_x}\ell _{adv}(\mathcal {G},D_x,Y,X)$, where $\mathcal {G}$ is the dual mapping, and $D_x$ is a source discriminator.
+
+Theoretically, a unique solution for above minmax game exists, with the mapping and the discriminator reaching a nash equilibrium. Since the adversarial training happens at the distribution level, no cross-lingual supervision is required.
+
+## Approach ::: Regularizers for Dual Models
+
+We train $\mathcal {F}$ and $\mathcal {G}$ jointly and introduce two regularizers. Formally, we hope that $\mathcal {G}(\mathcal {F}(X))$ is similar to $X$ and $\mathcal {F}(\mathcal {G}(Y))$ is similar to $Y$. We implement this constraint as a cycle consistency loss. As a result, the proposed model has two learning objectives: i) an adversarial loss ($\ell _{adv}$) for each model as in the baseline. ii) a cycle consistency loss ($\ell _{cycle}$) on each side to avoid $\mathcal {F}$ and $\mathcal {G}$ from contradicting each other. The overall architecture of our model is illustrated in Figure FIGREF4.
+
+Cycle Consistency Loss. We introduce
+
+where $\Delta $ denotes the discrepancy criterion, which is set as the average cosine similarity in our model.
+
+Full objective. The final objective is:
+
+## Approach ::: Model Selection
+
+We follow BIBREF11, using an unsupervised criterion to perform model selection. In preliminary experiments, we find in adversarial training that the single-direction criterion $S(\mathcal {F}, X, Y)$ by BIBREF11 does not always work well. To address this, we make a simple extension by calculating the weighted average of forward and backward scores:
+
+Where $\lambda $ is a hyperparameter to control the importance of the two objectives. Here $S$ first generates bilingual lexicons by learned mappings, and then computes the average cosine similarity of these translations.
+
+## Experiments
+
+We perform two sets of experiments, to investigate the effectiveness of our duality regularization in isolation (Section SECREF16) and to compare our final models with the state-of-the-art methods in the literature (Section SECREF18), respectively.
+
+## Experiments ::: Experimental Settings
+
+Dataset and Setup. Our datasets includes: (i) The Multilingual Unsupervised and Supervised Embeddings (MUSE) dataset released by BIBREF11 Conneau18a. (ii) the more challenging Vecmap dataset from BIBREF32 Dinu15 and the extensions of BIBREF33 Artetxe17ACL. We follow the evaluation setups of BIBREF11, utilizing cross-domain similarity local scaling (CSLS) for retrieving the translation of given source words. Following a standard evaluation practice BIBREF34, BIBREF35, BIBREF11, we report precision at 1 scores (P@1). Given the instability of existing methods, we follow BIBREF13 to perform 10 runs for each method and report the best and the average accuracies.
+
+## Experiments ::: The Effectiveness of Dual Learning
+
+We compare our method with BIBREF11 (Adv-C) under the same settings. As shown in Table TABREF12, our model outperforms Adv-C on both MUSE and Vecmap for all language pairs (except ES-EN). In addition, the proposed approach is less sensitive to initialization, and thus more stable than Adv-C over multiple runs. These results demonstrate the effectiveness of dual learning. Our method is also superior to Adv-C for the low-resource language pairs English $\leftrightarrow $ Malay (MS) and English $\leftrightarrow $ English-Esperanto (EO). Adv-C gives low performances on ES-EN, DE-EN, but much better results on the opposite directions on Vecmap. This is likely because the separate models are highly under-constrained, and thus easy to get stuck in poor local optima. In contrast, our method gives comparable results on both directions for the two languages, thanks to the use of information symmetry.
+
+Table TABREF13 shows the inconsistency rates of back translation between Adv-C and our method on MUSE. Compared with Adv-C, our model significantly reduces the inconsistency rates on all language pairs, which explains the overall improvement in Table TABREF12. Table TABREF14 gives several word translation examples. In the first three cases, our regularizer successfully fixes back translation errors. In the fourth case, ensuring cycle consistency does not lead to the correct translation, which explains some errors by our system. In the fifth case, our model finds a related word but not the same word in the back translation, due to the use of cosine similarity for regularization.
+
+## Experiments ::: Comparison with the State-of-the-art
+
+In this section, we compare our model with state-of-the-art systems, including those with different degrees of supervision. The baselines include: (1) Procrustes BIBREF11, which learns a linear mapping through Procrustes Analysis BIBREF36. (2) GPA BIBREF37, an extension of Procrustes Analysis. (3) GeoMM BIBREF38, a geometric approach which learn a Mahalanobis metric to refine the notion of similarity. (4) GeoMM$_{semi}$, iterative GeoMM with weak supervision. (5) Adv-C-Procrustes BIBREF11, which refines the mapping learned by Adv-C with iterative Procrustes, which learns the new mapping matrix by constructing a bilingual lexicon iteratively. (6) Unsup-SL BIBREF13, which integrates a weak unsupervised mapping with a robust self-learning. (7) Sinkhorn-BT BIBREF28, which combines sinkhorn distance BIBREF29 and back-translation. For fair comparison, we integrate our model with two iterative refinement methods (Procrustes and GeoMM$_{semi}$).
+
+Table TABREF15 shows the final results on Vecmap. We first compare our model with the state-of-the-art unsupervised methods. Our model based on procrustes (Ours-Procrustes) outperforms Sinkhorn-BT on all test language pairs, and shows better performance than Adv-C-Procrustes on most language pairs. Adv-C-Procrustes gives very low precision on DE-EN, FI-EN and ES-EN, while Ours-Procrustes obtains reasonable results consistently. A possible explanation is that dual learning is helpful for providing good initiations, so that the procrustes solution is not likely to fall in poor local optima. The reason why Unsup-SL gives strong results on all language pairs is that it uses a robust self-learning framework, which contains several techniques to avoid poor local optima.
+
+Additionally, we observe that our unsupervised method performs competitively and even better compared with strong supervised and semi-supervised approaches. Ours-Procrustes obtains comparable results with Procrustes on EN-IT and gives strong results on EN-DE, EN-FI, EN-ES and the opposite directions. Ours-GeoMM$_{semi}$ obtains the state-of-the-art results on all tested language pairs except EN-FI, with the additional advantage of being fully unsupervised.
+
+## Conclusion
+
+We investigated a regularization method to enhance unsupervised bilingual lexicon induction, by encouraging symmetry in lexical mapping between a pair of word embedding spaces. Results show that strengthening bi-directional mapping consistency significantly improves the effectiveness over the state-of-the-art method, leading to the best results on a standard benchmark.

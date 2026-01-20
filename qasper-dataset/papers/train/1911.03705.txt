@@ -1,0 +1,131 @@
+# CommonGen: A Constrained Text Generation Dataset Towards Generative Commonsense Reasoning
+
+**Paper ID:** 1911.03705
+
+## Abstract
+
+Rational humans can generate sentences that cover a certain set of concepts while describing natural and common scenes. For example, given {apple(noun), tree(noun), pick(verb)}, humans can easily come up with scenes like "a boy is picking an apple from a tree" via their generative commonsense reasoning ability. However, we find this capacity has not been well learned by machines. Most prior works in machine commonsense focus on discriminative reasoning tasks with a multi-choice question answering setting. Herein, we present CommonGen: a challenging dataset for testing generative commonsense reasoning with a constrained text generation task. We collect 37k concept-sets as inputs and 90k human-written sentences as associated outputs. Additionally, we also provide high-quality rationales behind the reasoning process for the development and test sets from the human annotators. We demonstrate the difficulty of the task by examining a wide range of sequence generation methods with both automatic metrics and human evaluation. The state-of-the-art pre-trained generation model, UniLM, is still far from human performance in this task. Our data and code is publicly available at this http URL .
+
+## Introduction
+
+Commonsense reasoning has long been acknowledged as a critical bottleneck of artificial intelligence and especially in natural language processing. It is an ability of combining commonsense facts and logic rules to make new presumptions about ordinary scenes in our daily life. A distinct property of commonsense reasoning problems is that they are generally trivial for human-beings while challenging for machine reasoners.
+
+There have been a few recent tasks and datasets for testing machine commonsense, while most of them frame their problems as multi-choice question answering, such as CSQA BIBREF0 and SWAG BIBREF1. We name this kind of tasks as deterministic commonsense reasoning because they focus on modeling the plausibility of given complete scenes. The systems for these tasks thus have to work with biased selection of distractors, and thus are less practical or challenging. Simply fine-tuning such large pre-trained language encoders can yield near or exceeding human performance BIBREF2. On the other hand, few work has been done so far in testing machine commonsense in a generative reasoning setting, where a reasoner is expected to complete scenes with several given concepts.
+
+Specifically, we would like to investigate if machine-reasoning models can generate a sentence that contains a required set of concepts (i.e. nouns or verbs) while describing a common scene in our daily life. For example, as shown in Figure FIGREF1, given an unordered collection of concepts “{apple (noun), bag (noun), pick (verb), place (verb), tree (noun)}”, a rational reasoner should be able to generate a sentence like “A boy picks some apples from a tree and places them into a bag.”, which describes a natural scene and contains all given concepts. The creation of this sentence is easy for humans while non-trivial for even state-of-the-art conditional language generation models. We argue that such an ability of recovering natural scenes of daily life can benefit a wide range of natural language generation (NLG) tasks including image/video captioning BIBREF3, BIBREF4, scene-based visual reasoning and VQA BIBREF5, storytelling BIBREF6, and dialogue systems BIBREF7, BIBREF8.
+
+Towards empowering machines with the generative commonsense reasoning ability, we create a large-scale dataset, named CommonGen, for the constrained text generation task. We collect $37,263$ concept-sets as the inputs, each of which contains three to five common concepts. These concept-sets are sampled from several large corpora of image/video captions, such that the concepts inside them are more likely to co-occur in natural scenes. Through crowd-sourcing via Amazon Mechanical Turk (AMT), we finally obtain $89,028$ human-written sentences as expected outputs. We investigate the performance of sophisticated sequence generation methods for the proposed task with both automatic metrics and human evaluation. The experiments show that all methods are far from human performance in generative commonsense reasoning. Our main contributions are as follows: 1) We introduce the first large-scale constrained text generation dataset targeting at generative commonsense reasoning; 2) We systematically compare methods for this (lexically) constrained text generation with extensive experiments and evaluation. 3) Our code and data are publicly available (w/ the URL in the abstract), so future research in this direction can be directly developed in a unified framework.
+
+## Problem Formulation
+
+In this section, we formulate our task with mathematical notations and discuss its inherent challenges. The input to the task is a set of $n$ concepts $x=\lbrace c_1,c_2,\dots ,c_n\rbrace \in \mathcal {X}$, where $c_i\in \mathcal {C}$ is a common noun or verb. $\mathcal {X}$ denotes the space of concept-sets and $\mathcal {C}$ stands for the concept vocabulary. The expected output of this task is a simple, grammatical sentence $y\in \mathcal {Y}$, describing a natural scene in our daily-life that covers all given concepts in $x$. Note that other forms of given concepts are also accepted, such as plural forms of nouns and verbs. In addition, we also provide rationales as an optional resource to model the generation process. For each pair of $(x, y)$, a rationale $r$ is a list of sentences that explains the background commonsense knowledge used in the scene recovering process.
+
+The task is to learn a structured predictive function $f:\mathcal {X} \rightarrow \mathcal {Y}$, which maps a concept-set to a sentence. Thus, it can be seen as a special case of constrained text generation BIBREF9. The unique challenges of our proposed task come from two main aspects as follows.
+
+Constrained Decoding. Lexically constrained decoding for sentence generation has been an important and challenging research topic in machine translation community BIBREF10, where they focus on how to decode sentences when some words/phrases (e.g. terminology) must present in target sentences (Section SECREF6). However, it is still an open problem how to efficiently generate sentences given an unordered set of multiple keywords with potential morphological changes (e.g. “pick” $\rightarrow $ “picks” in the previous case). Apart from that, the part-of-speech constraints brings even more difficulties (e.g. “place” can be verb/noun).
+
+Commonsense Reasoning. Apart from the challenge in constrained decoding, a generative commonsense reasoner also has to compositionally use (latent) commonsense knowledge for generating most plausible scenes. Recall the illustrative example in Figure FIGREF1, even such a simple scene generation process needs pretty much commonsense knowledge like: 1) “apples grow in trees”; 2) “bags are containers that you can put something in”; 3) “you usually pick something and then place it in a container”. Expected reasoners have to prioritize target scenes over an infinity number of less plausible scenes like “A boy picks an apple tree and places it into bags.” or “A boy places some bags on a tree and picks an apple.”.
+
+## The CommonGen Dataset
+
+In this section, we present how we build the CommonGen dataset for testing machine commonsense with generative reasoning. The overall data collection process is as follows. 1) We first collect a large amount of high-quality image/video caption sentences from several existing corpora, 2) Then, we compute co-occurrence statistics about concept-sets of different sizes ($3\sim 5$), such that we can find the concept-sets that are more likely to be present in the same scene. 3) Finally, we ask human crowd-workers from AMT to write scenes with rationales for every given concept-set, which serve as our development and test sets. The training set consists of carefully post-processed human-written caption sentences, which have little overlap with dev/test sets. We present the statistics and show its inherent challenges at the end of this section.
+
+## The CommonGen Dataset ::: Collecting Concept-Sets with Captions
+
+Following the general definition in the largest commonsense knowledge graph, ConceptNet BIBREF11, we understand a concept as a common noun or verb. We aim to test the ability of generating natural scenes with a given set of concepts. The expected concept-sets in our task are supposed to be likely co-occur in natural, daily-life scenes . The concepts in images/videos captions, which usually describe scenes in our daily life, thus possess the desired property. We therefore collect a large amount of caption sentences from a variety of datasets, including VATEX BIBREF4, LSMDC BIBREF12, ActivityNet BIBREF13, and SNLI BIBREF15, forming 1,040,330 sentences in total.
+
+We assume if a set of concepts are all mentioned together in more caption sentences, then this concept-set is more like to co-occur. Thus, we compute the co-occurrence frequency of all possible concept-sets that have $3\sim 5$ concepts, named as three/four/five-concept-sets respectively. Each concept-set is associated with at least one caption sentences. We carefully post-process them and take the shortest ones with minimal overlaps as the final data. These initial concept-sets are further divided into three parts: train/dev/test. We then iterate all training concept-sets and remove the ones that have more than two overlapping concepts with any concept-set in the dev or test set. Thus, the dev/test set can better measure the generalization ability of models on unseen combinations of concepts.
+
+## The CommonGen Dataset ::: Crowd-Sourcing via AMT
+
+It is true that the above-mentioned associated caption sentences for each concept-set are human-written and do describe scenes that cover all given concepts. However, they are created under specific contexts (i.e. an image or a video) and thus might be less representative for common sense. To better measure the quality and interpretability of generative reasoners, we need to evaluate them with scenes and rationales created by using concept-sets only as the signals for annotators.
+
+We collect more human-written scenes for each concept-set in dev and test set through crowd-sourcing via the Amazon Mechanical Turk platform. Each input concept-set is annotated by at least three different humans. The annotators are also required to give sentences as the rationales, which further encourage them to use common sense in creating their scenes. The crowd-sourced sentences correlate well with the associated captions, meaning that it is reasonable to use caption sentences as training data although they can be partly noisy. Additionally, we utilize a search engine over the OMCS corpus BIBREF16 for retrieving relevant propositions as distant rationales in training data.
+
+## The CommonGen Dataset ::: Statistics
+
+We present the statistical information of our final dataset. Firstly, we summarize the basic statistics in Table TABREF9, such as the number of unique concept-sets, scene sentences, and sentence lengths. In total, there are 3,706 unique concepts among all concept-sets, and 3,614/1,018/1,207 in the train/dev/test parts respectively. Note that there are 4% of the dev and 6% of the test concepts never appear in the training data, so we can better understand how well trained models can perform with unseen concepts.
+
+We analyze the overlap between training concept-sets and dev/test concept-sets. By average, we find that 98.8% of the training instances share no common concept at all with dev/test data, such that the dev/test can help us analyze model performance on new combinations of concepts.
+
+We also visualize the frequency distribution of our test concept-sets in Figure FIGREF7 by showing the frequency of top 50 single concepts and co-occurred concept pairs.
+
+## Methods
+
+In this section, we introduce the methods that we adopt for the proposed constrained text generation task. We group these methods into several types as follows. Basically, we have different kinds of encoder-decoder architectures with copy attention mechanism, including both classic and recently proposed methods. Apart from that, we utilize the state-of-the-art pre-trained sentence generation model for our task. Moreover, we include three typical models for abstractive summarization, story generation respectively, and keywords-based decoding of language models.
+
+## Methods ::: Seq-to-Seq Learning
+
+One very straightforward way is to form this problem as a “sequence”-to-sequence task, where input sequences are randomly sorted sets of given concepts. In this way, encoder-decoder seq2seq architectures based on bidirectional RNN (bRNN) BIBREF17 or Transformer (Trans.) BIBREF18 can be directly adopted to the task, just like many other conditional sequence generation problems (translation, summarization, etc.).
+
+Order-insensitive processing. However, these encoders may degrade because our inputs are actually order-insensitive. We thus try to use multi-layer perceptrons (MLP) with mean-pooling as the encoder (“mean encoder”) over sequences of word vectors to completely eliminate the order sensitivity. Similarly, we consider removing the positional embeddings in Transformers (Trans. w/o Pos).
+
+Copying mechanism. The above-mentioned architectures with vanilla attention can miss the words in input sequences and thus produce either unknown tokens or synonyms. To force the decoder to produce target sentences with a constraint on input sentence, we utilize the copying mechanism BIBREF19 for all these models. We follow the implementation of these methods by OpenNMT-py BIBREF20.
+
+Non-autoregressive generation. Recent advances in conditional sentence generation have a focus on edit-based models, which iteratively refine generated sequences (usually bounded by a fixed length). These models potentially get better performance than auto-regressive methods because of their explicit modeling on iterative refinements. We study typical models including iNAT BIBREF21, Insertion Transformer (InsertTrans) BIBREF22, and Levenshtein Transformer (LevenTrans) BIBREF23.
+
+## Methods ::: A BERT-based Method: UniLM
+
+We employ a new unified pre-trained language model, UniLM BIBREF24, which uses BERT BIBREF25 as the encoder and then fine-tunes the whole architecture with different generation-based objective. To the best of our knowledge, the UniLM model is the state-of-the-art method for a wide range of conditional text generation tasks including summarization, question generation, and dialogue responding.
+
+## Methods ::: Other methods
+
+Based on the similarity between our task and abstractive summarization and story generation (with given topic words), we also apply Pointer Generator Networks (“PointerGen”) BIBREF26 and Multi-scale Fusion Attention (“Fusion Attn.”) BIBREF27 model respectively for our task.
+
+## Methods ::: Incorporating Commonsense Rationales
+
+We explore how to utilize additional commonsense knowledge (i.e. rationales) as the input to the task. Like we mentioned in Section SECREF6, we search relevant sentences from the OMCS corpus as the additional distant rationales, and ground truth rationale sentences for dev/test data. The inputs are no longer the concept-sets themselves, but in a form of “[rationales$|$concept-set]” (i.e. concatenating the rationale sentences and original concept-set strings).
+
+## Evaluation
+
+Herein, we present the experimental results for comparing different baseline methods in the proposed setting. We first introduce the setup and automatic metrics, and then we present the results and analysis. Finally, we show human evaluation results and qualitative analysis.
+
+## Evaluation ::: Setup
+
+We use the proposed CommonGen dataset in two setting: knowledge-agnostic and knowledge-aware. For the knowledge-agnostic setting, we simply apply the methods in Section SECREF4 while we concatenate rationales and input concept-sets together as the knowledge-aware inputs (“$+r$”).
+
+## Evaluation ::: Automatic Metrics
+
+For automatically evaluating our methods, we propose to use widely used metric for image/video captioning. This is because the proposed CommonGen task can be regarded as also a caption task where the context are incomplete scenes with given concept-sets. Therefore, we choose BLEU-3/4 BIBREF28, ROUGE-2/L BIBREF29, CIDEr BIBREF30, and SPICE BIBREF31 as the main metrics. Apart from these classic metrics, we also include a novel embedding-based metric named BERTScore BIBREF32. To make the comparisons more clear, we show the delta of BERTScore results by subtracting the score of merely using input concept-sets as target sentences, named $\triangle $BERTS.
+
+To have an estimation about human performance in each metric, we iteratively treat every reference sentence in dev/test data as the prediction to be compared with all references (including itself). That is, if a model has the same reasoning ability with average performance of our crowd workers, its results should exceed this “human bound”.
+
+## Evaluation ::: Experimental Results
+
+We present the experimental results of five groups of methods that are introduced in Section SECREF4. We find that the model UniLM outperforms all other baseline methods by a large margin, which is expected due to it is pre-trained with the BERT encoder towards generation objectives. However, its performance is still way far from the human bound, and this margin is even larger in test data.
+
+We notice that the most recent edit-based model named LevenTrans archives the best performance among models without pre-training at all. This shows that edit-based sequence generation models can better deal with the cases where target sentences share similar vocabulary with source ones. Nonetheless, the other two models within the same sequence modeling framework (i.e. fairseq) are much worse, which might because of their specialty designed for machine translation.
+
+An order-insensitive sequence/set encoder, “mean encoder”, outperform order-sensitive counterparts like “bRNN”. However, such a marginal improvement is not seen in the comparison between “Trans.” vs “Trans. w/o Pos”. We assume that for short sequences the order sensitivity does not harm sequential encoders, while positional embeddings in Transformers can better improve the self-attention mechanism. Also, we find that Transformer-based seq2seq architectures are not outperforming simpler models like bRNN.
+
+As for the use of additional retrieved sentences form OMCS corpus and human-written associated rationales, we find that they are not generally helpful in investigated architectures. Although they increase the BLEU and ROUGE scores, the metrics specially designed for captioning like CIDEr and SPICE are dropping down. We argue that it might because the OMCS sentences are actually not aligned with training data, and more sophisticated methods for encoding such non-sequential facts in a more compositional way.
+
+## Evaluation ::: Human Evaluation
+
+From the automatic evaluation results with multiple metrics, we have a rough idea of the performance of all models. However, no automatic metric is perfect, especially for a newly proposed generation task like the CommonGen. We thus ask humans to rank 100 outputs of 6 selected typical models as well as one randomly picked reference sentence, forming seven systems in total. Annotators are educated to rank results by their coverage, fluency, and plausibility in daily life. Then, we compute the cumulative gains of each system in all 100 cases:
+
+$S^{(k)}_i$ is the final score of the $i$-th system by the $k$-th annotator. $G^{k}_{i, j}$ is the rank position of the $i$-th system output for $j$-th example. In our case, $N=100$, $K = 5$, $G^{k}_{i, j}\in [1,7]$.
+
+As shown in Table TABREF22, we compare different systems including human bound for both the above-introduced cumulative ranking scores and the average hit@top3 rates with standard deviations. We find that the correlation between human evaluation and CIDEr and SPICE are better than the other metrics (see Table TABREF15).
+
+## Evaluation ::: Qualitative Analysis
+
+For more clearly observe the performance of interested models, we present several real system outputs on the test set in Table TABREF24. We find that models usually cannot cover all given concepts, and also can produce repetitions of given concepts (e.g. “a dog catches a dog”, “a couple of couples”, and “at an object and an object .”). Moreover, we find that the order of actions may be mot natural. For example, the model output “a man pulls a sword out of his mouth and swallows it” makes less sense because a man usually swallow a sword first before he pull it out in such performances.
+
+## Related Work ::: Machine Common Sense
+
+Machine common sense (MCS) has long been considered as one of the most significant area in artificial intelligence. Recently, there are various emerging datasets for testing machine commonsense from different angles, such as commonsense extraction BIBREF33, BIBREF34, next situation prediction (SWAG BIBREF1, CODAH BIBREF35, HellaSWAG BIBREF36), cultural/social understanding BIBREF37, BIBREF38, BIBREF39, visual scene comprehension BIBREF40, and general commonsense question answering BIBREF0, BIBREF41. Most of them are in a multi-choice QA setting for discriminative commonsense reasoning, among which CSQA BIBREF0 and SWAG BIBREF1 are two typical examples. The input of the CSQA task is a question that needs commonsense reasoning and there are five candidate answers (words/phrases). The SWAG task asks models to select which situation is the most plausible next situation, given a sentence describing an event.
+
+The two tasks share very similar objectives with large pre-trained language encoders like BERT BIBREF42: Masked-LM can predict the missing words in an incomplete sentence, which is similar to the CSQA setting; NextSentPrediction classifies whether a sentence is the next sentence of the given sentence in the corpora, which can be seen as using distant supervision for the SWAG task. Thus, simply fine-tuning such large pre-trained language encoders can yield near or exceeding human performance BIBREF43, BIBREF2, but it does not necessarily mean machine reasoners can really produce new assumptions in an open and generative setting. The proposed CommonGen, to the best of our knowledge, is the first dataset and task for generative commonsense reasoning.
+
+## Related Work ::: Constrained Text Generation
+
+Constrained or controllable text generation aims to decode realistic sentences that have expected attributes such as sentiment BIBREF44, BIBREF9, tense BIBREF9, template BIBREF45, style BIBREF46, BIBREF47, BIBREF48, etc. The most similar scenario with our task is lexically constrained sentence encoding, which has been studied mainly in the machine translation community BIBREF49, BIBREF50 for dealing with terminology and additional bilingual dictionaries.
+
+Classic methods usually modify the (beam) searching algorithms to accommodate lexical constraints like Grid Beam Search BIBREF10. The most recent work in this line is the CGMH BIBREF51 model, which works in the inference stage to sample sentences with a sequence of multiple keywords from language models. However, our task brings more challenges: 1) we do not assume there is a fixed order of keywords in target sentences; 2) we allow morphological changes of the keywords; 3) the decoded sentences must describe highly plausible scenes in our daily life. Current methods cannot well address these issues and also work extremely slow to generate grammatical sentences. We instead mainly investigate sequence-to-sequence architectures, especially models that are based on editing operations and non-autoregressive. Pre-trained seq2seq generation models like UniLM BIBREF24 and BRAT BIBREF52 are usually initialized with pre-trained language encoder and then further fine-tuned with multiple NLG tasks. The UniLM archives the best performance on our proposed CommonGen task, while being far from human-level performance and hardly interpretable.
+
+## Conclusion
+
+In this paper, we purpose a novel constrained text generation task for generative commonsense reasoning. We introduce a new large-scale dataset named CommonGen and investigate various methods on them. Through our extensive experiments and human evaluation, we demonstrate that the inherent difficulties of the new task cannot be addressed by even the state-of-the-art pre-trained language generation model.
+
+For the future research, we believe the following directions are highly valuable to explore: 1) specially designed metrics for automatic evaluation that focus on commonsense plausibility; 2) better mechanisms for retrieving and imposing useful commonsense knowledge into sentence generation processes; 3) explicitly modeling keyword-centric edits (e.g. insertion, deletion, morphological changes) such that relevant commonsense knowledge can be well utilized. We also believe that models performed well on CommonGen can be easily transferred to other commonsense-required reasoning tasks with few annotations, including image/video captioning, visual question answering, and discriminative multi-choice commonsense question answering.

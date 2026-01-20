@@ -1,0 +1,291 @@
+# Robust Multilingual Named Entity Recognition with Shallow Semi-Supervised Features
+
+**Paper ID:** 1701.09123
+
+## Abstract
+
+We present a multilingual Named Entity Recognition approach based on a robust and general set of features across languages and datasets. Our system combines shallow local information with clustering semi-supervised features induced on large amounts of unlabeled text. Understanding via empirical experimentation how to effectively combine various types of clustering features allows us to seamlessly export our system to other datasets and languages. The result is a simple but highly competitive system which obtains state of the art results across five languages and twelve datasets. The results are reported on standard shared task evaluation data such as CoNLL for English, Spanish and Dutch. Furthermore, and despite the lack of linguistically motivated features, we also report best results for languages such as Basque and German. In addition, we demonstrate that our method also obtains very competitive results even when the amount of supervised data is cut by half, alleviating the dependency on manually annotated data. Finally, the results show that our emphasis on clustering features is crucial to develop robust out-of-domain models. The system and models are freely available to facilitate its use and guarantee the reproducibility of results.
+
+## Introduction
+
+A named entity can be mentioned using a great variety of surface forms (Barack Obama, President Obama, Mr. Obama, B. Obama, etc.) and the same surface form can refer to a variety of named entities. For example, according to the English Wikipedia, the form `Europe' can ambiguously be used to refer to 18 different entities, including the continent, the European Union, various Greek mythological entities, a rock band, some music albums, a magazine, a short story, etc. Furthermore, it is possible to refer to a named entity by means of anaphoric pronouns and co-referent expressions such as `he', `her', `their', `I', `the 35 year old', etc. Therefore, in order to provide an adequate and comprehensive account of named entities in text it is necessary to recognize the mention of a named entity and to classify it by a pre-defined type (e.g, person, location, organization). Named Entity Recognition and Classification (NERC) is usually a required step to perform Named Entity Disambiguation (NED), namely to link `Europe' to the right Wikipedia article, and to resolve every form of mentioning or co-referring to the same entity.
+
+Nowadays NERC systems are widely being used in research for tasks such as Coreference Resolution BIBREF0 , Named Entity Disambiguation BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 , BIBREF5 for which a lot of interest has been created by the TAC KBP shared tasks BIBREF6 , Machine Translation BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , Aspect Based Sentiment Analysis BIBREF11 , BIBREF12 , BIBREF13 , BIBREF14 , Event Extraction BIBREF15 , BIBREF16 , BIBREF17 , BIBREF18 , BIBREF19 and Event Ordering BIBREF20 .
+
+Moreover, NERC systems are integrated in the processing chain of many industrial software applications, mostly by companies offering specific solutions for a particular industrial sector which require recognizing named entities specific of their domain. There is therefore a clear interest in both academic research and industry to develop robust and efficient NERC systems: For industrial vendors it is particularly important to diversify their services by including NLP technology for a variety of languages whereas in academic research NERC is one of the foundations of many other NLP end-tasks.
+
+Most NERC taggers are supervised statistical systems that extract patterns and term features which are considered to be indications of Named Entity (NE) types using the manually annotated training data (extracting orthographic, linguistic and other types of evidence) and often external knowledge resources. As in other NLP tasks, supervised statistical NERC systems are more robust and obtain better performance on available evaluation sets, although sometimes the statistical models can also be combined with specific rules for some NE types. For best performance, supervised statistical approaches require manually annotated training data, which is both expensive and time-consuming. This has seriously hindered the development of robust high performing NERC systems for many languages but also for other domains and text genres BIBREF21 , BIBREF22 , in what we will henceforth call `out-of-domain' evaluations.
+
+Moreover, supervised NERC systems often require fine-tuning for each language and, as some of the features require language-specific knowledge, this poses yet an extra complication for the development of robust multilingual NERC systems. For example, it is well-known that in German every noun is capitalized and that compounds including named entities are pervasive. This also applies to agglutinative languages such as Basque, Korean, Finnish, Japanese, Hungarian or Turkish. For this type of languages, it had usually been assumed that linguistic features (typically Part of Speech (POS) and lemmas, but also semantic features based on WordNet, for example) and perhaps specific hand-crafted rules, were a necessary condition for good NERC performance as they would allow to capture better the most recurrent declensions (cases) of named entities for Basque BIBREF23 or to address problems such as sparsity and capitalization of every noun for German BIBREF24 , BIBREF25 , BIBREF26 . This language dependency was easy to see in the CoNLL 2002 and 2003 tasks, in which systems participating in the two available languages for each edition obtained in general different results for each language. This suggests that without fine-tuning for each corpus and language, the systems did not generalize well across languages BIBREF27 .
+
+This paper presents a multilingual and robust NERC system based on simple, general and shallow features that heavily relies on word representation features for high performance. Even though we do not use linguistic motivated features, our approach also works well for inflected languages such as Basque and German. We demonstrate the robustness of our approach by reporting best results for five languages (Basque, Dutch, German, English and Spanish) on 12 different datasets, including seven in-domain and eight out-of-domain evaluations.
+
+## Contributions
+
+The main contributions of this paper are the following: First, we show how to easily develop robust NERC systems across datasets and languages with minimal human intervention, even for languages with declension and/or complex morphology. Second, we empirically show how to effectively use various types of simple word representation features thereby providing a clear methodology for choosing and combining them. Third, we demonstrate that our system still obtains very competitive results even when the supervised data is reduced by half (even less in some cases), alleviating the dependency on costly hand annotated data. These three main contributions are based on:
+
+A simple and shallow robust set of features across languages and datasets, even in out-of-domain evaluations.
+
+The lack of linguistic motivated features, even for languages with agglutinative (e.g., Basque) and/or complex morphology (e.g., German).
+
+A clear methodology for using and combining various types of word representation features by leveraging public unlabeled data.
+
+Our approach consists of shallow local features complemented by three types of word representation (clustering) features: Brown clusters BIBREF28 , Clark clusters BIBREF29 and K-means clusters on top of the word vectors obtained by using the Skip-gram algorithm BIBREF30 . We demonstrate that combining and stacking different clustering features induced from various data sources (Reuters, Wikipedia, Gigaword, etc.) allows to cover different and more varied types of named entities without manual feature tuning. Even though our approach is much simpler than most, we obtain the best results for Dutch, Spanish and English and comparable results in German (on CoNLL 2002 and 2003). We also report best results for German using the GermEval 2014 shared task data and for Basque using the Egunkaria testset BIBREF23 .
+
+We report out-of-domain evaluations in three languages (Dutch, English and Spanish) using four different datasets to compare our system with the best publicly available systems for those languages: Illinois NER BIBREF31 for English, Stanford NER BIBREF32 for English and Spanish, SONAR-1 NERD for Dutch BIBREF33 and Freeling for Spanish BIBREF34 . We outperform every other system in the eight out-of-domain evaluations reported in Section SECREF79 . Furthermore, the out-of-domain results show that our clustering features provide a simple and easy method to improve the robustness of NERC systems.
+
+Finally, and inspired by previous work BIBREF35 , BIBREF36 we measure how much supervision is required to obtain state of the art results. In Section SECREF75 we show that we can still obtain very competitive results reducing the supervised data by half (and sometimes even more). This, together with the lack of linguistic features, means that our system considerably saves data annotation costs, which is quite convenient when trying to develop a NERC system for a new language and/or domain.
+
+Our system learns Perceptron models BIBREF37 using the Machine Learning machinery provided by the Apache OpenNLP project with our own customized (local and clustering) features. Our NERC system is publicly available and distributed under the Apache 2.0 License and part of the IXA pipes tools BIBREF38 . Every result reported in this paper is obtained using the conlleval script from the CoNLL 2002 and CoNLL 2003 shared tasks. To guarantee reproducibility of results we also make publicly available the models and the scripts used to perform the evaluations. The system, models and evaluation scripts can be found in the ixa-pipe-nerc website.
+
+Next Section reviews related work, focusing on best performing NERC systems for each language evaluated on standard shared evaluation task data. Section SECREF3 presents the design of our system and our overall approach to NERC. In Section SECREF4 we report the evaluation results obtained by our system for 5 languages (Basque, Dutch, German, English and Spanish) on 12 different datasets, distributed in 7 in-domain and 8 out-of-domain evaluations. Section SECREF5 discusses the results and contributions of our approach. In Section SECREF6 we highlight the main aspects of our work providing some concluding remarks and future work to be done using our NERC approach applied to other text genres, domains and sequence labeling tasks.
+
+## Related Work
+
+The Named Entity Recognition and Classification (NERC) task was first defined for the Sixth Message Understanding Conference (MUC 6) BIBREF39 . The MUC 6 tasks focused on Information Extraction (IE) from unstructured text and NERC was deemed to be an important IE sub-task with the aim of recognizing and classifying nominal mentions of persons, organizations and locations, and also numeric expressions of dates, money, percentage and time. In the following years, research on NERC increased as it was considered to be a crucial source of information for other Natural Language Processing tasks such as Question Answering (QA) and Textual Entailment (RTE) BIBREF39 . Furthermore, while MUC 6 was solely devoted to English as target language, the CoNLL shared tasks (2002 and 2003) boosted research on language independent NERC for 3 additional target languages: Dutch, German and Spanish BIBREF40 , BIBREF41 .
+
+The various MUC, ACE and CoNLL evaluations provided a very convenient framework to test and compare NERC systems, algorithms and approaches. They provided manually annotated data for training and testing the systems as well as an objective evaluation methodology. Using such framework, research rapidly evolved from rule-based approaches (consisting of manually handcrafted rules) to language independent systems focused on learning supervised statistical models. Thus, while in the MUC 6 competition 5 out of 8 systems were rule-based, in CoNLL 2003 16 teams participated in the English task all using statistical-based NERC BIBREF39 .
+
+## Datasets
+
+Table TABREF10 describes the 12 datasets used in this paper. The first half lists the corpora used for in-domain evaluation whereas the lower half contains the out-of-domain datasets. The CoNLL NER shared tasks focused on language independent machine learning approaches for 4 entity types: person, location, organization and miscellaneous entities. The 2002 edition provided manually annotated data in Dutch and Spanish whereas in 2003 the languages were German and English. In addition to the CoNLL data, for English we also use the formal run of MUC 7 and Wikigold for out-of-domain evaluation. Very detailed descriptions of CoNLL and MUC data can easily be found in the literature, including the shared task descriptions themselves BIBREF42 , BIBREF40 , BIBREF41 , so in the following we will describe the remaining, newer datasets.
+
+The Wikigold corpus consists of 39K words of English Wikipedia manually annotated following the CoNLL 2003 guidelines BIBREF27 . For Spanish and Dutch, we also use Ancora 2.0 BIBREF43 and SONAR-1 BIBREF33 respectively. SONAR-1 is a one million word Dutch corpus with both coarse-grained and fine-grained named entity annotations. The coarse-grained level includes product and event entity types in addition to the four types defined in CoNLL data. Ancora adds date and number types to the CoNLL four main types. In Basque the only gold standard corpus is Egunkaria BIBREF23 . Although the Basque Egunkaria dataset is annotated with four entity types, the miscellaneous class is extremely sparse, occurring only in a proportion of 1 to 10. Thus, in the training data there are 156 entities annotated as MISC whereas each of the other three classes contain around 1200 entities.
+
+In the datasets described so far, named entities were assumed to be non-recursive and non-overlapping. During the annotation process, if a named entity was embedded in a longer one, then only the longest mention was annotated. The exceptions are the GermEval 2014 shared task data for German and MEANTIME, where nested entities are also annotated (both inner and outer spans).
+
+The GermEval 2014 NER shared task BIBREF25 aimed at improving the state of the art of German NERC which was perceived to be comparatively lower than the English NERC. Two main extensions were introduced in GermEval 2014; (i) fine grained named entity sub-types to indicate derivations and compounds; (ii) embedded entities (and not only the longest span) are annotated. In total, there are 12 types for classification: person, location, organization, other plus their sub-types annotated at their inner and outer levels.
+
+Finally, the MEANTIME corpus BIBREF44 is a multilingual (Dutch, English, Italian and Spanish) publicly available evaluation set annotated within the Newsreader project. It consists of 120 documents, divided into 4 topics: Apple Inc., Airbus and Boeing, General Motors, Chrysler and Ford, and the stock market. The articles are selected in such a way that the corpus contains different articles that deal with the same topic over time (e.g. launch of a new product, discussion of the same financial indexes). Moreover, it contains nested entities so the evaluation results will be provided in terms of the outer and the inner spans of the named entities. MEANTIME includes six named entity types: person, location, organization, product, financial and mixed.
+
+## Related Approaches
+
+Named entity recognition is a task with a long history in NLP. Therefore, we will summarize those approaches that are most relevant to our work, especially those we will directly compared with in Section SECREF4 . Since CoNLL shared tasks, the most competitive approaches have been supervised systems learning CRF, SVM, Maximum Entropy or Averaged Perceptron models. In any case, while the machine learning method is important, it has also been demonstrated that good performance might largely be due to the feature set used BIBREF45 . Table TABREF13 provides an overview of the features used by previous best scoring approaches for each of the five languages we address in this paper.
+
+Traditionally, local features have included contextual and orthographic information, affixes, character-based features, prediction history, etc. As argued by the CoNLL 2003 organizers, no feature set was deemed to be ideal for NERC BIBREF41 , although many approaches for English refer to BIBREF46 as a useful general approach.
+
+Some of the CoNLL participants use linguistic information (POS, lemmas, chunks, but also specific rules or patterns) for Dutch and English BIBREF47 , BIBREF45 , although these type of features was deemed to be most important for German, for which the use of linguistic features is pervasive BIBREF25 . This is caused by the sparsity caused by the declension cases, the tendency to form compounds containing named entities and by the capitalization of every noun BIBREF24 . For example, the best system among the 11 participants in GermEval 2014, ExB, uses morphological features and specific suffix lists aimed at capturing frequent patterns in the endings of named entities BIBREF48 .
+
+In agglutinative languages such as Basque, which contains declension cases for named entities, linguistic features are considered to be a requirement. For example, the country name `Espainia' (Spain in Basque) can occur in several forms, Espainian, Espainiera, Espainiak, Espainiarentzat, Espainiako, and many more. Linguistic information has been used to treat this phenomenon. The only previous work for Basque developed Eihera, a rule-based NERC system formalized as finite state transducers to take into account declension classes BIBREF23 . The features of Eihera include word, lemma, POS, declension case, capitalized lemma, etc. These features are complemented with gazetteers extracted from the Euskaldunon Egunkaria newspaper and semantic information from the Basque WordNet.
+
+Dictionaries are widely used to inject world knowledge via gazetteer matches as features in machine learning approaches to NERC. The best performing systems carefully compile their own gazetteers from a variety of sources BIBREF47 . BIBREF31 leverage a collection of 30 gazetteers and matches against each one are weighted as a separate feature. In this way they trust each gazetteer to a different degree. BIBREF49 carefully compiled a large collection of English gazetteers extracted from US Census data and Wikipedia and applied them to the process of inducing word embeddings with very good results.
+
+While it is possible to automatically extract them from various corpora or resources, they still require careful manual inspection of the target data. Thus, our approach only uses off the shelf gazetteers whenever they are publicly available. Furthermore, our method collapses every gazetteer into one dictionary. This means that we only add a feature per token, instead of a feature per token and gazetteer.
+
+The intuition behind non-local (or global) features is to treat similarly all occurrences of the same named entity in a text. BIBREF47 proposed a method to produce the set of named entities for the whole sentence, where the optimal set of named entities for the sentence is the coherent set of named entities which maximizes the summation of confidences of the named entities in the set. BIBREF31 developed three types of non-local features, analyzing global dependencies in a window of between 200 and 1000 tokens.
+
+Semi-supervised approaches leveraging unlabeled text had already been applied to improve results in various NLP tasks. More specifically, it had been previously shown how to apply Brown clusters BIBREF28 for Chinese Word Segmentation BIBREF50 , dependency parsing BIBREF35 , NERC BIBREF51 and POS tagging BIBREF36 .
+
+ BIBREF31 used Brown clusters as features obtaining what was at the time the best published result of an English NERC system on the CoNLL 2003 testset. BIBREF52 made a rather exhaustive comparison of Brown clusters, Collobert and Weston's embeddings BIBREF53 and HLBL embeddings BIBREF54 to improve chunking and NERC. They show that in some cases the combination of word representation features was positive but, although they used Ratinov and Roth's (2009) system as starting point, they did not manage to improve over the state of the art. Furthermore, they reported that Brown clustering features performed better than the word embeddings.
+
+ BIBREF49 extend the Skip-gram algorithm to learn 50-dimensional lexicon infused phrase embeddings from 22 different gazetteers and the Wikipedia. The resulting embeddings are used as features by scaling them by a hyper-parameter which is a real number tuned on the development data. BIBREF49 report best results up to date for English NERC on CoNLL 2003 test data, 90.90 F1.
+
+The best German CoNLL 2003 system (an ensemble) was outperformed by BIBREF24 . They trained the Stanford NER system BIBREF32 , which uses a linear-chain Conditional Random Field (CRF) with a variety of features, including lemma, POS tag, etc. Crucially, they included “distributional similarity” features in the form of Clark clusters BIBREF29 induced from large unlabeled corpora: the Huge German Corpus (HGC) of around 175M tokens of newspaper text and the deWac corpus BIBREF55 consisting of 1.71B tokens of web-crawled data. Using the clusters induced from deWac as a form of semi-supervision improved the results over the best CoNLL 2003 system by 4 points in F1.
+
+The best participant of the English CoNLL 2003 shared task used the results of two externally trained NERC taggers to create an ensemble system BIBREF56 . BIBREF49 develop a stacked linear-chain CRF system: they train two CRFs with roughly the same features; the second CRF can condition on the predictions made by the first CRF. Their “baseline” system uses a similar local featureset as Ratinov and Roth's (2009) but complemented with gazetteers. Their baseline system combined with their phrase embeddings trained with infused lexicons allow them to report the best CoNLL 2003 result so far.
+
+The best system of the GermEval 2014 task built an ensemble of classifiers and pattern extractors to find the most likely tag sequence BIBREF48 . They paid special attention to out of vocabulary words which are addressed by semi-supervised word representation features and an ensemble of POS taggers. Furthermore, remaining unknown candidate mentions are tackled by look-up via the Wikipedia API.
+
+Apart from the feature types, the last two columns of Table TABREF13 refer to whether the systems are publicly available and whether any external resources used for training are made available (e.g., induced word embeddings, gazetteers or corpora). This is desirable to be able to re-train the systems on different datasets. For example, we would have been interested in training the Stanford NER system with the full Ancora corpus for the evaluation presented in Table TABREF85 , but their Spanish cluster lexicon is not available. Alternatively, we would have liked to train our system with the same Ancora partition used to train Stanford NER, but that is not available either.
+
+## System Description
+
+The design of ixa-pipe-nerc aims at establishing a simple and shallow feature set, avoiding any linguistic motivated features, with the objective of removing any reliance on costly extra gold annotations (POS tags, lemmas, syntax, semantics) and/or cascading errors if automatic language processors are used. The underlying motivation is to obtain robust models to facilitate the development of NERC systems for other languages and datasets/domains while obtaining state of the art results. Our system consists of:
+
+Table TABREF24 provides an example of the features generated by our system.
+
+## Local Features
+
+The local features constitute our baseline system on top of which the clustering features are added. We implement the following feature set, partially inspired by previous work BIBREF46 :
+
+Token: Current lowercase token (w), namely, ekuadorko in Table TABREF24 .
+
+Token Shape: Current lowercase token (w) plus current token shape (wc), where token shape consist of: (i) The token is either lowercase or a 2 digit word or a 4 digit word; (ii) If the token contains digits, then whether it also contains letters, or slashes, or hyphens, or commas, or periods or is numeric; (iii) The token is all uppercase letters or is an acronym or is a one letter uppercase word or starts with capital letter. Thus, in Table TABREF24 1994an is a 4 digit word (4d), Ekuadorko has an initial capital shape (ic) and hiriburuan is lowercase (lc).
+
+Previous prediction: the previous outcome (pd) for the current token. The previous predictions in our example are null because these words have not been seen previously, except for the comma.
+
+Sentence: Whether the token is the beginning of the sentence. None of the tokens in our example is at the beginning of the sentence, so this feature is not active in Table TABREF24 .
+
+Prefix: Two prefixes consisting of the first three and four characters of the current token: Eku and Ekua.
+
+Suffix: The four suffixes of length one to four from the last four characters of the current token.
+
+Bigram: Bigrams including the current token and the token shape.
+
+Trigram: Trigrams including the current token and the token shape.
+
+Character n-gram: All lowercase character bigrams, trigrams, fourgrams and fivegrams from the current token (ng).
+
+Token, token shape and previous prediction features are placed in a 5 token window, namely, for these these three features we also consider the previous and the next two words, as shown in Table TABREF24 .
+
+## Gazetteers
+
+We add gazetteers to our system only if they are readily available to use, but our approach does not fundamentally depend upon them. We perform a look-up in a gazetteer to check if a named entity occurs in the sentence. The result of the look-up is represented with the same encoding chosen for the training process, namely, the BIO or BILOU scheme. Thus, for the current token we add the following features:
+
+The current named entity class in the encoding schema. Thus, in the BILOU encoding we would have “unit”, “beginning”, “last”, “inside”, or if not match is found, “outside”, combined with the specific named entity type (LOC, ORG, PER, MISC, etc.).
+
+The current named entity class as above and the current token.
+
+## Clustering Features
+
+The general idea is that by using some type of semantic similarity or word cluster induced over large unlabeled corpora it is possible to improve the predictions for unseen words in the test set. This type of semi-supervised learning may be aimed at improving performance over a fixed amount of training data or, given a fixed target performance level, to establish how much supervised data is actually required to reach such performance BIBREF35 .
+
+So far the most successful approaches have only used one type of word representation BIBREF49 , BIBREF24 , BIBREF31 . However, our simple baseline combined with one type of word representation features are not able to compete with previous, more complex, systems. Thus, instead of encoding more elaborate features, we have devised a simple method to combine and stack various types of clustering features induced over different data sources or corpora. In principle, our method can be used with any type of word representations. However, for comparison purposes, we decided to use word representations previously used in successful NERC approaches: Brown clusters BIBREF31 , BIBREF52 , Word2vec clusters BIBREF49 and Clark clusters BIBREF32 , BIBREF24 . As can be observed in Table TABREF24 , our clustering features are placed in a 5 token window.
+
+The Brown clustering algorithm BIBREF28 is a hierarchical algorithm which clusters words to maximize the mutual information of bigrams. Thus, it is a class-based bigram model in which:
+
+The probability of a document corresponds to the product of the probabilities of its bigrams,
+
+the probability of each bigram is calculated by multiplying the probability of a bigram model over latent classes by the probability of each class generating the actual word types in the bigram, and
+
+each word type has non-zero probability only on a single class.
+
+The Brown algorithm takes a vocabulary of words to be clustered and a corpus of text containing these words. It starts by assigning each word in the vocabulary to its own separate cluster, then iteratively merges the pair of clusters which leads to the smallest decrease in the likelihood of the text corpus. This produces a hierarchical clustering of the words, which is usually represented as a binary tree, as shown in Figure FIGREF44 . In this tree every word is uniquely identified by its path from the root, and the path can be represented by a bit string. It is also possible to choose different levels of word abstraction by choosing different depths along the path from the root to the word. Therefore, by using paths of various lengths, we obtain clustering features of different granularities BIBREF57 .
+
+We use paths of length 4, 6, 10 and 20 as features BIBREF31 . However, we introduce several novelties in the design of our Brown clustering features:
+
+For each feature which is token-based, we add a feature containing the paths computed for the current token. Thus, taking into account our baseline system, we will add the following Brown clustering features:
+
+Brown Token: existing paths of length 4, 6, 10 and 20 for the current token.
+
+Brown Token Shape: existing paths of length 4, 6, 10, 20 for the current token and current token shape.
+
+Brown Bigram: existing paths of length 4, 6, 10, 20 for bigrams including the current token.
+
+Brown clustering features benefit from two additional features:
+
+Previous prediction plus token: the previous prediction (pd) for the current token and the current token.
+
+Previous two predictions: the previous prediction for the current and the previous token.
+
+For space reasons, Table TABREF24 only shows the Brown Token (bt) and Brown Token Shape (c) features for paths of length 4 and 6. We use the publicly available tool implemented by BIBREF50 with default settings. The input consists of a corpus tokenized and segmented one sentence per line, without punctuation. Furthermore, we follow previous work and remove all sentences which consist of less than 90% lowercase characters BIBREF50 , BIBREF52 before inducing the Brown clusters.
+
+ BIBREF29 presents a number of unsupervised algorithms, based on distributional and morphological information, for clustering words into classes from unlabeled text. The focus is on clustering infrequent words on a small numbers of clusters from comparatively small amounts of data. In particular, BIBREF29 presents an algorithm combining distributional information with morphological information of words “by composing the Ney-Essen clustering model with a model for the morphology within a Bayesian framework”. The objective is to bias the distributional information to put words that are morphologically similar in the same cluster. We use the code released by BIBREF29 off the shelf to induce Clark clusters using the Ney-Essen with morphological information method. The input of the algorithm is a sequence of lowercase tokens without punctuation, one token per line with sentence breaks.
+
+Our Clark clustering features are very simple: we perform a look-up of the current token in the clustering lexicon. If a match is found, we add as a feature the clustering class, or the lack of match if the token is not found (see Clark-a and Clark-b in Table TABREF24 ).
+
+Another family of language models that produces word representations are the neural language models. These approaches produce representation of words as continuous vectors BIBREF53 , BIBREF54 , also called word embeddings. Nowadays, perhaps the most popular among them is the Skip-gram algorithm BIBREF30 . The Skip-gram algorithm uses shallow log-linear models to compute vector representation of words which are more efficient than previous word representations induced on neural language models. Their objective is to produce word embeddings by computing the probability of each n-gram as the product of the conditional probabilities of each context word in the n-gram conditioned on its central word BIBREF30 .
+
+Instead of using continuous vectors as real numbers, we induce clusters or word classes from the word vectors by applying K-means clustering. In this way we can use the cluster classes as simple binary features by injecting unigram match features. We use the Word2vec tool released by BIBREF30 with a 5 window context to train 50-dimensional word embeddings and to obtain the word clusters on top of them. The input of the algorithm is a corpus tokenized, lowercased, with punctuation removed and in one line. The Word2vec features are implemented exactly like the Clark features.
+
+We successfully combine clustering features from different word representations. Furthermore, we also stack or accumulate features of the same type of word representation induced from different data sources, trusting each clustering lexicon to a different degree, as shown by the five encoded clustering features in Table TABREF24 : two Clark and Word2vec features from different source data and one Brown feature. When using word representations as semi-supervised features for a task like NERC, two principal factors need to be taken into account: (i) the source data or corpus used to induce the word representations and (ii) the actual word representation used to encode our features which in turn modify the weight of our model's parameters in the training process.
+
+For the clustering features to be effective the induced clusters need to contain as many words appearing in the training, development and test sets as possible. This can be achieved by using corpora closely related to the text genre or domain of the data sets or by using very large unlabeled corpora which, although not closely domain-related, be large enough to include many relevant words. For example, with respect to the CoNLL 2003 English dataset an example of the former would be the Reuters corpus while the Wikipedia would be an example of the latter.
+
+The word representations obtained by different algorithms would capture different distributional properties of words in a given corpus or data source. Therefore, each type of clustering would allow us to capture different types of occurring named entity types. In other words, combining and stacking different types of clustering features induced over a variety of data sources should help to capture more similarities between different words in the training and test sets, increasing the contribution to the weights of the model parameters in the training process.
+
+## Experimental Results
+
+In this Section we report on the experiments performed with the ixa-pipe-nerc system as described in the previous section. The experiments are performed in 5 languages: Basque, Dutch, English, German and Spanish. For comparison purposes, in-domain results are presented in Section SECREF61 using the most common NERC datasets for each language as summarized in Table TABREF10 . Section SECREF75 analyzes the performance when reducing training data and Section SECREF79 presents eight out-of-domain evaluations for three languages: Dutch, English and Spanish.
+
+The results for Dutch, English and Spanish do not include trigrams and character n-grams in the local featureset described in Section SECREF25 , except for the models in each in-domain evaluation which are marked with “charngram 1:6”.
+
+We also experiment with dictionary features but, in contrast to previous approaches such as BIBREF49 , we only use currently available gazetteers off-the-shelf. For every model marked with “dict” we use the thirty English Illinois NER gazetteers BIBREF31 , irrespective of the target language. Additionally, the English models use six gazetteers about the Global Automotive Industry provided by LexisNexis to the Newsreader project, whereas the German models include, in addition to the Illinois gazetteers, the German dictionaries distributed in the CoNLL 2003 shared task. The gazetteers are collapsed into one large dictionary and deployed as described in Section SECREF35 .
+
+Finally, the clustering features are obtained by processing the following clusters from publicly available corpora: (i) 1000 Brown clusters; (ii) Clark and Word2vec clusters in the 100-600 range. To choose the best combination of clustering features we test the available permutations of Clark and Word2vec clusters with and without the Brown clusters on the development data. Table TABREF58 provides details of every corpus used to induce the clusters. For example, the first row reads: “Reuters RCV1 was used; the original 63 million words were reduced to 35 million after pre-processing for inducing Brown clusters. Clark and Word2vec clusters were trained on the whole corpus”. The pre-processing and tokenization is performed with the IXA pipes tools BIBREF38 .
+
+Every evaluation is carried out using the CoNLL NER evaluation script. The results are obtained with the BILOU encoding for every experimental setting except for German CoNLL 2003.
+
+## In-domain evaluation
+
+In this section the results are presented by language. In two cases, Dutch and German, we use two different datasets, making it a total of seven in-domain evaluations.
+
+We tested our system in the highly competitive CoNLL 2003 dataset. Table TABREF63 shows that three of our models outperform previous best results reported for English in the CoNLL 2003 dataset BIBREF49 . Note that the best F1 score (91.36) is obtained by adding trigrams and character n-gram features to the best model (91.18). The results also show that these models improve the baseline provided by the local features by around 7 points in F1 score. The most significant gain is in terms of recall, almost 9 points better than the baseline.
+
+We also report very competitive results, only marginally lower than BIBREF49 , based on the stacking and combination of clustering features as described in Section UID57 . Thus, both best cluster and comp models, based on local plus clustering features only, outperform very competitive and more complex systems such as those of BIBREF31 and BIBREF52 , and obtain only marginally lower results than BIBREF49 . The stacking and combining effect manifests itself very clearly when we compare the single clustering feature models (BR, CW600, W2VG200 and W2VW400) with the light, comp and best cluster models which improve the overall F1 score by 1.30, 1.72 and 1.85 respectively over the best single clustering model (CW600).
+
+It is worth mentioning that our models do not score best in the development data. As the development data is closer in style and genre to the training data BIBREF31 , this may suggest that our system generalizes better on test data that is not close to the training data; indeed, the results reported in Section SECREF79 seem to confirm this hypothesis.
+
+We also compared our results with respect to the best two publicly available English NER systems trained on the same data. We downloaded the Stanford NER system distributed in the 2015-01-30 package. We evaluated their CoNLL model and, while the result is substantially better than their reference paper BIBREF32 , our clustering models obtain better results. The Illinois NER tagger is used by BIBREF31 and BIBREF52 , both of which are outperformed by our system.
+
+We tested our system in the GermEval 2014 dataset. Table TABREF65 compares our results with the best two systems (ExB and UKP) by means of the M3 metric, which separately analyzes the performance in terms of the outer and inner named entity spans. Table TABREF65 makes explicit the significant improvements achieved by the clustering features on top of the baseline system, particularly in terms of recall (almost 11 points in the outer level). The official results of our best configuration (de-cluster-dict) are reported in Table TABREF66 showing that our system marginally improves the best systems' results on that task (ExB and UKP).
+
+We also compare our system, in the last three rows, with the publicly available GermaNER BIBREF26 , which reports results for the 4 main outer level entity types (person, location, organization and other). For this experiment we trained the de-cluster and de-cluster + dict models on the four main classes, improving GermaNER's results by almost 3 F1 points. The GermaNER method of evaluation is interesting because allows researchers to directly compare their systems with a publicly available system trained on GermEval data.
+
+Table TABREF67 compares our German CoNLL 2003 results with the best previous work trained on public data. Our best CoNLL 2003 model obtains results similar to the state of the art performance with respect to the best system published up to date BIBREF24 using public data.
+
+ BIBREF24 also report 78.20 F1 with a model trained with Clark clusters induced using the Huge German Corpus (HGC). Unfortunately, the corpus or the induced clusters were not available.
+
+The best system up to date on the CoNLL 2002 dataset, originally published by BIBREF47 , is distributed as part of the Freeling library BIBREF34 . Table TABREF69 lists four models that improve over their reported results, almost by 3 points in F1 measure in the case of the es-cluster model (with our without trigram and character n-gram features).
+
+Despite using clusters from one data source only (see Table TABREF58 ), results in Table TABREF71 show that our nl-cluster model outperforms the best result published on CoNLL 2002 BIBREF45 by 3.83 points in F1 score. Adding the English Illinois NER gazetteers BIBREF31 and trigram and character n-gram features increases the score to 85.04 F1, 5.41 points better than previous published work on this dataset.
+
+We also compared our system with the more recently developed SONAR-1 corpus and the companion NERD system distributed inside its release BIBREF33 . They report 84.91 F1 for the six main named entity types via 10-fold cross validation. For this comparison we chose the local, nl-cluster and nl-cluster-dict configurations from Table TABREF71 and run them on SONAR-1 using the same settings. The results reported in Table TABREF72 shows our system's improvement over previous results on this dataset.
+
+Table TABREF74 reports on the experiments using the Egunkaria NER dataset provided by BIBREF23 . Due to the sparsity of the MISC class mentioned in Section SECREF9 , we decided to train our models on three classes only (location, organization and person). Thus, the results are obtained training our models in the customary manner and evaluating on 3 classes. However, for direct comparison with previous work BIBREF23 , we also evaluate our best eu-cluster model (trained on 3 classes) on 4 classes.
+
+The results show that our eu-cluster model clearly improves upon previous work by 4 points in F1 measure (75.40 vs 71.35). These results are particularly interesting as it had been so far assumed that complex linguistic features and language-specific rules were required to perform well for agglutinative languages such as Basque BIBREF23 . Finally, it is worth noting that the eu-cluster model increases the overall F1 score by 11.72 over the baseline, of which 10 points are gained in precision and 13 in terms of recall.
+
+## Reducing training data
+
+So far, we have seen how, given a fixed amount of supervised training data, leveraging unlabeled data using multiple cluster sources helped to obtain state of the art results in seven different in-domain settings for five languages. In this section we will investigate to what extent our system allows to reduce the dependency on supervised training data.
+
+We first use the English CoNLL 2003 dataset for this experiment. The training set consists of around 204K words and we use various smaller versions of it to test the performance of our best cluster model reported in Table TABREF63 . Table TABREF76 displays the F1 results of the baseline system consisting of local features and the best cluster model. The INLINEFORM0 column refers to the gains of our best cluster model with respect to the baseline model for every portion of the training set.
+
+While we have already commented the substantial gains obtained simply by adding our clustering features, it is also interesting to note that the gains are much substantial when less supervised training data is available. Furthermore, it is striking that training our clustering features using only one eight of the training data (30K words) allows to obtain similar performance to the baseline system trained on the full training set. Equally interesting is the fact that cutting by half the training data only marginally harms the overall performance. Finally, training on just a quarter of the training set (60K) results in a very competitive model when compared with other publicly available NER systems for English trained on the full training set: it roughly matches Stanford NER's performance, it outperforms models using external knowledge or non-local features reported by BIBREF31 , and also several models reported by BIBREF52 , which use one type of word representations on top of the baseline system.
+
+We have also re-trained the Illinois NER system BIBREF31 and our best CoNLL 2003 model (en-91-18) for comparison. First, we can observe that for every portion of the training set, both our best cluster and en-91-18 model outperform the Illinois NER system. The best cluster results are noteworthy because, as opposed to Illinois NER, it does not use gazetteers or global features for extra performance.
+
+These results are mirrored by those obtained for the rest of the languages and datasets. Thus, Table TABREF77 displays, for each language, the F1 results of the baseline system and of the best cluster models on top of the baseline. Overall, it confirms that our cluster-based models obtain state of the art results using just one half of the data. Furthermore, using just one quarter of the training data we are able to match results of other publicly available systems for every language, outperforming in some cases, such as Basque, much complex systems of classifiers exploiting linguistic specific rules and features (POS tags, lemmas, semantic information from WordNet, etc.). Considering that Basque is a low-resourced language, it is particularly relevant to be able to reduce as much as possible the amount of gold supervised data required to develop a competitive NERC system.
+
+## Out-of-domain evaluations
+
+NERC systems are often used in out-of-domain settings, namely, to annotate data that greatly differs from the data from which the NERC models were learned. These differences can be of text genre and/or domain, but also because the assumptions of what constitutes a named entity might differ. It is therefore interesting to develop robust NERC systems across both domains and datasets. In this section we demonstrate that our approach, consisting of basic, general local features and the combination and stacking of clusters, produces robust NERC systems in three out-of-domain evaluation settings:
+
+Class disagreements: Named entities are assigned to different classes in training and test.
+
+Different text genre: The text genre of training and test data differs.
+
+Annotation guidelines: The gold annotation of the test data follows different guidelines from the training data. This is usually reflected in different named entity spans.
+
+The datasets and languages chosen for these experiments are based on the availability of both previous results and publicly distributed NERC systems to facilitate direct comparison of our system with other approaches. Table TABREF83 specifies the datasets used for each out-of-domain setting and language. Details of each dataset can be found Table TABREF10 .
+
+MUC 7 annotates seven entity types, including four that are not included in CoNLL data: DATE, MONEY, NUMBER and TIME entities. Furthermore, CoNLL includes the MISC class, which was absent in MUC 7. This means that there are class disagreements in the gold standard annotation between the training and test datasets. In addition to the four CoNLL classes, SONAR-1 includes PRODUCT and EVENT whereas Ancora also annotates DATE and NUMBER. For example, consider the following sentence of the MUC 7 gold standard (example taken from BIBREF31 ):
+
+“...baloon, called the Virgin Global Challenger.”
+
+The gold annotation in MUC 7 establishes that there is one named entity:
+
+“...baloon, called [ORG Virgin] Global Challenger.”
+
+However, according to CoNLL 2003 guidelines, the entire name should be annotated like MISC:
+
+“...baloon, called [MISC Virgin Global Challenger].”
+
+In this setting some adjustments are made to the NERC systems' output. Following previous work BIBREF31 , every named entity that is not LOC, ORG, PER or MISC is labeled as `O'. Additionally for MUC 7 every MISC named entity is changed to `O'. For English we used the models reported in Section UID62 . For Spanish and Dutch we trained our system with the Ancora and SONAR-1 corpora using the configurations described in Sections UID68 and UID70 respectively. Table TABREF85 compares our results with previous approaches: using MUC 7, BIBREF52 provide standard phrase results whereas BIBREF31 score token based F1 results, namely, each token is considered a chunk, instead of considering multi-token spans too. For Spanish we use the Stanford NER Spanish model (2015-01-30 version) trained with Ancora. For Dutch we compare our SONAR-1 system with the companion system distributed with the SONAR-1 corpus BIBREF33 . The results are summarized in Table TABREF85 .
+
+In this setting the out-of-domain character is given by the differences in text genre between the English CoNLL 2003 set and the Wikigold corpus. We compare our system with English models trained on large amounts of silver-standard text (3.5M tokens) automatically created from the Wikipedia BIBREF27 . They report results on Wikigold showing that they outperformed their own CoNLL 2003 gold-standard model by 10 points in F1 score. We compare their result with our best cluster model in Table TABREF87 . While the results of our baseline model confirms theirs, our clustering model score is slightly higher. This result is interesting because it is arguably more simple to induce the clusters we use to train ixa-pipe-nerc rather than create the silver standard training set from Wikipedia as described in BIBREF27 .
+
+In this section the objective is studying not so much the differences in textual genre as the influence of substantially different annotation standards. We only use three classes (location, organization and person) to evaluate the best models presented for in-domain evaluations labeling `O' every entity which is not LOC, ORG or PER.
+
+The text genre of MEANTIME is not that different from CoNLL data. However, differences in the gold standard annotation result in significant disagreements regarding the span of the named entities BIBREF59 . For example, the following issues are markedly different with respect to the training data we use for each language:
+
+Different criteria to decide when a named entity is annotated: in the expression “40 billion US air tanker contract” the MEANTIME gold standard does not mark `US' as location, whereas in the training data this is systematically annotated.
+
+Mentions including the definite article within the name entity span: `the United States' versus `United States'.
+
+Longer extents containing common nouns: in the MEANTIME corpus there are many entities such as “United States airframer Boeing”, which in this case is considered an organization, whereas in the training data this span will in general consists of two entities: `United States' as location and `Boeing' as organization.
+
+Common nouns modifying the proper name: `Spokeswoman Sandy Angers' is annotated as a named entity of type PER whereas in the training data used the span of the named entity would usually be `Sandy Angers'.
+
+CoNLL NER phrase based evaluation punishes any bracketing error as both false positive and negative. Thus, these span-related disagreements make this setting extremely hard for models trained according to other annotation guidelines, as shown by Table TABREF93 . Our baseline models degrade around 40 F1 points and the cluster-based models around 35. Other systems' results worsen much more, especially for Spanish and Dutch. The token-based scores are in general better but the proportion in performance between systems across languages is similar.
+
+As an additional experiment, we also tested the English model recommended by Stanford NER which is trained for three classes (LOC, PER, ORG) using a variety of public and (not identified) private corpora (referred to as Stanford NER 3 class (ALL) in Table TABREF94 ). The results with respect to their CoNLL model improved by around 3 points in F1 score across named entity labels and evaluation types (phrase or token based). In view of these results, we experimented with multi-corpora training data added to our best CoNLL 2003 model (en-91-18). Thus, we trained using three public training sets: MUC 7, CoNLL 2003 and Ontonotes 4.0. The local model with the three training sets (Local ALL) improved 12 and 17 points in F1 score across evaluations and entity types, outperforming our best model trained only with CoNLL 2003. Adding the clustering features gained between 2 and 5 points more surpassing the Stanford NER 3 class multi-corpora model in every evaluation. We believe that the main reason to explain these improvements is the variety and quantity of annotations provided by Ontonotes (1M word corpus), and to a lesser extent by MUC 7, which includes some spans containing common nouns and determiners making the model slightly more robust regarding the mention spans.
+
+## Discussion
+
+Despite the simplicity of the ixa-pipe-nerc approach, we report best results for English in 4 different datasets: for CoNLL 2003 and for the three English out-of-domain evaluations. For German we improve the results of the best system in the GermEval 2014 task and obtain comparable results to previous work in the CoNLL 2003 dataset using publicly available data. In Spanish we provide results on CoNLL 2002 and in two out-of-domain evaluations clearly outperforming previous best results. For Dutch we improve over previous results in CoNLL 2002 and SONAR-1 data and two out-of-domain evaluations. Finally, for Basque (Egunkaria) the improvements are considerable.
+
+## Conclusion and Future Work
+
+We have shown how to develop robust NERC systems across languages and datasets with minimal human intervention, even for languages with inflected named entities. This is based on adequately combining word representation features on top of shallow and general local features. Crucially, we have empirically demonstrate how to effectively combine various types of simple word representation features depending on the source data available. This has resulted in a clear methodology for using the three types of clustering features which produces very competitive results in both in-domain and out-of-domain settings.
+
+Thus, despite the relative simplicity of our approach, we report state of the art results for Dutch, English, German, Spanish and Basque in seven in-domain evaluations.
+
+We also outperform previous work in eight out-of-domain evaluations, showing that our clustering features improve the robustness of NERC systems across datasets. Finally, we have measured how much our system's performance degrades when the amount of supervised data is drastically cut. The results show our models are still very competitive even when reducing the supervised data by half or more. This, together with the lack of linguistic features, facilitates the easy and fast development of NERC systems for new domains or languages.
+
+In future work we would like to explore more the various types of domain adaptation required for robust performance across text genres and domains, perhaps including micro-blog and noisy text such as tweets. Furthermore, we are also planning to adapt our techniques to other sequence labeling problems such as Opinion Target Extraction BIBREF13 , BIBREF14 and Super Sense tagging BIBREF60 .
+
+## Acknowledgments
+
+We would like to thank the anonymous reviewers for their comments to improve this paper. We would also like to thank Sebastian Padó for his help training the Clark clusters. This work has been supported by the European projects NewsReader, EC/FP7/316404 and QTLeap - EC/FP7/610516, and by the Spanish Ministry for Science and Innovation (MICINN) SKATER, Grant No. TIN2012-38584-C06-01 and TUNER, TIN2015-65308-C5-1-R.

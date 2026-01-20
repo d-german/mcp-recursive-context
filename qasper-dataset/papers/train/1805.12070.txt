@@ -1,0 +1,75 @@
+# Code-Switching Language Modeling using Syntax-Aware Multi-Task Learning
+
+**Paper ID:** 1805.12070
+
+## Abstract
+
+Lack of text data has been the major issue on code-switching language modeling. In this paper, we introduce multi-task learning based language model which shares syntax representation of languages to leverage linguistic information and tackle the low resource data issue. Our model jointly learns both language modeling and Part-of-Speech tagging on code-switched utterances. In this way, the model is able to identify the location of code-switching points and improves the prediction of next word. Our approach outperforms standard LSTM based language model, with an improvement of 9.7% and 7.4% in perplexity on SEAME Phase I and Phase II dataset respectively.
+
+## Introduction
+
+Code-switching has received a lot of attention from speech and computational linguistic communities especially on how to automatically recognize text from speech and understand the structure within it. This phenomenon is very common in bilingual and multilingual communities. For decades, linguists studied this phenomenon and found that speakers switch at certain points, not randomly and obeys several constraints which point to the code-switched position in an utterance BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 . These hypotheses have been empirically proven by observing that bilinguals tend to code-switch intra-sententially at certain (morpho)-syntactic boundaries BIBREF5 . BIBREF1 defined the well-known theory that constraints the code-switch between a functional head and its complement is given the strong relationship between the two constituents, which corresponds to a hierarchical structure in terms of Part-of-Speech (POS) tags. BIBREF3 introduced Matrix-Language Model Framework for an intra-sentential case where the primary language is called Matrix Language and the second one called Embedded Language BIBREF2 . A language island was then introduced which is a constituent composed entirely of the language morphemes. From the Matrix-Language Frame Model, both matrix language (ML) island and embedded language (EL) islands are well-formed in their grammars and the EL islands are constrained under ML grammar BIBREF6 . BIBREF7 studied determiner–noun switches in Spanish–English bilinguals .
+
+Code-switching can be classified into two categories: intra-sentential and inter-sentential switches BIBREF0 . Intra-sentential switch defines a shift from one language to another language within an utterance. Inter-sentential switch refers to the change between two languages in a single discourse, where the switching occurs after a sentence in the first language has been completed and the next sentence starts with a new language. The example of the intra-sentential switch is shown in (1), and the inter-sentential switch is shown in (2).
+
+Language modeling using only word lexicons is not adequate to learn the complexity of code-switching patterns, especially in a low resource setting. Learning at the same time syntactic features such as POS tag and language identifier allows to have a shared grammatical information that constraint the next word prediction. Due to this reason, we propose a multi-task learning framework for code-switching language modeling task which is able to leverage syntactic features such as language and POS tag.
+
+The main contribution of this paper is two-fold. First, multi-task learning model is proposed to jointly learn language modeling task and POS sequence tagging task on code-switched utterances. Second, we incorporate language information into POS tags to create bilingual tags - it distinguishes tags between Chinese and English. The POS tag features are shared towards the language model and enrich the features to better learn where to switch. From our experiments result, we found that our method improves the perplexity on SEAME Phase I and Phase II dataset BIBREF8 .
+
+## Related Work
+
+The earliest language modeling research on code-switching data was applying linguistic theories on computational modelings such as Inversion Constraints and Functional Head Constraints on Chinese-English code-switching data BIBREF9 , BIBREF10 . BIBREF11 built a bilingual language model which is trained by interpolating two monolingual language models with statistical machine translation (SMT) based text generation to generate artificial code-switching text. BIBREF12 , BIBREF13 introduced a class-based method using RNNLM for computing the posterior probability and added POS tags in the input. BIBREF14 explored the combination of brown word clusters, open class words, and clusters of open class word embeddings as hand-crafted features for improving the factored language model. In addition, BIBREF15 proposed a generative language modeling with explicit phrase structure. A method of tying input and output embedding helped to reduce the number of parameters in language model and improved the perplexity BIBREF16 .
+
+Learning multiple NLP tasks using multi-task learning have been recently used in many domains BIBREF17 , BIBREF18 , BIBREF19 . They presented a joint many-task model to handle multiple NLP tasks and share parameters with growing depth in a single end-to-end model. A work by BIBREF20 showed the potential of combining POS tagging with Named-Entity Recognition task.
+
+## Methodology
+
+This section shows how to build the features and how to train our multi-task learning language model. Multi-task learning consists of two NLP tasks: Language modeling and POS sequence tagging.
+
+## Feature Representation
+
+In the model, word lexicons and syntactic features are used as input.
+
+Word Lexicons: Sentences are encoded as 1-hot vectors and our vocabulary is built from training data.
+
+Syntactic Features: For each language island, phrase within the same language, we extract POS Tags iteratively using Chinese and English Penn Tree Bank Parser BIBREF21 , BIBREF22 . There are 31 English POS Tags and 34 Chinese POS Tags. Chinese words are distinguishable from English words since they have different encoding. We add language information in the POS tag label to discriminate POS tag between two languages.
+
+## Model Description
+
+faFigure FIGREF7 illustrates our multi-task learning extension to recurrent language model. In this multi-task learning setting, the tasks are language modeling and POS tagging. The POS tagging task shares the POS tag vector and the hidden states to LM task, but it does not receive any information from the other loss. Let INLINEFORM0 be the word lexicon in the document and INLINEFORM1 be the POS tag of the corresponding INLINEFORM2 at index INLINEFORM3 . They are mapped into embedding matrices to get their INLINEFORM4 -dimensional vector representations INLINEFORM5 and INLINEFORM6 . The input embedding weights are tied with the output weights. We concatenate INLINEFORM7 and INLINEFORM8 as the input of INLINEFORM9 . The information from the POS tag sequence is shared to the language model through this step. INLINEFORM10 INLINEFORM11 
+
+where INLINEFORM0 denotes the concatenation operator, INLINEFORM1 and INLINEFORM2 are the final hidden states of INLINEFORM3 and INLINEFORM4 respectively. INLINEFORM5 and INLINEFORM6 , the hidden states from both LSTMs are summed before predicting the next word. INLINEFORM7 INLINEFORM8 
+
+The word distribution of the next word INLINEFORM0 is normalized using softmax function. The model uses cross-entropy losses as error functions INLINEFORM1 and INLINEFORM2 for language modeling task and POS tagging task respectively. We optimize the multi-objective losses using the Back Propagation algorithm and we perform a weighted linear sum of the losses for each individual task. INLINEFORM3 
+
+where INLINEFORM0 is the weight of the loss in the training.
+
+## Experimental Setup
+
+In this section, we present the experimental setting for this task
+
+Corpus: SEAME (South East Asia Mandarin-English), a conversational Mandarin-English code-switching speech corpus consists of spontaneously spoken interviews and conversations BIBREF8 . Our dataset (LDC2015S04) is the most updated version of the Linguistic Data Consortium (LDC) database. However, the statistics are not identical to BIBREF23 . The corpus consists of two phases. In Phase I, only selected audio segments were transcribed. In Phase II, most of the audio segments were transcribed. According to the authors, it was not possible to restore the original dataset. The authors only used Phase I corpus. Few speaker ids are not in the speaker list provided by the authors BIBREF23 . Therefore as a workaround, we added these ids to the train set. As our future reference, the recording lists are included in the supplementary material.
+
+Preprocessing: First, we tokenized English and Chinese word using Stanford NLP toolkit BIBREF24 . Second, all hesitations and punctuations were removed except apostrophe, for examples: “let's" and “it's". Table TABREF9 and Table TABREF10 show the statistics of SEAME Phase I and II corpora. Table TABREF11 shows the most common trigger POS tag for Phase II corpus.
+
+Training: The baseline model was trained using RNNLM BIBREF25 . Then, we trained our LSTM models with different hidden sizes [200, 500]. All LSTMs have 2 layers and unrolled for 35 steps. The embedding size is equal to the LSTM hidden size. A dropout regularization BIBREF26 was applied to the word embedding vector and POS tag embedding vector, and to the recurrent output BIBREF27 with values between [0.2, 0.4]. We used a batch size of 20 in the training. EOS tag was used to separate every sentence. We chose Stochastic Gradient Descent and started with a learning rate of 20 and if there was no improvement during the evaluation, we reduced the learning rate by a factor of 0.75. The gradient was clipped to a maximum of 0.25. For the multi-task learning, we used different loss weights hyper-parameters INLINEFORM0 in the range of [0.25, 0.5, 0.75]. We tuned our model with the development set and we evaluated our best model using the test set, taking perplexity as the final evaluation metric. Where the latter was calculated by taking the exponential of the error in the negative log-form. INLINEFORM1 
+
+## Results
+
+Table TABREF14 and Table TABREF15 show the results of multi-task learning with different values of the hyper-parameter INLINEFORM0 . We observe that the multi-task model with INLINEFORM1 achieved the best performance. We compare our multi-task learning model against RNNLM and LSTM baselines. The baselines correspond to recurrent neural networks that are trained with word lexicons. Table TABREF16 and Table TABREF17 present the overall results from different models. The multi-task model performs better than LSTM baseline by 9.7% perplexity in Phase I and 7.4% perplexity in Phase II. The performance of our model in Phase II is also better than the RNNLM (8.9%) and far better than the one presented in BIBREF13 in Phase I.
+
+Moreover, the results show that adding shared POS tag representation to INLINEFORM0 does not hurt the performance of the language modeling task. This implies that the syntactic information helps the model to better predict the next word in the sequence. To further verify this hypothesis, we conduct two analysis by visualizing our prediction examples in Figure FIGREF13 :
+
+Results with different hyper-parameter settings
+
+## Conclusion
+
+In this paper, we propose a multi-task learning approach for code-switched language modeling. The multi-task learning models achieve the best performance and outperform LSTM baseline with 9.7% and 7.4% improvement in perplexity for Phase I and Phase II SEAME corpus respectively. This implies that by training two different NLP tasks together the model can correctly learn the correlation between them. Indeed, the syntactic information helps the model to be aware of code-switching points and it improves the performance over the language model. Finally, we conclude that multi-task learning has good potential on code-switching language modeling research and there are still rooms for improvements, especially by adding more language pairs and corpora.
+
+## Acknowledgments
+
+This work is partially funded by ITS/319/16FP of the Innovation Technology Commission, HKUST 16214415 & 16248016 of Hong Kong Research Grants Council, and RDC 1718050-0 of EMOS.AI.
+
+## Recording Lists
+
+We split the recording ids into train, development, and test set as the following:

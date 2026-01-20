@@ -1,0 +1,164 @@
+# Learning to Paraphrase for Question Answering
+
+**Paper ID:** 1708.06022
+
+## Abstract
+
+Question answering (QA) systems are sensitive to the many different ways natural language expresses the same information need. In this paper we turn to paraphrases as a means of capturing this knowledge and present a general framework which learns felicitous paraphrases for various QA tasks. Our method is trained end-to-end using question-answer pairs as a supervision signal. A question and its paraphrases serve as input to a neural scoring model which assigns higher weights to linguistic expressions most likely to yield correct answers. We evaluate our approach on QA over Freebase and answer sentence selection. Experimental results on three datasets show that our framework consistently improves performance, achieving competitive results despite the use of simple QA models.
+
+## Introduction
+
+Enabling computers to automatically answer questions posed in natural language on any domain or topic has been the focus of much research in recent years. Question answering (QA) is challenging due to the many different ways natural language expresses the same information need. As a result, small variations in semantically equivalent questions, may yield different answers. For example, a hypothetical QA system must recognize that the questions “who created microsoft” and “who started microsoft” have the same meaning and that they both convey the founder relation in order to retrieve the correct answer from a knowledge base.
+
+Given the great variety of surface forms for semantically equivalent expressions, it should come as no surprise that previous work has investigated the use of paraphrases in relation to question answering. There have been three main strands of research. The first one applies paraphrasing to match natural language and logical forms in the context of semantic parsing. BIBREF0 use a template-based method to heuristically generate canonical text descriptions for candidate logical forms, and then compute paraphrase scores between the generated texts and input questions in order to rank the logical forms. Another strand of work uses paraphrases in the context of neural question answering models BIBREF1 , BIBREF2 , BIBREF3 . These models are typically trained on question-answer pairs, and employ question paraphrases in a multi-task learning framework in an attempt to encourage the neural networks to output similar vector representations for the paraphrases.
+
+The third strand of research uses paraphrases more directly. The idea is to paraphrase the question and then submit the rewritten version to a QA module. Various resources have been used to produce question paraphrases, such as rule-based machine translation BIBREF4 , lexical and phrasal rules from the Paraphrase Database BIBREF5 , as well as rules mined from Wiktionary BIBREF6 and large-scale paraphrase corpora BIBREF7 . A common problem with the generated paraphrases is that they often contain inappropriate candidates. Hence, treating all paraphrases as equally felicitous and using them to answer the question could degrade performance. To remedy this, a scoring model is often employed, however independently of the QA system used to find the answer BIBREF4 , BIBREF5 . Problematically, the separate paraphrase models used in previous work do not fully utilize the supervision signal from the training data, and as such cannot be properly tuned to the question answering tasks at hand. Based on the large variety of possible transformations that can generate paraphrases, it seems likely that the kinds of paraphrases that are useful would depend on the QA application of interest BIBREF8 . BIBREF9 use features that are defined over the original question and its rewrites to score paraphrases. Examples include the pointwise mutual information of the rewrite rule, the paraphrase's score according to a language model, and POS tag features. In the context of semantic parsing, BIBREF6 also use the ID of the rewrite rule as a feature. However, most of these features are not informative enough to model the quality of question paraphrases, or cannot easily generalize to unseen rewrite rules.
+
+In this paper, we present a general framework for learning paraphrases for question answering tasks. Given a natural language question, our model estimates a probability distribution over candidate answers. We first generate paraphrases for the question, which can be obtained by one or several paraphrasing systems. A neural scoring model predicts the quality of the generated paraphrases, while learning to assign higher weights to those which are more likely to yield correct answers. The paraphrases and the original question are fed into a QA model that predicts a distribution over answers given the question. The entire system is trained end-to-end using question-answer pairs as a supervision signal. The framework is flexible, it does not rely on specific paraphrase or QA models. In fact, this plug-and-play functionality allows to learn specific paraphrases for different QA tasks and to explore the merits of different paraphrasing models for different applications.
+
+We evaluate our approach on QA over Freebase and text-based answer sentence selection. We employ a range of paraphrase models based on the Paraphrase Database (PPDB; BIBREF10 ), neural machine translation BIBREF11 , and rules mined from the WikiAnswers corpus BIBREF9 . Results on three datasets show that our framework consistently improves performance; it achieves state-of-the-art results on GraphQuestions and competitive performance on two additional benchmark datasets using simple QA models.
+
+## Problem Formulation
+
+Let $q$ denote a natural language question, and $a$ its answer. Our aim is to estimate $p\left(a | q\right)$ , the conditional probability of candidate answers given the question. We decompose $p\left(a |
+q\right)$ as: 
+
+$$\hspace*{-5.69046pt}p\left(a | q\right) = \sum _{q^{\prime } \in {H_q \cup \lbrace q\rbrace  }} { \underbrace{p_{\psi }\left(a | q^{\prime } \right)}_{\text{~~~~QA Model~~~~}} \underbrace{p_{\theta }\left(q^{\prime } | q\right)}_{\text{Paraphrase Model}} }$$   (Eq. 2) 
+
+where $H_q$ is the set of paraphrases for question $q$ , $\psi $ are the parameters of a QA model, and $\theta $ are the parameters of a paraphrase scoring model.
+
+As shown in Figure 1 , we first generate candidate paraphrases $H_q$ for question $q$ . Then, a neural scoring model predicts the quality of the generated paraphrases, and assigns higher weights to the paraphrases which are more likely to obtain the correct answers. These paraphrases and the original question simultaneously serve as input to a QA model that predicts a distribution over answers for a given question. Finally, the results of these two models are fused to predict the answer. In the following we will explain how $p\left(q^{\prime } | q\right)$ and $p\left(a | q^{\prime }\right)$ are estimated.
+
+## Paraphrase Generation
+
+As shown in Equation ( 2 ), the term $p\left(a |
+q\right)$ is the sum over $q$ and its paraphrases $H_q$ . Ideally, we would generate all the paraphrases of $q$ . However, since this set could quickly become intractable, we restrict the number of candidate paraphrases to a manageable size. In order to increase the coverage and diversity of paraphrases, we employ three methods based on: (1) lexical and phrasal rules from the Paraphrase Database BIBREF10 ; (2) neural machine translation models BIBREF12 , BIBREF13 ; and (3) paraphrase rules mined from clusters of related questions BIBREF9 . We briefly describe these models below, however, there is nothing inherent in our framework that is specific to these, any other paraphrase generator could be used instead.
+
+Bilingual pivoting BIBREF14 is one of the most well-known approaches to paraphrasing; it uses bilingual parallel corpora to learn paraphrases based on techniques from phrase-based statistical machine translation (SMT, BIBREF15 ). The intuition is that two English strings that translate to the same foreign string can be assumed to have the same meaning. The method first extracts a bilingual phrase table and then obtains English paraphrases by pivoting through foreign language phrases.
+
+Drawing inspiration from syntax-based SMT, BIBREF16 and BIBREF17 extended this idea to syntactic paraphrases, leading to the creation of PPDB BIBREF18 , a large-scale paraphrase database containing over a billion of paraphrase pairs in 24 different languages. BIBREF10 further used a supervised model to automatically label paraphrase pairs with entailment relationships based on natural logic BIBREF19 . In our work, we employ bidirectionally entailing rules from PPDB. Specifically, we focus on lexical (single word) and phrasal (multiword) rules which we use to paraphrase questions by replacing words and phrases in them. An example is shown in Table 1 where we substitute car with vehicle and manufacturer with producer.
+
+ BIBREF11 revisit bilingual pivoting in the context of neural machine translation (NMT, BIBREF12 , BIBREF13 ) and present a paraphrasing model based on neural networks. At its core, NMT is trained end-to-end to maximize the conditional probability of a correct translation given a source sentence, using a bilingual corpus. Paraphrases can be obtained by translating an English string into a foreign language and then back-translating it into English. NMT-based pivoting models offer advantages over conventional methods such as the ability to learn continuous representations and to consider wider context while paraphrasing.
+
+In our work, we select German as our pivot following BIBREF11 who show that it outperforms other languages in a wide range of paraphrasing experiments, and pretrain two NMT systems, English-to-German (En-De) and German-to-English (De-En). A naive implementation would translate a question to a German string and then back-translate it to English. However, using only one pivot can lead to inaccuracies as it places too much faith on a single translation which may be wrong. Instead, we translate from multiple pivot sentences BIBREF11 . As shown in Figure 2 , question $q$ is translated to $K$ -best German pivots, $\mathcal {G}_q = \lbrace  g_1 , \dots , g_K \rbrace $ . The probability of generating paraphrase $q^{\prime } = y_1 \dots y_{|q^{\prime }|}$ is decomposed as: 
+
+$$\begin{aligned}
+p\left( q^{\prime } | \mathcal {G}_q \right) &= \prod _{ t=1 }^{ |q^{\prime }| }{ p\left( y_t | y_{<t} , \mathcal {G}_q \right) } \\
+&= \prod _{ t=1 }^{ |q^{\prime }| }{ \sum _{ k=1 }^{ K }{ p\left( g_k | q \right) p\left( y_{ t }|y_{ <t }, g_k \right) } }
+\end{aligned}$$   (Eq. 8) 
+
+where $y_{<t} = y_1 , \dots , y_{t-1}$ , and $|q^{\prime }|$ is the length of $q^{\prime }$ . Probabilities $p\left( g_k | q \right)$ and $p\left( y_{ t
+}|y_{ <t }, g_k \right)$ are computed by the En-De and De-En models, respectively. We use beam search to decode tokens by conditioning on multiple pivoting sentences. The results with the best decoding scores are considered candidate paraphrases. Examples of NMT paraphrases are shown in Table 1 .
+
+Compared to PPDB, NMT-based paraphrases are syntax-agnostic, operating on the surface level without knowledge of any underlying grammar. Furthermore, paraphrase rules are captured implicitly and cannot be easily extracted, e.g., from a phrase table. As mentioned earlier, the NMT-based approach has the potential of performing major rewrites as paraphrases are generated while considering wider contextual information, whereas PPDB paraphrases are more local, and mainly handle lexical variation.
+
+Our third paraphrase generation approach uses rules mined from the WikiAnswers corpus BIBREF9 which contains more than 30 million question clusters labeled as paraphrases by WikiAnswers users. This corpus is a large resource (the average cluster size is 25), but is relatively noisy due to its collaborative nature – $45\%$ of question pairs are merely related rather than genuine paraphrases. We therefore followed the method proposed in BIBREF7 to harvest paraphrase rules from the corpus. We first extracted question templates (i.e., questions with at most one wild-card) that appear in at least ten clusters. Any two templates co-occurring (more than five times) in the same cluster and with the same arguments were deemed paraphrases. Table 2 shows examples of rules extracted from the corpus. During paraphrase generation, we consider substrings of the input question as arguments, and match them with the mined template pairs. For example, the stemmed input question in Table 1 can be paraphrased using the rules (“what be the zip code of __”, “what be __ 's postal code”) and (“what be the zip code of __”, “zip code of __”). If no exact match is found, we perform fuzzy matching by ignoring stop words in the question and templates.
+
+## Paraphrase Scoring
+
+Recall from Equation ( 2 ) that $p_{\theta }\left(q^{\prime } |
+q\right)$ scores the generated paraphrases $q^{\prime } \in H_q \cup \lbrace q\rbrace $ . We estimate $p_{\theta }\left(q^{\prime } | q\right)$ using neural networks given their successful application to paraphrase identification tasks BIBREF20 , BIBREF21 , BIBREF22 . Specifically, the input question and its paraphrases are encoded as vectors. Then, we employ a neural network to obtain the score $s\left(q^{\prime } | q\right)$ which after normalization becomes the probability $p_{\theta }\left(q^{\prime }
+| q\right)$ .
+
+Let $q = q_1 \dots q_{|q|}$ denote an input question. Every word is initially mapped to a $d$ -dimensional vector. In other words, vector $\mathbf {q}_t$ is computed via $\mathbf {q}_t = \mathbf {W}_q \mathbf {e}\left( q_t \right) $ , where $\mathbf {W}_q \in \mathbb {R}^{d \times |\mathcal {V}|}$ is a word embedding matrix, $|\mathcal {V}|$ is the vocabulary size, and $\mathbf {e}\left( q_t \right)$ is a one-hot vector. Next, we use a bi-directional recurrent neural network with long short-term memory units (LSTM, BIBREF23 ) as the question encoder, which is shared by the input questions and their paraphrases. The encoder recursively processes tokens one by one, and uses the encoded vectors to represent questions. We compute the hidden vectors at the $t$ -th time step via: 
+
+$$\begin{aligned}
+\overrightarrow{\mathbf {h} }_{ t } &= \operatornamewithlimits{\textrm {LSTM}}\left( \overrightarrow{\mathbf {h} }_{ t-1 } , \mathbf {q}_t \right) , t = 1, \dots , |q| \\
+\overleftarrow{\mathbf {h} }_{ t } &= \operatornamewithlimits{\textrm {LSTM}}\left( \overleftarrow{\mathbf {h} }_{ t+1 } , \mathbf {q}_t \right) , t = |q|, \dots , 1
+\end{aligned}$$   (Eq. 14) 
+
+where $\overrightarrow{\mathbf {h} }_{ t }, \overleftarrow{\mathbf {h}
+}_{ t } \in \mathbb {R}^{n}$ . In this work we follow the $\operatornamewithlimits{\textrm {LSTM}}$ function described in BIBREF24 . The representation of $q$ is obtained by: 
+
+$$\mathbf {q} = \left[ \overrightarrow{\mathbf {h} }_{ |q| } , \overleftarrow{\mathbf {h} }_{ 1 } \right]$$   (Eq. 15) 
+
+where $[\cdot ,\cdot ]$ denotes concatenation, and $\mathbf {q} \in \mathbb {R}^{2n}$ .
+
+After obtaining vector representations for $q$ and $q^{\prime }$ , we compute the score $s\left(q^{\prime } | q\right)$ via: 
+
+$$s\left(q^{\prime } | q\right) = \mathbf {w}_s \cdot \left[ \mathbf {q} , \mathbf {q^{\prime }} , \mathbf {q} \odot \mathbf {q^{\prime }} \right] + b_s$$   (Eq. 17) 
+
+where $\mathbf {w}_s \in \mathbb {R}^{6n}$ is a parameter vector, $[\cdot ,\cdot ,\cdot ]$ denotes concatenation, $\odot $ is element-wise multiplication, and $b_s$ is the bias. Alternative ways to compute $s\left(q^{\prime } | q\right)$ such as dot product or with a bilinear term were not empirically better than Equation ( 17 ) and we omit them from further discussion.
+
+For paraphrases $q^{\prime } \in H_q \cup \lbrace q\rbrace $ , the probability $p_{\theta }\left(q^{\prime } | q\right)$ is computed via: 
+
+$$p_{\theta }\left(q^{\prime } | q\right) = \frac{\exp \lbrace s\left(q^{\prime } | q\right)\rbrace }{\sum _{ r \in H_q \cup \lbrace q\rbrace  }{ \exp \lbrace s\left(r | q\right)\rbrace  }}$$   (Eq. 19) 
+
+where the paraphrase scores are normalized over the set $H_q \cup \lbrace q\rbrace $ .
+
+## QA Models
+
+The framework defined in Equation ( 2 ) is relatively flexible with respect to the QA model being employed as long as it can predict $p_{\psi }\left(a | q^{\prime } \right)$ . We illustrate this by performing experiments across different tasks and describe below the models used for these tasks.
+
+In our first task we use the Freebase knowledge base to answer questions. Query graphs for the questions typically contain more than one predicate. For example, to answer the question “who is the ceo of microsoft in 2008”, we need to use one relation to query “ceo of microsoft” and another relation for the constraint “in 2008”. For this task, we employ the SimpleGraph model described in BIBREF25 , BIBREF26 , and follow their training protocol and feature design. In brief, their method uses rules to convert questions to ungrounded logical forms, which are subsequently matched against Freebase subgraphs. The QA model learns from question-answer pairs: it extracts features for pairs of questions and Freebase subgraphs, and uses a logistic regression classifier to predict the probability that a candidate answer is correct. We perform entity linking using the Freebasee/KG API on the original question BIBREF25 , BIBREF26 , and generate candidate Freebase subgraphs. The QA model estimates how likely it is for a subgraph to yield the correct answer.
+
+Given a question and a collection of relevant sentences, the goal of this task is to select sentences which contain an answer to the question. The assumption is that correct answer sentences have high semantic similarity to the questions BIBREF27 , BIBREF28 , BIBREF29 . We use two bi-directional recurrent neural networks (BiLSTM) to separately encode questions and answer sentences to vectors (Equation ( 15 )). Similarity scores are computed as shown in Equation ( 17 ), and then squashed to $(0,1)$ by a $\operatorname{\textrm {sigmoid}}$ function in order to predict $p_{\psi }\left(a | q^{\prime } \right)$ .
+
+## Training and Inference
+
+We use a log-likelihood objective for training, which maximizes the likelihood of the correct answer given a question: 
+
+$$\operatorname{\textrm {maximize}}\sum _{(q , a) \in \mathcal {D} }{ \log {p \left( a | q \right)}}$$   (Eq. 24) 
+
+where $\mathcal {D}$ is the set of all question-answer training pairs, and $p \left( a | q \right)$ is computed as shown in Equation ( 2 ). For the knowledge base QA task, we predict how likely it is that a subgraph obtains the correct answer, and the answers of some candidate subgraphs are partially correct. So, we use the binary cross entropy between the candidate subgraph's F1 score and the prediction as the objective function. The RMSProp algorithm BIBREF30 is employed to solve this non-convex optimization problem. Moreover, dropout is used for regularizing the recurrent neural networks BIBREF24 .
+
+At test time, we generate paraphrases for the question $q$ , and then predict the answer by: 
+
+$$\hat{a} = \operatornamewithlimits{arg\,max}_{a^{\prime } \in \mathcal {C}_q}{ p \left( a^{\prime } | q \right) }$$   (Eq. 25) 
+
+where $\mathcal {C}_q$ is the set of candidate answers, and $p \left(
+a^{\prime } | q \right)$ is computed as shown in Equation ( 2 ).
+
+## Experiments
+
+We compared our model which we call Para4QA (as shorthand for learning to paraphrase for question answering) against multiple previous systems on three datasets. In the following we introduce these datasets, provide implementation details for our model, describe the systems used for comparison, and present our results.
+
+## Datasets
+
+Our model was trained on three datasets, representative of different types of QA tasks. The first two datasets focus on question answering over a structured knowledge base, whereas the third one is specific to answer sentence selection.
+
+This dataset BIBREF31 contains $3,778$ training instances and $2,032$ test instances. Questions were collected by querying the Google Suggest API. A breadth-first search beginning with wh- was conducted and the answers were crowd-sourced using Freebase as the backend knowledge base.
+
+The dataset BIBREF32 contains $5,166$ question-answer pairs (evenly split into a training and a test set). It was created by asking crowd workers to paraphrase 500 Freebase graph queries in natural language.
+
+This dataset BIBREF28 has $3,047$ questions sampled from Bing query logs. The questions are associated with $29,258$ candidate answer sentences, $1,473$ of which contain the correct answers to the questions.
+
+## Implementation Details
+
+Candidate paraphrases were stemmed BIBREF33 and lowercased. We discarded duplicate or trivial paraphrases which only rewrite stop words or punctuation. For the NMT model, we followed the implementation and settings described in BIBREF11 , and used English $\leftrightarrow $ German as the language pair. The system was trained on data released as part of the WMT15 shared translation task ( $4.2$ million sentence pairs). We also had access to back-translated monolingual training data BIBREF34 . Rare words were split into subword units BIBREF35 to handle out-of-vocabulary words in questions. We used the top 15 decoding results as candidate paraphrases. We used the S size package of PPDB 2.0 BIBREF10 for high precision. At most 10 candidate paraphrases were considered. We mined paraphrase rules from WikiAnswers BIBREF9 as described in Section UID9 . The extracted rules were ranked using the pointwise mutual information between template pairs in the WikiAnswers corpus. The top 10 candidate paraphrases were used.
+
+For the paraphrase scoring model, we used GloVe BIBREF36 vectors pretrained on Wikipedia 2014 and Gigaword 5 to initialize the word embedding matrix. We kept this matrix fixed across datasets. Out-of-vocabulary words were replaced with a special unknown symbol. We also augmented questions with start-of- and end-of-sequence symbols. Word vectors for these special symbols were updated during training. Model hyperparameters were validated on the development set. The dimensions of hidden vectors and word embeddings were selected from $\lbrace 50,100,200\rbrace $ and $\lbrace 100,200\rbrace $ , respectively. The dropout rate was selected from $\lbrace 0.2,0.3,0.4\rbrace $ . The BiLSTM for the answer sentence selection QA model used the same hyperparameters. Parameters were randomly initialized from a uniform distribution $\mathcal {U}\left(-0.08,0.08\right)$ . The learning rate and decay rate of RMSProp were $0.01$ and $0.95$ , respectively. The batch size was set to 150. To alleviate the exploding gradient problem BIBREF37 , the gradient norm was clipped to 5. Early stopping was used to determine the number of epochs.
+
+## Paraphrase Statistics
+
+Table 3 presents descriptive statistics on the paraphrases generated by the various systems across datasets (training set). As can be seen, the average paraphrase length is similar to the average length of the original questions. The NMT method generates more paraphrases and has wider coverage, while the average number and coverage of the other two methods varies per dataset. As a way of quantifying the extent to which rewriting takes place, we report BLEU BIBREF38 and TER BIBREF39 scores between the original questions and their paraphrases. The NMT method and the rules extracted from WikiAnswers tend to paraphrase more (i.e., have lower BLEU and higher TER scores) compared to PPDB.
+
+## Comparison Systems
+
+We compared our framework to previous work and several ablation models which either do not use paraphrases or paraphrase scoring, or are not jointly trained.
+
+The first baseline only uses the base QA models described in Section "QA Models" (SimpleGraph and BiLSTM). The second baseline (AvgPara) does not take advantage of paraphrase scoring. The paraphrases for a given question are used while the QA model's results are directly averaged to predict the answers. The third baseline (DataAugment) employs paraphrases for data augmentation during training. Specifically, we use the question, its paraphrases, and the correct answer to automatically generate new training samples.
+
+In the fourth baseline (SepPara), the paraphrase scoring model is separately trained on paraphrase classification data, without taking question-answer pairs into account. In the experiments, we used the Quora question paraphrase dataset which contains question pairs and labels indicating whether they constitute paraphrases or not. We removed questions with more than 25 tokens and sub-sampled to balance the dataset. We used $90\%$ of the resulting 275K examples for training, and the remaining for development. The paraphrase score $s\left(q^{\prime } | q\right)$ (Equation ( 17 )) was wrapped by a $\operatorname{\textrm {sigmoid}}$ function to predict the probability of a question pair being a paraphrase. A binary cross-entropy loss was used as the objective. The classification accuracy on the dev set was $80.6\%$ .
+
+Finally, in order to assess the individual contribution of different paraphrasing resources, we compared the Para4QA model against versions of itself with one paraphrase generator removed ( $-$ NMT/ $-$ PPDB/ $-$ Rule).
+
+## Results
+
+We first discuss the performance of Para4QA on GraphQuestions and WebQuestions. The first block in Table 4 shows a variety of systems previously described in the literature using average F1 as the evaluation metric BIBREF31 . Among these, ParaSemp, SubGraph, MCCNN, and BiLayered utilize paraphrasing resources. The second block compares Para4QA against various related baselines (see Section "Comparison Systems" ). SimpleGraph results on WebQuestions and GraphQuestions are taken from BIBREF25 and BIBREF26 , respectively.
+
+Overall, we observe that Para4QA outperforms baselines which either do not employ paraphrases (SimpleGraph) or paraphrase scoring (AvgPara, DataAugment), or are not jointly trained (SepPara). On GraphQuestions, our model Para4QA outperforms the previous state of the art by a wide margin. Ablation experiments with one of the paraphrase generators removed show that performance drops most when the NMT paraphrases are not used on GraphQuestions, whereas on WebQuestions removal of the rule-based generator hurts performance most. One reason is that the rule-based method has higher coverage on WebQuestions than on GraphQuestions (see Table 3 ).
+
+Results on WikiQA are shown in Table 5 . We report MAP and MMR which evaluate the relative ranks of correct answers among the candidate sentences for a question. Again, we observe that Para4QA outperforms related baselines (see BiLSTM, DataAugment, AvgPara, and SepPara). Ablation experiments show that performance drops most when NMT paraphrases are removed. When word matching features are used (see +cnt in the third block), Para4QA reaches state of the art performance.
+
+Examples of paraphrases and their probabilities ${p_{\theta }\left(q^{\prime } | q\right)}$ (see Equation ( 19 )) learned by Para4QA are shown in Table 6 . The two examples are taken from the development set of GraphQuestions and WebQuestions, respectively. We also show the Freebase relations used to query the correct answers. In the first example, the original question cannot yield the correct answer because of the mismatch between the question and the knowledge base. The paraphrase contains “role” in place of “sort of part”, increasing the chance of overlap between the question and the predicate words. The second question contains an informal expression “play 4”, which confuses the QA model. The paraphrase model generates “play for” and predicts a high paraphrase score for it. More generally, we observe that the model tends to give higher probabilities ${p_{\theta }\left(q^{\prime } | q\right)}$ to paraphrases biased towards delivering appropriate answers.
+
+We also analyzed which structures were mostly paraphrased within a question. We manually inspected 50 (randomly sampled) questions from the development portion of each dataset, and their three top scoring paraphrases (Equation ( 17 )). We grouped the most commonly paraphrased structures into the following categories: a) question words, i.e., wh-words and and “how”; b) question focus structures, i.e., cue words or cue phrases for an answer with a specific entity type BIBREF40 ; c) verbs or noun phrases indicating the relation between the question topic entity and the answer; and d) structures requiring aggregation or imposing additional constraints the answer must satisfy BIBREF43 . In the example “which year did Avatar release in UK”, the question word is “which”, the question focus is “year”, the verb is “release”, and “in UK” constrains the answer to a specific location.
+
+Figure 3 shows the degree to which different types of structures are paraphrased. As can be seen, most rewrites affect Relation Verb, especially on WebQuestions. Question Focus, Relation NP, and Constraint & Aggregation are more often rewritten in GraphQuestions compared to the other datasets.
+
+Finally, we examined how our method fares on simple versus complex questions. We performed this analysis on GraphQuestions as it contains a larger proportion of complex questions. We consider questions that contain a single relation as simple. Complex questions have multiple relations or require aggregation. Table 7 shows how our model performs in each group. We observe improvements for both types of questions, with the impact on simple questions being more pronounced. This is not entirely surprising as it is easier to generate paraphrases and predict the paraphrase scores for simpler questions.
+
+## Conclusions
+
+In this work we proposed a general framework for learning paraphrases for question answering. Paraphrase scoring and QA models are trained end-to-end on question-answer pairs, which results in learning paraphrases with a purpose. The framework is not tied to a specific paraphrase generator or QA system. In fact it allows to incorporate several paraphrasing modules, and can serve as a testbed for exploring their coverage and rewriting capabilities. Experimental results on three datasets show that our method improves performance across tasks. There are several directions for future work. The framework can be used for other natural language processing tasks which are sensitive to the variation of input (e.g., textual entailment or summarization). We would also like to explore more advanced paraphrase scoring models BIBREF48 , BIBREF49 as well as additional paraphrase generators since improvements in the diversity and the quality of paraphrases could also enhance QA performance.

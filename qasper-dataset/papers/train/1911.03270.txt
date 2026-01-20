@@ -1,0 +1,195 @@
+# Char-RNN and Active Learning for Hashtag Segmentation
+
+**Paper ID:** 1911.03270
+
+## Abstract
+
+We explore the abilities of character recurrent neural network (char-RNN) for hashtag segmentation. Our approach to the task is the following: we generate synthetic training dataset according to frequent n-grams that satisfy predefined morpho-syntactic patterns to avoid any manual annotation. The active learning strategy limits the training dataset and selects informative training subset. The approach does not require any language-specific settings and is compared for two languages, which differ in inflection degree.
+
+## Introduction
+
+A hashtag is a form of metadata labeling used in various social networks to help the users to navigate through the content. For example, one of the most popular hashtags on Instagram is "#photooftheday" [photo of the day]. Hashtags are written without any delimiters, although some users use an underscore or camel-casing to separate words. Hashtags themselves may be a great source for features for following opinion mining and social network analysis. Basically hashtags serve as keyphrases for a post in social media. By segmenting the hashtags into separate words we may use regular techniques to process them. The problem of hashtag segmentation resembles of another problem, namely word segmentation.
+
+The problem of word segmentation is widely studied in languages like Chinese, since it lacks whitespaces to separate words, or in German to split compound words. In languages like English or Russian, where compounds are not that frequent as in German and where whitespace delimiters are regularly used, the problem of word segmentation arises mainly when working with hashtags.
+
+Formally the problem is stated as follows: given a string of $n$ character $s = s_1 \ldots s_n$ we need to define the boundaries of the substrings $s_{i:j}, i < j$, so that each substring is meaningful (i.e. is a regular word, named entity, abbreviation, number, etc). The main challenge of this problem is that the segmentation might be ambiguous. For example, a string “somethingsunclear” might be segmented as “something sun clear” or “somethings unclear”. To deal with the ambiguity more processing is required, such as POS-tagging, estimation of frequencies of all hashtag constituencies or their co-occurence frequency. The frequencies can be estimated on a large corpus, such as BNC , COCA , Wikipedia. However when working with noisy user generated data, such as texts or hashtags from social networks, the problem of unknown words (or out of vocabulary words) arises. In language modeling this problem is solved by using smoothing, such as Laplacian smoothing or Knesser-Ney smoothing. Otherwise additional heuristics can be used to extend the dictionary with word-like sequences of characters. Unlike language modelling, in hashtag segmentation frequency estimation is not only source for defining word boundaries. Otherwise candidate substrings can be evaluated according to length BIBREF0.
+
+Several research groups have shown that introducing character level into models help to deal with unknown words in various NLP tasks, such as text classification BIBREF1, named entity recognition BIBREF2, POS-tagging BIBREF3, dependency parsing BIBREF4, word tokenization and sentence segmentation BIBREF5 or machine translation BIBREF6, BIBREF7. The character level model is a model which either treats the text as a sequence of characters without any tokenization or incorporates character level information into word level information. Character level models are able to capture morphological patterns, such as prefixes and suffixes, so that the model is able to define the POS tag or NE class of an unknown word.
+
+Following this intuition, we use a character level model for hashtag segmentation. Our main motivation is the following: if the character level model is able to capture word ending patterns, it should also be able to capture the word boundary patterns. We apply a character level model, specifically, a recurrent neural network, referred further as char-RNN, to the task of hashtag segmentation. The char-RNN is trained and tested on the synthetic data, which was generated from texts, collected from social networks in English and Russian, independently. We generate synthetic data for training by extracting frequent $N$-grams and removing whitespaces. The test data is annotated manually . Since the problem statement is very basic, we use additional techniques, such as active learning, character embeddings and RNN hidden state visualization, to interpret the weights, learned by char-RNN. We address the following research questions and claim our respective contributions:
+
+We show that our char-RNN model outperforms the traditional unigram or bigram language models with extensive use of external sources BIBREF8, BIBREF0.
+
+What is the impact of high inflection in languages such as Russian on the performance of character-level modelling as opposed to languages with little inflection such as English? We claim that character-level models offer benefits for processing highly inflected languages by capturing the rich variety of word boundary patterns.
+
+As getting sufficient amount of annotated training collection is labor-intensive and error-prone, a natural question would be: can we avoid annotating real-world data altogether and still obtain high quality hashtag segmentations? We approach this problem by using morpho-syntactic patterns to generate synthetic hashtags.
+
+A potentially unlimited volume of our synthetic training dataset raises yet another question of whether an informative training subset could be selected. To this extent, we apply an active learning-based strategy to subset selection and identify a small portion of the original synthetic training dataset, necessary to obtain a high performance.
+
+## Neural Model for Hashtag Segmentation ::: Sequence Labeling Approach
+
+We treat hashtag segmentation as a sequence labeling task. Each character is labeled with one of the labels $\mathcal {L} = \lbrace 0, 1\rbrace $, (1) for the end of a word, and (0) otherwise (Table TABREF9 and TABREF9). Given a string $s = {s_1, \ldots , s_n}$ of characters, the task is to find the labels $Y^* = {y_1^*. \ldots , y_n^*}$, such that $ Y^* = \arg \max _{Y \in \mathcal {L} ^n} p(Y | s).$
+
+The neural model for hashtag segmentation consists of three layers.
+
+The embedding layer is used to compute the distributed representation of input characters. Each character $c_i$ is represented with an embedding vector $e_i \in \mathbb {R}^{d_e}$, where $d_e$ is the size of the character embedding. $E$ is the look up table of size $|V| \times d_e$, where $V$ is the vocabulary, i.e. the number of unique characters.
+
+The feature layer is used to process the input. We use a bi-directional recurrent layer with LSTM units to process the input in forward and backward directions. The LSTM units we use are default keras LSTM units as introduced by Hochreiter.
+
+The inference layer is used to predict the labels of each character. We use a single dense layer as f or inference and $softmax$ to predict the probabilities of the labels $\mathcal {L} = \lbrace 0, 1\rbrace $.
+
+Each character is assigned with the most probable label.
+
+The parameters of the char-RNN are the following:
+
+Embedding layer = 50 input dimensions;
+
+Feature layer = 64 bidirectional LSTM units;
+
+Inference layer = 2 output neurons with softmax activation function mapped to each of 64 outputs.
+
+## Dataset
+
+In this section we describe the datasets we used for hashtag segmentation. We experimented with Russian and English datasets to compare the performance of the char-RNN.
+
+## Dataset ::: Russian dataset
+
+To our knowledge there is no available dataset for hashtag segmentation in Russian, so we faced the need to create our own dataset. Our approach to the dataset creation was twofold: the training data was created from social network texts by selecting frequent $n$-grams and generating hashtags following some hashtag patterns. The test dataset consists of real hashtags collected from vk.com (a Russian social network) and were segmented manually.
+
+We followed the same strategy to create an English language dataset.
+
+## Dataset ::: Russian dataset ::: Training Dataset Generation
+
+We scraped texts from several pages about civil services from vk.com. Next we extracted frequent $n$-grams that do not contain stopwords and consist of words and digits in various combinations (such as word + 4 digits + word or word + word + 8 digits). We used several rules to merge these $n$-grams so that they resemble real hashtags, for example:
+
+remove all whitespace: wordwordworddigits
+
+Examples: ЁлкаВЗазеркалье, нескольколетназад
+
+replace all whitespace with an underscore: word_word_digits
+
+Examples: увд_юга_столицы
+
+remove some whitespace and replace other spaces with an underscore: word_worddigits.
+
+Examples: ищусвоегогероя_уфпс
+
+A word here might be a word in lower case, upper case or capitalized or an abbreviation. There might be up to four digits.
+
+In general, we introduced 11 types of hashtags, which contain simply constructed hashtags as well as the complex ones. Here are a couple of examples:
+
+The hashtag consists of two parts: the word/abbreviation in the first part and the number or word in the second. The underscore is a delimiter.
+
+Examples: word_2017, NASA_2017, word_word
+
+Two or three words, which are separated by an underscore.
+
+Examples: Word_Word, word_word_word
+
+## Dataset ::: Russian dataset ::: Test Dataset Annotation
+
+We segmented manually 2K the most frequent hashtags, extracted from the same collection of the scraped texts.
+
+The resulting size of the Russian dataset is 15k hashtags for training and 2k hashtags for testing.
+
+## Dataset ::: English dataset
+
+We used the dataset, released by BIBREF0. This dataset consists of:
+
+a collection of tweets, which we used to generate the synthetic training hashtags according to the same rules as for Russian;
+
+a collection of annotated and separated hashtags, which we used as a testing set. From this test set we excluded ambiguous hashtags, annotated with several possible segmentations.
+
+The resulting size of the English dataset is 15k hashtags for training and 1k hashtags for testing.
+
+## Active Learning
+
+We followed the strategy for active learning, as in BIBREF9. The training procedure consists of multiple rounds of training and testing of the model. We start by training the model on 1k hashtags, which were randomly selected from the training dataset. Next we test the model on the reminder of the training dataset and select 1k hashtags according to the current model’s uncertainty in its prediction of the segmentation. These hashtags are not manually relabelled, since a) they belong to the synthetically generated training dataset and b) the correct labeling for these hashtag is already known. In BIBREF9 three uncertainty measure are presented, from which we selected the maximum normalized log-probability (MNLP) assigned by the model to the most likely sequence of tags. The model is then retrained on the hashtags it is uncertain about. Note, that here we do not check if the predictions of the model are correct. We are more interested in training the model on hard examples than in evaluating the quality of intermediate results. We refer the reader to BIBREF9 for more technical details.
+
+## Experiments ::: Baseline
+
+As for baseline algorithm, we consider the BIBREF0 system architecture as a state-of-the-art algorithm. Unfortunately, their approach is not straightforwardly applicable to our synthetic Russian dataset, because it requires twofold input: a hashtag and a corresponding tweet or a text from any other social media, which is absent in our task setting due to synthetic nature of the training dataset.
+
+For this reason as a baseline algorithm for English dataset we refer to results from BIBREF0, and as for Russian dataset, we used the probabilistic language model, described in BIBREF8. The probability of a sequence of words is the product of the probabilities of each word, given the word’s context: the preceding word. As in the following equation:
+
+where
+
+In case there is no such a pair of words $(w_{i-1}, w_i)$ in the set of bigrams, the probability of word $w_i$ is obtained as if it was only an unigram model:
+
+where $V$ – vocabulary, $f(w_{i})$ – frequency of word $w_{i}$, and $\alpha $ = 1.
+
+In Table TABREF30 we present three baseline results: LM BIBREF8 for Russian and English datasets; context-based LM BIBREF0 for English dataset only. We treat a segmentation as correct if prediction and target sequences are the same.
+
+## Experiments ::: Neural Model
+
+In our experiments we used 5 epochs to train the char-RNN with LSTM units. For each language we observed three datasets with different number of hashtags. In case of Russian language, the more data we use while training, the higher the accuracy. As for English, the highest accuracy score was achieved on a set of 10k hashtags (Table TABREF32). Due to it's lower morphological diversity and complexity the model starts to overfit on training sets with large sizes. The training showed that mostly the model makes wrong predictions of segmentation on hashtags of complex types, such as “wordword_worddigits”.
+
+Our results outperform all choosen baseline both for Russian and English datasets. Note, that we have two baselines for the English dataset: one is purely frequency-based, another is cited from BIBREF0, where external resources are heavily used. We show that using significantly less amount of training data, we achieve a boost in quality by switching from statistical word language models to char-RNN. As expected, the results on Russian dataset are higher than for the English dataset due to higher inflection degree in Russian as opposed to English.
+
+## Experiments ::: Active Learning
+
+In order to evaluate the efficiency of deep learning with active learning when used in combination, we run the experiments for both languages. As for the datasets, we took the ones on which the highest accuracy was obtained (15k for Russian and 10k for English).
+
+The learning process consists of multiple rounds which are repeated until the test set is finished. At the beginning we train the model on 1k of randomly selected hashtags and predict the probability of segmentation for the remaining hashtags. Then we sort the remaining hashtags in ascending order according to the probability assigned by the model and pick 1k of hashtags which the model is least confident about. Finally, we add these hashtags with the least probable sequence of tags to the training data and continue training the model. This pipeline is repeated till there are no samples left.
+
+In comparison to our initial experiments, application of active learning demonstrates impressive results. The amount of labeled training data can be drastically reduced, to be more specific, in both cases the size of the training set can be reduced by half without any decline in accuracy (see Figures 2 and 3).
+
+Active learning selects a more informative set of examples in contrast to supervised learning, which is trained on a set of randomly chosen examples. We decided to analyze the updated version of the training data and see if number of morphologically complex types of hashtags is higher than the simple ones. We were able to divide hashatgs into complex and simple as the model is trained on synthetic data and there is a finite number of templates by which each hashtag can be generated.
+
+To better understand the contribution of uncertainty sampling approach, we plot the distribution of different types of hashtags in new training datasets for both languages, Russian and English (see Figure 4 and 5). According to identified types of hashtags in real data, it can be seen from the plots that in both cases the algorithm added more of morphologically complex hashtags to training data – types 3, 6 and 7. These types mostly consist of hashtags with two or three words in lower case without underscore.
+
+Examples of featured types:
+
+wordword_2017
+
+wordword, word2017word
+
+wordwordword, wordword2017word
+
+## Experiments ::: Visualization
+
+In order to see if embeddings of similar characters, in terms of string segmentation, appear near each-other in their resulting 50-dimensional embedding space, we have applied one technique for dimensionality reduction: SVD to character embeddings to plot them on 2D space. For both languages meaningful and interpretable clusters can be extracted: capital letters, letters in lower case, digits and underscore, as shown below.
+
+## Related Work
+
+The problem of word segmentation has received much attention in Chinese and German NLP for word segmentation and compound splitting BIBREF10, respectively. The major techniques for word segmentation exploit string matching algorithms BIBREF11, language models BIBREF12, BIBREF0 and sequence labeling methods BIBREF10. Recent trend of deep learning as a major approach for any NLP task in general and sequence labeling in particular resulted in using various RNN-based models and CNN-based model for Chinese word segmentation BIBREF10, BIBREF13, BIBREF14.
+
+Since BIBREF10 Chinese word segmentation is addressed as a character labeling task: each character of the input sequence is labeled with one of the four labels $\mathcal {L} = \lbrace B, M, E, S\rbrace $, which stand for character in Begin, Middle or End of the word or Single character word. BIBREF10 uses a maximum entropy tagger to tag each character independently. This approach was extended in BIBREF15 to the sequence modeling task, and linear conditional random fields were used to attempt it and receive state of the art results. A neural approach to Chinese segmentation mainly uses various architectures of character level recurrent neural networks BIBREF16, BIBREF17, BIBREF18 and very deep constitutional networks BIBREF19. Same architectures are used for dialectal Arabic segmentation BIBREF20.
+
+The evolution of German compound splitters is more or less similar to Chinese word segmentation systems. The studies of German compound splitting started with corpus- and frequency-based approaches BIBREF13, BIBREF14 and are now dominated with neural-based distributional semantic models. However, German compound splitting is rarely seen as sequence modeling task.
+
+The problem of hashtag segmentation, analysis and usage in English has been approached by several research groups. As it was shown by BIBREF12 hashtag segmentation for TREC microblog track 2011 BIBREF21 improves the quality of information retrieval, while BIBREF0 shows that hashtag segmentation improves linking of entities extracted from tweets to a knowledge base. Both BIBREF12, BIBREF0 use Viterbi-like algorithm for hashtag segmentation: all possible segmentations of hashtag are scored using a scoring function:
+
+where $P_{Unigram}$ are probabilities, computed according to the unigram model based on a large enough corpus or any N-gram service.
+
+Following the idea of scoring segmentation candidates, BIBREF11 introduces other scoring functions, which include a bigram model (2GM) and a Maximum Unknown Matching (MUM), which is adjustable to unseen words.
+
+BIBREF22 attempt to split camel-cased hashtags using rule-based approach and POS-tagging for further semantic classification. WordSegment has been used for sentiment analysis BIBREF23, BIBREF24 and other applications.
+
+To our knowledge there has been little work done for word or hashtag segmentation in Russian.
+
+## Related Work ::: Active Learning in NLP
+
+Active learning is machine learning technique which allows efficient use of the available training data. It presumes that, first an initial model is trained on a very little amount of data and next tested on large unlabeled set. Next the model is able to choose a few most difficult examples and ask an external knowledge source about the desired labels. Upon receiving these labels, the model is updated and retrained on the new train set. There might be a few rounds of label querying and model updating. To use active learning strategy, we need a definition of what a difficult example is and how to score its difficulty. One of the most common scoring approaches is entropy-based uncertainty sampling, which selects the examples with the lowest prediction probability.
+
+Active learning is widely used in NLP applications, when there is little annotated data while the amount of unlabeled data is abundant. Being ultimately used for text classification using traditional machine learning classifiers BIBREF25, BIBREF26, active learning is less known to be used with deep learning sequence classifiers. Recent works report on scoring word embeddings that are likely to be updated with the greatest magnitude BIBREF27 and on using maximum normalized log-probability (MNLP) assigned by the model to the most likely sequence of tags BIBREF9:
+
+## Related Work ::: Training on synthetic data
+
+The lack of training data is an issue for many NLP applications. There have been attempts to generate and use synthetic data for training question answering systems BIBREF28 and SQL2text systems BIBREF29. In BIBREF0 synthetic hashtags are generated by removing whitespace characters from frequent n-grams, while in BIBREF30 German compounds are synthesized for further machine translation.
+
+## Conclusions
+
+In this paper we approach the problem of hashtag segmentation by using char-RNNs. We treat the problem of hashtag segmentation as a sequence labeling task, so that each symbol of a given string is labeled with 1 (there should be a whitespace after this symbol) or 0 (otherwise). We use two datasets to test this approach in English and in Russian without any language-specific settings. We compare char-RNN to traditional probabilistic algorithms. To interpret the results we use a few visualization techniques and the strategy of active learning to evaluate the complexity of training data, since we use synthetically generated hashtags for training.
+
+The results show that:
+
+When approached on character level, hashtag segmentation problem can be solved using relatively small and simple recurrent neural network model without usage of any external corpora and vocabularies. Such char-RNN not only outperforms significantly traditional frequency-based language models, but also can be trained on synthetic data generated according to morpho-syntactic patterns, without any manual annotation and preprocessing.
+
+In languages with high inflection (such as Russian) the char-RNN achieves higher results than in languages with little inflections (such as English) due to the ability of the char-RNN to capture and memorize word boundary patterns, especially word ending patterns (i.e. adjective endings “ый”,“ая”,“ое” or verbal endings “ать”,“еть” in Russian).
+
+The amount of generated synthetic training data can be limited by using techniques for active learning which allows to select sufficient training subset without any loss of quality.
+
+## Acknowledgements
+
+The paper was prepared within the framework of the HSE University Basic Research Program and funded by the Russian Academic Excellence Project '5-100'.

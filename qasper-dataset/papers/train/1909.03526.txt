@@ -1,0 +1,89 @@
+# Multi-Task Bidirectional Transformer Representations for Irony Detection
+
+**Paper ID:** 1909.03526
+
+## Abstract
+
+Supervised deep learning requires large amounts of training data. In the context of the FIRE2019 Arabic irony detection shared task (IDAT@FIRE2019), we show how we mitigate this need by fine-tuning the pre-trained bidirectional encoders from transformers (BERT) on gold data in a multi-task setting. We further improve our models by by further pre-training BERT on `in-domain' data, thus alleviating an issue of dialect mismatch in the Google-released BERT model. Our best model acquires 82.4 macro F1 score, and has the unique advantage of being feature-engineering free (i.e., based exclusively on deep learning).
+
+## Introduction
+
+The proliferation of social media has provided a locus for use, and thereby collection, of figurative and creative language data, including irony BIBREF0. According to the Merriam-Webster online dictionary, irony refers to “the use of word to express something other than and especially the opposite of the literal meaning." A complex, controversial, and intriguing linguistic phenomenon, irony has been studied in disciplines such as linguistics, philosophy, and rhetoric. Irony detection also has implications for several NLP tasks such as sentiment analysis, hate speech detection, fake news detection, etc BIBREF0. Hence, automatic irony detection can potentially improve systems designed for each of these tasks. In this paper, we focus on learning irony. More specifically, we report our work submitted to the FIRE 2019 Arabic irony detection task (IDAT@FIRE2019). We focus our energy on an important angle of the problem–the small size of training data.
+
+Deep learning is the most successful under supervised conditions with large amounts of training data (tens-to-hundreds of thousands of examples). For most real-world tasks, we hard to obtain labeled data. Hence, it is highly desirable to eliminate, or at least reduce, dependence on supervision. In NLP, pre-training language models on unlabeled data has emerged as a successful approach for improving model performance. In particular, the pre-trained multilingual Bidirectional Encoder Representations from Transformers (BERT) BIBREF1 was introduced to learn language regularities from unlabeled data. Multi-task learning (MTL) is another approach that helps achieve inductive transfer between various tasks. More specifically, MTL leverages information from one or more source tasks to improve a target task BIBREF2, BIBREF3. In this work, we introduce Transformer representations (BERT) in an MTL setting to address the data bottleneck in IDAT@FIRE2019. To show the utility of BERT, we compare to a simpler model with gated recurrent units (GRU) in a single task setting. To identify the utility, or lack thereof, of MTL BERT, we compare to a single task BERT model. For MTL BERT, we train on a number of tasks simultaneously. Tasks we train on are sentiment analysis, gender detection, age detection, dialect identification, and emotion detection.
+
+Another problem we face is that the BERT model released by Google is trained only on Arabic Wikipedia, which is almost exclusively Modern Standard Arabic (MSA). This introduces a language variety mismatch due to the irony data involving a number of dialects that come from the Twitter domain. To mitigate this issue, we further pre-train BERT on an in-house dialectal Twitter dataset, showing the utility of this measure. To summarize, we make the following contributions:
+
+In the context of the Arabic irony task, we show how a small-sized labeled data setting can be mitigated by training models in a multi-task learning setup.
+
+We view different varieties of Arabic as different domains, and hence introduce a simple, yet effective, `in-domain' training measure where we further pre-train BERT on a dataset closer to task domain (in that it involves dialectal tweet data).
+
+## Methods
+
+## Methods ::: GRU
+
+For our baseline, we use gated recurrent units (GRU) BIBREF4, a simplification of long-short term memory (LSTM) BIBREF5, which in turn is a variation of recurrent neural networks (RNNs). A GRU learns based on the following:
+
+where the update state $\textbf {\textit {z}}^{(t)}$ decides how much the unit updates its content:
+
+where W and U are weight matrices. The candidate activation makes use of a reset gate $\textbf {\textit {r}}^{(t)}$:
+
+where $\odot $ is a Hadamard product (element-wise multiplication). When its value is close to zero, the reset gate allows the unit to forget the previously computed state. The reset gate $\textbf {\textit {r}}^{(t)}$ is computed as follows:
+
+## Methods ::: BERT
+
+BERT BIBREF1 is based on the Transformer BIBREF6, a network architecture that depends solely on encoder-decoder attention. The Transformer attention employs a function operating on queries, keys, and values. This attention function maps a query and a set of key-value pairs to an output, where the output is a weighted sum of the values. Encoder of the Transformer in BIBREF6 has 6 attention layers, each of which is composed of two sub-layers: (1) multi-head attention where queries, keys, and values are projected h times into linear, learned projections and ultimately concatenated; and (2) fully-connected feed-forward network (FFN) that is applied to each position separately and identically. Decoder of the Transformer also employs 6 identical layers, yet with an extra sub-layer that performs multi-head attention over the encoder stack. The architecture of BERT BIBREF1 is a multi-layer bidirectional Transformer encoder BIBREF6. It uses masked language models to enable pre-trained deep bidirectional representations, in addition to a binary next sentence prediction task captures context (i.e., sentence relationships). More information about BERT can be found in BIBREF1.
+
+## Methods ::: Multi-task Learning
+
+In multi-task learning (MTL), a learner uses a number of (usually relevant) tasks to improve performance on a target task BIBREF2, BIBREF3. The MTL setup enables the learner to use cues from various tasks to improve the performance on the target task. MTL also usually helps regularize the model since the learner needs to find representations that are not specific to a single task, but rather more general. Supervised learning with deep neural networks requires large amounts of labeled data, which is not always available. By employing data from additional tasks, MTL thus practically augments training data to alleviate need for large labeled data. Many researchers achieve state-of-the-art results by employing MTL in supervised learning settings BIBREF7, BIBREF8. In specific, BERT was successfully used with MTL. Hence, we employ multi-task BERT (following BIBREF8). For our training, we use the same pre-trained BERT-Base Multilingual Cased model as the initial checkpoint. For this MTL pre-training of BERT, we use the same afore-mentioned single-task BERT parameters. We now describe our data.
+
+## Data
+
+The shared task dataset contains 5,030 tweets related to different political issues and events in the Middle East taking place between 2011 and 2018. Tweets are collected using pre-defined keywords (i.e. targeted political figures or events) and the positive class involves ironic hashtags such as #sokhria, #tahakoum, and #maskhara (Arabic variants for “irony"). Duplicates, retweets, and non-intelligible tweets are removed by organizers. Tweets involve both MSA as well as dialects at various degrees of granularity such as Egyptian, Gulf, and Levantine.
+
+IDAT@FIRE2019 is set up as a binary classification task where tweets are assigned labels from the set {ironic, non-ironic}. A total of 4,024 tweets were released by organizers as training data. In addition, 1,006 tweets were used by organizers as as test data. Test labels were not release; and teams were expected to submit the predictions produced by their systems on the test split. For our models, we split the 4,024 released training data into 90% TRAIN ($n$=3,621 tweets; `ironic'=1,882 and `non-ironic'=1,739) and 10% DEV ($n$=403 tweets; `ironic'=209 and `non-ironic'=194). We train our models on TRAIN, and evaluate on DEV.
+
+Our multi-task BERT models involve six different Arabic classification tasks. We briefly introduce the data for these tasks here:
+
+Author profiling and deception detection in Arabic (APDA). BIBREF9 . From APDA, we only use the corpus of author profiling (which includes the three profiling tasks of age, gender, and variety). The organizers of APDA provide 225,000 tweets as training data. Each tweet is labelled with three tags (one for each task). To develop our models, we split the training data into 90% training set ($n$=202,500 tweets) and 10% development set ($n$=22,500 tweets). With regard to age, authors consider tweets of three classes: {Under 25, Between 25 and 34, and Above 35}. For the Arabic varieties, they consider the following fifteen classes: {Algeria, Egypt, Iraq, Kuwait, Lebanon-Syria, Lybia, Morocco, Oman, Palestine-Jordan, Qatar, Saudi Arabia, Sudan, Tunisia, UAE, Yemen}. Gender is labeled as a binary task with {male,female} tags.
+
+LAMA+DINA Emotion detection. Alhuzali et al. BIBREF10 introduce LAMA, a dataset for Arabic emotion detection. They use a first-person seed phrase approach and extend work by Abdul-Mageed et al. BIBREF11 for emotion data collection from 6 to 8 emotion categories (i.e. anger, anticipation, disgust, fear, joy, sadness, surprise and trust). We use the combined LAMA+DINA corpus. It is split by the authors as 189,902 tweets training set, 910 as development, and 941 as test. In our experiment, we use only the training set for out MTL experiments.
+
+Sentiment analysis in Arabic tweets. This dataset is a shared task on Kaggle by Motaz Saad . The corpus contains 58,751 Arabic tweets (46,940 training, and 11,811 test). The tweets are annotated with positive and negative labels based on an emoji lexicon.
+
+## Models ::: GRU
+
+We train a baseline GRU network with our iorny TRAIN data. This network has only one layer unidirectional GRU, with 500 unites and a linear, output layer. The input word tokens are embedded by the trainable word vectors which are initialized with a standard normal distribution, with $\mu =0$, and $\sigma =1$, i.e., $W \sim N(0,1)$. We use Adam BIBREF12 with a fixed learning rate of $1e-3$ for optimization. For regularization, we use dropout BIBREF13 with a rate of 0.5 on the hidden layer. We set the maximum sequence sequence in our GRU model to 50 words, and use all 22,000 words of training set as vocabulary. We employ batch training with a batch size of 64 for this model. We run the network for 20 epochs and save the model at the end of each epoch, choosing the model that performs highest on DEV as our best model. We report our best result on DEV in Table TABREF22. Our best result is acquired with 12 epochs. As Table TABREF22 shows, the baseline obtains $accuracy=73.70\%$ and $F_1=73.47$.
+
+## Models ::: Single-Task BERT
+
+We use the BERT-Base Multilingual Cased model released by the authors BIBREF1 . The model is trained on 104 languages (including Arabic) with 12 layers, 768 hidden units each, 12 attention heads. The entire model has 110M parameters. The model has 119,547 shared WordPieces vocabulary, and was pre-trained on the entire Wikipedia for each language. For fine-tuning, we use a maximum sequence size of 50 tokens and a batch size of 32. We set the learning rate to $2e-5$ and train for 20 epochs. For single-task learning, we fine-tune BERT on the training set (i.e., TRAIN) of the irony task exclusively. We refer to this model as BERT-ST, ST standing for `single task.' As Table TABREF22 shows, BERT-ST unsurprisingly acquires better performance than the baseline GRU model. On accuracy, BERT-ST is 7.94% better than the baseline. BERT-ST obtains 81.62 $F_1$ which is 7.35 better than the baseline.
+
+## Models ::: Multi-Task BERT
+
+We follow the work of Liu et al. BIBREF8 for training an MTL BERT in that we fine-tune the afore-mentioned BERT-Base Multilingual Cased model with different tasks jointly. First, we fine-tune with the three tasks of author profiling and the irony task simultaneously. We refer to this model trained on the 4 tasks simply as BERT-MT4. BERT-MT5 refers to the model fine-tuned on the 3 author profiling tasks, the emotion task, and the irony task. We also refer to the model fine-tuned on all six tasks (adding the sentiment task mentioned earlier) as BERT-MT6. For MTL BERT, we use the same parameters as the single task BERT listed in the previous sub-section (i.e., Single-Task BERT). In Table TABREF22, we present the performance on the DEV set of only the irony detection task. We note that all the results of multitask learning with BERT are better than those with the single task BERT. The model trained on all six tasks obtains the best result, which is 2.23% accuracy and 2.25% $F_1$ higher than the single task BERT model.
+
+## Models ::: In-Domain Pre-Training
+
+Our irony data involves dialects such as Egyptian, Gulf, and Levantine, as we explained earlier. The BERT-Base Multilingual Cased model we used, however, was trained on Arabic Wikipedia, which is mostly MSA. We believe this dialect mismatch is sub-optimal. As Sun et al. BIBREF14 show, further pre-training with domain specific data can improve performance of a learner. Viewing dialects as constituting different domains, we turn to dialectal data to further pre-train BERT. Namely, we use 1M tweets randomly sampled from an in-house Twitter dataset to resume pre-training BERT before we fine-tune on the irony data. We use BERT-Base Multilingual Cased model as an initial checkpoint and pre-train on this 1M dataset with a learning rate of $2e-5$, for 10 epochs. Then, we fine-tune on MT5 (and then on MT6) with the new further-pre-trained BERT model. We refer to the new models as BERT-1M-MT5 and BERT-1M-MT6, respectively. As Table TABREF22 shows, BERT-1M-MT5 performs best: BERT-1M-MT5 obtains 84.37% accuracy (0.5% less than BERT-MT6) and 83.34 $F_1$ (0.47% less than BERT-MT6).
+
+## Models ::: IDAT@FIRE2019 Submission
+
+For the shared task submission, we use the predictions of BERT-1M-MT5 as our first submitted system. Then, we concatenate our DEV and TRAIN data to compose a new training set (thus using all the training data released by organizers) to re-train BERT-1M-MT5 and BERT-MT6 with the same parameters. We use the predictions of these two models as our second and third submissions. Our second submission obtains 82.4 $F_1$ on the official test set, and ranks $4th$ on this shared task.
+
+## Related Work
+
+Multi-Task Learning. MTL has been effectively used to model several NLP problems. These include, for example, syntactic parsing BIBREF15, sequence labeling BIBREF16, BIBREF17, and text classification BIBREF18.
+
+Irony in different languages. Irony detection has been investigated in various languages. For example, Hee et al. BIBREF19 propose two irony detection tasks in English tweets. Task A is a binary classification task (irony vs. non-irony), and Task B is multi-class identification of a specific type of irony from the set {verbal, situational, other-irony, non-ironic}. They use hashtags to automatically collect tweets that they manually annotate using a fine-grained annotation scheme. Participants in this competition construct models based on logistic regression and support vector machine (SVM) BIBREF20, XGBoost BIBREF21, convolutional neural networks (CNNs) BIBREF21, long short-term memory networks (LSTMs) BIBREF22, etc. For the Italian language, Cignarella et al. propose the IronTA shared task BIBREF23, and the best system BIBREF24 is a combination of bi-directional LSTMs, word $n$-grams, and affective lexicons. For Spanish, Ortega-Bueno1 et al. BIBREF25 introduce the IroSvA shared task, a binary classification task for tweets and news comments. The best-performing model on the task, BIBREF26, employs pre-trained Word2Vec, multi-head Transformer encoder and a global average pooling mechanism.
+
+Irony in Arabic. Although Arabic is a widely spoken collection of languages ($\sim $ 300 million native speakers) BIBREF27, BIBREF28, there has not been works on irony that we know of on the language. IDAT@FIRE2019 aims at bridging this gap. The closest works in Arabic are those focusing on other text classification tasks such as sentiment analysis BIBREF29, BIBREF30, BIBREF31, BIBREF32, emotion BIBREF10, and dialect identification BIBREF28, BIBREF33, BIBREF34, BIBREF35.
+
+## Conclusion
+
+In this paper, we described our submissions to the Irony Detection in Arabic shared task (IDAT@FIRE2019). We presented how we acquire effective models using pre-trained BERT in a multi-task learning setting. We also showed the utility of viewing different varieties of Arabic as different domains by reporting better performance with models pre-trained with dialectal data rather than exclusively on MSA. Our multi-task model with domain-specific BERT ranks $4th$ in the official IDAT@FIRE2019 evaluation. The model has the advantage of being exclusively based on deep learning. In the future, we will investigate other multi-task learning architectures, and extend our work with semi-supervised methods.
+
+## Acknowledgement
+
+We acknowledge the support of the Natural Sciences and Engineering Research Council of Canada (NSERC), the Social Sciences Research Council of Canada (SSHRC), and Compute Canada (www.computecanada.ca).

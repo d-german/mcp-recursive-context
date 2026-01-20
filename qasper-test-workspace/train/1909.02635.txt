@@ -1,0 +1,185 @@
+# Effective Use of Transformer Networks for Entity Tracking
+
+**Paper ID:** 1909.02635
+
+## Abstract
+
+Tracking entities in procedural language requires understanding the transformations arising from actions on entities as well as those entities' interactions. While self-attention-based pre-trained language encoders like GPT and BERT have been successfully applied across a range of natural language understanding tasks, their ability to handle the nuances of procedural texts is still untested. In this paper, we explore the use of pre-trained transformer networks for entity tracking tasks in procedural text. First, we test standard lightweight approaches for prediction with pre-trained transformers, and find that these approaches underperform even simple baselines. We show that much stronger results can be attained by restructuring the input to guide the transformer model to focus on a particular entity. Second, we assess the degree to which transformer networks capture the process dynamics, investigating such factors as merged entities and oblique entity references. On two different tasks, ingredient detection in recipes and QA over scientific processes, we achieve state-of-the-art results, but our models still largely attend to shallow context clues and do not form complex representations of intermediate entity or process state.
+
+## Introduction
+
+Transformer based pre-trained language models BIBREF0, BIBREF1, BIBREF2, BIBREF3, BIBREF4 have been shown to perform remarkably well on a range of tasks, including entity-related tasks like coreference resolution BIBREF5 and named entity recognition BIBREF0. This performance has been generally attributed to the robust transfer of lexical semantics to downstream tasks. However, these models are still better at capturing syntax than they are at more entity-focused aspects like coreference BIBREF6, BIBREF7; moreover, existing state-of-the-art architectures for such tasks often perform well looking at only local entity mentions BIBREF8, BIBREF9, BIBREF10 rather than forming truly global entity representations BIBREF11, BIBREF12. Thus, performance on these tasks does not form sufficient evidence that these representations strongly capture entity semantics. Better understanding the models' capabilities requires testing them in domains involving complex entity interactions over longer texts. One such domain is that of procedural language, which is strongly focused on tracking the entities involved and their interactions BIBREF13, BIBREF14, BIBREF15.
+
+This paper investigates the question of how transformer-based models form entity representations and what these representations capture. We expect that after fine-tuning on a target task, a transformer's output representations should somehow capture relevant entity properties, in the sense that these properties can be extracted by shallow classification either from entity tokens or from marker tokens. However, we observe that such “post-conditioning” approaches don't perform significantly better than rule-based baselines on the tasks we study. We address this by proposing entity-centric ways of structuring input to the transformer networks, using the entity to guide the intrinsic self-attention and form entity-centric representations for all the tokens. We find that our proposed methods lead to a significant improvement in performance over baselines.
+
+Although our entity-specific application of transformers is more effective at the entity tracking tasks we study, we perform additional analysis and find that these tasks still do not encourage transformers to form truly deep entity representations. Our performance gain is largely from better understanding of verb semantics in terms of associating process actions with entity the paragraph is conditioned on. The model also does not specialize in “tracking” composed entities per se, again using surface clues like verbs to identify the components involved in a new composition.
+
+We evaluate our models on two datasets specifically designed to invoke procedural understanding: (i) Recipes BIBREF16, and (ii) ProPara BIBREF14. For the Recipes dataset, we classify whether an ingredient was affected in a certain step, which requires understanding when ingredients are combined or the focus of the recipe shifts away from them. The ProPara dataset involves answering a more complex set of questions about physical state changes of components in scientific processes. To handle this more structured setting, our transformer produces potentials consumed by a conditional random field which predicts entity states over time. Using a unidirectional GPT-based architecture, we achieve state-of-the-art results on both the datasets; nevertheless, analysis shows that our approach still falls short of capturing the full space of entity interactions.
+
+## Background: Process Understanding
+
+Procedural text is a domain of text involved with understanding some kind of process, such as a phenomenon arising in nature or a set of instructions to perform a task. Entity tracking is a core component of understanding such texts.
+
+BIBREF14 introduced the ProPara dataset to probe understanding of scientific processes. The goal is to track the sequence of physical state changes (creation, destruction, and movement) entites undergo over long sequences of process steps. Past work involves both modeling entities across time BIBREF17 and capturing structural constraints inherent in the processes BIBREF18, BIBREF19 Figure FIGREF2b shows an example of the dataset posed as a structured prediction task, as in BIBREF19. For such a domain, it is crucial to capture implicit event occurrences beyond explicit entity mentions. For example, in fuel goes into the generator. The generator converts mechanical energy into electrical energy”, the fuel is implicitly destroyed in the process.
+
+BIBREF15 introduced the task of detecting state changes in recipes in the Recipes dataset and proposed an entity-centric memory network neural architecture for simulating action dynamics. Figure FIGREF2a shows an example from the Recipes dataset with a grid showing ingredient presence. We focus specifically on this core problem of ingredient detection; while only one of the sub-tasks associated with their dataset, it reflects some complex semantics involving understanding the current state of the recipe. Tracking of ingredients in the cooking domain is challenging owing to the compositional nature of recipes whereby ingredients mix together and are aliased as intermediate compositions.
+
+We pose both of these procedural understanding tasks as classification problems, predicting the state of the entity at each timestep from a set of pre-defined classes. In Figure FIGREF2, these classes correspond to either the presence (1) or absence (0) or the sequence of state changes create (C), move (M), destroy (D), exists (E), and none (O).
+
+State-of-the-art approaches on these tasks are inherently entity-centric. Separately, it has been shown that entity-centric language modeling in a continuous framework can lead to better performance for LM related tasks BIBREF20, BIBREF21. Moreover, external data has shown to be useful for modeling process understanding tasks in prior work BIBREF18, BIBREF15, suggesting that pre-trained models may be effective.
+
+With such tasks in place, a strong model will ideally learn to form robust entity-centric representation at each time step instead of solely relying on extracting information from the local entity mentions. This expectation is primarily due to the evolving nature of the process domain where entities undergo complex interactions, form intermediate compositions, and are often accompanied by implicit state changes. We now investigate to what extent this is true in a standard application of transformer models to this problem.
+
+## Studying Basic Transformer Representations for Entity Tracking ::: Post-conditioning Models
+
+The most natural way to use the pre-trained transformer architectures for the entity tracking tasks is to simply encode the text sequence and then attempt to “read off” entity states from the contextual transformer representation. We call this approach post-conditioning: the transformer runs with no knowledge of which entity or entities we are going to make predictions on, but we only condition on the target entity after the transformer stage.
+
+Figure FIGREF4 depicts this model. Formally, for a labelled pair $(\lbrace s_1, s_2, \dots , s_t\rbrace , y_{et})$, we encode the tokenized sequence of steps up to the current timestep (the sentences are separated by using a special [SEP] token), independent of the entity. We denote by $X=[h_{1}, h_{2},\dots , h_{m}]$ the contextualized hidden representation of the $m$ input tokens from the last layer, and by $\textstyle g_{e}\!=\!\!\!\sum \limits _{\text{ent toks}}\!emb(e_i)$ the entity representation for post conditioning. We now use one of the following two ways to make an entity-specific prediction:
+
+## Studying Basic Transformer Representations for Entity Tracking ::: Post-conditioning Models ::: Task Specific Input Token
+
+We append a $\texttt {[CLS]}$ token to the input sequence and use the output representation of the $\texttt {[CLS]}$ token denoted by $h_{ \texttt {[CLS]}}$ concatenated with the learned BPE embeddings of the entity as the representation $c_{e,t}$ for our entity tracking system. We then use a linear layer over it to get class probabilities:
+
+The aim of the [CLS] token is to encode information related to general entity related semantics participating in the recipe (sentence priors). We then use a single linear layer to learn sentence priors and entity priors independently, without strong interaction. We call this model GPT$_{indep}$.
+
+## Studying Basic Transformer Representations for Entity Tracking ::: Post-conditioning Models ::: Entity Based Attention
+
+Second, we explore a more fine-grained way of using the GPT model outputs. Specifically, we use bilinear attention between $g_e$ and the transformer output for the process tokens $X$ to get a contextual representation $c_{e,t}$ for a given entity. Finally, using a feed-forward network followed by softmax layer gives us the class probabilities:
+
+The bilinear attention over the contextual representations of the process tokens allows the model to fetch token content relevant to that particular entity. We call this model GPT$_{attn}$.
+
+## Studying Basic Transformer Representations for Entity Tracking ::: Results and Observations
+
+We evaluate the discussed post-conditioning models on the ingredient detection task of the Recipes dataset. To benchmark the performance, we compare to three rule-based baselines. This includes (i) Majority Class, (ii) Exact Match of an ingredient $e$ in recipe step $s_t$, and (iii) First Occurrence, where we predict the ingredient to be present in all steps following the first exact match. These latter two baselines capture natural modes of reasoning about the dataset: an ingredient is used when it is directly mentioned, or it is used in every step after it is mentioned, reflecting the assumption that a recipe is about incrementally adding ingredients to an ever-growing mixture. We also construct a LSTM baseline to evaluate the performance of ELMo embeddings (ELMo$_{token}$ and ELMo$_{sent}$) BIBREF22 compared to GPT.
+
+Table TABREF10 compares the performance of the discussed models against the baselines, evaluating per-step entity prediction performance. Using the ground truth about ingredient's state, we also report the uncombined (UR) and combined (CR) recalls, which are per-timestep ingredient recall distinguished by whether the ingredient is explicitly mentioned (uncombined) or part of a mixture (combined). Note that Exact Match and First Occ baselines represent high-precision and high-recall regimes for this task, respectively.
+
+As observed from the results, the post-conditioning frameworks underperform compared to the First Occ baseline. While the CR values appear to be high, which would suggest that the model is capturing the addition of ingredients to the mixture, we note that this value is also lower than the corresponding value for First Occ. This result suggests that the model may be approximating the behavior of this baseline, but doing so poorly. The unconditional self-attention mechanism of the transformers does not seem sufficient to capture the entity details at each time step beyond simple presence or absence. Moreover, we see that GPT$_{indep}$ performs somewhat comparably to GPT$_{attn}$, suggesting that consuming the transformer's output with simple attention is not able to really extract the right entity representation.
+
+For ProPara, we observe similar performance trends where the post-conditioning model performed below par with the state-of-the-art architectures.
+
+## Entity-Conditioned Models
+
+The post-conditioning framework assumes that the transformer network can form strong representations containing entity information accessible in a shallow way based on the target entity. We now propose a model architecture which more strongly conditions on the entity as a part of the intrinsic self-attention mechanism of the transformers.
+
+Our approach consists of structuring input to the transformer network to use and guide the self-attention of the transformers, conditioning it on the entity. Our main mode of encoding the input, the entity-first method, is shown in Figure FIGREF4. The input sequence begins with a [START] token, then the entity under consideration, then a [SEP] token. After each sentence, a [CLS] token is used to anchor the prediction for that sentence. In this model, the transformer can always observe the entity it should be primarily “attending to” from the standpoint of building representations. We also have an entity-last variant where the entity is primarily observed just before the classification token to condition the [CLS] token's self-attention accordingly. These variants are naturally more computationally-intensive than post-conditioned models, as we need to rerun the transformer for each distinct entity we want to make a prediction for.
+
+## Entity-Conditioned Models ::: Sentence Level vs. Document Level
+
+As an additional variation, we can either run the transformer once per document with multiple [CLS] tokens (a document-level model as shown in Figure FIGREF4) or specialize the prediction to a single timestep (a sentence-level model). In a sentence level model, we formulate each pair of entity $e$ and process step $t$ as a separate instance for our classification task. Thus, for a process with $T$ steps and $m$ entities we get $T \times m$ input sequences for fine tuning our classification task.
+
+## Entity-Conditioned Models ::: Training Details
+
+In most experiments, we initialize the network with the weights of the standard pre-trained GPT model, then subsequently do either domain specific LM fine-tuning and supervised task specific fine-tuning.
+
+## Entity-Conditioned Models ::: Training Details ::: Domain Specific LM fine-tuning
+
+For some procedural domains, we have access to additional unlabeled data. To adapt the LM to capture domain intricacies, we fine-tune the transformer network on this unlabeled corpus.
+
+## Entity-Conditioned Models ::: Training Details ::: Supervised Task Fine-Tuning
+
+After the domain specific LM fine-tuning, we fine-tune our network parameters for the end task of entity tracking. For fine-tuning for the task, we have a labelled dataset which we denote by $\mathcal {C}$, the set of labelled pairs $(\lbrace s_1, s_2, \dots , s_t\rbrace , y_{et})$ for a given process. The input is converted according to our chosen entity conditioning procedure, then fed through the pre-trained network.
+
+In addition, we observed that adding the language model loss during task specific fine-tuning leads to better performance as well, possibly because it adapts the LM to our task-specific input formulation. Thus,
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection
+
+We first evaluate the proposed entity conditioned self-attention model on the Recipes dataset to compare the performance with the post-conditioning variants.
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection ::: Systems to Compare
+
+We use the pre-trained GPT architecture in the proposed entity conditioned framework with all its variants. BERT mainly differs in that it is bidirectional, though we also use the pre-trained [CLS] and [SEP] tokens instead of introducing new tokens in the input vocabulary and training them from scratch during fine-tuning. Owing to the lengths of the processes, all our experiments are performed on BERT$_{BASE}$.
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection ::: Systems to Compare ::: Neural Process Networks
+
+The most significant prior work on this dataset is the work of BIBREF15. However, their data condition differs significantly from ours: they train on a large noisy training set and do not use any of the high-quality labeled data, instead treating it as dev and test data. Consequently, their model achieves low performance, roughly 56 $F_1 $ while ours achieves $82.5$ $F_1$ (though these are not the exact same test set). Moreover, theirs underperforms the first occurrence baseline, which calls into question the value of that training data. Therefore, we do not compare to this model directly. We use the small set of human-annotated data for our probing task. Our train/dev/test split consists of $600/100/175$ recipes, respectively.
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection ::: Results
+
+Table TABREF20 compares the overall performances of our proposed models. Our best ET$_{GPT}$ model achieves an $F_1$ score of $82.50$. Comparing to the baselines (Majority through First) and post-conditioned models, we see that the early entity conditioning is critical to achieve high performance.
+
+Although the First model still achieves the highest CR, due to operating in a high-recall regime, we see that the ET$_{GPT}$ models all significantly outperform the post-conditioning models on this metric, indicating better modeling of these compositions. Both recall and precision are substantially increaesd compared to these baseline models. Interestingly, the ELMo-based model under-performs the first-occurrence baseline, indicating that the LSTM model is not learning much in terms of recognizing complex entity semantics grounded in long term contexts.
+
+Comparing the four variants of structuring input in proposed architectures as discussed in Section SECREF4, we observe that the document-level, entity-first model is the best performing variant. Given the left-to-right unidirectional transformer architecture, this model notably forms target-specific representations for all process tokens, compared to using the transformer self-attention only to extract entity specific information at the end of the process.
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection ::: Ablations
+
+We perform ablations to evaluate the model's dependency on the context and on the target ingredient. Table TABREF23 shows the results for these ablations.
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection ::: Ablations ::: Ingredient Specificity
+
+In the “no ingredient” baseline (w/o ing.), the model is not provided with the specific ingredient information. Table TABREF23 shows that while not being a strong baseline, the model achieves decent overall accuracy with the drop in UR being higher compared to CR. This indicates that there are some generic indicators (mixture) that it can pick up to try to guess at overall ingredient presence or absence.
+
+## Entity-Conditioned Models ::: Experiments: Ingredient Detection ::: Ablations ::: Context Importance
+
+We compare with a “no context” model (w/o context) which ignore the previous context and only use the current recipe step in determining the ingredient's presence. Table TABREF23 shows that the such model is able to perform surprisingly well, nearly as well as the first occurrence baseline.
+
+This is because the model can often recognize words like verbs (for example, add) or nouns (for example, mixture) that indicate many ingredients are being used, and can do well without really tracking any specific entity as desired for the task.
+
+## Entity-Conditioned Models ::: State Change Detection (ProPara)
+
+Next, we now focus on a structured task to evaluate the performance of the entity tracking architecture in capturing the structural information in the continuous self-attention framework. For this, we use the ProPara dataset and evaluate our proposed model on the comprehension task.
+
+Figure FIGREF2b shows an example of a short instance from the ProPara dataset. The task of identifying state change follows a structure satisfying the existence cycle; for example, an entity can not be created after destruction. Our prior work BIBREF19 proposed a structured model for the task that achieved state-of-the-art performance. We adapt our proposed entity tracking transformer models to this structured prediction framework, capturing creation, movement, existence (distinct from movement or creation), destruction, and non-existence.
+
+We use the standard evaluation scheme of the ProPara dataset, which is framed as answering the following categories of questions: (Cat-1) Is e created (destroyed, moved) in the process?, (Cat-2) When (step #) is e created (destroyed, moved)?, (Cat-3) Where is e created/destroyed/moved from/to)?
+
+## Entity-Conditioned Models ::: State Change Detection (ProPara) ::: Systems to Compare
+
+We compare our proposed models to the previous work on the ProPara dataset. This includes the entity specific MRC models, EntNet BIBREF23, QRN BIBREF24, and KG-MRC BIBREF17. Also, BIBREF14 proposed two task specific models, ProLocal and ProGlobal, as baselines for the dataset. Finally, we compare against our past neural CRF entity tracking model (NCET) BIBREF19 which uses ELMo embeddings in a neural CRF architecture.
+
+For the proposed GPT architecture, we use the task specific [CLS] token to generate tag potentials instead of class probabilities as we did previously. For BERT, we perform a similar modification as described in the previous task to utilize the pre-trained [CLS] token to generate tag potentials. Finally, we perform a Viterbi decoding at inference time to infer the most likely valid tag sequence.
+
+## Entity-Conditioned Models ::: State Change Detection (ProPara) ::: Results
+
+Table TABREF28 compares the performance of the proposed entity tracking models on the sentence level task. Since, we are considering the classification aspect of the task, we compare our model performance for Cat-1 and Cat-2. As shown, the structured document level, entity first ET$_{GPT}$ and ET$_{BERT}$ models achieve state-of-the-art results. We observe that the major source of performance gain is attributed to the improvement in identifying the exact step(s) for the state changes (Cat-2). This shows that the model are able to better track the entities by identifying the exact step of state change (Cat-2) accurately rather than just detecting the presence of such state changes (Cat-1).
+
+This task is more highly structured and in some ways more non-local than ingredient prediction; the high performance here shows that the ET$_{GPT}$ model is able to capture document level structural information effectively. Further, the structural constraints from the CRF also aid in making better predictions. For example, in the process “higher pressure causes the sediment to heat up. the heat causes chemical processes. the material becomes a liquid. is known as oil.”, the material is a by-product of the chemical process but there's no direct mention of it. However, the material ceases to exist in the next step, and because the model is able to predict this correctly, maintaining consistency results in the model finally predicting the entire state change correctly as well.
+
+## Challenging Task Phenomena
+
+Based on the results in the previous section, our models clearly achieve strong performance compared to past approaches. We now revisit the challenging cases discussed in Section SECREF2 to see if our entity tracking approaches are modeling sophisticated entity phenomena as advertised. For both datasets and associated tasks, we isolate the specific set of challenging cases grounded in tracking (i) intermediate compositions formed as part of combination of entities leading to no explicit mention, and (ii) implicit events which change entities' states without explicit mention of the affects.
+
+## Challenging Task Phenomena ::: Ingredient Detection
+
+For Recipes, we mainly want to investigate cases of ingredients getting re-engaged in the recipe not in a raw form but in a combined nature with other ingredients and henceforth no explicit mention. For example, eggs in step 4 of Figure FIGREF2a exemplifies this case. The performance in such cases is indicative of how strongly the model can track compositional entities. We also examine the performance for cases where the ingredient is referred by some other name.
+
+## Challenging Task Phenomena ::: Ingredient Detection ::: Intermediate Compositions
+
+Formally, we pick the set of examples where the ground truth is a transition from $0 \rightarrow 1$ (not present to present) and the 1 is a “combined” case. Table TABREF31 shows the model's performance on this subset of cases, of which there are 1049 in the test set. The model achieves an accuracy of 51.1% on these bigrams, which is relatively low given the overall model performance. In the error cases, the model defaults to the $1\rightarrow 1$ pattern indicative of the First Occ baseline.
+
+## Challenging Task Phenomena ::: Ingredient Detection ::: Hypernymy and Synonymy
+
+We observe the model is able to capture ingredients based on their hypernyms (nuts $\rightarrow $ pecans, salad $\rightarrow $ lettuce) and rough synonymy (bourbon $\rightarrow $ scotch). This performance can be partially attributed to the language model pre-training. We can isolate these cases by filtering for uncombined ingredients when there is no matching ingredient token in the step. Out of 552 such cases in the test set, the model predicts 375 correctly giving a recall of $67.9$. This is lower than overall UR; if pre-training behaves as advertised, we expect little degradation in this case, but instead we see performance significantly below the average on uncombined ingredients.
+
+## Challenging Task Phenomena ::: Ingredient Detection ::: Impact of external data
+
+One question we can ask of the model's capabilities is to what extent they arise from domain knowledge in the large pre-trained data. We train transformer models from scratch and additionally investigate using the large corpus of unlabeled recipes for our LM pre-training. As can be seen in Table TABREF35, the incorporation of external data leads to major improvements in the overall performance. This gain is largely due to the increase in combined recall. One possible reason could be that external data leads to better understanding of verb semantics and in turn the specific ingredients forming part of the intermediate compositions. Figure FIGREF37 shows that verbs are a critical clue the model relies on to make predictions. Performing LM fine-tuning on top of GPT also gives gains.
+
+## Challenging Task Phenomena ::: State Change Detection
+
+For ProPara, Table TABREF28 shows that the model does not significantly outperform the SOTA models in state change detection (Cat-1). However, for those correctly detected events, the transformer model outperforms the previous models for detecting the exact step of state change (Cat-2), primarily based on verb semantics. We do a finer-grained study in Table TABREF36 by breaking down the performance for the three state changes: creation (C), movement (M), and destruction (D), separately. Across the three state changes, the model suffers a loss of performance in the movement cases. This is owing to the fact that the movement cases require a deeper compositional and implicit event tracking. Also, a majority of errors leading to false negatives are due to the the formation of new sub-entities which are then mentioned with other names. For example, when talking about weak acid in “the water becomes a weak acid. the water dissolves limestone” the weak acid is also considered to move to the limestone.
+
+## Analysis
+
+The model's performance on these challenging task cases suggests that even though it outperforms baselines, it may not be capturing deep reasoning about entities. To understand what the model actually does, we perform analysis of the model's behavior with respect to the input to understand what cues it is picking up on.
+
+## Analysis ::: Gradient based Analysis
+
+One way to analyze the model is to compute model gradients with respect to input features BIBREF26, BIBREF25. Figure FIGREF37 shows that in this particular example, the most important model inputs are verbs possibly associated with the entity butter, in addition to the entity's mentions themselves. It further shows that the model learns to extract shallow clues of identifying actions exerted upon only the entity being tracked, regardless of other entities, by leveraging verb semantics.
+
+In an ideal scenario, we would want the model to track constituent entities by translating the “focus” to track their newly formed compositions with other entities, often aliased by other names like mixture, blend, paste etc. However, the low performance on such cases shown in Section SECREF5 gives further evidence that the model is not doing this.
+
+## Analysis ::: Input Ablations
+
+We can study which inputs are important more directly by explicitly removing specific certain words from the input process paragraph and evaluating the performance of the resulting input under the current model setup. We mainly did experiments to examine the importance of: (i) verbs, and (ii) other ingredients.
+
+Table TABREF40 presents these ablation studies. We only observe a minor performance drop from $84.59$ to $82.71$ (accuracy) when other ingredients are removed entirely. Removing verbs dropped the performance to $79.08$ and further omitting both leads to $77.79$. This shows the model’s dependence on verb semantics over tracking the other ingredients.
+
+## Conclusion
+
+In this paper, we examined the capabilities of transformer networks for capturing entity state semantics. First, we show that the conventional framework of using the transformer networks is not rich enough to capture entity semantics in these cases. We then propose entity-centric ways to formulate richer transformer encoding of the process paragraph, guiding the self-attention in a target entity oriented way. This approach leads to significant performance improvements, but examining model performance more deeply, we conclude that these models still do not model the intermediate compositional entities and perform well by largely relying on surface entity mentions and verb semantics.
+
+## Acknowledgments
+
+This work was partially supported by NSF Grant IIS-1814522 and an equipment grant from NVIDIA. The authors acknowledge the Texas Advanced Computing Center (TACC) at The University of Texas at Austin for providing HPC resources used to conduct this research. Results presented in this paper were obtained using the Chameleon testbed supported by the National Science Foundation. Thanks as well to the anonymous reviewers for their helpful comments.

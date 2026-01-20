@@ -1,0 +1,127 @@
+# Drug-drug Interaction Extraction via Recurrent Neural Network with Multiple Attention Layers
+
+**Paper ID:** 1705.03261
+
+## Abstract
+
+Drug-drug interaction (DDI) is a vital information when physicians and pharmacists intend to co-administer two or more drugs. Thus, several DDI databases are constructed to avoid mistakenly combined use. In recent years, automatically extracting DDIs from biomedical text has drawn researchers' attention. However, the existing work utilize either complex feature engineering or NLP tools, both of which are insufficient for sentence comprehension. Inspired by the deep learning approaches in natural language processing, we propose a recur- rent neural network model with multiple attention layers for DDI classification. We evaluate our model on 2013 SemEval DDIExtraction dataset. The experiments show that our model classifies most of the drug pairs into correct DDI categories, which outperforms the existing NLP or deep learning methods.
+
+## Introduction
+
+Drug-drug interaction (DDI) is a situation when one drug increases or decreases the effect of another drug BIBREF0 . Adverse drug reactions may cause severe side effect, if two or more medicines were taken and their DDI were not investigated in detail. DDI is a common cause of illness, even a cause of death BIBREF1 . Thus, DDI databases for clinical medication decisions are proposed by some researchers. These databases such as SFINX BIBREF2 , KEGG BIBREF3 , CredibleMeds BIBREF4 help physicians and pharmacists avoid most adverse drug reactions.
+
+Traditional DDI databases are manually constructed according to clinical records, scientific research and drug specifications. For instance, The sentence “With combined use, clinicians should be aware, when phenytoin is added, of the potential for reexacerbation of pulmonary symptomatology due to lowered serum theophylline concentrations BIBREF5 ”, which is from a pharmacotherapy report, describe the side effect of phenytoin and theophylline's combined use. Then this information on specific medicines will be added to DDI databases. As drug-drug interactions have being increasingly found, manually constructing DDI database would consume a lot of manpower and resources.
+
+There has been many efforts to automatically extract DDIs from natural language BIBREF0 , BIBREF6 , BIBREF7 , BIBREF8 , BIBREF9 , BIBREF10 , BIBREF11 , BIBREF12 , mainly medical literature and clinical records. These works can be divided into the following categories:
+
+To avoid complex feature engineering and NLP toolkits' usage, we employ deep learning approaches for sentence comprehension as a whole. Our model takes in a sentence from biomedical literature which contains a drug pair and outputs what kind of DDI this drug pair belongs. This assists physicians refrain from improper combined use of drugs. In addition, the word and sentence level attentions are introduced to our model for better DDI predictions.
+
+We train our language comprehension model with labeled instances. Figure FIGREF5 shows partial records in DDI corpus BIBREF16 . We extract the sentence and drug pairs in the records. There are 3 drug pairs in this example thus we have 3 instances. The DDI corpus annotate each drug pair in the sentence with a DDI type. The DDI type, which is the most concerned information, is described in table TABREF4 . The details about how we train our model and extract the DDI type from text are described in the remaining sections.
+
+## Related Work
+
+In DDI extraction task, NLP methods or machine learning approaches are proposed by most of the work. Chowdhury BIBREF14 and Thomas et al. BIBREF11 proposed methods that use linguistic phenomenons and two-stage SVM to classify DDIs. FBK-irst BIBREF10 is a follow-on work which applies kernel method to the existing model and outperforms it.
+
+Neural network based approaches have been proposed by several works. Liu et al. BIBREF9 employ CNN for DDI extraction for the first time which outperforms the traditional machine learning based methods. Limited by the convolutional kernel size, the CNN can only extracted features of continuous 3 to 5 words rather than distant words. Liu et al. BIBREF8 proposed dependency-based CNN to handle distant but relevant words. Sahu et al. BIBREF12 proposed LSTM based DDI extraction approach and outperforms CNN based approach, since LSTM handles sentence as a sequence instead of slide windows. To conclude, Neural network based approaches have advantages of 1) less reliance on extra NLP toolkits, 2) simpler preprocessing procedure, 3) better performance than text analysis and machine learning methods.
+
+Drug-drug interaction extraction is a relation extraction task of natural language processing. Relation extraction aims to determine the relation between two given entities in a sentence. In recent years, attention mechanism and various neural networks are applied to relation extraction BIBREF17 , BIBREF18 , BIBREF19 , BIBREF20 , BIBREF21 . Convolutional deep neural network are utilized for extracting sentence level features in BIBREF19 . Then the sentence level features are concatenated with lexical level features, which are obtained by NLP toolkit WordNet BIBREF22 , followed by a multilayer perceptron (MLP) to classify the entities' relation. A fixed work is proposed by Nguyen et al. BIBREF21 . The convolutional kernel is set various size to capture more n-gram features. In addition, the word and position embedding are trained automatically instead of keeping constant as in BIBREF19 . Wang et al. BIBREF20 introduce multi-level attention mechanism to CNN in order to emphasize the keywords and ignore the non-critical words during relation detection. The attention CNN model outperforms previous state-of-the-art methods.
+
+Besides CNN, Recurrent neural network (RNN) has been applied to relation extraction as well. Zhang et al. BIBREF18 utilize long short-term memory network (LSTM), a typical RNN model, to represent sentence. The bidirectional LSTM chronologically captures the previous and future information, after which a pooling layer and MLP have been set to extract feature and classify the relation. Attention mechanism is added to bidirectional LSTM in BIBREF17 for relation extraction. An attention layer gives each memory cell a weight so that classifier can catch the principal feature for the relation detection. The Attention based bidirectional LSTM has been proven better than previous work.
+
+## Proposed Model
+
+In this section, we present our bidirectional recurrent neural network with multiple attention layer model. The overview of our architecture is shown in figure FIGREF15 . For a given instance, which describes the details about two or more drugs, the model represents each word as a vector in embedding layer. Then the bidirectional RNN layer generates a sentence matrix, each column vector in which is the semantic representation of the corresponding word. The word level attention layer transforms the sentence matrix to vector representation. Then sentence level attention layer generates final representation for the instance by combining several relevant sentences in view of the fact that these sentences have the same drug pair. Followed by a softmax classifier, the model classifies the drug pair in the given instance as specific DDI.
+
+## Preprocessing
+
+The DDI corpus contains thousands of XML files, each of which are constructed by several records. For a sentence containing INLINEFORM0 drugs, there are INLINEFORM1 drug pairs. We replace the interested two drugs with “drug1” and “drug2” while the other drugs are replaced by “durg0”, as in BIBREF9 did. This step is called drug blinding. For example, the sentence in figure FIGREF5 generates 3 instances after drug blinding: “drug1: an increased risk of hepatitis has been reported to result from combined use of drug2 and drug0”, “drug1: an increased risk of hepatitis has been reported to result from combined use of drug0 and drug2”, “drug0: an increased risk of hepatitis has been reported to result from combined use of drug1 and drug2”. The drug blinded sentences are the instances that are fed to our model.
+
+We put the sentences with the same drug pairs together as a set, since the sentence level attention layer (will be described in Section SECREF21 ) will use the sentences which contain the same drugs.
+
+## Embedding Layer
+
+Given an instance INLINEFORM0 which contains specified two drugs INLINEFORM1 , INLINEFORM2 , each word is embedded in a INLINEFORM3 dimensional space ( INLINEFORM4 , INLINEFORM5 are the dimension of word embedding and position embedding). The look up table function INLINEFORM6 maps a word or a relative position to a column vector. After embedding layer the sentence is represented by INLINEFORM7 , where DISPLAYFORM0 
+
+The INLINEFORM0 function is usually implemented with matrix-vector product. Let INLINEFORM1 , INLINEFORM2 denote the one-hot representation (column vector) of word and relative distance. INLINEFORM3 , INLINEFORM4 are word and position embedding query matrix. The look up functions are implemented by DISPLAYFORM0 
+
+Then the word sequence INLINEFORM0 is fed to the RNN layer. Note that the sentence will be filled with INLINEFORM1 if its length is less than INLINEFORM2 .
+
+## Bidirectional RNN Encoding Layer
+
+The words in the sequence are read by RNN's gated recurrent unit (GRU) one by one. The GRU takes the current word INLINEFORM0 and the previous GRU's hidden state INLINEFORM1 as input. The current GRU encodes INLINEFORM2 and INLINEFORM3 into a new hidden state INLINEFORM4 (its dimension is INLINEFORM5 , a hyperparameter), which can be regarded as informations the GRU remembered.
+
+Figure FIGREF25 shows the details in GRU. The reset gate INLINEFORM0 selectively forgets informations delivered by previous GRU. Then the hidden state becomes INLINEFORM1 . The update gate INLINEFORM2 updates the informations according to INLINEFORM3 and INLINEFORM4 . The equations below describe these procedures. Note that INLINEFORM5 stands for element wise multiplication. DISPLAYFORM0 DISPLAYFORM1 
+
+The bidirectional RNN contains forward RNN and backward RNN. Forward RNN reads sentence from INLINEFORM0 to INLINEFORM1 , generating INLINEFORM2 , INLINEFORM3 , ..., INLINEFORM4 . Backward RNN reads sentence from INLINEFORM5 to INLINEFORM6 , generating INLINEFORM7 , INLINEFORM8 , ..., INLINEFORM9 . Then the encode result of this layer is DISPLAYFORM0 
+
+We apply dropout technique in RNN layer to avoid overfitting. Each GRU have a probability (denoted by INLINEFORM0 , also a hyperparameter) of being dropped. The dropped GRU has no output and will not affect the subsequent GRUs. With bidirectional RNN and dropout technique, the input INLINEFORM1 is encoded into sentence matrix INLINEFORM2 .
+
+## Word Level Attention
+
+The purpose of word level attention layer is to extract sentence representation (also known as feature vector) from encoded matrix. We use word level attention instead of max pooling, since attention mechanism can determine the importance of individual encoded word in each row of INLINEFORM0 . Let INLINEFORM1 denotes the attention vector (column vector), INLINEFORM2 denotes the filter that gives each element in the row of INLINEFORM3 a weight. The following equations shows the attention operation, which is also illustrated in figure FIGREF15 . DISPLAYFORM0 DISPLAYFORM1 
+
+The softmax function takes a vector INLINEFORM0 as input and outputs a vector, DISPLAYFORM0 
+
+ INLINEFORM0 denotes the feature vector captured by this layer. Several approaches BIBREF12 , BIBREF17 use this vector and softmax classifier for classification. Inspired by BIBREF23 we propose the sentence level attention to combine the information of other sentences for a improved DDI classification.
+
+## Sentence Level Attention
+
+The previous layers captures the features only from the given sentence. However, other sentences may contains informations that contribute to the understanding of this sentence. It is reasonable to look over other relevant instances when determine two drugs' interaction from the given sentence. In our implementation, the instances that have the same drug pair are believed to be relevant. The relevant instances set is denoted by INLINEFORM0 , where INLINEFORM1 is the sentence feature vector. INLINEFORM2 stands for how well the instance INLINEFORM3 matches its DDI INLINEFORM4 (Vector representation of a specific DDI). INLINEFORM5 is a diagonal attention matrix, multiplied by which the feature vector INLINEFORM6 can concentrate on those most representative features. DISPLAYFORM0 DISPLAYFORM1 
+
+ INLINEFORM0 is the softmax result of INLINEFORM1 . The final sentence representation is decided by all of the relevant sentences' feature vector, as Equation EQREF24 shows. DISPLAYFORM0 
+
+Note that the set INLINEFORM0 is gradually growing as new sentence with the same drugs pairs is found when training. An instance INLINEFORM1 is represented by INLINEFORM2 before sentence level attention. The sentence level attention layer finds the set INLINEFORM3 , instances in which have the same drug pair as in INLINEFORM4 , and put INLINEFORM5 in INLINEFORM6 . Then the final sentence representation INLINEFORM7 is calculated in this layer.
+
+## Classification and Training
+
+A given sentence INLINEFORM0 is finally represented by the feature vector INLINEFORM1 . Then we feed it to a softmax classifier. Let INLINEFORM2 denotes the set of all kinds of DDI. The output INLINEFORM3 is the probabilities of each class INLINEFORM4 belongs. DISPLAYFORM0 
+
+We use cross entropy cost function and INLINEFORM0 regularization as the optimization objective. For INLINEFORM1 -th instance, INLINEFORM2 denotes the one-hot representation of it's label, where the model outputs INLINEFORM3 . The cross entropy cost is: DISPLAYFORM0 
+
+For a mini-batch INLINEFORM0 , the optimization objective is: DISPLAYFORM0 
+
+All parameters in this model is: DISPLAYFORM0 
+
+We optimize the parameters of objective function INLINEFORM0 with Adam BIBREF24 , which is a variant of mini-batch stochastic gradient descent. During each train step, the gradient of INLINEFORM1 is calculated. Then INLINEFORM2 is adjusted according to the gradient. After the end of training, we have a model that is able to predict two drugs' interactions when a sentence about these drugs is given.
+
+## DDI Prediction
+
+The model is trained for DDI classification. The parameters in list INLINEFORM0 are tuned during the training process. Given a new sentence with two drugs, we can use this model to classify the DDI type.
+
+The DDI prediction follows the procedure described in Section SECREF6 - SECREF26 . The given sentence is eventually represented by feature vector INLINEFORM0 . Then INLINEFORM1 is classified to a specific DDI type with a softmax classifier. In next section, we will evaluate our model's DDI prediction performance and see the advantages and shortcomings of our model.
+
+## Datasets and Evaluation Metrics
+
+We use the DDI corpus of the 2013 DDIExtraction challenge BIBREF16 to train and test our model. The DDIs in this corpus are classified as five types. We give the definitions of these types and their example sentences, as shown in table TABREF4 . This standard dataset is made up of training set and testing set. We use the same metrics as in other drug-drug interaction extraction literature BIBREF11 , BIBREF10 , BIBREF25 , BIBREF9 , BIBREF8 , BIBREF12 : the overall precision, recall, and F1 score on testing set. INLINEFORM0 denotes the set of {False, Mechanism, Effect, Advise, Int}. The precision and recall of each INLINEFORM1 are calculated by DISPLAYFORM0 DISPLAYFORM1 
+
+Then the overall precision, recall, and F1 score are calculated by DISPLAYFORM0 
+
+Besides, we evaluate the captured feature vectors with t-SNE BIBREF26 , a visualizing and intuitive way to map a high dimensional vector into a 2 or 3-dimensional space. If the points in a low dimensional space are easy to be split, the feature vectors are believed to be more distinguishable.
+
+## Hyperparameter Settings and Training
+
+We use TensorFlow BIBREF27 r0.11 to implement the proposed model. The input of each word is an ordered triple (word, relative distance from drug1, relative distance from drug2). The sentence, which is represented as a matrix, is fed to the model. The output of the model is a INLINEFORM0 -dimensional vector representing the probabilities of being corresponding DDI. It is the network, parameters, and hyperparameters which decides the output vector. The network's parameters are adjusted during training, where the hyperparameters are tuned by hand. The hyperparameters after tuning are as follows. The word embedding's dimension INLINEFORM1 , the position embedding's dimension INLINEFORM2 , the hidden state's dimension INLINEFORM3 , the probability of dropout INLINEFORM4 , other hyperparameters which are not shown here are set to TensorFlow's default values.
+
+The word embedding is initialized by pre-trained word vectors using GloVe BIBREF28 , while other parameters are initialized randomly. During each training step, a mini-batch (the mini-batch size INLINEFORM0 in our implementation) of sentences is selected from training set. The gradient of objective function is calculated for parameters updating (See Section SECREF26 ).
+
+Figure FIGREF32 shows the training process. The objective function INLINEFORM0 is declining as the training mini-batches continuously sent to the model. As the testing mini-batches, the INLINEFORM1 function is fluctuating while its overall trend is descending. The instances in testing set are not participated in training so that INLINEFORM2 function is not descending so fast. However, training and testing instances have similar distribution in sample space, causing that testing instances' INLINEFORM3 tends to be smaller along with the training process. INLINEFORM4 has inverse relationship with the performance measurement. The F1 score is getting fluctuating around a specific value after enough training steps. The reason why fluctuating range is considerable is that only a tiny part of the whole training or testing set has been calculated the F1 score. Testing the whole set during every step is time consuming and not necessary. We will evaluate the model on the whole testing set in Section SECREF47 .
+
+## Experimental Results
+
+We save our model every 100 step and predict all the DDIs of the instances in the testing set. These predictions' F1 score is shown in figure FIGREF40 . To demonstrate the sentence level attention layer is effective, we drop this layer and then directly use INLINEFORM0 for softmax classification (See figure FIGREF15 ). The result is shown with “RNN + dynamic word embedding + ATT” curve, which illustrates that the sentence level attention layer contributes to a more accurate model.
+
+Whether a dynamic or static word embedding is better for a DDI extraction task is under consideration. Nguyen et al. BIBREF21 shows that updating word embedding at the time of other parameters being trained makes a better performance in relation extraction task. We let the embedding be static when training, while other conditions are all the same. The “RNN + static word embedding + 2ATT” curve shows this case. We can draw a conclusion that updating the initialized word embedding trains more suitable word vectors for the task, which promotes the performance.
+
+We compare our best F1 score with other state-of-the-art approaches in table TABREF39 , which shows our model has competitive advantage in dealing with drug-drug interaction extraction. The predictions confusion matrix is shown in table TABREF46 . The DDIs other than false being classified as false makes most of the classification error. It may perform better if a classifier which can tells true and false DDI apart is trained. We leave this two-stage classifier to our future work. Another phenomenon is that the “Int” type is often classified as “Effect”. The “Int” sentence describes there exists interaction between two drugs and this information implies the two drugs' combination will have good or bed effect. That's the reason why “Int” and “Effect” are often obfuscated.
+
+To evaluate the features our model captured, we employ scikit-learn BIBREF29 's t-SNE class to map high dimensional feature vectors to 2-dimensional vectors, which can be depicted on a plane. We depict all the features of the instances in testing set, as shown in figure FIGREF41 . The RNN model using dynamic word embedding and 2 layers of attention is the most distinguishable one. Unfortunately, the classifier can not classify all the instances into correct classes. Comparing table TABREF46 with figure UID44 , both of which are from the best performed model, we can observe some conclusions. The “Int” DDIs are often misclassified as “Effect”, for the reason that some of the “Int” points are in the “Effect” cluster. The “Effect” points are too scattered so that plenty of “Effect” DDIs are classified to other types. The “Mechanism” points are gathered around two clusters, causing that most of the “mechanism” DDIs are classified to two types: “False” and “Mechanism”. In short, the visualizability of feature mapping gives better explanations for the prediction results and the quality of captured features.
+
+## Conclusion and Future Work
+
+To conclude, we propose a recurrent neural network with multiple attention layers to extract DDIs from biomedical text. The sentence level attention layer, which combines other sentences containing the same drugs, has been added to our model. The experiments shows that our model outperforms the state-of-the-art DDI extraction systems. Task relevant word embedding and two attention layers improved the performance to some extent.
+
+The imbalance of the classes and the ambiguity of semantics cause most of the misclassifications. We consider that instance generation using generative adversarial networks would cover the instance shortage in specific category. It is also reasonable to use distant supervision learning (which utilize other relevant material) for knowledge supplement and obtain a better performed DDI extraction system.
+
+## Acknowledgment
+
+This work is supported by the NSFC under Grant 61303191, 61303190, 61402504, 61103015.

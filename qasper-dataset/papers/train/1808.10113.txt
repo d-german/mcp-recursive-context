@@ -1,0 +1,237 @@
+# Story Ending Generation with Incremental Encoding and Commonsense Knowledge
+
+**Paper ID:** 1808.10113
+
+## Abstract
+
+Generating a reasonable ending for a given story context, i.e., story ending generation, is a strong indication of story comprehension. This task requires not only to understand the context clues which play an important role in planning the plot but also to handle implicit knowledge to make a reasonable, coherent story. In this paper, we devise a novel model for story ending generation. The model adopts an incremental encoding scheme to represent context clues which are spanning in the story context. In addition, commonsense knowledge is applied through multi-source attention to facilitate story comprehension, and thus to help generate coherent and reasonable endings. Through building context clues and using implicit knowledge, the model is able to produce reasonable story endings. context clues implied in the post and make the inference based on it. Automatic and manual evaluation shows that our model can generate more reasonable story endings than state-of-the-art baselines.
+
+## Introduction
+
+Story generation is an important but challenging task because it requires to deal with logic and implicit knowledge BIBREF0 , BIBREF1 , BIBREF2 , BIBREF3 , BIBREF4 , BIBREF5 . Story ending generation aims at concluding a story and completing the plot given a story context. We argue that solving this task involves addressing the following issues: 1) Representing the context clues which contain key information for planning a reasonable ending; and 2) Using implicit knowledge (e.g., commonsense knowledge) to facilitate understanding of the story and better predict what will happen next.
+
+Comparing to textual entailment or reading comprehension BIBREF6 , BIBREF7 story ending generation requires more to deal with the logic and causality information that may span multiple sentences in a story context. The logic information in story can be captured by the appropriate sequence of events or entities occurring in a sequence of sentences, and the chronological order or causal relationship between events or entities. The ending should be generated from the whole context clue rather than merely inferred from a single entity or the last sentence. It is thus important for story ending generation to represent the context clues for predicting what will happen in an ending.
+
+However, deciding a reasonable ending not only depends on representing the context clues properly, but also on the ability of language understanding with implicit knowledge that is beyond the text surface. Humans use their own experiences and implicit knowledge to help understand a story. As shown in Figure 1 , the ending talks about candy which can be viewed as commonsense knowledge about Halloween. Such knowledge can be crucial for story ending generation.
+
+Figure 1 shows an example of a typical story in the ROCStories corpus BIBREF8 . In this example, the events or entities in the story context constitute the context clues which reveal the logical or causal relationships between events or entities. These concepts, including Halloween, trick or treat, and monster, are connected as a graph structure. A reasonable ending should consider all the connected concepts rather than just some individual one. Furthermore, with the help of commonsense knowledge retrieved from ConceptNet BIBREF9 , it is easier to infer a reasonable ending with the knowledge that candy is highly related to Halloween.
+
+To address the two issues in story ending generation, we devise a model that is equipped with an incremental encoding scheme to encode context clues effectively, and a multi-source attention mechanism to use commonsense knowledge. The representation of the context clues is built through incremental reading (or encoding) of the sentences in the story context one by one. When encoding a current sentence in a story context, the model can attend not only to the words in the preceding sentence, but also the knowledge graphs which are retrieved from ConceptNet for each word. In this manner, commonsense knowledge can be encoded in the model through graph representation techniques, and therefore, be used to facilitate understanding story context and inferring coherent endings. Integrating the context clues and commonsense knowledge, the model can generate more reasonable endings than state-of-the-art baselines.
+
+Our contributions are as follows:
+
+## Related Work
+
+The corpus we used in this paper was first designed for Story Cloze Test (SCT) BIBREF10 , which requires to select a correct ending from two candidates given a story context. Feature-based BIBREF11 , BIBREF12 or neural BIBREF8 , BIBREF13 classification models are proposed to measure the coherence between a candidate ending and a story context from various aspects such as event, sentiment, and topic. However, story ending generation BIBREF14 , BIBREF15 , BIBREF16 is more challenging in that the task requires to modeling context clues and implicit knowledge to produce reasonable endings.
+
+Story generation, moving forward to complete story comprehension, is approached as selecting a sequence of events to form a story by satisfying a set of criteria BIBREF0 . Previous studies can be roughly categorized into two lines: rule-based methods and neural models. Most of the traditional rule-based methods for story generation BIBREF0 , BIBREF1 retrieve events from a knowledge base with some pre-specified semantic relations. Neural models for story generation has been widely studied with sequence-to-sequence (seq2seq) learning BIBREF17 . And various contents such as photos and independent descriptions are largely used to inspire the story BIBREF3 .To capture the deep meaning of key entities and events, BIBREF2 ( BIBREF2 ) and BIBREF5 ( BIBREF5 ) explicitly modeled the entities mentioned in story with dynamic representation, and BIBREF4 ( BIBREF4 ) decomposed the problem into planning successive events and generating sentences from some given events. BIBREF18 ( BIBREF18 ) adopted a hierarchical architecture to generate the whole story from some given keywords.
+
+Commonsense knowledge is beneficial for many natural language tasks such as semantic reasoning and text entailment, which is particularly important for story generation. BIBREF19 ( BIBREF19 ) characterized the types of commonsense knowledge mostly involved in recognizing textual entailment. Afterwards, commonsense knowledge was used in natural language inference BIBREF20 , BIBREF21 and language generation BIBREF22 . BIBREF23 ( BIBREF23 ) incorporated external commonsense knowledge into a neural cloze-style reading comprehension model. BIBREF24 ( BIBREF24 ) performed commonsense inference on people's intents and reactions of the event's participants given a short text. Similarly, BIBREF25 ( BIBREF25 ) introduced a new annotation framework to explain psychology of story characters with commonsense knowledge. And commonsense knowledge has also been shown useful to choose a correct story ending from two candidate endings BIBREF12 , BIBREF26 .
+
+## Overview
+
+The task of story ending generation can be stated as follows: given a story context consisting of a sentence sequence $X=\lbrace X_1, X_2, \cdots , X_K\rbrace $ , where $X_i=x_1^{(i)}x_2^{(i)}\cdots x_{l_i}^{(i)}$ represents the $i$ -th sentence containing $l_i$ words, the model should generate a one-sentence ending $Y=y_1y_2...y_l$ which is reasonable in logic, formally as 
+
+$${Y^*} = \mathop {argmax}\limits _{Y} \mathcal {P}(Y|X).$$   (Eq. 9) 
+
+As aforementioned, context clue and commonsense knowledge is important for modeling the logic and casual information in story ending generation. To this end, we devise an incremental encoding scheme based on the general encoder-decoder framework BIBREF27 . As shown in Figure 2 , the scheme encodes the sentences in a story context incrementally with a multi-source attention mechanism: when encoding sentence $X_{i}$ , the encoder obtains a context vector which is an attentive read of the hidden states, and the graph vectors of the preceding sentence $X_{i-1}$ . In this manner, the relationship between words (some are entities or events) in sentence $X_{i-1}$ and those in $X_{i}$ is built incrementally, and therefore, the chronological order or causal relationship between entities (or events) in adjacent sentences can be captured implicitly. To leverage commonsense knowledge which is important for generating a reasonable ending, a one-hop knowledge graph for each word in a sentence is retrieved from ConceptNet, and each graph can be represented by a vector in two ways. The incremental encoder not only attends to the hidden states of $X_{i-1}$ , but also to the graph vectors at each position of $X_{i-1}$ . By this means, our model can generate more reasonable endings by representing context clues and encoding commonsense knowledge.
+
+## Background: Encoder-Decoder Framework
+
+The encoder-decoder framework is a general framework widely used in text generation. Formally, the model encodes the input sequence $X=x_1x_2\cdots x_m$ into a sequence of hidden states, as follows, 
+
+$$\textbf {h}_{t} &= \mathbf {LSTM}(\textbf {h}_{t-1}, \mathbf {e}(x_t)), $$   (Eq. 11) 
+
+ where $\textbf {h}_{t}$ denotes the hidden state at step $t$ and $\mathbf {e}(x)$ is the word vector of $x$ .
+
+At each decoding position, the framework will generate a word by sampling from the word distribution $\mathcal {P}(y_t|y_{<t},X)$ ( $y_{<t}=y_1y_2\cdots y_{t-1}$ denotes the sequences that has been generated before step $t$ ), which is computed as follows: 
+
+$$&\mathcal {P}(y_t|y_{<t}, X) = \mathbf {softmax}(\textbf {W}_{0}\mathbf {s}_{t}+\textbf {b}_0), \\
+&\textbf {s}_{ t} = \mathbf {LSTM}(\textbf {s}_{ t-1}, \mathbf {e}(y_{t-1}), \textbf {c}_{t-1}), $$   (Eq. 12) 
+
+ where $\textbf {s}_t$ denotes the decoder state at step $t$ . When an attention mechanism is applied, $\textbf {c}_{t-1}$ is an attentive read of the context, which is a weighted sum of the encoder's hidden states as $\textbf {c}_{t-1}=\sum _{i=1}^m\alpha _{(t-1)i}\textbf {h}_i$ , and $\alpha _{(t-1)i}$ measures the association between the decoder state $\textbf {s}_{t-1}$ and the encoder state $\textbf {h}_i$ . Refer to BIBREF28 for more details.
+
+## Incremental Encoding Scheme
+
+Straightforward solutions for encoding the story context can be: 1) Concatenating the $K$ sentences to a long sentence and encoding it with an LSTM ; or 2) Using a hierarchical LSTM with hierarchical attention BIBREF29 , which firstly attends to the hidden states of a sentence-level LSTM, and then to the states of a word-level LSTM. However, these solutions are not effective to represent the context clues which may capture the key logic information. Such information revealed by the chronological order or causal relationship between events or entities in adjacent sentences.
+
+To better represent the context clues, we propose an incremental encoding scheme: when encoding the current sentence $X_i$ , it obtains a context vector which is an attentive read of the preceding sentence $X_{i-1}$ . In this manner, the order/relationship between the words in adjacent sentences can be captured implicitly.
+
+This process can be stated formally as follows: 
+
+$$\textbf {h}_{j}^{(i)} = \mathbf {LSTM}(\textbf {h}_{j-1}^{(i)}, \mathbf {e}(x_j^{(i)}), \textbf {c}_{\textbf {l}j}^{(i)}), ~i\ge 2. $$   (Eq. 14) 
+
+ where $\textbf {h}^{(i)}_{j}$ denotes the hidden state at the $j$ -th position of the $i$ -th sentence, $\mathbf {e}(x_j^{(i)})$ denotes the word vector of the $j$ -th word $x_j^{(i)}$ . $\textbf {c}_{\textbf {l},j}^{(i)}$ is the context vector which is an attentive read of the preceding sentence $X_{i-1}$ , conditioned on $\textbf {h}^{(i)}_{j-1}$ . We will describe the context vector in the next section.
+
+During the decoding process, the decoder obtains a context vector from the last sentence $X_{K}$ in the context to utilize the context clues. The hidden state is obtained as below: 
+
+$$&\textbf {s}_{t} = \mathbf {LSTM}(\textbf {s}_{t-1}, \mathbf {e}(y_{t-1}), \textbf {c}_{\textbf {l}t}), $$   (Eq. 15) 
+
+ where $\textbf {c}_{\textbf {l}t}$ is the context vector which is the attentive read of the last sentence $X_K$ , conditioned on $\textbf {s}_{t-1}$ . More details of the context vector will be presented in the next section.
+
+## Multi-Source Attention (MSA)
+
+The context vector ( $\textbf {c}_{\textbf {l}}$ ) plays a key role in representing the context clues because it captures the relationship between words (or states) in the current sentence and those in the preceding sentence. As aforementioned, story comprehension sometime requires the access of implicit knowledge that is beyond the text. Therefore, the context vector consists of two parts, computed with multi-source attention. The first one $\textbf {c}_{\textbf {h}j}^{(i)}$ is derived by attending to the hidden states of the preceding sentence, and the second one $\textbf {c}_{\textbf {x}j}^{(i)}$ by attending to the knowledge graph vectors which represent the one-hop graphs in the preceding sentence. The MSA context vector is computed as follows: 
+
+$$\textbf {c}_{\textbf {l}j}^{(i)} = \textbf {W}_\textbf {l}([\textbf {c}_{\textbf {h}j}^{(i)}; \textbf {c}_{\textbf {x}j}^{(i)}])+\textbf {b}_\textbf {l},$$   (Eq. 17) 
+
+ where $\oplus $ indicates vector concatenation. Hereafter, $\textbf {c}_{\textbf {h}j}^{(i)}$ is called state context vector, and $\textbf {c}_{\textbf {x}j}^{(i)}$ is called knowledge context vector.
+
+The state context vector is a weighted sum of the hidden states of the preceding sentence $X_{i-1}$ and can be computed as follows: 
+
+$$\textbf {c}_{\textbf {h}j}^{(i)} &= \sum _{k = 1}^{l_{i-1}}\alpha _{h_k,j}^{(i)}\textbf {h}_{k}^{(i-1)}, \\
+\alpha _{h_k,j}^{(i)} &= \frac{e^{\beta _{h_k,j}^{(i)}}}{\;\sum \limits _{m=1}^{l_{i-1}}e^{\beta _{h_m,j}^{(i)}}\;},\\
+\beta _{h_k,j}^{(i)} &= \textbf {h}_{j-1}^{(i)\rm T}\textbf {W}_\textbf {s} \textbf {h}_k^{(i-1)},$$   (Eq. 18) 
+
+ where $\beta _{h_k,j}^{(i)}$ can be viewed as a weight between hidden state $\textbf {h}_{j-1}^{(i)}$ in sentence $X_i$ and hidden state $\textbf {h}_k^{(i-1)}$ in the preceding sentence $X_{i-1}$ .
+
+Similarly, the knowledge context vector is a weighted sum of the graph vectors for the preceding sentence. Each word in a sentence will be used as a query to retrieve a one-hop commonsense knowledge graph from ConceptNet, and then, each graph will be represented by a graph vector. After obtaining the graph vectors, the knowledge context vector can be computed by: 
+
+$$\textbf {c}_{\textbf {x}j}^{(i)} &= \sum _{k = 1}^{l_{i-1}}\alpha _{x_k,j}^{(i)}\textbf {g}(x_{k}^{(i-1)}), \\
+\alpha _{x_k,j}^{(i)} &= \frac{e^{\beta _{x_k,j}^{(i)}}}{\;\sum \limits _{m=1}^{l_{i-1}}e^{\beta _{x_m,j}^{(i)}}\;},\\
+\beta _{x_k,j}^{(i)} &= \textbf {h}_{j-1}^{(i)\rm T}\textbf {W} _\textbf {k}\textbf {g}(x_k^{(i-1)}),$$   (Eq. 19) 
+
+ where $\textbf {g}(x_k^{(i-1)})$ is the graph vector for the graph which is retrieved for word $x_k^{(i-1)}$ . Different from $\mathbf {e}(x_k^{(i-1)})$ which is the word vector, $\textbf {g}(x_k^{(i-1)})$ encodes commonsense knowledge and extends the semantic representation of a word through neighboring entities and relations.
+
+During the decoding process, the knowledge context vectors are similarly computed by attending to the last input sentence $X_K$ . There is no need to attend to all the context sentences because the context clues have been propagated within the incremental encoding scheme.
+
+## Knowledge Graph Representation
+
+Commonsense knowledge can facilitate language understanding and generation. To retrieve commonsense knowledge for story comprehension, we resort to ConceptNet BIBREF9 . ConceptNet is a semantic network which consists of triples $R=(h, r, t)$ meaning that head concept $h$ has the relation $r$ with tail concept $t$ . Each word in a sentence is used as a query to retrieve a one-hop graph from ConceptNet. The knowledge graph for a word extends (encodes) its meaning by representing the graph from neighboring concepts and relations.
+
+There have been a few approaches to represent commonsense knowledge. Since our focus in this paper is on using knowledge to benefit story ending generation, instead of devising new methods for representing knowledge, we adopt two existing methods: 1) graph attention BIBREF30 , BIBREF22 , and 2) contextual attention BIBREF23 . We compared the two means of knowledge representation in the experiment.
+
+Formally, the knowledge graph of word (or concept) $x$ is represented by a set of triples, $\mathbf {G}(x)=\lbrace R_1, R_2, \cdots , R_{N_x}\rbrace $ (where each triple $R_i$ has the same head concept $x$ ), and the graph vector $\mathbf {g}(x)$ for word $x$ can be computed via graph attention, as below: 
+
+$$\textbf {g}(x) &= \sum _{i = 1}^{N_x}\alpha _{R_i}[\textbf {h}_i ; \textbf {t}_i],\\
+\alpha _{R_i} &= \frac{e^{\beta _{R_i}}}{\;\sum \limits _{j=1}^{N_x}e^{\beta _{R_j}}\;},\\
+\beta _{R_i} =
+(\textbf {W}_{\textbf {r}}&\textbf {r}_i)^{\rm T}\mathop {tanh}(\textbf {W}_{\textbf {h}}\textbf {h}_i+\textbf {W}_{\textbf {t}}\textbf {t}_i),$$   (Eq. 23) 
+
+ where $(h_i, r_i, t_i) = R_i \in \mathbf {G}(x)$ is the $i$ -th triple in the graph. We use word vectors to represent concepts, i.e. $\textbf {h}_i = \mathbf {e}(h_i), \textbf {t}_i = \mathbf {e}(t_i)$ , and learn trainable vector $\textbf {r}_i$ for relation $r_i$ , which is randomly initialized.
+
+Intuitively, the above formulation assumes that the knowledge meaning of a word can be represented by its neighboring concepts (and corresponding relations) in the knowledge base. Note that entities in ConceptNet are common words (such as tree, leaf, animal), we thus use word vectors to represent h/r/t directly, instead of using geometric embedding methods (e.g., TransE) to learn entity and relation embeddings. In this way, there is no need to bridge the representation gap between geometric embeddings and text-contextual embeddings (i.e., word vectors).
+
+When using contextual attention, the graph vector $\textbf {g}(x)$ can be computed as follows: 
+
+$$\textbf {g}(x)&=\sum _{i=1}^{N_x}\alpha _{R_i}\textbf {M}_{R_i},\\
+\textbf {M}_{R_i}&=BiGRU(\textbf {h}_i,\textbf {r}_i,\textbf {t}_i),\\
+\alpha _{R_i} &= \frac{e^{\beta _{R_i}}}{\;\sum \limits _{j=1}^{N_x}e^{\beta _{R_j}}\;},\\
+\beta _{R_i}&= \textbf {h}_{(x)}^{\rm T}\textbf {W}_\textbf {c}\textbf {M}_{R_i},$$   (Eq. 25) 
+
+ where $\textbf {M}_{R_i}$ is the final state of a BiGRU connecting the elements of triple $R_i$ , which can be seen as the knowledge memory of the $i$ -th triple, while $\textbf {h}_{(x)}$ denotes the hidden state at the encoding position of word $x$ .
+
+## Loss Function
+
+As aforementioned, the incremental encoding scheme is central for story ending generation. To better model the chronological order and causal relationship between adjacent sentences, we impose supervision on the encoding network. At each encoding step, we also generate a distribution over the vocabulary, very similar to the decoding process: 
+
+$$\mathcal {P}(y_t|y_{<t}, X) =\mathbf {softmax}(\textbf {W}_{0}\textbf {h}_{j}^{(i)}+\textbf {b}_0),$$   (Eq. 27) 
+
+ Then, we calculate the negative data likelihood as loss function: 
+
+$$\Phi &= \Phi _{en} + \Phi _{de}\\
+\Phi _{en} &= \sum _{i=2}^K\sum _{j=1}^{l_i} - \log \mathcal {P}(x_j^{(i)}=\widetilde{x}_j^{(i)}|x_{<j}^{(i)}, X_{<i}),\\
+\Phi _{de} &= \sum _t - \log \mathcal {P}(y_t=\tilde{y}_t|y_{<t}, X),$$   (Eq. 28) 
+
+ where $\widetilde{x}_j^{(i)}$ means the reference word used for encoding at the $j$ -th position in sentence $i$ , and $\tilde{y}_t$ represents the $j$ -th word in the reference ending. Such an approach does not mean that at each step there is only one correct next sentence, exactly as many other generation tasks. Experiments show that it is better in logic than merely imposing supervision on the decoding network.
+
+## Dataset
+
+We evaluated our model on the ROCStories corpus BIBREF10 . The corpus contains 98,162 five-sentence stories for evaluating story understanding and script learning. The original task is designed to select a correct story ending from two candidates, while our task is to generate a reasonable ending given a four-sentence story context. We randomly selected 90,000 stories for training and the left 8,162 for evaluation. The average number of words in $X_1/X_2/X_3/X_4/Y$ is 8.9/9.9/10.1/10.0/10.5 respectively. The training data contains 43,095 unique words, and 11,192 words appear more than 10 times. For each word, we retrieved a set of triples from ConceptNet and stored those whose head entity and tail entity are noun or verb, meanwhile both occurring in SCT. Moreover, we retained at most 10 triples if there are too many. The average number of triples for each query word is 3.4.
+
+## Baselines
+
+We compared our models with the following state-of-the-art baselines:
+
+Sequence to Sequence (Seq2Seq): A simple encoder-decoder model which concatenates four sentences to a long sentence with an attention mechanism BIBREF31 .
+
+Hierarchical LSTM (HLSTM): The story context is represented by a hierarchical LSTM: a word-level LSTM for each sentence and a sentence-level LSTM connecting the four sentences BIBREF29 . A hierarchical attention mechanism is applied, which attends to the states of the two LSTMs respectively.
+
+HLSTM+Copy: The copy mechanism BIBREF32 is applied to hierarchical states to copy the words in the story context for generation.
+
+HLSTM+Graph Attention(GA): We applied multi-source attention HLSTM where commonsense knowledge is encoded by graph attention.
+
+HLSTM+Contextual Attention(CA): Contextual attention is applied to represent commonsense knowledge.
+
+## Experiment Settings
+
+The parameters are set as follows: GloVe.6B BIBREF33 is used as word vectors, and the vocabulary size is set to 10,000 and the word vector dimension to 200. We applied 2-layer LSTM units with 512-dimension hidden states. These settings were applied to all the baselines.
+
+The parameters of the LSTMs (Eq. 14 and 15 ) are shared by the encoder and the decoder.
+
+## Automatic Evaluation
+
+We conducted the automatic evaluation on the 8,162 stories (the entire test set). We generated endings from all the models for each story context.
+
+We adopted perplexity(PPL) and BLEU BIBREF34 to evaluate the generation performance. Smaller perplexity scores indicate better performance. BLEU evaluates $n$ -gram overlap between a generated ending and a reference ending. However, since there is only one reference ending for each story context, BLEU scores will become extremely low for larger $n$ . We thus experimented with $n=1,2$ . Note also that there may exist multiple reasonable endings for the same story context.
+
+The results of the automatic evaluation are shown in Table 1 , where IE means a simple incremental encoding framework that ablated the knowledge context vector from $\textbf {c}_{\textbf {l}}$ in Eq. ( 17 ). Our models have lower perplexity and higher BLEU scores than the baselines. IE and IE+MSA have remarkably lower perplexity than other models. As for BLEU, IE+MSA(CA) obtained the highest BLEU-1 and BLEU-2 scores. This indicates that multi-source attention leads to generate story endings that have more overlaps with the reference endings.
+
+## Manual Evaluation
+
+Manual evaluations are indispensable to evaluate the coherence and logic of generated endings. For manual evaluation, we randomly sampled 200 stories from the test set and obtained 1,600 endings from the eight models. Then, we resorted to Amazon Mechanical Turk (MTurk) for annotation. Each ending will be scored by three annotators and majority voting is used to select the final label.
+
+We defined two metrics - grammar and logicality for manual evaluation. Score 0/1/2 is applied to each metric during annotation.
+
+Whether an ending is natural and fluent. Score 2 is for endings without any grammar errors, 1 for endings with a few errors but still understandable and 0 for endings with severe errors and incomprehensible.
+
+Whether an ending is reasonable and coherent with the story context in logic. Score 2 is for reasonable endings that are coherent in logic, 1 for relevant endings but with some discrepancy between an ending and a given context, and 0 for totally incompatible endings.
+
+Note that the two metrics are scored independently. To produce high-quality annotation, we prepared guidelines and typical examples for each metric score.
+
+The results of the manual evaluation are also shown in Table 1 . Note that the difference between IE and IE+MSA exists in that IE does not attend to knowledge graph vectors in a preceding sentence, and thus it does use any commonsense knowledge. The incremental encoding scheme without MSA obtained the best grammar score and our full mode IE+MSA(GA) has the best logicality score. All the models have fairly good grammar scores (maximum is 2.0), while the logicality scores differ remarkably, much lower than the maximum score, indicating the challenges of this task.
+
+More specifically, incremental encoding is effective due to the facts: 1) IE is significantly better than Seq2Seq and HLSTM in grammar (Sign Test, 1.84 vs. $1.74/1.57$ , p-value= $0.046/0.037$ , respectively), and in logicality (1.10 vs. 0.70/0.84, p-value $<0.001/0.001$ ). 2) IE+MSA is significantly better than HLSTM+MSA in logicality (1.26 vs. 1.06, p-value= $0.014$ for GA; 1.24 vs. 1.02, p-value= $0.022$ for CA). This indicates that incremental encoding is more powerful than traditional (Seq2Seq) and hierarchical (HLSTM) encoding/attention in utilizing context clues. Furthermore, using commonsense knowledge leads to significant improvements in logicality. The comparison in logicality between IE+MSA and IE (1.26/1.24 vs. 1.10, p-value= $0.028/0.042$ for GA/CA, respectively), HLSTM+MSA and HLSTM (1.06/1.02 vs. 0.84, p-value $<0.001/0.001$ for GA/CA, respectively), and HLSTM+MSA and HLSTM+Copy (1.06/1.02 vs. 0.90, p-value= $0.044/0.048$ , respectively) all approve this claim. In addition, similar results between GA and CA show that commonsense knowledge is useful but multi-source attention is not sensitive to the knowledge representation scheme.
+
+More detailed results are listed in Table 2 . Comparing to other models, IE+MSA has a much larger proportion of endings that are good both in grammar and logicality (2-2). The proportion of good logicality (score=2.0) from IE+MSA is much larger than that from IE (45.0%+5.0%/41.0%+4.0% vs. 36.0%+2.0% for GA/CA, respectively), and also remarkable larger than those from other baselines. Further, HLSTM equipped with MSA is better than those without MSA, indicating that commonsense knowledge is helpful. And the kappa measuring inter-rater agreement is 0.29 for three annotators, which implies a fair agreement.
+
+## Examples and Attention Visualization
+
+We presented an example of generated story endings in Table 3 . Our model generates more natural and reasonable endings than the baselines.
+
+In this example, the baselines predicted wrong events in the ending. Baselines (Seq2Seq, HLSTM, and HLSTM+Copy) have predicted improper entities (cake), generated repetitive contents (her family), or copied wrong words (eat). The models equipped with incremental encoding or knowledge through MSA(GA/CA) perform better in this example. The ending by IE+MSA is more coherent in logic, and fluent in grammar. We can see that there may exist multiple reasonable endings for the same story context.
+
+In order to verify the ability of our model to utilize the context clues and implicit knowledge when planning the story plot, we visualized the attention weights of this example, as shown in Figure 3 . Note that this example is produced from graph attention.
+
+In Figure 3 , phrases in the box are key events of the sentences that are manually highlighted. Words in blue or purple are entities that can be retrieved from ConceptNet, respectively in story context or in ending. An arrow indicates that the words in the current box (e.g., they eat in $X_2$ ) all have largest attention weights to some words in the box of the preceding sentence (e.g., cooking a special meal in $X_1$ ). Black arrows are for state context vector (see Eq. 18 ) and blue for knowledge context vector (see Eq. 19 ). For instance, eat has the largest knowledge attention to meal through the knowledge graph ( $<$ meal, AtLocation, dinner $>$ , $<$ meal, RelatedTo, eat $>$ ). Similarly, eat also has the second largest attention weight to cooking through the knowledge graph. For attention weights of state context vector, both words in perfects everything has the largest weight to some of everything to be just right (everything $\rightarrow $ everything, perfect $\rightarrow $ right).
+
+The example illustrates how the connection between context clues are built through incremental encoding and use of commonsense knowledge. The chain of context clues, such as ${be\_cooking}\rightarrow {want\_everything\_be\_right}\rightarrow {perfect\_everything}\rightarrow {lay\_down}\rightarrow {get\_back}$ , and the commonsense knowledge, such as $<$ cook, AtLocation, kitchen $>$ and $<$ oven, UsedFor, burn $>$ , are useful for generating reasonable story endings.
+
+## Conclusion and Future Work
+
+We present a story ending generation model that builds context clues via incremental encoding and leverages commonsense knowledge with multi-source attention. It encodes a story context incrementally with a multi-source attention mechanism to utilize not only context clues but also commonsense knowledge: when encoding a sentence, the model obtains a multi-source context vector which is an attentive read of the words and the corresponding knowledge graphs of the preceding sentence in the story context. Experiments show that our models can generate more coherent and reasonable story endings.
+
+As future work, our incremental encoding and multi-source attention for using commonsense knowledge may be applicable to other language generation tasks.
+
+Refer to the Appendix for more details.
+
+## Acknowledgements
+
+This work was jointly supported by the National Science Foundation of China (Grant No.61876096/61332007), and the National Key R&D Program of China (Grant No. 2018YFC0830200). We would like to thank Prof. Xiaoyan Zhu for her generous support.
+
+## Appendix A: Annotation Statistics
+
+We presented the statistics of annotation agreement in Table 4 . The proportion of the annotations in which at least two annotators (3/3+2/3) assigned the same score to an ending is 96% for grammar and 94% for logicality. We can also see that the 3/3 agreement for logicality is much lower than that for grammar, indicating that logicality is more complicated for annotation than grammar.
+
+## Appendix B: Error Analysis
+
+We analyzed error types by manually checking all 46 bad endings generated by our model, where bad means the average score in terms of at least one metric is not greater than 1.
+
+There are 3 typical error types: bad grammar (BG), bad logicality (BL), and other errors. The distribution of types is shown in Table 5 .
+
+We also presented some typical cases for each error type in Table 6 . Note that we only took graph attention as example. The first case shows an instance of bad grammar for repetitive generation. The second case shows that our model predicted a wrong entity at the last position where car is obviously more appropriate than daughter. It happens when the attention focuses on the wrong position, but in more cases it happens due to the noise of the commonsense knowledge base. The ending of the third case contains a relevant event work on his own but the event is not consistent to the previous word relieved. Other cases show that our model is not good at dealing with rare words. However, this can be further improved by applying copy mechanism, as our future work. These errors also indicate that story ending generation is challenging, and logic and implicit knowledge plays a central role in this task.
+
+## Appendix C: Attention Visualization
+
+The multi-source attention mechanism computes the state context vectors and knowledge context vectors respectively as follows: 
+
+$$\textbf {c}_{\textbf {h}j}^{(i)} &= \sum _{k = 1}^{l_{i-1}}\alpha _{h_k,j}^{(i)}\textbf {h}_{k}^{(i-1)}, \\
+\textbf {c}_{\textbf {x}j}^{(i)} &= \sum _{k = 1}^{l_{i-1}}\alpha _{x_k,j}^{(i)}\textbf {g}(x_{k}^{(i-1)}), $$   (Eq. 53) 
+
+The visualization analysis in Section 4.6 “Generated Ending Examples and Attention Visualization" is based on the attention weights ( $\alpha _{h_{k,j}}^{(i)}$ and $\alpha _{x_{k,j}}^{(i)}$ ), as presented in Figure 4 . Similarly we take as example the graph attention method to represent commonsense knowledge.
+
+The figure illustrates how the incremental encoding scheme with the multi-source attention utilizes context clues and implicit knowledge.
+
+1) The left column: for utilizing context clues, when the model encodes $X_2$ , cooking in $X_1$ obtains the largest state attention weight ( $\alpha _{h_{k,j}}^{(i)}$ ), which illustrates cooking is an important word (or event) for the context clue. Similarly, the key events in each sentence have largest attention weights to some entities or events in the preceding sentence, which forms the context clue (e.g., perfects in $X_3$ to right in $X_2$ , lay/down in $X_4$ to perfect/everything in $X_3$ , get/back in $Y$ to lay/down in $X_4$ , etc.).
+
+2) The right column: for the use of commonsense knowledge, each sentence has attention weights ( $\alpha _{x_{k,j}}^{(i)}$ ) to the knowledge graphs of the preceding sentence (e.g. eat in $X_2$ to meal in $X_1$ , dinner in $X_3$ to eat in $X_2$ , etc.). In this manner, the knowledge information is added into the encoding process of each sentence, which helps story comprehension for better ending generation (e.g., kitchen in $Y$ to oven in $X_2$ , etc.).

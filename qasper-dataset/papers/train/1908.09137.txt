@@ -1,0 +1,97 @@
+# Propagate-Selector: Detecting Supporting Sentences for Question Answering via Graph Neural Networks
+
+**Paper ID:** 1908.09137
+
+## Abstract
+
+In this study, we propose a novel graph neural network, called propagate-selector (PS), which propagates information over sentences to understand information that cannot be inferred when considering sentences in isolation. First, we design a graph structure in which each node represents the individual sentences, and some pairs of nodes are selectively connected based on the text structure. Then, we develop an iterative attentive aggregation, and a skip-combine method in which a node interacts with its neighborhood nodes to accumulate the necessary information. To evaluate the performance of the proposed approaches, we conducted experiments with the HotpotQA dataset. The empirical results demonstrate the superiority of our proposed approach, which obtains the best performances compared to the widely used answer-selection models that do not consider the inter-sentential relationship.
+
+## Introduction
+
+Understanding texts and being able to answer a question posed by a human is a long-standing goal in the artificial intelligence field. Given the rapid advancement of neural network-based models and the availability of large-scale datasets, such as SQuAD BIBREF0 and TriviaQA BIBREF1, researchers have begun to concentrate on building automatic question-answering (QA) systems. One example of such a system is called the machine-reading question-answering (MRQA) model, which provides answers to questions from given passages BIBREF2, BIBREF3, BIBREF4.
+
+Recently, research has revealed that most of the questions in the existing MRQA datasets do not require reasoning across sentences in the given context (passage); instead, they can be answered by looking at only a single sentence BIBREF5. Using this characteristic, a simple model can achieve performances competitive with that of a sophisticated model. However, in most of the real scenarios of QA applications, more than one sentences should be utilized to extract a correct answer.
+
+To alleviate this limitation in the previous datasets, another type of dataset was developed in which answering the question requires reasoning over multiple sentences in the given passages BIBREF6, BIBREF7. Figure shows an example of a recently released dataset, the HotpotQA. This dataset consists of not only question-answer pairs with context passages but also supporting sentence information for answering the question annotated by a human.
+
+In this study, we are interested in building a model that exploits the relational information among sentences in passages and in classifying the supporting sentences that contain the essential information for answering the question. To this end, we propose a novel graph neural network model, named Propagate-selector (PS), that can be directly employed as a subsystem in the QA pipeline. First, we design a graph structure to hold information in the HotpotQA dataset by assigning each sentence to an independent graph node. Then, we connect the undirected edges between nodes using a proposed graph topology (see the discussion in SECREF1). Next, we allow PS to propagate information between the nodes through iterative hops to perform reasoning across the given sentences. Trough the propagate process, the model learns to understand information that cannot be inferred when considering sentences in isolation.
+
+To the best of our knowledge, this is the first work to employ a graph neural network structure to find supporting sentences for a QA system. Through experiments, we demonstrate that the proposed method achieves better performances when classifying supporting sentences than those of the widely used answer-selection models BIBREF8, BIBREF9, BIBREF10, BIBREF11.
+
+## Related Work
+
+Previous researchers have also investigated neural network-based models for MRQA. One line of inquiry employs an attention mechanism between tokens in the question and passage to compute the answer span from the given text BIBREF12, BIBREF3. As the task scope was extended from specific- to open-domain QA, several models have been proposed to select a relevant paragraph from the text to predict the answer span BIBREF13, BIBREF14. However, none of these methods have addressed reasoning over multiple sentences.
+
+To understand the relational patterns in the dataset, graph neural network algorithms have also been previously proposed. BIBREF15 proposed a graph convolutional network to classify graph-structured data. This model was further investigated for applications involving large-scale graphs BIBREF16, for the effectiveness of aggregating and combining graph nodes by employing an attention mechanism BIBREF17, and for adopting recurrent node updates BIBREF18. In addition, one trial involved applying graph neural networks to QA tasks; however, this usage was limited to the entity level rather than sentence level understanding BIBREF19.
+
+## Task and Dataset
+
+The specific problem we aim to tackle in this study is to classify supporting sentences in the MRQA task. We consider the target dataset HotpotQA, by BIBREF6, which is comprised of tuples ($<$Q, $P_n$, $Y_i$, A$>$) where Q is the question, $P_n$ is the set of passages as the given context, and each passage $P\,{\in }\,P_n$ is further comprised of a set of sentences $S_i$ ($S_i\,{\in }\,P_n)$. Here, $Y_i$ is a binary label indicating whether $S_i$ contains the information required to answer the question, and A is the answer. In particular, we call a sentence, $S_s\,{\in }\,S_i$, a supporting sentence when $Y_s$ is true. Figure shows an example of the HotpotQA dataset.
+
+In this study, we do not use the answer information from the dataset; we use only the subsequent tuples $<$Q, $P_n$, $Y_i$$>$ when classifying supporting sentences. We believe that this subproblem plays an important role in building a full QA pipeline because the proposed models for this task will be combined with other MRQA models in an end-to-end training process.
+
+## Methodology ::: Propagate-Selector
+
+In this paper, we are interested in identifying supporting sentences, among sentences in the given text that contain information essential to answering the question. To build a model that can perform reasoning across multiple sentences, we propose a graph neural network model called Propagate-selector (PS). PS consists of the following parts:
+
+Topology: To build a model that understands the relationship between sentences for answering a question, we propose a graph neural network where each node represents a sentence from passages and the question. Figure depicts the topology of the proposed model. In an offline step, we organize the content of each instance in a graph where each node represents a sentence from the passages and the question. Then, we add edges between nodes using the following topology:
+
+we fully connect nodes that represent sentences from the same passage (dotted-black);
+
+we fully connect nodes that represent the first sentence of each passage (dotted-red);
+
+we add an edge between the question and every node for each passage (dotted-blue).
+
+In this way, we enable a path by which sentence nodes can propagate information between both inner and outer passages.
+
+Node representation: Question $\textbf {Q}\,{\in }\,\mathbb {R}^{d\times Q}$ and sentence ${\textbf {S}}_i\,{\in }\,\mathbb {R}^{d\times S_i}$, (where $d$ is the dimensionality of the word embedding and $Q$ and ${S}_i$ represent the lengths of the sequences in Q and ${\textbf {S}}_i$, respectively), are processed to acquire the sentence-level information. Recent studies have shown that a pretrained language model helps the model capture the contextual meaning of words in the sentence BIBREF20, BIBREF21. Following this study, we select an ELMo BIBREF20 language model for the word-embedding layer of our model as follows: $\textbf {L}^{Q}\,{=}\,\text{ELMo}(\textbf {Q}),~\textbf {L}^{S}\,{=}\,\text{ELMo}(\textbf {S})$. Using these new representations, we compute the sentence representation as follows:
+
+where $f_\theta $ is the RNN function with the weight parameters $\theta $, and $\textbf {N}^Q\,{\in }\,\mathbb {R}^{d^{\prime }}$ and $\textbf {N}^S\,{\in }\,\mathbb {R}^{d^{\prime }}$ are node representations for the question and sentence, respectively (where $d^{\prime }$ is the dimensionality of the RNN hidden units).
+
+Aggregation: An iterative attentive aggregation function to the neighbor nodes is utilized to compute the amount of information to be propagated to each node in the graph as follows:
+
+where $\textbf {A}_v\,{\in }\,\mathbb {R}^{d^{\prime }}$ is the aggregated information for the v-th node computed by attentive weighted summation of its neighbor nodes, $a_{vu}$ is attention weight between node v and its neighbor nodes $u~(u{\in }N(v))$, $\textbf {N}_u\,{\in }\,\mathbb {R}^{d^{\prime }}$ is the u-th node representation, $\sigma $ is a nonlinear activation function, and $\textbf {W}\,{\in }\,\mathbb {R}^{d^{\prime }\times d^{\prime }}$ is the learned model parameter. Because all the nodes belong to a graph structure in which the iterative aggregation is performed among nodes, the k in the equation indicates that the computation occurs in the k-th hop (iteration).
+
+Update: The aggregated information for the v-th node, $\textbf {A}_v$ in equation (DISPLAY_FORM6), is combined with its previous node representation to update the node. We apply a skip connection to allow the model to learn the amount of information to be updated in each hop as follows:
+
+where $\sigma $ is a nonlinear activation function, {;} indicates vector concatenation, and $\textbf {W}\,{\in }\,\mathbb {R}^{d^{\prime }\times 2d^{\prime }}$ is the learned model parameter.
+
+## Methodology ::: Optimization
+
+Because our objective is to classify supporting sentences ($S_i\,{\in }\,{P_n}$) from the given tuples $<$Q, $P_n$, $Y_i$$>$, we define two types of loss to be minimized. One is a rank loss that computes the cross-entropy loss between a question and each sentence using the ground-truth $Y_i$ as follows:
+
+where $g_{\theta }$ is a feedforward network that computes a similarity score between the final representation of the question and each sentence. The other is attention loss, which is defined in each hop as follows:
+
+where $a_{qi}^{(k)}$ indicates the relevance between the question node q and the i-th sentence node in the k-th hop as computed by equation (DISPLAY_FORM6).
+
+Finally, these two losses are combined to construct the final objective function:
+
+where $\alpha $ is a hyperparameter.
+
+## Experiments
+
+We regard the task as the problem of selecting the supporting sentences from the passages to answer the questions. Similar to the answer-selection task in the QA literature, we report the model performance using the mean average precision (MAP) and mean reciprocal rank (MRR) metrics. To evaluate the model performance, we use the HotpotQA dataset, which is described in section “Task and Dataset". Table shows properties of the dataset. We conduct a series of experiments to compare baseline methods with the newly proposed models. All codes developed for this research will be made available via a public web repository along with the dataset.
+
+## Experiments ::: Implementation Details
+
+To implement the Propagate-selector (PS) model, we first use a small version of ELMo (13.6 M parameters) that provides 256-dimensional context embedding. This choice was based on the available batch size (50 for our experiments) when training the complete model on a single GPU (GTX 1080 Ti). When we tried using the original version of ELMo (93.6 M parameters, 1024-dimensional context embedding), we were able to increase the batch size only up to 20, which results in excessive training time (approximately 90 hours). For the sentence encoding, we used a GRU BIBREF22 with a hidden unit dimension of 200. The hidden unit weight matrix of the GRU is initialized using orthogonal weights BIBREF23. Dropout is applied for regularization purposes at a ratio of 0.7 for the RNN (in equation DISPLAY_FORM5) to 0.7 for the attention weight matrix (in equation DISPLAY_FORM6). For the nonlinear activation function (in equation DISPLAY_FORM6 and DISPLAY_FORM7), we use the $tanh$ function.
+
+Regarding the vocabulary, we replaced vocabulary with fewer than 12 instances in terms of term-frequency with “UNK" tokens. The final vocabulary size was 138,156. We also applied the Adam optimizer BIBREF24, including gradient clipping by norm at a threshold of 5.
+
+## Experiments ::: Comparisons with Other Methods
+
+Table shows the model performances on the HotpotQA dataset. Because the dataset only provides training (trainset) and validation (devset) subsets, we report the model performances on these datasets. While training the model, we implement early termination based on the devset performance and measure the best performance. To compare the model performances, we choose widely used answer-selection models such as CompAggr BIBREF8, IWAN BIBREF10, CompClip BIBREF9, sCARNN BIBREF11, and CompClip-LM BIBREF25 which were primarily developed to rank candidate answers for a given question. The CompClip-LM is based on CompClip and adopts ELMo in its word-embedding layer.
+
+In addition to the main proposed model, PS-rnn-elmo, we also investigate three model variants: PS-rnn-elmo-s uses a small version of ELMo, PS-rnn uses GloVe BIBREF26 instead of ELMo as a word-embedding layer, and PS-avg employs average pooling ($\textbf {N}^Q{=}\,\text{average}(\textbf {Q})$ and $\textbf {N}^S{=}\,\text{average}(\textbf {S})$) instead of RNN encoding in equation (DISPLAY_FORM5).
+
+As shown in Table , the proposed PS-rnn-elmo shows a significant MAP performance improvement compared to the previous best model, CompClip-LM (0.696 to 0.734 absolute).
+
+## Experiments ::: Hop Analysis
+
+Table shows the model performance (PS-elmo) as the number of hops increases. We find that the model achieves the best performance in the 4-hop case but starts to degrade when the number of hops exceeds 4. We assume that the model experiences the vanishing gradient problem under a larger number of iterative propagations (hops). Table shows model performance with small version of ELMo.
+
+Figure depicts the attention weight between the question node and each sentence node (hop-4 model case). As the hop number increases, we observe that the model properly identifies supporting sentences (in this example, sentence #4 and #17). This behavior demonstrates that our proposed model correctly learns how to propagate the necessary information among the sentence nodes via the iterative process.
+
+## Conclusion
+
+In this paper, we propose a graph neural network that finds the sentences crucial for answering a question. The experiments demonstrate that the model correctly classifies supporting sentences by iteratively propagating the necessary information through its novel architecture. We believe that our approach will play an important role in building a QA pipeline in combination with other MRQA models trained in an end-to-end manner.

@@ -1,0 +1,159 @@
+# BiSET: Bi-directional Selective Encoding with Template for Abstractive Summarization
+
+**Paper ID:** 1906.05012
+
+## Abstract
+
+The success of neural summarization models stems from the meticulous encodings of source articles. To overcome the impediments of limited and sometimes noisy training data, one promising direction is to make better use of the available training data by applying filters during summarization. In this paper, we propose a novel Bi-directional Selective Encoding with Template (BiSET) model, which leverages template discovered from training data to softly select key information from each source article to guide its summarization process. Extensive experiments on a standard summarization dataset were conducted and the results show that the template-equipped BiSET model manages to improve the summarization performance significantly with a new state of the art.
+
+## Introduction
+
+Abstractive summarization aims to shorten a source article or paragraph by rewriting while preserving the main idea. Due to the difficulties in rewriting long documents, a large body of research on this topic has focused on paragraph-level article summarization. Among them, sequence-to-sequence models have become the mainstream and some have achieved state-of-the-art performance BIBREF0 , BIBREF1 , BIBREF2 . In general, the only available information for these models during decoding is simply the source article representations from the encoder and the generated words from the previous time steps BIBREF2 , BIBREF3 , BIBREF4 , while the previous words are also generated based on the article representations. Since natural language text is complicated and verbose in nature, and training data is insufficient in size to help the models distinguish important article information from noise, sequence-to-sequence models tend to deteriorate with the accumulation of word generation, e.g., they generate irrelevant and repeated words frequently BIBREF5 .
+
+Template-based summarization BIBREF6 is an effective approach to traditional abstractive summarization, in which a number of hard templates are manually created by domain experts, and key snippets are then extracted and populated into the templates to form the final summaries. The advantage of such approach is it can guarantee concise and coherent summaries in no need of any training data. However, it is unrealistic to create all the templates manually since this work requires considerable domain knowledge and is also labor-intensive. Fortunately, the summaries of some specific training articles can provide similar guidance to the summarization as hard templates. Accordingly, these summaries are referred to as soft templates, or templates for simplicity, in this paper.
+
+Despite their potential in relieving the verbosity and insufficiency problems of natural language data, templates have not been exploited to full advantage. For example, cao2018retrieve simply concatenated template encoding after the source article in their summarization work. To this end, we propose a Bi-directional Selective Encoding with Template (BiSET) model for abstractive sentence summarization. Our model involves a novel bi-directional selective layer with two gates to mutually select key information from an article and its template to assist with summary generation. Due to the limitations in obtaining handcrafted templates, we further propose a multi-stage process for automatic retrieval of high-quality templates from training corpus. Extensive experiments were conducted on the Gigaword dataset BIBREF0 , a public dataset widely used for abstractive sentence summarization, and the results appear to be quite promising. Merely using the templates selected by our approach as the final summaries, our model can already achieve superior performance to some baseline models, demonstrating the effect of our templates. This may also indicate the availability of many quality templates in the corpus. Secondly, the template-equipped summarization model, BiSET, outperforms all the state-of-the-art models significantly. To evaluate the importance of the bi-directional selective layer and the two gates, we conducted an ablation study by discarding them respectively, and the results show that, while both of the gates are necessary, the template-to-article (T2A) gate tends to be more important than the article-to-template (A2T) gate. A human evaluation further validates the effectiveness of our model in generating informative, concise and readable summaries.
+
+1.0 The contributions of this work include:
+
+## The Framework
+
+Our framework includes three key modules: Retrieve, Fast Rerank, and BiSET. For each source article, Retrieve aims to return a few candidate templates from the training corpus. Then, the Fast Rerank module quickly identifies a best template from the candidates. Finally, BiSET mutually selects important information from the source article and the template to generate an enhanced article representation for summarization.
+
+## Retrieve
+
+This module starts with a standard information retrieval library to retrieve a small set of candidates for fine-grained filtering as cao2018retrieve. To do that, all non-alphabetic characters (e.g., dates) are removed to eliminate their influence on article matching. The retrieval process starts by querying the training corpus with a source article to find a few (5 to 30) related articles, the summaries of which will be treated as candidate templates.
+
+## Fast Rerank
+
+The above retrieval process is essentially based on superficial word matching and cannot measure the deep semantic relationship between two articles. Therefore, the Fast Rerank module is developed to identify a best template from the candidates based on their deep semantic relevance with the source article. We regard the candidate with highest relevance as the template. As illustrated in Figure FIGREF6 , this module consists of a Convolution Encoder Block, a Similarity Matrix and a Pooling Layer.
+
+Convolution Encoder Block. This block maps the input article and its candidate templates into high-level representations. The popular ways to this are either by using recurrent neural network (RNN) or a stack of convolutional neural network (CNN), while none of them are suitable for our problem. This is because a source article is usually much longer than a template, and both RNN and CNN may lead to semantic irrelevance after encodings. Instead, we implement a new convolution encoder block which includes a word embedding layer, a 1-D convolution followed by a non-linearity function, and residual connections BIBREF7 .
+
+Formally, given word embeddings INLINEFORM0 of an article, we use a 1-D convolution with kernel INLINEFORM1 and bias INLINEFORM2 to extract the n-gram features: DISPLAYFORM0 
+
+where INLINEFORM0 . We pad both sides of an article/template with zeros to keep fixed length. After that, we employ the gated linear unit (GLU) BIBREF8 as our activation function to control the proportion of information to pass through. GLU takes half the dimension of INLINEFORM1 as input and reduces the input dimension to INLINEFORM2 . Let INLINEFORM3 , where INLINEFORM4 , we have: DISPLAYFORM0 
+
+where INLINEFORM0 , INLINEFORM1 is the sigmoid function, and INLINEFORM2 means element-wise multiplication. To retain the original information, we add residual connections from the input of the convolution layer to the output of this block: INLINEFORM3 .
+
+Similarity Matrix. The above encoder block generates a high-level representation for each source article/candidate template. Then, a similarity matrix INLINEFORM0 is calculated for a given article representation, INLINEFORM1 , and a template representation, INLINEFORM2 : DISPLAYFORM0 
+
+where INLINEFORM0 is the similarity function, and the common options for INLINEFORM1 include: DISPLAYFORM0 
+
+Most previous work uses dot product or bilinear function BIBREF9 for the similarity, yet we find the family of Euclidean distance perform much better for our task. Therefore, we define the similarity function as: DISPLAYFORM0 
+
+Pooling Layer. This layer is intended to filter out unnecessary information in the matrix INLINEFORM0 . Before applying such pooling operations as max-pooling and k-max pooling BIBREF10 over the similarity matrix, we note there are repeated words in the source article, which we only want to count once. For this reason, we first identify some salient weights from INLINEFORM1 : DISPLAYFORM0 
+
+where INLINEFORM0 is a column-wise maximum function. We then apply k-max pooling over INLINEFORM1 to select INLINEFORM2 most important weights, INLINEFORM3 . Finally, we apply a two-layer feed-forward network to output a similarity score for the source article and the candidate template: DISPLAYFORM0 
+
+As mentioned before, the role of Fast Rerank is to re-rank the initial search results and return a best template for summarization. To examine the effect of this module, we studied its ranking quality under different ranges as in Section SECREF38 . The original rankings by Retrieve are presented for comparison with the NDCG metric. We regard the ROUGE-2 score of each candidate template with the reference summary as the ground truth. As shown in Figure FIGREF42 , Fast Rerank consistently provides enhanced rankings over the original.
+
+## Traditional Methodologies
+
+In this section, we explore three traditional approaches to taking advantage of the templates for summarization. They share the same encoder and decoder layers, but own different interaction layers for combination of a source article and template. The encoder layer uses a standard bi-directional RNN (BiRNN) to separately encode the source article and the template into hidden states INLINEFORM0 and INLINEFORM1 .
+
+Concatenation. This approach directly concatenates the hidden state, INLINEFORM0 , of a template after the article representation, INLINEFORM1 , to form a new article representation, INLINEFORM2 . This approach is similar to INLINEFORM3 BIBREF11 but uses our Fast Rerank and summary generation modules.
+
+Concatenation+Self-Attention. This approach adds a multi-head self-attention BIBREF12 layer with 4 heads on the basis of the above direct concatenation.
+
+DCN Attention. Initially introduced for machine reading comprehension BIBREF13 , this interaction approach is employed here to create template-aware article representations. First, we compute a similarity matrix, INLINEFORM0 , for each pair of article and template words by INLINEFORM1 , where `;' is the concatenation operation. We then normalize each row and column of INLINEFORM2 by softmax, giving rise to two new matrices INLINEFORM3 and INLINEFORM4 . After that, the Dynamic Coattention Network (DCN) attention is applied to compute the bi-directional attention: INLINEFORM5 and INLINEFORM6 , where INLINEFORM7 denotes article-to-template attention and INLINEFORM8 is template-to-article attention. Finally, we obtain the template-aware article representation INLINEFORM9 : DISPLAYFORM0 
+
+## BiSET
+
+Inspired by the research in machine reading comprehension BIBREF13 and selective mechanism BIBREF14 , we propose a novel Bi-directional Selective Encoding with Template (BiSET) model for abstractive sentence summarization. The core idea behind BiSET is to involve templates to assist with article representation and summary generation. As shown in Figure FIGREF17 , BiSET contains two selective gates: Template-to-Article (T2A) gate and Article-to-Template (A2T) gate. The role of T2A is to use a template to filter the source article representation: DISPLAYFORM0 
+
+where INLINEFORM0 is the concatenation of the last forward hidden state, INLINEFORM1 , and the first backward hidden state, INLINEFORM2 , of the template.
+
+On the other hand, the purpose of A2T is to control the proportion of INLINEFORM0 in the final article representation. We assume the source article is credible and use its representation INLINEFORM1 together with INLINEFORM2 to calculate a confidence degree, where INLINEFORM3 is obtained in a similar way as INLINEFORM4 . The confidence degree INLINEFORM5 is computed by: DISPLAYFORM0 
+
+The final source article representation is calculated as the weighted sum of INLINEFORM0 and INLINEFORM1 : DISPLAYFORM0 
+
+which allows a flexible manner for template incorporation and helps to resist errors when low-quality templates are given.
+
+The decoder layer. This layer includes an ordinary RNN decoder BIBREF15 . At each time step INLINEFORM0 , the decoder reads the word INLINEFORM1 and hidden state INLINEFORM2 generated in the previous step, and gives a new hidden state for the current step: DISPLAYFORM0 
+
+where the hidden state is initialized with the original source article representation, INLINEFORM0 . We then compute the attention between INLINEFORM1 and the final article representation INLINEFORM2 to obtain a context vector INLINEFORM3 : DISPLAYFORM0 
+
+After that, a simple concatenation layer is used to combine the hidden state INLINEFORM0 and the context vector INLINEFORM1 into a new hidden state INLINEFORM2 : DISPLAYFORM0 
+
+which will be mapped to a new representation of vocabulary size and fed through a softmax layer to output the target word distribution: DISPLAYFORM0 
+
+The overall performance of all the studied models is shown in Table TABREF46 . The results show that our model significantly outperforms all the baseline models and sets a new state of the art for abstractive sentence summarization. To evaluate the impact of templates on our model, we also implemented BiSET with two other types of templates: randomly-selected templates and best templates identified by Fast Rank under different ranges. As shown in Table TABREF47 , the performance of our model improves constantly with the improvement of template quality (larger ranges lead to better chances for good templates). Even with randomly-selected templates, our model still works with stable performance, demonstrating its robustness.
+
+## Training
+
+The Retrieve module involves an unsupervised process with traditional indexing and retrieval techniques. For Fast Rerank, since there is no ground truth available, we use ROUGE-1 BIBREF16 to evaluate the saliency of a candidate template with respect to the gold summary of current source article. Therefore, the loss function is defined as: DISPLAYFORM0 
+
+where INLINEFORM0 is a score predicted by Equation EQREF16 , and INLINEFORM1 is the product of the training set size, INLINEFORM2 , and the number of retrieved templates for each article.
+
+For the BiSET module, the loss function is chosen as the negative log-likelihood between the generated summary, INLINEFORM0 , and the true summary, INLINEFORM1 : DISPLAYFORM0 
+
+where INLINEFORM0 is the length of the true summary, INLINEFORM1 contains all the trainable variables, and INLINEFORM2 and INLINEFORM3 denote the source article and the template, respectively.
+
+## Experiments
+
+In this section, we introduce our evaluations on a standard dataset.
+
+## Dataset and Implementation
+
+The dataset used for evaluation is Annotated English Gigaword BIBREF17 , a parallel corpus formed by pairing the first sentence of an article with its headline. For a fair comparison, we use the version preprocessed by Rush2015A as previous work.
+
+During training, both the Fast Rerank and BiSET modules have a batch size of 64 with the Adam optimizer BIBREF18 . We also apply grad clipping BIBREF19 with a range of [-5,5]. The differences of the two modules in settings are listed below.
+
+Fast Rerank. We set the size of word embeddings to 300, the convolution encoder block number to 1, and the kernel size of CNN to 3. The weights are shared between the article and template encoders. The INLINEFORM0 of k-max pooling is set to 10. L2 weight decay with INLINEFORM1 is performed over all trainable variables. The initial learning rate is 0.001 and multiplied by 0.1 every 10K steps. Dropout between layers is applied.
+
+BiSET. A two-layer BiLSTM is used as the encoder, and another two-layer LSTM as the decoder. The sizes of word embeddings and LSTM hidden states are both set to 500. We only apply dropout in the LSTM stack with a rate of 0.3. The learning rate is set to 0.001 for the first 50K steps and halved every 10K steps. Beam search with size 5 is applied to search for optimal answers.
+
+## Evaluation Metrics
+
+Following previous work BIBREF2 , BIBREF14 , BIBREF11 , we use the standard F1 scores of ROUGE-1, ROUGE-2 and ROUGE-L BIBREF16 to evaluate the selected templates and generated summaries, where the official ROUGE script is applied. We employ the normalized discounted cumulative gain (NDCG) BIBREF20 from information retrieval to evaluate the Fast Rerank module.
+
+## Results and Analysis
+
+In this section, we report our experimental results with thorough analysis and discussions.
+
+## Performance of Retrieve
+
+The Retrieve module is intended to narrow down the search range for a best template. We evaluated this module by considering three types of templates: (a)
+
+Random means a randomly selected summary from the training corpus; (b)
+
+Retrieve-top is the highest-ranked summary by Retrieve; (c)
+
+N-Optimal means among the INLINEFORM0 top search results, the template is specified as the summary with largest ROUGE score with gold summary.
+
+As the results show in Table TABREF40 , randomly selected templates are totally irrelevant and unhelpful. When they are replaced by the Retrieve-top templates, the results improve apparently, demonstrating the relatedness of top-ranked summaries to gold summaries. Furthermore, when the N-Optimal templates are used, additional improvements can be observed as INLINEFORM0 grows. This trend is also confirmed by Figure FIGREF39 , in which the ROUGE scores increase before 30 and stabilize afterwards. These results suggest that the ranges given by Retrieve indeed help to find quality templates.
+
+## Interaction Approaches
+
+In Section SECREF20 , we also explored three alternative approaches to integrating an article with its template. The results are shown in Table TABREF44 , from which we can note that none of these approaches help yield satisfactory performance. Even though DCN Attention works impressively in machine reading comprehension, it performs even worse in this task than the simple concatenation. We conjecture the reason is that the DCN Attention attempts to fuse the template information into an article as in machine reading comprehension, rather than selects key information from the two to form an enhanced article representation.
+
+## Speed Comparison
+
+Our model is designed for both accuracy and efficiency. Due to the parallelizable nature of CNN, the Fast Rerank module only takes about 30 minutes for training and 3 seconds for inference on the whole test set. The BiSET model takes about 8 hours for training (GPU:GTX 1080), 6 times faster than INLINEFORM0 BIBREF11 .
+
+## Ablation Study
+
+The purpose of this study is to examine the roles of the bi-directional selective layer and its two gates. Firstly, we removed the selective layer and replaced it with the direct concatenation of an article with its template representation. As the results show in Table TABREF51 , the model performs even worse than some ordinary sequence-to-sequence models in Table TABREF46 . The reason might be that templates would overwhelm the original article representations and become noise after concatenation. Then, we removed the Template-to-Article (T2A) gate, and as a result the model shows a great decline in performance, indicating the importance of templates in article representations. Finally, when we removed the Article-to-Template (A2T) gate, whose role is to control the weight of T2A in article representations, only a small performance decline is observed. This may suggest that the T2A gate alone can already capture most of the important article information, while A2T plays some supplemental role.
+
+## Human Evaluation
+
+We then carried out a human evaluation to evaluate the generated summaries from another perspective. Our evaluators include 8 graduate students and 4 senior undergraduates, while the dataset is 100 randomly-selected articles from the test set. Each sample in this dataset also includes: 1 reference summary, 5 summaries generated by Open-NMT BIBREF21 , INLINEFORM0 BIBREF11 and BiSET under three settings, respectively, and 3 randomly-selected summaries for trapping. We asked the evaluators to independently rate each summary on a scale of 1 to 5, with respect to its quality in informativity, conciseness, and readability. While collecting the results, we rejected the samples in which more than half evaluators rate the informativity of the reference summary below 3. We also rejected the samples in which the informativity of a randomly-selected summary is scored higher than 3. Finally, we obtained 43 remaining samples and calculated an average score for each aspect. As the results show in Table TABREF55 , our model not only performs much better than the baselines, it also shows quite comparable performance with the reference summaries.
+
+In Table TABREF56 we present two real examples, which show the templates found by our model are indeed related to the source articles, and with their aid, our model succeeds to keep the main content of the source articles for summarization while discarding unrelated words like `US' and `Olympic Games'.
+
+## Related Work
+
+Abstractive sentence summarization, a task analogous to headline generation or sentence compression, aims to generate a brief summary given a short source article. Early studies in this problem mainly focus on statistical or linguistic-rule-based methods, including those based on extractive and compression BIBREF23 , BIBREF24 , BIBREF25 , templates BIBREF6 and statistical machine translation BIBREF26 .
+
+The advent of large-scale summarization corpora accelerates the development of various neural network methods. Rush2015A first applied an attention-based sequence-to-sequence model for abstractive summarization, which includes a convolutional neural network (CNN) encoder and a feed-forward network decoder. Chopra2016Abstractive replaced the decoder with a recurrent neural network (RNN). Nallapati2016Abstractive further changed the sequence-to-sequence model to a fully RNN-based model. Besides, Gu2016Incorporating found that this task benefits from copying words from the source articles and proposed the CopyNet correspondingly. With a similar purpose, Gulcehre2016Pointing proposed to use a switch gate to control when to copy from the source article and when to generate from the vocabulary. Zhou2017Selective employed a selective gate to filter out unimportant information when encoding.
+
+Some other work attempts to incorporate external knowledge for abstractive summarization. For example, Nallapati2016Abstractive proposed to enrich their encoder with handcrafted features such as named entities and part-of-speech (POS) tags. guu2018generating also attempted to encode human-written sentences to improve neural text generation. Similar to our work, cao2018retrieve proposed to retrieve a related summary from the training set as soft template to assist with the summarization. However, their approach tends to oversimplify the role of the template, by directly concatenating a template after the source article encoding. In contrast, our bi-directional selective mechanism exhibits a novel attempt to selecting key information from the article and the template in a mutual manner, offering greater flexibility in using the template.
+
+## Conclusion
+
+In this paper, we presented a novel Bi-directional Selective Encoding with Template (BiSET) model for abstractive sentence summarization. To counteract the verbosity and insufficiency of training data, we proposed to retrieve high-quality existing summaries as templates to assist with source article representations through an ingenious bi-directional selective layer. The enhanced article representations are expected to contribute towards better summarization eventually. We also developed the corresponding retrieval and re-ranking modules for obtaining quality templates. Extensive evaluations were conducted on a standard benchmark dataset and experimental results show that our model can quickly pick out high-quality templates from the training corpus, laying key foundation for effective article representations and summary generations. The results also show that our model outperforms all the baseline models and sets a new state of the art. An ablation study validates the role of the bi-directional selective layer, and a human evaluation further proves that our model can generate informative, concise, and readable summaries.
+
+## Acknowledgement
+
+The paper was partially supported by the Program for Guangdong Introducing Innovative and Enterpreneurial Teams (No.2017ZT07X355) and the Key R INLINEFORM0 D Program of Guangdong Province (2019B010120001).

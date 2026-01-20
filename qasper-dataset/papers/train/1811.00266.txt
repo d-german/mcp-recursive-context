@@ -1,0 +1,81 @@
+# Learning to Describe Phrases with Local and Global Contexts
+
+**Paper ID:** 1811.00266
+
+## Abstract
+
+When reading a text, it is common to become stuck on unfamiliar words and phrases, such as polysemous words with novel senses, rarely used idioms, Internet slang, or emerging entities. At first, we attempt to figure out the meaning of those expressions from their context, and ultimately we may consult a dictionary for their definitions. However, rarely-used senses or emerging entities are not always covered by the hand-crafted definitions in existing dictionaries, which can cause problems in text comprehension. This paper undertakes a task of describing (or defining) a given expression (word or phrase) based on its usage contexts, and presents a novel neural-network generator for expressing its meaning as a natural language description. Experimental results on four datasets (including WordNet, Oxford and Urban Dictionaries, non-standard English, and Wikipedia) demonstrate the effectiveness of our method over previous methods for definition generation[Noraset+17; Gadetsky+18; Ni+17].
+
+## Introduction
+
+When we read news text with emerging entities, text in unfamiliar domains, or text in foreign languages, we often encounter expressions (words or phrases) whose senses we are unsure of. In such cases, we may first try to examine other usages of the same expression in the text, in order to infer its meaning from this context. Failing to do so, we may consult a dictionary, and in the case of polysemous words, choose an appropriate meaning based on the context. Acquiring novel word senses via dictionary definitions is known to be more effective than contextual guessing BIBREF3 , BIBREF4 . However, very often, hand-crafted dictionaries do not contain definitions for rare or novel phrases/words, and we eventually give up on understanding them completely, leaving us with only a shallow reading of the text.
+
+There are several natural language processing (nlp) tasks that can roughly address this problem of unfamiliar word senses, all of which are incomplete in some way. Word sense disambiguation (wsd) can basically only handle words (or senses) that are registered in a dictionary a priori. Paraphrasing can suggest other ways of describing a word while keeping its meaning, but those paraphrases are generally context-insensitive and may not be sufficient for understanding.
+
+To address this problem, BIBREF2 has proposed a task of describing a phrase in a given context. However, they follow the strict assumption that the target phrase is unknown and there is only a single local context available for the phrase, which makes the task of generating an accurate and coherent definition difficult (perhaps as difficult as a human comprehending the phrase itself). On the other hand, BIBREF0 attempted to generate a definition of a word from its word embedding induced from massive text, followed by BIBREF1 that refers to a local context to define a polysemous word with a local context by choosing relevant dimensions of their embeddings. Although these research efforts revealed that both local and global contexts of words are useful in generating their definitions, none of these studies exploited both local and global contexts directly.
+
+In this study, we tackle a task of describing (defining) a phrase when given its local context as BIBREF2 , while allowing access to other usage examples via word embeddings trained from massive text (global contexts) BIBREF0 , BIBREF1 . We present LOG-Cad, a neural network-based description generator (Figure FIGREF1 ) to directly solve this task. Given a word with its context, our generator takes advantage of the target word's embedding, pre-trained from massive text (global contexts), while also encoding the given local context, combining both to generate a natural language description. The local and global contexts complement one another and are both essential; global contexts are crucial when local contexts are short and vague, while the local context is crucial when the target phrase is polysemous, rare, or unseen.
+
+Considering various contexts where we need definitions of phrases, we evaluated our method with four datasets including WordNet BIBREF0 for general words, the Oxford dictionary BIBREF1 for polysemous words, Urban Dictionary BIBREF2 for rare idioms or slangs, and a newly-created Wikipedia dataset for entities. Experimental results demonstrate the effectiveness of our method against the three baselines stated above BIBREF0 , BIBREF2 , BIBREF1 .
+
+Our contributions are as follows:
+
+## Context-aware Description Generation
+
+In what follows, we define our task of describing a phrase or word in a specific context. Given expression INLINEFORM0 with its context INLINEFORM1 , our task is to output a description INLINEFORM2 . Here, INLINEFORM3 can be a single word or a short phrase and is included in INLINEFORM4 . INLINEFORM5 is a definition-like concrete and concise phrase/sentence that describes the expression INLINEFORM6 .
+
+For example, given a phrase “sonic boom” with its context “the shock wave may be caused by sonic boom or by explosion,” the task is to generate a description such as “sound created by an object moving fast.” If the given context has been changed to “this is the first official tour to support the band's latest studio effort, 2009's Sonic Boom,” then the appropriate output would be “album by Kiss.”
+
+The process of description generation can be modeled with a conditional language model as DISPLAYFORM0 
+
+## LOG-CaD: Local & Global Context-aware Description Generator
+
+We propose LOG-CaD, a neural model that generates the description of a given phrase or word by using its local and global contexts. In the rest of this section, we first describe our idea of utilizing local and global contexts in the description generation task, then present the details of our model.
+
+## Wikipedia dataset
+
+One of our goals is to describe infrequent/rare words and phrases such as proper nouns in a variety of domains depending on their surrounding context. However, among the three existing datasets, WordNet and Oxford dictionary mainly target the descriptions of relatively common words, and thus are non-ideal test beds for this goal. On the other hand, although the Urban Dictionary dataset contains descriptions of rarely-used phrases as well, the domain of its targeted words and phrases is limited to Internet slang.
+
+Therefore, in order to confirm that our model can generate the description of rarely-used phrases as well as words, we constructed a new dataset for context-aware phrase description generation from Wikipedia and Wikidata which contain a wide variety of entity descriptions with contexts. Table TABREF14 and Table TABREF15 show the properties and statistics of the new dataset and the three existing datasets, respectively.
+
+The overview of the data extraction process is shown in Figure FIGREF18 . Similarly to the WordNet dataset, each entry in the dataset consists of (1) a phrase, (2) its description, and (3) context (a sentence). For preprocessing, we applied Stanford Tokenizer to the descriptions of Wikidata items and the articles in Wikipedia. Next, we removed phrases in parentheses from the Wikipedia articles, since they tend to be paraphrasing in other languages and work as noise. To obtain the contexts of each item in Wikidata, we extracted the sentence which has a link referring to the item through all the first paragraphs of Wikipedia articles and replaced the phrase of the links with a special token [TRG]. Wikidata items with no description or no contexts are ignored. This utilization of links makes it possible to resolve the ambiguity of words and phrases in a sentence without human annotations, which is one of the major advantages of using Wikipedia. Note that we used only links whose anchor texts are identical to the title of the Wikipedia articles, since the users of Wikipedia sometimes link mentions to related articles.
+
+## Experiments
+
+We evaluate our method by applying it to describe words in WordNet BIBREF13 and Oxford Dictionary, phrases in Urban Dictionary and Wikidata. For all of these datasets, a given word or phrase has an inventory of senses with corresponding definitions and usage examples. These definitions are regarded as ground-truth descriptions.
+
+## Discussion
+
+In this section, we present some analyses on how the local and global contexts contribute to the description generation task. First, we discuss how the local context helps the models to describe a phrase. Then, we analyze the impact of global context under the situation where local context is unreliable.
+
+## How do the models utilize local contexts?
+
+Local context helps us (1) disambiguate polysemous words and (2) infer the meanings of unknown expressions. In this section, we will discuss the two roles of local context.
+
+Considering that the pre-trained word embeddings are obtained from word-level co-occurrences in a massive text, more information is mixed up into a single vector as the more senses the word has. While BIBREF1 gadetsky2018conditional designed the I-Attention model to filter out unrelated meanings in the global context given local context, they did not discuss the impact the number of senses has on the performance of definition generation. To understand the influence of the ambiguity of phrases to be defined on the generation performance, we did an analysis on our Wikipedia dataset. Figure FIGREF37 (a) shows that the description generation task becomes harder as the phrases to be described become more ambiguous. In particular, when a phrase has an extremely large number of senses, (i.e., #senses INLINEFORM0 ), the Global model drops its performance significantly. This result indicates that the local context is necessary to disambiguate the meanings in global context.
+
+As shown in Table TABREF15 , a large proportion of the phrases in our Wikipedia dataset includes unknown words (i.e., only INLINEFORM0 of words have their pre-trained embeddings). This fact indicates that the global context in the dataset is extremely noisy. Then our next question is, how does the lack of information from global context affect the performance of phrase description? Figure FIGREF37 (b) shows the impact of unknown words in the phrases to be described on the performance. As we can see from the result, the advantage of LOG-CaD and Local models over Global and I-Attention models becomes larger as the unknown words increases. This result suggests that we need to fully utilize local contexts especially in practical applications where the phrases to be defined have many unknown words.
+
+## How do the models utilize global contexts?
+
+As discussed earlier, local contexts are important to describe expressions, but how about global contexts? Assuming a situation where we cannot obtain much information from local contexts (e.g., infer the meaning of “boswellia” from a short local context “Here is a boswellia”), global contexts should be essential to understand the meaning. To confirm this hypothesis, we analyzed the impact of the length of local contexts on bleu scores. Figure FIGREF37 (c) shows that when the length of local context is extremely short ( INLINEFORM0 ), the LOG-CaD model becomes much stronger than the Local model. This result indicates that not only local context but also global context help models describe the meanings of phrases.
+
+## Related Work
+
+In this study, we address a task of describing a given phrase/word with its context. In what follows, we explain several tasks that are related to our task.
+
+Our task is closely related to word sense disambiguation (wsd) BIBREF7 , which identifies a pre-defined sense for the target word with its context. Although we can use it to solve our task by retrieving the definition sentence for the sense identified by wsd, it requires a substantial amount of training data to handle a different set of meanings of each word, and cannot handle words (or senses) which are not registered in the dictionary. Although some studies have attempted to detect novel senses of words for given contexts BIBREF8 , BIBREF9 , they do not provide definition sentences. Our task avoids these difficulties in wsd by directly generating descriptions for phrases or words with their contexts. It also allows us to flexibly tailor a fine-grained definition for the specific context.
+
+Paraphrasing BIBREF14 , BIBREF15 (or text simplification BIBREF16 ) can be used to rephrase words with unknown senses. However, the target of paraphrase acquisition are words (or phrases) with no specified context. Although several studies BIBREF17 , BIBREF18 , BIBREF19 consider sub-sentential (context-sensitive) paraphrases, they do not intend to obtain a definition-like description as a paraphrase of a word.
+
+Recently, BIBREF0 noraset2017definition introduced a task of generating a definition sentence of a word from its pre-trained embedding. Since their task does not take local contexts of words as inputs, their method cannot generate an appropriate definition for a polysemous word for a specific context. To cope with this problem, BIBREF1 gadetsky2018conditional have proposed a definition generation method that works with polysemous words in dictionaries. They present a model that utilizes local context to filter out the unrelated meanings from a pre-trained word embedding in a specific context. While their method use local context only for disambiguating the meanings that are mixed up in word embeddings, the information from local contexts cannot be utilized if the pre-trained embeddings are unavailable or unreliable. On the other hand, our method can fully utilize the local context through an attentional mechanism, even if the reliable word embeddings are unavailable.
+
+Focusing on non-standard English words (or phrases), BIBREF2 ni2017learning generated their explanations solely from sentences with those words. Their model does not take advantage of global contexts (word embeddings induced from massive text) as was used in BIBREF0 noraset2017definition.
+
+Our task of describing phrases with its given context is a generalization of these three tasks BIBREF0 , BIBREF2 , BIBREF1 , and the proposed method naturally utilizes both local and global contexts of a word in question.
+
+## Conclusions
+
+This paper sets up a task of generating a natural language description for a word/phrase with a specific context, aiming to help us acquire unknown word senses when reading text. We approached this task by using a variant of encoder-decoder models that capture the given local context by an encoder and global contexts by the target word's embedding induced from massive text. Experimental results on three existing datasets and one novel dataset built from Wikipedia dataset confirmed that the use of both local and global contexts is the key to generating appropriate context-sensitive description in various situations.
+
+We plan to modify our model to use multiple contexts in text to improve the quality of descriptions, considering the “one sense per discourse” hypothesis BIBREF20 .
